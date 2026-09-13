@@ -291,10 +291,14 @@ fs.writeFileSync(flagManifest, JSON.stringify({
   pageTarget: "MenuFlagsPage",
   pageLangName: "",
   layoutStatus: "complete",
-  layoutEvidence: { matchedBottomBarItems: 2, unresolvedBottomBarItems: 0 },
+  layoutEvidence: { matchedBottomBarItems: 4, unresolvedBottomBarItems: 0 },
   menuItems: [
     { name: "报警", icon: "", index: 1, isNeedRedMark: true, isShowStatus: true },
-    { name: "普通", icon: "", index: 2, isNeedRedMark: false }
+    { name: "普通", icon: "", index: 2, isNeedRedMark: false },
+    // 空串一律不发射（不得写 IsShowStatus=""）
+    { name: "空串", icon: "", index: 3, isShowStatus: "", isNeedRedMark: "   " },
+    // 常驻字段取到布尔 false 也必须发射，不能被布尔过滤吃掉
+    { name: "恒写false", icon: "", index: 4, ioVisible: false }
   ]
 }, null, 2), "utf8");
 result = spawnSync(process.execPath, [script, "--manifest", flagManifest], { encoding: "utf8" });
@@ -305,6 +309,23 @@ assert.match(text, /Name="报警"[\s\S]*?IsShowStatus="true" IsNeedRedMark="true
 assert.match(text, /Name="普通"[^>]*\/>/, "第二个菜单项必须存在");
 assert.ok(!/Name="普通"[^>]*IsShowStatus=/.test(text), "缺省时不得发射 IsShowStatus");
 assert.ok(!/Name="普通"[^>]*IsNeedRedMark=/.test(text), "false 时不得发射 IsNeedRedMark");
+assert.ok(!/Name="空串"[^>]*IsShowStatus=/.test(text), "空串不得发射 IsShowStatus");
+assert.ok(!/Name="空串"[^>]*IsNeedRedMark=/.test(text), "纯空白串不得发射 IsNeedRedMark");
+assert.match(text, /Name="恒写false"[\s\S]*?IOVisible="false"/,
+  "恒写字段取到布尔 false 时仍必须发射（布尔过滤只能作用于设计稿标记）");
+
+// 属性名真值源：用真实模板表运行时，标记属性名必须取自 layoutRules.bottomBar.menuItemFlags.*.attr
+const realMapForFlags = path.resolve(__dirname, "..", "references", "adapters", "mtslg-iocontrol", "mtslg-iocontrol-map.json");
+const mapFlagLayout = path.join(root, "MenuFlagsFromMapLayout.xml");
+const mapFlagManifest = path.join(root, "menu-flags-from-map.json");
+const mapFlagSource = JSON.parse(fs.readFileSync(flagManifest, "utf8"));
+mapFlagSource.layoutPath = mapFlagLayout;
+fs.writeFileSync(mapFlagManifest, JSON.stringify(mapFlagSource, null, 2), "utf8");
+result = spawnSync(process.execPath, [script, "--manifest", mapFlagManifest, "--map", realMapForFlags], { encoding: "utf8" });
+assert.strictEqual(result.status, 0, result.stderr);
+text = fs.readFileSync(mapFlagLayout, "utf8");
+assert.match(text, /IsShowStatus="true" IsNeedRedMark="true"/,
+  "标记属性名必须与模板表 menuItemFlags 登记一致");
 
 // 真值源回归锁：模板表（mtslg-iocontrol-map.json）与脚本内置默认必须一致，
 // 且右栏“父节点语义（parentVariants）”建模必须保持作废状态。

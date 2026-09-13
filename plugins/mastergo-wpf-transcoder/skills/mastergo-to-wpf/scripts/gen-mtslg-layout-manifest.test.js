@@ -156,8 +156,16 @@ function flagText(value, id, color) {
   if (color) node._color = color;
   return node;
 }
-function flagButton(id, x, label, color, withStatusBox) {
+function flagButton(id, x, label, color, withStatusBox, withSmallIcon) {
   const children = [flagText(label, id + "/label", color)];
+  // 左上角的小图标（INSTANCE + PATH）：不得被误判成状态方框。
+  if (withSmallIcon) {
+    children.push({
+      type: "INSTANCE", id: id + "/icon", name: "icon",
+      layoutStyle: { width: 20, height: 20, relativeX: 8, relativeY: 8 },
+      children: [{ type: "PATH", id: id + "/icon/path", name: "路径", layoutStyle: { width: 20, height: 20, relativeX: 0, relativeY: 0 }, path: [{ fill: "paint_1", data: "M0,0L20,0L20,20Z" }] }]
+    });
+  }
   if (withStatusBox) {
     children.push({
       type: "GROUP", id: id + "/status", name: "组 2492",
@@ -184,7 +192,8 @@ const flagDsl = {
           { type: "INSTANCE", id: "42:9/bar/resident", name: "右侧底部-常驻button", layoutStyle: { width: 200, height: 200, relativeX: 1000, relativeY: 0 }, children: [] },
           flagButton("42:9/bar/1", 28, "报警", "#F8274B", false),
           flagButton("42:9/bar/2", 236, "普通", "#000000", false),
-          flagButton("42:9/bar/3", 444, "开关", "#000000", true)
+          flagButton("42:9/bar/3", 444, "开关", "#000000", true),
+          flagButton("42:9/bar/4", 652, "小图标", "#000000", false, true)
         ]
       }]
     }],
@@ -213,5 +222,7 @@ assert.strictEqual(byName.get("普通").isNeedRedMark, undefined, "非红字不�
 // 左上角状态方框 → IsShowStatus=true；没有方框的不写该字段
 assert.strictEqual(byName.get("开关").isShowStatus, true, "左上角有状态方框必须推导出 IsShowStatus");
 assert.strictEqual(byName.get("普通").isShowStatus, undefined, "没有状态方框不得写 IsShowStatus");
+assert.strictEqual(byName.get("小图标").isShowStatus, undefined,
+  "左上角的小图标（INSTANCE + PATH）不得被误判成状态方框");
 
 console.log("PASS MTSLG Layout manifest derivation regression test");

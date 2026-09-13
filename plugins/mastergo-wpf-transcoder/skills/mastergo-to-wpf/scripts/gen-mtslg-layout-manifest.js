@@ -54,6 +54,12 @@ const STATUS_MIN_SIZE = Number.isFinite(Number(statusSpec.minSize)) ? Number(sta
 const STATUS_MAX_SIZE = Number.isFinite(Number(statusSpec.maxSize)) ? Number(statusSpec.maxSize) : 32;
 const STATUS_MAX_OFFSET_X = Number.isFinite(Number(statusSpec.maxOffsetX)) ? Number(statusSpec.maxOffsetX) : 20;
 const STATUS_MAX_OFFSET_Y = Number.isFinite(Number(statusSpec.maxOffsetY)) ? Number(statusSpec.maxOffsetY) : 20;
+// 状态方框只可能是 GROUP / LAYER（实测：状态方框 = GROUP 组 2492 + 两个 LAYER 矩形；
+// 图标 = INSTANCE + PATH，F 键提示 = TEXT），因此按节点类型排除即可区分。
+const STATUS_NODE_TYPES = Array.isArray(statusSpec.nodeTypes) && statusSpec.nodeTypes.length
+  ? new Set(statusSpec.nodeTypes.map(String))
+  : new Set(["GROUP", "LAYER"]);
+const STATUS_EXCLUDE_ICON = statusSpec.excludeIconSubtree === undefined ? true : Boolean(statusSpec.excludeIconSubtree);
 
 const root = dslSnapshot.dsl && Array.isArray(dslSnapshot.dsl.nodes) ? dslSnapshot.dsl.nodes[0] : null;
 if (!root) fail("DSL 快照缺少 dsl.nodes[0]");
@@ -117,19 +123,32 @@ function isRedColor(value) {
   return r >= RED_MIN_RED && g <= RED_MAX_GREEN_BLUE && b <= RED_MAX_GREEN_BLUE;
 }
 
-// 菜单项左上角的状态方框：非 TEXT 节点、宽高在阈值内、相对菜单项左上角偏移在阈值内。
+// 菜单项左上角的状态方框：宽高在阈值内、相对菜单项左上角偏移在阈值内。
+// 必须排除 TEXT 文本、PATH 图形以及图标子树（否则左上角的小图标会被误判成状态方框）。
 function hasStatusBox(node) {
+  const excluded = new Set();
+  if (STATUS_EXCLUDE_ICON) {
+    const iconEntry = iconEntryOf(node);
+    const iconNode = iconEntry ? nodeById.get(iconEntry.sourceRef || iconEntry.sourceId) : null;
+    if (iconNode) {
+      (function mark(current) {
+        excluded.add(current.id);
+        for (const child of current.children || []) mark(child);
+      })(iconNode);
+    }
+  }
   let found = false;
   (function walk(current, absX, absY) {
     if (found) return;
     for (const child of current.children || []) {
+      if (excluded.has(child.id)) continue;
       const ls = child.layoutStyle || {};
       const x = absX + (Number(ls.relativeX) || 0);
       const y = absY + (Number(ls.relativeY) || 0);
       const w = Number(ls.width) || 0;
       const h = Number(ls.height) || 0;
-      const isText = child.type === "TEXT" || Array.isArray(child.text);
-      if (!isText && w >= STATUS_MIN_SIZE && w <= STATUS_MAX_SIZE &&
+      const isCandidateType = STATUS_NODE_TYPES.has(String(child.type || ""));
+      if (isCandidateType && w >= STATUS_MIN_SIZE && w <= STATUS_MAX_SIZE &&
           h >= STATUS_MIN_SIZE && h <= STATUS_MAX_SIZE &&
           x <= STATUS_MAX_OFFSET_X && y <= STATUS_MAX_OFFSET_Y) {
         found = true;

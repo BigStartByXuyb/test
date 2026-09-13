@@ -41,9 +41,9 @@
 **MenuItem 设计稿标记（命中才写，不是常驻字段）**：
 
 1. **红字文案 → `IsNeedRedMark="true"`**：菜单项文案 TEXT 的颜色属于红色系（实测设计稿取值 `#F8274B`；判定 R≥180 且 G≤100 且 B≤100，颜色取 TEXT 的 `_color`，取不到时回退 `fill` → styles 的值）。
-2. **左上角状态方框 → `IsShowStatus="true"`**：菜单项组件内存在左上角小方框（非 TEXT 节点、宽高 8–32px、相对菜单项左上角 x≤20 且 y≤20；实测「首页-长方形」变体的 `组 2492` 18×18@8,8，对应公开属性 `显示开关`）。
+2. **左上角状态方框 → `IsShowStatus="true"`**：菜单项组件内存在左上角小方框——节点类型必须在 `GROUP` / `LAYER` 内（实测状态方框是 `GROUP` 组 2492 + 两个 `LAYER` 矩形；图标是 `INSTANCE` + `PATH`、F 键提示是 `TEXT`，因此按类型即可区分，左上角的小图标不会被误判），宽高 8–32px、相对菜单项左上角 x≤20 且 y≤20，并额外排除图标映射命中的几何子树；实测「首页-长方形」的 `组 2492` 18×18@8,8，对应公开属性 `显示开关`。
 
-两者都是**命中才发射**：未命中时**不写**该属性（不得写空串、不得写 `false`）。判定参数的真值源是 `mtslg-iocontrol-map.json` 的 `layoutRules.bottomBar.menuItemFlags`；推导由 `gen-mtslg-layout-manifest.js` 完成（写进 `menuItems.isNeedRedMark` / `menuItems.isShowStatus`），发射由 `gen-mtslg-layout.js` 完成。
+两者都是**命中才发射**：未命中时**不写**该属性（`false`、空串、纯空白串都不发射）。判定参数的真值源是 `mtslg-iocontrol-map.json` 的 `layoutRules.bottomBar.menuItemFlags`——属性名（`attr`）、节点类型（`nodeTypes`）、数值阈值（`minRed` / `maxGreenBlue` / `minSize` / `maxSize` / `maxOffsetX` / `maxOffsetY`）与 `excludeIconSubtree` 都由脚本直接读取，改表即改产物。推导由 `gen-mtslg-layout-manifest.js` 完成（写进 `menuItems.isNeedRedMark` / `menuItems.isShowStatus`），发射由 `gen-mtslg-layout.js` 完成；该布尔过滤只作用于这两个标记字段，**不得影响 `IO*` 等恒写字段**（恒写字段即使取到布尔 `false` 也必须发射）。
 
 ## Layout 清单（menuItems）的机械推导
 
@@ -70,7 +70,7 @@
 <MenuItem Name="{text}" Icon="{icon}" Index="{index}"/>
 ```
 
-文本槽位写入 Name；固定模板声明的多语言键缺失时写入 `LangName=""`。图标槽位存在且已在当前页面的 Icon 文件中确认时才写入 Icon；图标槽位存在但资源名待配置时写入 `Icon=""` 并在 mapping 标记待配置。开关状态用于该实例的视觉状态核对，不生成未定义的 Layout 属性；本变体没有键盘提示槽位，不生成 TopLeftContent。
+文本槽位写入 Name；固定模板声明的多语言键缺失时写入 `LangName=""`。图标槽位存在且已在当前页面的 Icon 文件中确认时才写入 Icon；图标槽位存在但资源名待配置时写入 `Icon=""` 并在 mapping 标记待配置。开关状态槽位（左上角方框 `组 2492`，对应公开属性 `显示开关`）：方框存在时按「MenuItem 设计稿标记」写入 `IsShowStatus="true"`，方框不存在时**不发射**该属性；本变体没有键盘提示槽位，不生成 TopLeftContent。
 
 ### 属性 1：非首页-长方形
 

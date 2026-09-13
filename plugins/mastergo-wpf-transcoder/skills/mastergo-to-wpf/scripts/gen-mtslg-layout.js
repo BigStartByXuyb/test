@@ -28,6 +28,36 @@ const ATTR_FIELDS = [
 const DEFAULT_MENU_ITEM_ALWAYS_ATTRS = ["LangName", "PageName", "IOCommand", "IOVisible", "IOEnable"];
 let MENU_ITEM_ALWAYS_ATTRS = DEFAULT_MENU_ITEM_ALWAYS_ATTRS;
 
+// 设计稿标记的属性名真值来源：模板表 layoutRules.bottomBar.menuItemFlags.*.attr。
+// 这两个字段是“命中才写”，未命中不发射（不是常驻字段），因此不进入 MENU_ITEM_ALWAYS_ATTRS。
+const DEFAULT_MENU_ITEM_FLAG_ATTRS = { statusBox: "IsShowStatus", redText: "IsNeedRedMark" };
+const MENU_ITEM_FLAG_FIELDS = new Set(["isShowStatus", "isNeedRedMark"]);
+let MENU_ITEM_FLAG_ATTRS = DEFAULT_MENU_ITEM_FLAG_ATTRS;
+
+function loadMenuItemFlagAttrs(mapPath) {
+  if (!mapPath) return DEFAULT_MENU_ITEM_FLAG_ATTRS;
+  let templateMap;
+  try { templateMap = JSON.parse(fs.readFileSync(mapPath, "utf8")); }
+  catch (error) { fail("读取模板表失败: " + mapPath + " - " + error.message); }
+  const flags = templateMap.layoutRules && templateMap.layoutRules.bottomBar
+    ? templateMap.layoutRules.bottomBar.menuItemFlags : null;
+  if (!flags) return DEFAULT_MENU_ITEM_FLAG_ATTRS;
+  const statusBox = flags.statusBox && typeof flags.statusBox.attr === "string" && flags.statusBox.attr.trim()
+    ? flags.statusBox.attr.trim() : DEFAULT_MENU_ITEM_FLAG_ATTRS.statusBox;
+  const redText = flags.redText && typeof flags.redText.attr === "string" && flags.redText.attr.trim()
+    ? flags.redText.attr.trim() : DEFAULT_MENU_ITEM_FLAG_ATTRS.redText;
+  return { statusBox: statusBox, redText: redText };
+}
+
+// 把表里登记的属性名套用到发射顺序表上（改表即改产物，不在脚本里另存一份名字）。
+function applyMenuItemFlagAttrs(flagAttrs) {
+  MENU_ITEM_FLAG_ATTRS = flagAttrs;
+  ATTR_FIELDS.forEach(function (pair) {
+    if (pair[1] === "isShowStatus") pair[0] = flagAttrs.statusBox;
+    if (pair[1] === "isNeedRedMark") pair[0] = flagAttrs.redText;
+  });
+}
+
 function loadMenuAlwaysAttrs(mapPath) {
   if (!mapPath) return DEFAULT_MENU_ITEM_ALWAYS_ATTRS;
   let templateMap;
@@ -67,8 +97,15 @@ function xmlAttr(value) {
 
 function attrEntries(item) {
   return ATTR_FIELDS.filter(function (pair) {
-    // 布尔标记只在 true 时发射；false / 空值不写这个属性。
-    return item[pair[1]] !== undefined && item[pair[1]] !== null && item[pair[1]] !== false;
+    const value = item[pair[1]];
+    if (value === undefined || value === null) return false;
+    // 设计稿标记只在 true 时发射：false / 空串一律不写这个属性。
+    // 该过滤只作用于这两个标记字段，不得影响 IO* 等“恒写”字段（它们即使取到布尔 false 也必须发射）。
+    if (MENU_ITEM_FLAG_FIELDS.has(pair[1])) {
+      if (value === false) return false;
+      if (typeof value === "string" && !value.trim()) return false;
+    }
+    return true;
   }).map(function (pair) {
     return [pair[0], item[pair[1]]];
   });
@@ -285,6 +322,8 @@ function main() {
   const args = parseArgs(process.argv.slice(2));
   const manifest = JSON.parse(fs.readFileSync(path.resolve(args.manifestPath), "utf8"));
   if (args.mapPath) MENU_ITEM_ALWAYS_ATTRS = loadMenuAlwaysAttrs(args.mapPath);
+  // 即使不传 --map 也要把默认属性名套用一次，保证 ATTR_FIELDS 与 MENU_ITEM_FLAG_ATTRS 一致。
+  applyMenuItemFlagAttrs(args.mapPath ? loadMenuItemFlagAttrs(args.mapPath) : DEFAULT_MENU_ITEM_FLAG_ATTRS);
   if (typeof manifest.layoutPath !== "string" || !manifest.layoutPath.trim()) {
     fail("layoutPath 必须提供");
   }
