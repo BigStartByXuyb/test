@@ -105,7 +105,7 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 
 ## 页面 Icon 文件（当前 MTSLG 路线）
 
-每个页面使用自己的 Icon 文件，文件名固定由页面 `name` 派生为 `Resources/Pages/{name}/{name}Icons.xaml`，与页面 XML 同处该页专属目录；View 只能引用本页面的该文件。新页面不得复用或覆盖其他页面的 Icon 文件。`gen-mtslg-page-icons.js` 只负责创建当前页面的新 ResourceDictionary，目标文件已存在时失败，不执行 Icon 合并。
+每个页面使用自己的 Icon 文件，文件名固定由页面 `name` 派生为 `Resources/Pages/{name}/{name}Icons.xaml`，与页面 XML 同处该页专属目录。新页面不得复用或覆盖其他页面的 Icon 文件。`gen-mtslg-page-icons.js` 只负责创建当前页面的新 ResourceDictionary，目标文件已存在时失败，不执行 Icon 合并。**生成的 View（`<Page>View.xaml`）不合并本页 Icon 资源字典**：宿主壳只输出 `UserControl` 头 + `PageDesign`，不写 `<UserControl.Resources><ResourceDictionary Source="…/<页面名>Icons.xaml" /></UserControl.Resources>`；页面 Icon 文件仍照常生成并按 Icon Page 注册进 `.csproj`，Icon 键在运行时的解析由目标宿主负责。
 
 `extractSvg` 只返回 PATH 自身的 `d` + `transform`，**几何完全相同的复用实例会被去重**（典型场景：同一个方向图标被旋转/翻转复用，例如「向上/向下」只差组级 `flipV`、「向左/向右」只差组级 `rotate`），因此某些方向按钮拿不到条目，页面就会出现「有图标槽位但无 Icon」的节点。补救方式：给 `gen-mtslg-page-icons.js` 传入第 4 个参数（DSL 快照路径 `dsl.snapshot.json`），并在页面图标映射里把这类条目写成 `"fromDsl": true`：
 

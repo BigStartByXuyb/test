@@ -738,10 +738,8 @@ function validateBundleOutputs(info) {
   if (!/<UserControl\b/.test(view) || !/<uidesign:PageDesign\b/.test(view)) {
     fail("View XAML 缺少 MaxWell PageDesign 宿主: " + info.hostPaths[0]);
   }
-  const ownIconPath = projectRelative(info.projectRoot, info.iconPath).replace(/\\/g, "/");
-  if (view.indexOf(ownIconPath) < 0) {
-    fail("View XAML 未引用当前页面自己的 Icon 文件: " + ownIconPath);
-  }
+  // View 不再合并页面 Icon 资源字典（宿主壳只输出 UserControl 头 + PageDesign）；
+  // 页面 Icon 文件本身仍要求存在并在 .csproj 注册，因此这里不再校验 View 里的引用。
   requireFile(info.hostPaths[1], "View.xaml.cs");
   requireFile(info.hostPaths[2], "ViewModel");
   if (info.scaffold) {

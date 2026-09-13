@@ -44,7 +44,10 @@ assert.ok(fs.existsSync(viewModelPath));
 
 const view = fs.readFileSync(viewPath, 'utf8');
 assert.match(view, /x:Class="Demo\.Pages\.F2_Teach\.View\.F2NewOperationView"/);
-assert.match(view, /Resources\/Pages\/F2NewOperation\/F2NewOperationIcons\.xaml/);
+// View 不合并页面 Icon 资源字典：宿主壳只输出 UserControl 头 + PageDesign。
+assert.ok(!/UserControl\.Resources/.test(view), "View 不得生成 <UserControl.Resources>");
+assert.ok(!/F2NewOperationIcons\.xaml/.test(view), "View 不得引用页面 Icon 文件");
+assert.ok(!/ResourceDictionary\s+Source=/.test(view), "View 不得合并页面级资源字典");
 assert.match(view, /XmlPagePath="F2NewOperationPage"/);
 assert.match(fs.readFileSync(codeBehindPath, 'utf8'), /partial class F2NewOperationView : UserControl/);
 assert.match(fs.readFileSync(viewModelPath, 'utf8'), /class F2NewOperationViewModel : IOScreen, IPage/);

@@ -247,12 +247,9 @@ function renderView(config) {
     "    d:DesignHeight=\"" + xmlAttr(config.designHeight) + "\" d:DesignWidth=\"" +
       xmlAttr(config.designWidth) + "\" mc:Ignorable=\"d\">"
   ];
-  if (config.iconPath) {
-    lines.push("  <UserControl.Resources>");
-    lines.push("    <ResourceDictionary Source=\"/" + config.rootNamespace + ";component/" +
-      config.iconPath + "\" />");
-    lines.push("  </UserControl.Resources>");
-  }
+  // 不生成 <UserControl.Resources>：宿主壳只保留 UserControl 头 + PageDesign。
+  // 页面 Icon 文件仍照常生成并按 Icon Page 注册进 .csproj，Icon 键在运行时的
+  // 解析由目标宿主负责；宿主脚本不写页面级资源合并声明。
   lines.push("  <Grid>");
   lines.push("    <uidesign:PageDesign x:Name=\"pageDesign\" XmlPagePath=\"" +
     xmlAttr(config.xmlPageName) + "\" Loaded=\"{s:Action PageDesign_Loaded}\" />");
