@@ -878,6 +878,8 @@ function main() {
     && !Array.isArray(manifest.languages) && manifest.languages.auto === true;
   let langSpec = null;
   let autoLangReport = null;
+  // 本次页面标题文案的来源（写入审计，避免“静默回退成画板框名”再次无人发现）。
+  let autoLangTitleSource = null;
   let langLocales = [];
   if (autoLang) {
     langLocales = LANG_KEYS.localesFrom(manifest.languages.locales);
@@ -999,6 +1001,16 @@ function main() {
       const langDsl = manifest.dslPath
         ? readJson(resolveInput(manifestDir, projectRoot, manifest.dslPath, "dslPath"))
         : null;
+      // 页面标题文案取值链（与单脚本 CLI 一致）：
+      //   manifest.pageTitleText（显式覆盖）→ mapping.textAudit 的 page-title → DSL 根节点名 → 页面名。
+      // textAudit 是 DSL 的机械产物，属于可靠来源；缺省时不再静默落到画板框名，
+      // 本次实际用的来源写入审计 languages.titleSource。
+      const manifestTitleText = typeof manifest.pageTitleText === "string"
+        ? manifest.pageTitleText.trim() : "";
+      const auditTitleText = LANG_KEYS.titleFromMapping(mapping);
+      autoLangTitleSource = manifestTitleText
+        ? "manifest.pageTitleText"
+        : (auditTitleText ? "mapping.textAudit" : "dslRoot");
       const derived = LANG_KEYS.deriveLangSpec({
         pageName: manifest.name,
         mapping,
@@ -1007,7 +1019,7 @@ function main() {
         keyCatalog: LANG_KEYS.buildKeyCatalogFromFiles(resolveLangCatalogPaths(manifestDir, projectRoot, manifest)),
         glossary: resolveLangGlossary(manifestDir, projectRoot, manifest),
         translations: resolveLangTranslations(manifestDir, projectRoot, manifest),
-        titleText: manifest.pageTitleText,
+        titleText: manifestTitleText || auditTitleText,
         locales: langLocales
       });
       manifest.languages = mergeAutoLangKeys(derived.languages, manifest.languages);
@@ -1165,6 +1177,8 @@ function main() {
         keyCount: langSpec.keys.length,
         paths: langPaths,
         bindings: langBindings,
+        // 页面标题文案来源：manifest.pageTitleText | mapping.textAudit | dslRoot（非自动派生时为 null）。
+        titleSource: autoLangTitleSource,
         derivation: autoLangReport
       } : null,
       // 多语言默认开启（manifest 未写 languages 时自动按 auto + CN/EN 生成）；
@@ -1192,6 +1206,7 @@ function main() {
         auto: autoLang,
         locales: langSpec.locales,
         keyCount: langSpec.keys.length,
+        titleSource: autoLangTitleSource,
         translated: autoLangReport
           ? {
               fromCatalog: autoLangReport.translatedFromCatalog,

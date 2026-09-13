@@ -145,7 +145,7 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 
 `languages.auto=true` 时，Bundle 在 XML/Layout 生成前调用 `gen-mtslg-lang-keys-from-dsl.js`，从当前页 DSL/mapping/Layout 菜单项**机械派生** LanguageKey，不再要求调用方逐条登记。派生规则固定、可复现：
 
-1. 页面标题 → `{页面名}PageTitle`，文案取 `textAudit` 的 `page-title`，没有则取 DSL 根节点名。
+1. 页面标题 → `{页面名}PageTitle`，文案取值链固定为：`manifest.pageTitleText`（**可选**的显式覆盖）→ `mapping.textAudit` 里 `role=page-title` 的 `sourceText`（**默认来源**，DSL 机械产物）→ DSL 根节点名 → 页面名。Bundle 与单脚本 CLI 走同一条链，不允许两边不一致；本次实际用到的来源写入审计 `languages.titleSource`（`manifest.pageTitleText` / `mapping.textAudit` / `dslRoot`），不得静默回退后无人知晓。
 2. Layout 菜单项 → `MenuItem{名称}`，语义名优先取菜单 `Icon` 资源名去掉 `Geometry` 后缀。
 3. 页面内容节点（`valueSource=dsl.text`）→ `{页面名}{名称}`，语义名按以下优先级回退：
    1. （**仅当显式配置 `keyCatalog` 时**）目标项目已登记语言字典里**同文案**的既有 key → 直接复用并记为 `scope=shared`；`MenuItem*` 命名空间的键不给页面内容节点复用。默认不配置，页面 key 全部页面内自产。
@@ -162,6 +162,7 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 - **英文文案由 AI 翻译产出，并以 `languages.translations` 显式落盘**：AI 读取派生出清单里的中文 CN 文案，逐条给出英文译文，写成 `{ "中文文案": "English Text" }`（内联对象或 JSON 文件路径都可）。脚本不做翻译、也不调用机翻服务，只机械套用这份清单，保证译文可追溯、可复核、可回滚。
 - **译文清单与术语表是「页面级生成产物」，不是插件固定资产**：每次生成按当前页面的 DSL/mapping 产出，并由 Bundle 同步落盘到该页审计目录 `Generated/{页面名}.lang-translations.json` 与 `Generated/{页面名}.lang-glossary.json`（未提供对应输入时不生成）。禁止把它们做成跨页面共享的固定文件；不同页面的译文与术语各自独立、可逐页复核与回滚。
 - 英文取值优先级：**目标项目已登记字典同 key 的英文（工程已确认）> `translations` 译文 > 中文占位**。前两者命中数分别记在 `languages.derivation.translatedFromCatalog` 与 `translatedFromInput`。
+- **页面标题文案来源必须逐页核对**：审计 `languages.titleSource` = `mapping.textAudit` 表示标题取自设计稿原文（默认、可信）；= `manifest.pageTitleText` 表示工程师显式覆盖值，交付前必须与 `textAudit` 的 `sourceText` 逐字比对（含空格与标点，不得自行归一化）；= `dslRoot` 表示既没有覆盖值也没有 textAudit 标题，退回的是**设计画板框名**（可能带前缀点、空格差异、版本后缀），交付说明必须单列并要求人工确认。
 - 确实没能翻译的条目会保留中文占位并逐条记入 `languages.derivation.pendingTranslations`；交付说明必须单列这份“待翻译清单”，不得把中文占位当已完成翻译交付。
 - 数字、符号、编号等中英文一致的文本已在第 5 条豁免，不出现在待翻译清单里。
 - `provisionalKeys`（临时键）与 `autoNoLangRefs`（自动豁免）必须在交付说明里列全，供工程师改名与确认；不得因为门禁通过就隐去。

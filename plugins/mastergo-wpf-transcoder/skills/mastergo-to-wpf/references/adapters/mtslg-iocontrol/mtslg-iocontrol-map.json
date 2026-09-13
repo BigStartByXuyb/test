@@ -590,7 +590,7 @@
     "match": {
       "property": "按钮类型"
     },
-    "componentSetPolicy": "按公开属性「按钮类型」的值命中变体；变体登记 componentSet 时用变体内部实例的组件名交叉核对，冲突以 componentSet 为准；componentSet=null 表示尚未从组件库登记，仅按属性值匹配。图层名不参与匹配。",
+    "componentSetPolicy": "按公开属性「按钮类型」的值命中变体；变体登记 componentSet 时用变体内部实例的组件名交叉核对，两者不一致直接失败并要求重新核对（不静默选边）；componentSet=null 表示尚未从组件库登记，仅按属性值匹配。图层名不参与匹配。",
     "variants": {
       "F+文案": {
         "componentSet": null,
@@ -1189,7 +1189,8 @@
         "LangName",
         "PageName",
         "IOCommand",
-        "IOVisible"
+        "IOVisible",
+        "IOEnable"
       ],
       "iconSizeAttrs": [
         "IconWidth",

@@ -79,6 +79,15 @@ fs.writeFileSync(dslSnapshot, JSON.stringify({
             { type: "TEXT", id: "body-text/inner/value-group/direction", name: "Dir", layoutStyle: { width: 21, height: 16, relativeX: 29, relativeY: 0 }, text: [{ text: "Dir" }] }
           ] }
         ]
+      }, {
+        // 设计稿的页面标题文本：必须放在组件之后，避免参与组件内部的文本槽位排序；
+        // 它不在内容区发射（决策 omit），但必须作为 textAudit 的 role=page-title
+        // 记录，成为页面标题文案的机械来源。
+        type: "TEXT",
+        id: "page-title",
+        name: "标题演示",
+        layoutStyle: { width: 200, height: 40, relativeX: 20, relativeY: 60 },
+        text: [{ text: "标题演示" }]
       }]
     }]
   },
@@ -175,6 +184,18 @@ assert.ok(bundleAudit.languages.keyCount >= 1, "默认多语言必须派生出�
 assert.match(fs.readFileSync(path.join(project, "Resources/Pages/F2NewPage/F2NewPagePage.xml"), "utf8"), /LangName="/);
 assert.match(fs.readFileSync(path.join(project, "Resources/Pages/F2NewPage/F2NewPage_CN.xaml"), "utf8"), /F2NewPagePageTitle/);
 assert.match(fs.readFileSync(path.join(project, "Resources/Layout/Layout.xml"), "utf8"), /<Page Target="F2NewPage" LangName="F2NewPagePageTitle">/);
+// 页面标题文案来源：manifest 没写 pageTitleText 时必须取 mapping.textAudit 的 page-title
+// （DSL 机械产物），不得静默回退成设计画板框名；实际用到的来源写入审计 languages.titleSource。
+assert.strictEqual(
+  bundleAudit.languages.titleSource,
+  "mapping.textAudit",
+  "未提供 pageTitleText 时必须取 textAudit 的 page-title，并记录来源"
+);
+assert.match(
+  fs.readFileSync(path.join(project, "Resources/Pages/F2NewPage/F2NewPage_CN.xaml"), "utf8"),
+  /<sys:String x:Key="F2NewPagePageTitle">标题演示<\/sys:String>/,
+  "标题文案必须等于设计稿 textAudit 的 page-title 原文（不是画板框名 界面内操作组）"
+);
 // 译文/术语表是页面级产物：本场景没有提供译文与术语表输入，因此不应凭空生成这两个文件。
 assert.ok(!fs.existsSync(path.join(project, "Generated/F2NewPage.lang-translations.json")));
 assert.ok(!fs.existsSync(path.join(project, "Generated/F2NewPage.lang-glossary.json")));
@@ -363,6 +384,24 @@ function langManifestFor(pageName, languages) {
   return item;
 }
 
+// 显式 pageTitleText 是覆盖通道（优先于 textAudit），来源记为 manifest.pageTitleText。
+const titleOverrideManifest = langManifestFor("TitleOverride", { auto: true, locales: ["CN", "EN"] });
+titleOverrideManifest.pageTitleText = "手填标题";
+const titleOverridePath = path.join(root, "title-override-bundle.json");
+fs.writeFileSync(titleOverridePath, JSON.stringify(titleOverrideManifest, null, 2), "utf8");
+result = spawnSync(process.execPath, [script, "--manifest", titleOverridePath], { encoding: "utf8" });
+assert.strictEqual(result.status, 0, result.stderr);
+assert.match(
+  fs.readFileSync(path.join(project, "Resources/Pages/TitleOverride/TitleOverride_CN.xaml"), "utf8"),
+  /<sys:String x:Key="TitleOverridePageTitle">手填标题<\/sys:String>/,
+  "显式 pageTitleText 必须覆盖 textAudit 的 page-title"
+);
+assert.strictEqual(
+  JSON.parse(fs.readFileSync(path.join(project, "Generated/TitleOverride.bundle.manifest.json"), "utf8")).languages.titleSource,
+  "manifest.pageTitleText",
+  "显式覆盖时来源必须记为 manifest.pageTitleText"
+);
+
 // 正向：文案自动匹配（不写 sourceRef），页面里所有文本控件都必须挂上 LangName。
 const langManifest = langManifestFor("LangDemo", {
   locales: ["CN", "EN"],
@@ -488,7 +527,7 @@ const autoManifest = langManifestFor("LangAuto", {
   keyCatalog: autoCatalog,
   // 英文译文由 AI 产出后显式落盘，脚本只机械套用。
   translations: {
-    "界面内操作组": "Operation Group",
+    "标题演示": "Title Demo",
     "操作": "Operation"
   }
 });
@@ -502,11 +541,12 @@ assert.deepStrictEqual(fs.readdirSync(autoDir).sort(),
 const autoCn = fs.readFileSync(path.join(autoDir, "LangAuto_CN.xaml"), "utf8");
 const autoEn = fs.readFileSync(path.join(autoDir, "LangAuto_EN.xaml"), "utf8");
 assert.deepStrictEqual(readLangKeys(autoCn), readLangKeys(autoEn), "CN/EN 的 key 必须完全一致");
-assert.match(autoEn, /<sys:String x:Key="LangAutoPageTitle">Operation Group<\/sys:String>/,
-  "页面标题必须使用 translations 里的真实英文");
+assert.match(autoEn, /<sys:String x:Key="LangAutoPageTitle">Title Demo<\/sys:String>/,
+  "页面标题必须取设计稿 textAudit 的 page-title，并使用 translations 里的真实英文");
 assert.match(autoEn, /<sys:String x:Key="MenuItemAction">Operation<\/sys:String>/,
   "菜单项必须使用 translations 里的真实英文");
-assert.match(autoCn, /<sys:String x:Key="LangAutoPageTitle">/, "页面标题键必须机械生成");
+assert.match(autoCn, /<sys:String x:Key="LangAutoPageTitle">标题演示<\/sys:String>/,
+  "页面标题 CN 必须取设计稿 textAudit 的 page-title 原文（不是画板框名）");
 assert.match(autoCn, /<sys:String x:Key="LangAutoText\d+">\+5<\/sys:String>/,
   "按钮族数值文案（+5）必须产键（CN/EN 文案一致）");
 assert.match(autoCn, /<sys:String x:Key="CommonDir">Dir<\/sys:String>/,

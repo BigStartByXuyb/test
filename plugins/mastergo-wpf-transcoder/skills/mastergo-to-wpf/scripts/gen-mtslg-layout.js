@@ -18,11 +18,11 @@ const ATTR_FIELDS = [
   ["IconWidth", "iconWidth"], ["IconHeight", "iconHeight"]
 ];
 
-// MenuItem 常驻属性：与页面 XML 的按钮族（PageName/IOVisible/IOCommand 恒写）同一策略，
+// MenuItem 常驻属性：与页面 XML 的按钮族（PageName/IOVisible/IOCommand/IOEnable 恒写）同一策略，
 // 取不到来源时写空字符串占位，避免重新生成时把宿主要求的字段丢掉。
 // 真值来源：模板表 layoutRules.bottomBar.menuItemAlwaysWrittenAttrs（--map 传入时读取）；
 // 另外仍可由 manifest.menuItemAlwaysAttrs 追加。
-const DEFAULT_MENU_ITEM_ALWAYS_ATTRS = ["LangName", "PageName", "IOCommand", "IOVisible"];
+const DEFAULT_MENU_ITEM_ALWAYS_ATTRS = ["LangName", "PageName", "IOCommand", "IOVisible", "IOEnable"];
 let MENU_ITEM_ALWAYS_ATTRS = DEFAULT_MENU_ITEM_ALWAYS_ATTRS;
 
 function loadMenuAlwaysAttrs(mapPath) {

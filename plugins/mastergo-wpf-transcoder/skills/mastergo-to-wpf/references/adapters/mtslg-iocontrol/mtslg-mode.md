@@ -19,7 +19,7 @@
 
 本手册负责 IOContorl 页面格式、运行时约束、坐标和验证流程；MasterGo 组件集如何匹配固定 IOContorl 模板，统一读取同目录的本地工作副本 [飞书组件库映射规范](./feishu-component-library-mapping.md)。页面顶部栏、底部栏和键盘提示如何写入 Layout.xml，统一读取 [页面壳层 Layout 映射规范](./feishu-layout-mapping.md)。后续规则更新直接修改本地工作副本，不把线上飞书文档作为运行时依赖。
 
-- 先按飞书规范匹配父节点语义、公开变量属性和真实变量值；
+- 先按飞书规范匹配独立组件集名称 / 公开属性名和真实属性值（右栏这类聚合组件族只按公开属性值命中，不存在“父节点语义”这一层）；
 - 再按本手册核对 `ControlType`、允许属性、坐标、资源键和运行时先例；
 - 两份规则冲突或某个组件无法唯一命中时，只隔离该组件：标记待确认并保留其 DSL 来源、坐标和 provenance；不得自行套用相似模板，也不得阻塞其他已唯一命中组件的 XML 生成。
 
@@ -64,7 +64,7 @@
 - **必写字段（所有 ControlType）**：每个 ControlType 的固定必写字段集登记在 `mtslg-iocontrol-map.json` 的 `controlTypeRequiredAttrs`；生成器必须发射这些属性，取不到来源时写**空字符串占位**（个别字段在 `controlTypeAttrDefaults` 里登记了默认值，如 `Border.Value` 线宽默认 `1`）。`LangName` 是唯一例外：只在多语言绑定层给出真实 key 时发射，动态值等 `noLangRefs` 豁免节点不写空占位。
 - **多语言默认开启**：Bundle 在 manifest 缺少 `languages` 时自动按 `languages.auto=true` + CN/EN 生成页面字典并强制 `LangName` 闭环；只有显式 `languages=false` / `{disabled:true, reason:"…"}` 才关闭，关闭原因写入审计。多语言是默认能力，不是可选项。
 - **按钮族固定参数（IconButton / Button / StatusButton）**：`PageName`、`IOVisible`、`IOCommand`、`IOEnable` 四个运行时参数无论能否取到来源都恒写，取不到时写空字符串值（merge 时保留工程师已有真实值）；`IconButton` 的 `Icon`/`IconWidth`/`IconHeight` 同样恒写：有图标槽位时取**图标图形节点自身 bbox**（映射字段 `iconSize`，四舍五入取整，不是控件宽高），无图标槽位时写空字符串；`Button`/`StatusButton` 模板不含图标字段，不发射 `Icon`、`IconWidth`、`IconHeight`。映射带 `Icon` 却没有 `iconSize` 时生成器直接失败，禁止猜图标尺寸。
-- **模板匹配键**：组件族匹配使用“组件集名 + 公开属性名 + 真实属性值”。设计稿里的图层名称只用于核对，不参与匹配；`rightSidebarTemplates.parentVariants` 这类“父节点语义”表已作废（右栏的 `右侧栏-左右结构`/`右侧栏-上下结构` 是独立组件名，不是父节点语义）。变体登记 `componentSet` 时，解析先用公开属性值命中变体，再用变体内部实例的组件名交叉核对，冲突以组件名（componentSet）为准并记录冲突。
+- **模板匹配键**：组件族匹配使用“组件集名 + 公开属性名 + 真实属性值”。设计稿里的图层名称只用于核对，不参与匹配；`rightSidebarTemplates.parentVariants` 这类“父节点语义”表已作废（右栏的 `右侧栏-左右结构`/`右侧栏-上下结构` 是独立组件名，不是父节点语义）。变体登记 `componentSet` 时，解析先用公开属性值命中变体，再用变体内部实例的组件名交叉核对；两者不一致**直接失败并要求重新核对**，不静默选边（`resolve-mtslg-template-mapping.js` 按此实现）。
 - **图标尺寸来源**：`IconWidth`/`IconHeight` 取页面图标映射中几何来源节点（`sourceRef`，缺失时回退 `sourceId`）的 bbox；右栏这类带图标槽位的按钮，图标来自 `实例` 属性指向的图标节点；空占位虚线框视为没有图标。
 - **图标几何补充来源（extractSvg 去重）**：`extractSvg` 只输出 PATH 自身的 `d` + `transform`，几何完全相同的复用实例会被去重（同一方向图标经组级 `rotate`/`flipV` 复用时只返回一条），因此会出现「按钮有图标槽位却没有 `Icon`」。补齐办法：`gen-mtslg-page-icons.js` 追加第 4 个参数（`dsl.snapshot.json`），图标映射条目加 `"fromDsl": true`（按 PATH 原始 `d` + 自身 matrix 合成，与 extractSvg 等价并平移到原点）；需要区分方向时再加 `"bakeAncestorTransform": true`，把祖先 `rotate`/`flipH`/`flipV` 烘焙进坐标。烘焙结果必须视觉复核；同一组图标在 DSL 里几何完全相同（如「向左」与「向右」）时属于设计侧缺图，标记待确认，不得自行镜像猜测。
 - **设计稿最上方示例标题默认剥离**：位于根节点或展示外壳、仅用于说明组件或工件示教的标题标记为 `design-artifact-title`，不写入页面 XML。业务内容容器内部且运行时需要的标题才保留。
@@ -83,7 +83,7 @@
 | 文本/输入 | TextBlock、TextBox（Keypad）、NumberBox（DecimalPlaces 默认 3）、IntNumberBox、CheckBox |
 | 按钮 | Button（PageName="Jump:X"/IOName/IOStyle）、IconButton（Icon=Geometry 键/TopLeftContent=F1..F12）、StatusButton（IOState 状态色）、Togglebutton、RadioButton |
 
-按钮族（IconButton / Button / StatusButton）另有固定参数：`PageName`/`IOVisible`/`IOCommand` 恒写（取不到写空字符串值），`IconWidth`/`IconHeight` 只在有图标槽位时按图标图形节点 bbox 发射；详见飞书组件库映射规范的“固定字段与可选字段规则”。
+按钮族（IconButton / Button / StatusButton）另有固定参数：`PageName`/`IOVisible`/`IOCommand`/`IOEnable` 恒写（取不到写空字符串值）；`IconButton` 的 `Icon`/`IconWidth`/`IconHeight` 同样恒写——有图标槽位时按图标图形节点 bbox 四舍五入发射，无图标槽位时写空字符串，`Button`/`StatusButton` 不含图标字段、不发射这三项；详见飞书组件库映射规范的“固定字段与可选字段规则”。
 | 选择 | ComboBox（选项=子 TextBlock；ItemsSourceFile/DisplayMemberPath/SelectedValuePath） |
 | 数据 | DataGrid（Value=数据文件名；列=子 TextBlock/ComboBox）、ProgressBar、RangeProgressBar、PowerControl（实时功率曲线） |
 | 视觉/设备 | Image（Value=绝对路径）、Camera（DesignPanelID）、AutoCutCamera、HighAngleCamera、LowAngleCamera、EMTCamera |

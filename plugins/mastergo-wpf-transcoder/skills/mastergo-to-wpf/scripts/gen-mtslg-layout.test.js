@@ -29,12 +29,12 @@ assert.strictEqual(result.status, 0, result.stderr);
 let text = fs.readFileSync(layout, "utf8");
 assert.match(text, /<Page Target="F2NewPage" LangName="F2NewPageTitle">/);
 assert.match(text, /<Layout>[\s\S]*<Header>[\s\S]*<Body>[\s\S]*<Pages>[\s\S]*<Page Target="F2NewPage"[\s\S]*<\/Pages>[\s\S]*<LeftToolBox \/>[\s\S]*<ToolBox \/>[\s\S]*<\/Body>[\s\S]*<Footer \/>[\s\S]*<\/Layout>/);
-// MenuItem 常驻属性：LangName / PageName / Value / IOCommand / IOVisible 恒写（来源缺失时为空字符串）；
+// MenuItem 常驻属性：LangName / PageName / IOCommand / IOVisible / IOEnable 恒写（来源缺失时为空字符串）；
 // 图标尺寸与页面 XML 按钮族同一规则：有 Icon 必须有 iconSize，取整后写 IconWidth/IconHeight。
 // 属性顺序与页面 XML 同一约定：Name → Icon → TopLeftContent/Index → LangName → PageName/IO* → IconWidth/IconHeight。
-assert.match(text, /Name="第一项" Icon="FirstGeometry" TopLeftContent="F1" Index="1" LangName="" PageName="" IOCommand="" IOVisible="" IconWidth="35" IconHeight="33"/);
-assert.match(text, /Icon="SecondGeometry" TopLeftContent="F2" Index="2" LangName="" PageName="" IOCommand="" IOVisible="" IconWidth="40" IconHeight="40"/);
-assert.doesNotMatch(text, /IOEnable=|UserRightId=/);
+assert.match(text, /Name="第一项" Icon="FirstGeometry" TopLeftContent="F1" Index="1" LangName="" PageName="" IOCommand="" IOVisible="" IOEnable="" IconWidth="35" IconHeight="33"/);
+assert.match(text, /Icon="SecondGeometry" TopLeftContent="F2" Index="2" LangName="" PageName="" IOCommand="" IOVisible="" IOEnable="" IconWidth="40" IconHeight="40"/);
+assert.doesNotMatch(text, /UserRightId=/);
 // MenuItem 不写 Value（菜单文本只放在 Name）
 assert.doesNotMatch(text, /Value=/);
 
@@ -142,7 +142,7 @@ result = spawnSync(process.execPath, [script, "--manifest", manifest, "--overwri
 assert.strictEqual(result.status, 0, result.stderr);
 text = fs.readFileSync(layout, "utf8");
 assert.strictEqual((text.match(/<Page\s+Target="F2NewPage"/g) || []).length, 1);
-assert.match(text, /Name="第一项" Icon="FirstGeometry" TopLeftContent="F1" Index="1" LangName="" PageName="" IOCommand="" IOVisible="" IconWidth="35" IconHeight="33"/);
+assert.match(text, /Name="第一项" Icon="FirstGeometry" TopLeftContent="F1" Index="1" LangName="" PageName="" IOCommand="" IOVisible="" IOEnable="" IconWidth="35" IconHeight="33"/);
 assert.doesNotMatch(text, /Name="旧页面"/);
 
 // 右下角常驻分组（右侧底部-常驻button）内的实例不生成 MenuItem：
@@ -164,8 +164,8 @@ result = spawnSync(process.execPath, [script, "--manifest", residentManifest], {
 assert.strictEqual(result.status, 0, result.stderr);
 text = fs.readFileSync(residentLayout, "utf8");
 assert.strictEqual((text.match(/<MenuItem /g) || []).length, 2, "常驻分组内的实例不得生成 MenuItem");
-assert.match(text, /Name="第一项" Icon="FirstGeometry" Index="1" LangName="" PageName="" IOCommand="" IOVisible="" IconWidth="35" IconHeight="33"/);
-assert.match(text, /Name="第二项" Icon="SecondGeometry" Index="2" LangName="" PageName="" IOCommand="" IOVisible="" IconWidth="40" IconHeight="40"/);
+assert.match(text, /Name="第一项" Icon="FirstGeometry" Index="1" LangName="" PageName="" IOCommand="" IOVisible="" IOEnable="" IconWidth="35" IconHeight="33"/);
+assert.match(text, /Name="第二项" Icon="SecondGeometry" Index="2" LangName="" PageName="" IOCommand="" IOVisible="" IOEnable="" IconWidth="40" IconHeight="40"/);
 
 const residentMismatch = path.join(root, "resident-mismatch.json");
 fs.writeFileSync(residentMismatch, JSON.stringify({
@@ -197,8 +197,8 @@ result = spawnSync(process.execPath, [script, "--manifest", duplicateIndexManife
 assert.notStrictEqual(result.status, 0, "重复 Index 必须失败");
 assert.match(result.stderr + result.stdout, /重复 Index/);
 
-// MenuItem 常驻属性：LangName / PageName / Value / IOCommand / IOVisible 恒写，来源缺失时写空字符串
-// （与页面 XML 按钮族同一策略）；Value 无显式来源时取该菜单项文本。
+// MenuItem 常驻属性：LangName / PageName / IOCommand / IOVisible / IOEnable 恒写，来源缺失时写空字符串
+// （与页面 XML 按钮族同一策略）；Value 不写（菜单文本只放在 Name）。
 const residentAttrsManifest = path.join(root, "menu-always-attrs.json");
 const residentAttrsLayout = path.join(root, "MenuAlwaysAttrsLayout.xml");
 fs.writeFileSync(residentAttrsManifest, JSON.stringify({
@@ -212,7 +212,7 @@ fs.writeFileSync(residentAttrsManifest, JSON.stringify({
 result = spawnSync(process.execPath, [script, "--manifest", residentAttrsManifest], { encoding: "utf8" });
 assert.strictEqual(result.status, 0, result.stderr);
 text = fs.readFileSync(residentAttrsLayout, "utf8");
-assert.match(text, /Name="激光设置" Icon="" Index="1" LangName="" PageName="" IOCommand="" IOVisible=""/);
+assert.match(text, /Name="激光设置" Icon="" Index="1" LangName="" PageName="" IOCommand="" IOVisible="" IOEnable=""/);
 
 // 显式给出 LangName / PageName 时保留真实值。
 const explicitAttrsManifest = path.join(root, "menu-explicit-attrs.json");
@@ -237,7 +237,7 @@ fs.writeFileSync(extraAttrsManifest, JSON.stringify({
   layoutPath: extraAttrsLayout,
   pageTarget: "MenuExtraAttrsPage",
   layoutStatus: "complete",
-  menuItemAlwaysAttrs: ["IOEnable"],
+  menuItemAlwaysAttrs: ["UserRightId"],
   layoutEvidence: { matchedBottomBarItems: 1, unresolvedBottomBarItems: 0 },
   menuItems: [{ name: "激光设置", icon: "", index: 1 }]
 }, null, 2), "utf8");
@@ -245,6 +245,7 @@ result = spawnSync(process.execPath, [script, "--manifest", extraAttrsManifest],
 assert.strictEqual(result.status, 0, result.stderr);
 text = fs.readFileSync(extraAttrsLayout, "utf8");
 assert.match(text, /Icon="" Index="1" LangName="" PageName="" IOCommand="" IOVisible="" IOEnable=""/);
+assert.match(text, /IOEnable="" UserRightId=""/, "manifest.menuItemAlwaysAttrs 追加的字段必须发射");
 
 // 有 Icon 但没有 iconSize 必须失败（禁止猜图标尺寸），与页面 XML 按钮族同一门禁。
 const missingIconSizeManifest = path.join(root, "menu-missing-icon-size.json");
@@ -280,5 +281,18 @@ assert.match(text, /Icon="" Index="1" LangName="" IOEnable=""/,
   "常驻属性集合必须来自模板表（LangName + IOEnable，且不再补 PageName/IOCommand/IOVisible）");
 assert.doesNotMatch(text, /PageName=|IOCommand=|IOVisible=/,
   "模板表未声明的常驻属性不得发射");
+
+// 真值源回归锁：模板表（mtslg-iocontrol-map.json）与脚本内置默认必须一致，
+// 且右栏“父节点语义（parentVariants）”建模必须保持作废状态。
+const realMapPath = path.resolve(__dirname, "..", "references", "adapters", "mtslg-iocontrol", "mtslg-iocontrol-map.json");
+const realMap = JSON.parse(fs.readFileSync(realMapPath, "utf8"));
+assert.deepStrictEqual(
+  realMap.layoutRules.bottomBar.menuItemAlwaysWrittenAttrs,
+  ["LangName", "PageName", "IOCommand", "IOVisible", "IOEnable"],
+  "MenuItem 常驻属性表必须与页面 XML 按钮族同策略（含 IOEnable）"
+);
+const mapText = fs.readFileSync(realMapPath, "utf8");
+assert.strictEqual(mapText.indexOf("parentVariants"), -1, "右栏 parentVariants 建模必须保持作废");
+assert.strictEqual(mapText.indexOf("父节点语义"), -1, "映射表不得再出现“父节点语义”匹配层");
 
 console.log("PASS MTSLG Layout generator regression test");

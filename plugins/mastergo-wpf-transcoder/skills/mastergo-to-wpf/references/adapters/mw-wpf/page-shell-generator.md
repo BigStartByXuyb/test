@@ -50,8 +50,8 @@ public class <Page>ViewModel : IOScreen, IPage
     {
         if (message.IsMouseDown)
         {
-            switch (message.ButtonName)
-            {
+                switch (message.ButtonName)
+                {
                     case "新建示教":                              // 本页底部 Layout Menu 的每个 MenuItem
                         // TODO: 新建示教 按钮处理
                         break;

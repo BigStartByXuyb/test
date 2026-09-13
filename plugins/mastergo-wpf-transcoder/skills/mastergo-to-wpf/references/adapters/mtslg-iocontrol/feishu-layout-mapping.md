@@ -34,7 +34,7 @@
 
 新建页面时，Index 取当前页面底部栏中该实例的实际排列顺序，**从 1 起**（第 1 个按钮 = 1，按底部栏的视觉排列顺序，含没有生成 MenuItem 的按钮）；不生成 MenuItem 的按钮（如右下角常驻分组）在 Index 上保留空档，不重排后续编号。例如底部栏第 1~5 个按钮生成 MenuItem、第 6~7 个是常驻分组不生成、第 8~12 个再生成，则 Index 为 `1,2,3,4,5,8,9,10,11,12`。不写入 Left、Top、Width、Height。增量修改已有 Layout 时，已有页面和已有 MenuItem 的 Index 原样保留，不用设计稿顺序覆盖。固定模板已经声明的 `PageName`、`IOEnable`、`UserRightId` 等可选属性，目标项目未提供时保留属性并输出空字符串；当前变体没有声明的属性不新增。
 
-**MenuItem 常驻属性（恒写）**：`LangName`、`PageName`、`IOCommand`、`IOVisible` 与页面 XML 按钮族的 `PageName` / `IOVisible` / `IOCommand` 同一策略——无论变体是否声明、来源是否取到，都写出该属性；没有可靠来源时写空字符串占位，不允许因为"没取到"而丢字段。`Value` 不写（菜单文本只放在 `Name`）。需要追加恒写字段时用 manifest 的 `menuItemAlwaysAttrs`（例如 `["IOEnable", "UserRightId"]`）扩展。
+**MenuItem 常驻属性（恒写）**：`LangName`、`PageName`、`IOCommand`、`IOVisible`、`IOEnable` 与页面 XML 按钮族的 `PageName` / `IOVisible` / `IOCommand` / `IOEnable` 同一策略——无论变体是否声明、来源是否取到，都写出该属性；没有可靠来源时写空字符串占位，不允许因为"没取到"而丢字段。`Value` 不写（菜单文本只放在 `Name`）。常驻集合的真值源是 `mtslg-iocontrol-map.json` 的 `layoutRules.bottomBar.menuItemAlwaysWrittenAttrs`；需要额外追加时用 manifest 的 `menuItemAlwaysAttrs`（例如 `["UserRightId"]`）扩展。
 
 **MenuItem 图标尺寸**：与页面 XML 按钮族同一规则——有 `Icon` 就必须有 `iconSize`（图标图形节点 bbox），发射时四舍五入写 `IconWidth` / `IconHeight`；没有图标槽位时不写 `Icon` / `IconWidth` / `IconHeight`；带 `Icon` 却没有 `iconSize` 直接失败，禁止猜尺寸。
 
@@ -227,7 +227,7 @@ Layout 映射只定义字段来源和生成条件，不登记任何具体页面�
 
 Name 取当前组件实例的真实文本槽位；LangName 仅从当前页面的语言文件读取；Icon 仅从当前页面的 Icon 文件读取；TopLeftContent 取当前实例的 F 键提示槽位；新建页面的 Index 取当前页面底部栏中该实例的实际排列顺序，已有 MenuItem 的 Index 保留 Layout.xml 原值。
 
-当前实例没有对应来源时，如果该字段属于当前固定模板，则保留属性并输出空字符串；如果字段不属于当前固定模板，则不新增属性。`LangName` / `PageName` 按常驻属性恒写（取不到值为空字符串），`IOEnable`、`UserRightId` 的值仍只从目标项目或用户明确提供的 Layout 配置读取。
+当前实例没有对应来源时，如果该字段属于当前固定模板，则保留属性并输出空字符串；如果字段不属于当前固定模板，则不新增属性。`LangName` / `PageName` / `IOCommand` / `IOVisible` / `IOEnable` 按常驻属性恒写（取不到值为空字符串）；`UserRightId` 的值仍只从目标项目或用户明确提供的 Layout 配置读取。
 
 ## 未确认项处理
 
