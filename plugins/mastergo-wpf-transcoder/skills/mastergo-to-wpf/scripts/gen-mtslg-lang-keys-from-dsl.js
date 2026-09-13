@@ -20,6 +20,11 @@
  *   5. DSL 图层英文名（过滤 Dir / F1 / CH1 之类的结构噪音）
  *   6. 兜底 {页面名}Text{序号}：页面内唯一、稳定，标记 provisional，报告里列出待改名
  *
+ * 【同页同文案复用】同一页面内文案完全相同的页面内容节点共用一个 LanguageKey：
+ * 第一个节点派生键名，其余节点登记进该键的 sourceRefs（运行时同一文案只维护一条翻译），
+ * 不再产生 XxxText02 / Xxx2 这类重复键；复用结果记入报告 reusedTextKeys 与
+ * sources.reusedByText。只有“不同文案撞出相同语义名”时才使用稳定数字后缀。
+ *
  * 【不需要翻译的文本】中英文写法一致的文本不生成语言键，自动进入 noLangRefs 并在报告里
  * 逐条列出原因：纯数字、符号、正负步进标签（+5 / -1 / ±0.5）、百分比、版本号、序列号、
  * IP、日期时间、功能键 F1 —— 即“不含中文且不含英文字母”的文本。
@@ -303,6 +308,9 @@ function deriveLangSpec(options) {
 
   const usedKeys = new Set();
   const sharedByKey = new Map();
+  // 页面内“同一文案 → 同一个 LanguageKey”：文案相同的多个节点共用一个 key，
+  // 其余节点登记进该 key 的 sourceRefs（运行时同一文案只维护一条翻译）。
+  const contentEntryByText = new Map();
   const keys = [];
   const noLangRefs = [];
   const report = {
@@ -311,7 +319,7 @@ function deriveLangSpec(options) {
     titleKey: pageName + TITLE_SUFFIX,
     sources: {
       title: 0, menu: 0, catalog: 0, icon: 0, glossary: 0,
-      signNumber: 0, asciiText: 0, dslLayerName: 0, fallback: 0
+      signNumber: 0, asciiText: 0, dslLayerName: 0, fallback: 0, reusedByText: 0
     },
     provisionalKeys: [],
     pendingTranslations: [],
@@ -321,6 +329,7 @@ function deriveLangSpec(options) {
     sharedKeys: [],
     autoNoLangRefs: [],
     duplicateKeys: [],
+    reusedTextKeys: [],
     warnings: []
   };
 
@@ -510,6 +519,19 @@ function deriveLangSpec(options) {
       });
     }
 
+    // 3.0 页面内同文案复用：同一页面里文案完全相同的节点直接共用一个 LanguageKey，
+    //     后续节点写入该 key 的 sourceRefs，不再派生 XxxText02 / Xxx2 这类重复键。
+    const reused = contentEntryByText.get(text);
+    if (reused) {
+      if (!Array.isArray(reused.sourceRefs)) {
+        reused.sourceRefs = reused.sourceRef ? [reused.sourceRef] : [];
+      }
+      if (reused.sourceRefs.indexOf(ref) === -1) reused.sourceRefs.push(ref);
+      report.sources.reusedByText += 1;
+      report.reusedTextKeys.push({ key: reused.key, text, sourceRef: ref });
+      continue;
+    }
+
     // 3.1 目标项目已登记 key：同一文案只命中一个 key 时直接复用（scope=shared）。
     // 菜单命名空间（MenuItem*）的键只给 Layout 菜单项用，页面内容节点不复用，
     // 否则会出现“页面按钮引用菜单键”的错位绑定。
@@ -536,6 +558,7 @@ function deriveLangSpec(options) {
       };
       usedKeys.add(hit.key);
       sharedByKey.set(hit.key, entry);
+      contentEntryByText.set(text, entry);
       keys.push(entry);
       report.sources.catalog += 1;
       report.sharedKeys.push({ key: hit.key, sourceRef: ref, text });
@@ -599,6 +622,7 @@ function deriveLangSpec(options) {
       }
     }
     keys.push(entry);
+    contentEntryByText.set(text, entry);
     report.sources[source] += 1;
   }
 

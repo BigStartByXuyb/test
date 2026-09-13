@@ -147,7 +147,7 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 
 1. 页面标题 → `{页面名}PageTitle`，文案取值链固定为：`manifest.pageTitleText`（**可选**的显式覆盖）→ `mapping.textAudit` 里 `role=page-title` 的 `sourceText`（**默认来源**，DSL 机械产物）→ DSL 根节点名 → 页面名。Bundle 与单脚本 CLI 走同一条链，不允许两边不一致；本次实际用到的来源写入审计 `languages.titleSource`（`manifest.pageTitleText` / `mapping.textAudit` / `dslRoot`），不得静默回退后无人知晓。
 2. Layout 菜单项 → `MenuItem{名称}`，语义名优先取菜单 `Icon` 资源名去掉 `Geometry` 后缀。
-3. 页面内容节点（`valueSource=dsl.text`）→ `{页面名}{名称}`，语义名按以下优先级回退：
+3. 页面内容节点（`valueSource=dsl.text`）→ `{页面名}{名称}`。**同一页面内文案完全相同的节点共用一个 key**（第一个节点派生键名，其余节点登记进该 key 的 `sourceRefs`），不再产生 `Xxx2` / `XxxText02` 这类重复键——同一页面里重复文案直接复用同一个 LanguageKey；只有“不同文案撞出相同语义名”时才用稳定数字后缀。语义名按以下优先级回退：
    1. （**仅当显式配置 `keyCatalog` 时**）目标项目已登记语言字典里**同文案**的既有 key → 直接复用并记为 `scope=shared`；`MenuItem*` 命名空间的键不给页面内容节点复用。默认不配置，页面 key 全部页面内自产。
    2. 节点 `Icon` 资源名去掉 `Geometry` 后缀（IconButton / 带图标按钮天然带英文语义名）。
    3. `langGlossary` 术语表（`{ "中文文案": "EnglishIdentifier" }`，可内联或给 JSON 文件路径）。

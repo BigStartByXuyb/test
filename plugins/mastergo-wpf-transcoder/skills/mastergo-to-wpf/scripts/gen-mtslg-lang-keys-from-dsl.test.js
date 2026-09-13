@@ -58,9 +58,11 @@ const mapping = {
     // 同一共享文案出现两次 → 一个 key 绑定两个节点。
     { sourceRef: "p/tb-ok-a", controlType: "TextBlock", sourceText: "确定", valueSource: "dsl.text", attrs: { Value: "确定" } },
     { sourceRef: "p/tb-ok-b", controlType: "TextBlock", sourceText: "确定", valueSource: "dsl.text", attrs: { Value: "确定" } },
-    // 同名同来源 → 需要稳定数字后缀。
+    // 同页同文案 → 共用一个 key（其余节点写入 sourceRefs）。
     { sourceRef: "p/btn-dup-a", controlType: "IconButton", sourceText: "设备维护", valueSource: "dsl.text", attrs: { Value: "设备维护", Icon: "DeviceMaintenanceGeometry" } },
     { sourceRef: "p/btn-dup-b", controlType: "IconButton", sourceText: "设备维护", valueSource: "dsl.text", attrs: { Value: "设备维护", Icon: "DeviceMaintenanceGeometry" } },
+    // 不同文案但派生出的语义名相同 → 仍需要稳定数字后缀，不静默覆盖。
+    { sourceRef: "p/btn-collide", controlType: "IconButton", sourceText: "维护设置", valueSource: "dsl.text", attrs: { Value: "维护设置", Icon: "DeviceMaintenanceGeometry" } },
     // 纯 ASCII 文案：没有 Icon 也要有语义名。
     { sourceRef: "p/tb-aux", controlType: "TextBlock", sourceText: "AUX.", valueSource: "dsl.text", attrs: { Value: "AUX." } },
     // 兜底：中文 + 无 Icon + 图层名不可用。
@@ -173,9 +175,18 @@ assert.strictEqual(keyByRef.get("p/tb-ok-a"), "CommonOK", "keys=" + emittedKeys)
 assert.strictEqual(keyByRef.get("p/tb-ok-b"), "CommonOK", "keys=" + emittedKeys);
 assert.deepStrictEqual(keys.get("CommonOK").sourceRefs, ["p/tb-ok-a", "p/tb-ok-b"]);
 
-// 6) 同名同来源 → 稳定数字后缀，且不静默覆盖。
+// 6) 同页同文案 → 共用一个 LanguageKey，其余节点登记进 sourceRefs（不产生 Xxx2 重复键）。
 assert.strictEqual(keyByRef.get("p/btn-dup-a"), "DemoRecipeDeviceMaintenance");
-assert.strictEqual(keyByRef.get("p/btn-dup-b"), "DemoRecipeDeviceMaintenance2");
+assert.strictEqual(keyByRef.get("p/btn-dup-b"), "DemoRecipeDeviceMaintenance");
+assert.deepStrictEqual(keys.get("DemoRecipeDeviceMaintenance").sourceRefs, ["p/btn-dup-a", "p/btn-dup-b"],
+  "同文案节点必须共用一个 key 并登记全部 sourceRefs");
+assert.ok(report.reusedTextKeys.some((item) => item.key === "DemoRecipeDeviceMaintenance" && item.sourceRef === "p/btn-dup-b"),
+  "同文案复用必须记入报告 reusedTextKeys");
+assert.strictEqual(report.sources.reusedByText, 2, "复用计数应包含 确定 与 设备维护 各 1 次");
+assert.ok(!keyByRef.has("DemoRecipeDeviceMaintenance2"), "同文案不得再派生 Xxx2 重复键");
+
+// 6.1) 不同文案撞出相同语义名时，仍用稳定数字后缀，不静默覆盖。
+assert.strictEqual(keyByRef.get("p/btn-collide"), "DemoRecipeDeviceMaintenance2");
 assert.ok(report.duplicateKeys.some((item) => item.key === "DemoRecipeDeviceMaintenance2"));
 
 // 7) 不需要翻译的文本：全部进 noLangRefs 并带原因，绝不编造语言键。
