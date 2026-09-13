@@ -1185,6 +1185,25 @@
       "residentGroupPattern": "常驻(button|按钮|分组)",
       "fKeyPattern": "^F\\d+$",
       "decorativeNamePattern": "背景|分割",
+      "menuItemFlags": {
+        "_note": "MenuItem 的设计稿标记：命中才写属性，未命中不发射该属性（不是恒写字段）。",
+        "redText": {
+          "attr": "IsNeedRedMark",
+          "colorSource": "MenuItem 文案 TEXT 的 _color（取不到时回退 fill→styles 的值）",
+          "minRed": 180,
+          "maxGreenBlue": 100,
+          "rule": "文案颜色属于红色系（R≥minRed 且 G≤maxGreenBlue 且 B≤maxGreenBlue，实测 #F8274B）时写 IsNeedRedMark=\"true\""
+        },
+        "statusBox": {
+          "attr": "IsShowStatus",
+          "nodeTypes": "非 TEXT 节点（GROUP / LAYER / INSTANCE 等）",
+          "minSize": 8,
+          "maxSize": 32,
+          "maxOffsetX": 20,
+          "maxOffsetY": 20,
+          "rule": "菜单项组件内存在左上角小方框（宽高 8–32px、相对菜单项左上角 x≤20 且 y≤20，实测 首页-长方形 的 组 2492 18×18@8,8）时写 IsShowStatus=\"true\""
+        }
+      },
       "menuItemAlwaysWrittenAttrs": [
         "LangName",
         "PageName",

@@ -150,4 +150,68 @@ assert.match(manifest.layoutEvidence.note, /底部栏/);
 const reportJson = JSON.parse(fs.readFileSync(report, "utf8"));
 assert.ok(Array.isArray(reportJson.menuItems) && reportJson.menuItems.length === 4);
 
+// ---- 设计稿标记：红字文案 → IsNeedRedMark；左上角状态方框 → IsShowStatus ----
+function flagText(value, id, color) {
+  const node = { type: "TEXT", id: id, name: "固定文本框", layoutStyle: { width: 100, height: 16, relativeX: 0, relativeY: 56 }, text: [{ text: value }] };
+  if (color) node._color = color;
+  return node;
+}
+function flagButton(id, x, label, color, withStatusBox) {
+  const children = [flagText(label, id + "/label", color)];
+  if (withStatusBox) {
+    children.push({
+      type: "GROUP", id: id + "/status", name: "组 2492",
+      layoutStyle: { width: 18, height: 18, relativeX: 8, relativeY: 8 },
+      children: [{ type: "LAYER", id: id + "/status/rect", name: "矩形 49", layoutStyle: { width: 18, height: 18, relativeX: 0, relativeY: 0 } }]
+    });
+  }
+  return {
+    type: "INSTANCE", id: id, name: "非首页-长方形",
+    layoutStyle: { width: 180, height: 84, relativeX: x, relativeY: 12 },
+    componentInfo: { properties: { "属性 1": "非首页-长方形" } },
+    children: children
+  };
+}
+const flagDsl = {
+  dsl: {
+    nodes: [{
+      type: "INSTANCE", id: "42:9", name: "页面",
+      layoutStyle: { width: 1280, height: 1024, relativeX: 0, relativeY: 0 },
+      children: [{
+        type: "FRAME", id: "42:9/bar", name: "底部button",
+        layoutStyle: { width: 1280, height: 202, relativeX: 0, relativeY: 822 },
+        children: [
+          { type: "INSTANCE", id: "42:9/bar/resident", name: "右侧底部-常驻button", layoutStyle: { width: 200, height: 200, relativeX: 1000, relativeY: 0 }, children: [] },
+          flagButton("42:9/bar/1", 28, "报警", "#F8274B", false),
+          flagButton("42:9/bar/2", 236, "普通", "#000000", false),
+          flagButton("42:9/bar/3", 444, "开关", "#000000", true)
+        ]
+      }]
+    }],
+    styles: {},
+    components: []
+  }
+};
+fs.writeFileSync(path.join(root, "flag-dsl.json"), JSON.stringify(flagDsl, null, 2), "utf8");
+fs.writeFileSync(path.join(root, "flag-icon-map.json"), JSON.stringify({ icons: [] }, null, 2), "utf8");
+const flagOut = path.join(root, "flag-layout-manifest.json");
+const flagResult = spawnSync(process.execPath, [script,
+  "--dsl", path.join(root, "flag-dsl.json"),
+  "--icon-map", path.join(root, "flag-icon-map.json"),
+  "--map", path.join(root, "map.json"),
+  "--page-target", "FlagPage",
+  "--page-lang-name", "",
+  "--layout-path", "Resources/Layout/Layout.xml",
+  "--out", flagOut,
+], { encoding: "utf8" });
+assert.strictEqual(flagResult.status, 0, flagResult.stderr);
+const flagManifest = JSON.parse(fs.readFileSync(flagOut, "utf8"));
+const byName = new Map(flagManifest.menuItems.map((item) => [item.name, item]));
+// 红字文案（#F8274B）→ IsNeedRedMark=true；黑字不写该字段
+assert.strictEqual(byName.get("报警").isNeedRedMark, true, "红色文案必须推导出 IsNeedRedMark");
+assert.strictEqual(byName.get("普通").isNeedRedMark, undefined, "非红字不得写 IsNeedRedMark");
+// 左上角状态方框 → IsShowStatus=true；没有方框的不写该字段
+assert.strictEqual(byName.get("开关").isShowStatus, true, "左上角有状态方框必须推导出 IsShowStatus");
+assert.strictEqual(byName.get("普通").isShowStatus, undefined, "没有状态方框不得写 IsShowStatus");
+
 console.log("PASS MTSLG Layout manifest derivation regression test");

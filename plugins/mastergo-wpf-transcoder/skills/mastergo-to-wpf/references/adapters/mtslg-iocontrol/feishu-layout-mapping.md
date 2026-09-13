@@ -38,6 +38,13 @@
 
 **MenuItem 图标尺寸**：与页面 XML 按钮族同一规则——有 `Icon` 就必须有 `iconSize`（图标图形节点 bbox），发射时四舍五入写 `IconWidth` / `IconHeight`；没有图标槽位时不写 `Icon` / `IconWidth` / `IconHeight`；带 `Icon` 却没有 `iconSize` 直接失败，禁止猜尺寸。
 
+**MenuItem 设计稿标记（命中才写，不是常驻字段）**：
+
+1. **红字文案 → `IsNeedRedMark="true"`**：菜单项文案 TEXT 的颜色属于红色系（实测设计稿取值 `#F8274B`；判定 R≥180 且 G≤100 且 B≤100，颜色取 TEXT 的 `_color`，取不到时回退 `fill` → styles 的值）。
+2. **左上角状态方框 → `IsShowStatus="true"`**：菜单项组件内存在左上角小方框（非 TEXT 节点、宽高 8–32px、相对菜单项左上角 x≤20 且 y≤20；实测「首页-长方形」变体的 `组 2492` 18×18@8,8，对应公开属性 `显示开关`）。
+
+两者都是**命中才发射**：未命中时**不写**该属性（不得写空串、不得写 `false`）。判定参数的真值源是 `mtslg-iocontrol-map.json` 的 `layoutRules.bottomBar.menuItemFlags`；推导由 `gen-mtslg-layout-manifest.js` 完成（写进 `menuItems.isNeedRedMark` / `menuItems.isShowStatus`），发射由 `gen-mtslg-layout.js` 完成。
+
 ## Layout 清单（menuItems）的机械推导
 
 底部栏菜单不再人工登记，由 `gen-mtslg-layout-manifest.js` 从 DSL 快照 + 当前页面 Icon 映射 + 模板表机械推导，规则全部登记在 `mtslg-iocontrol-map.json` 的 `layoutRules.bottomBar`：

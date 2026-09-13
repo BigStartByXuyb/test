@@ -44,6 +44,16 @@ const residentPattern = new RegExp(bottomBar.residentGroupPattern || "常驻(but
 const fKeyPattern = new RegExp(bottomBar.fKeyPattern || "^F\\d+$");
 const decorPattern = new RegExp(bottomBar.decorativeNamePattern || "背景|分割");
 const variantNames = new Set(Object.keys(bottomBar.variants));
+// 底部栏标记的判定参数（真值来源：模板表 layoutRules.bottomBar.menuItemFlags）。
+const flagSpec = bottomBar.menuItemFlags || {};
+const redSpec = flagSpec.redText || {};
+const statusSpec = flagSpec.statusBox || {};
+const RED_MIN_RED = Number.isFinite(Number(redSpec.minRed)) ? Number(redSpec.minRed) : 180;
+const RED_MAX_GREEN_BLUE = Number.isFinite(Number(redSpec.maxGreenBlue)) ? Number(redSpec.maxGreenBlue) : 100;
+const STATUS_MIN_SIZE = Number.isFinite(Number(statusSpec.minSize)) ? Number(statusSpec.minSize) : 8;
+const STATUS_MAX_SIZE = Number.isFinite(Number(statusSpec.maxSize)) ? Number(statusSpec.maxSize) : 32;
+const STATUS_MAX_OFFSET_X = Number.isFinite(Number(statusSpec.maxOffsetX)) ? Number(statusSpec.maxOffsetX) : 20;
+const STATUS_MAX_OFFSET_Y = Number.isFinite(Number(statusSpec.maxOffsetY)) ? Number(statusSpec.maxOffsetY) : 20;
 
 const root = dslSnapshot.dsl && Array.isArray(dslSnapshot.dsl.nodes) ? dslSnapshot.dsl.nodes[0] : null;
 if (!root) fail("DSL 快照缺少 dsl.nodes[0]");
@@ -85,6 +95,52 @@ for (const icon of iconMap.icons || []) {
 }
 
 function childrenOf(node) { return (node.children || []).slice(); }
+
+// ---------- 底部栏标记推导：红字文案 / 左上角状态方框 ----------
+// 红字 → MenuItem 写 IsNeedRedMark="true"；左上角有状态方框 → 写 IsShowStatus="true"。
+// 两者都只取设计稿事实（文案 TEXT 的颜色 / 组件内的方框节点），取不到就不写。
+function colorOf(node) {
+  if (!node) return "";
+  if (typeof node._color === "string" && node._color.trim()) return node._color.trim();
+  const styles = dslSnapshot.dsl && dslSnapshot.dsl.styles ? dslSnapshot.dsl.styles : {};
+  const paint = node.fill && styles[node.fill] ? styles[node.fill].value : null;
+  const first = Array.isArray(paint) ? paint[0] : paint;
+  return typeof first === "string" ? first.trim() : "";
+}
+
+function isRedColor(value) {
+  const match = /^#([0-9a-fA-F]{6})$/.exec(String(value || "").trim());
+  if (!match) return false;
+  const r = parseInt(match[1].slice(0, 2), 16);
+  const g = parseInt(match[1].slice(2, 4), 16);
+  const b = parseInt(match[1].slice(4, 6), 16);
+  return r >= RED_MIN_RED && g <= RED_MAX_GREEN_BLUE && b <= RED_MAX_GREEN_BLUE;
+}
+
+// 菜单项左上角的状态方框：非 TEXT 节点、宽高在阈值内、相对菜单项左上角偏移在阈值内。
+function hasStatusBox(node) {
+  let found = false;
+  (function walk(current, absX, absY) {
+    if (found) return;
+    for (const child of current.children || []) {
+      const ls = child.layoutStyle || {};
+      const x = absX + (Number(ls.relativeX) || 0);
+      const y = absY + (Number(ls.relativeY) || 0);
+      const w = Number(ls.width) || 0;
+      const h = Number(ls.height) || 0;
+      const isText = child.type === "TEXT" || Array.isArray(child.text);
+      if (!isText && w >= STATUS_MIN_SIZE && w <= STATUS_MAX_SIZE &&
+          h >= STATUS_MIN_SIZE && h <= STATUS_MAX_SIZE &&
+          x <= STATUS_MAX_OFFSET_X && y <= STATUS_MAX_OFFSET_Y) {
+        found = true;
+        return;
+      }
+      walk(child, x, y);
+      if (found) return;
+    }
+  })(node, 0, 0);
+  return found;
+}
 
 // 底部栏按钮按"视觉行序"排列：先按 y 分行（同一行内 y 差不超过行高的一半视为同行），行内按 x。
 function visualOrder(entries) {
@@ -213,6 +269,10 @@ const raw = candidateEntries.map(function (item) {
       .find(function (value) { return typeof value === "string" && variantNames.has(value); }) || node.name,
     name: nameText ? nameText.text : "",
     topLeftContent: fKeyText ? fKeyText.text : "",
+    // 红字文案（实测 #F8274B）→ IsNeedRedMark；左上角状态方框 → IsShowStatus。
+    labelColor: nameText ? colorOf(nameText.node) : "",
+    isNeedRedMark: nameText ? isRedColor(colorOf(nameText.node)) : false,
+    isShowStatus: hasStatusBox(node),
     icon: iconEntry ? iconEntry.name : "",
     iconSize: geometryNode ? {
       width: geometryNode.layoutStyle.width,
@@ -230,6 +290,9 @@ const menuItems = raw.map(function (item) {
     icon: item.icon,
   };
   if (item.icon && item.iconSize) out.iconSize = item.iconSize;
+  // 布尔标记只在成立时写；不成立不发射该属性。
+  if (item.isNeedRedMark) out.isNeedRedMark = true;
+  if (item.isShowStatus) out.isShowStatus = true;
   if (bottomBar.variants[item.variant] && bottomBar.variants[item.variant].topLeftContent !== "none") {
     out.topLeftContent = item.topLeftContent;
   }
@@ -262,7 +325,11 @@ if (args.report) {
     residentGroups: residentGroups.map(function (node) { return { ref: node.id, name: node.name }; }),
     residentGroupItems: residentGroupItems,
     menuItems: menuItems.map(function (item) {
-      return { index: item.index, sourceRef: item.sourceRef, name: item.name, icon: item.icon, topLeftContent: item.topLeftContent };
+      return {
+        index: item.index, sourceRef: item.sourceRef, name: item.name, icon: item.icon,
+        topLeftContent: item.topLeftContent,
+        isNeedRedMark: item.isNeedRedMark === true, isShowStatus: item.isShowStatus === true
+      };
     }),
   }, null, 2) + "\n", "utf8");
 }

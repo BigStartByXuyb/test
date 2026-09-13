@@ -282,6 +282,30 @@ assert.match(text, /Icon="" Index="1" LangName="" IOEnable=""/,
 assert.doesNotMatch(text, /PageName=|IOCommand=|IOVisible=/,
   "模板表未声明的常驻属性不得发射");
 
+// 设计稿标记：红字 → IsNeedRedMark="true"，左上角状态方框 → IsShowStatus="true"；
+// 只有 true 才发射，false / 缺省都不写这两个属性（不是常驻字段）。
+const flagManifest = path.join(root, "menu-flags.json");
+const flagLayout = path.join(root, "MenuFlagsLayout.xml");
+fs.writeFileSync(flagManifest, JSON.stringify({
+  layoutPath: flagLayout,
+  pageTarget: "MenuFlagsPage",
+  pageLangName: "",
+  layoutStatus: "complete",
+  layoutEvidence: { matchedBottomBarItems: 2, unresolvedBottomBarItems: 0 },
+  menuItems: [
+    { name: "报警", icon: "", index: 1, isNeedRedMark: true, isShowStatus: true },
+    { name: "普通", icon: "", index: 2, isNeedRedMark: false }
+  ]
+}, null, 2), "utf8");
+result = spawnSync(process.execPath, [script, "--manifest", flagManifest], { encoding: "utf8" });
+assert.strictEqual(result.status, 0, result.stderr);
+text = fs.readFileSync(flagLayout, "utf8");
+assert.match(text, /Name="报警"[\s\S]*?IsShowStatus="true" IsNeedRedMark="true"/,
+  "红字文案与左上角状态方框必须分别发射 IsNeedRedMark / IsShowStatus");
+assert.match(text, /Name="普通"[^>]*\/>/, "第二个菜单项必须存在");
+assert.ok(!/Name="普通"[^>]*IsShowStatus=/.test(text), "缺省时不得发射 IsShowStatus");
+assert.ok(!/Name="普通"[^>]*IsNeedRedMark=/.test(text), "false 时不得发射 IsNeedRedMark");
+
 // 真值源回归锁：模板表（mtslg-iocontrol-map.json）与脚本内置默认必须一致，
 // 且右栏“父节点语义（parentVariants）”建模必须保持作废状态。
 const realMapPath = path.resolve(__dirname, "..", "references", "adapters", "mtslg-iocontrol", "mtslg-iocontrol-map.json");

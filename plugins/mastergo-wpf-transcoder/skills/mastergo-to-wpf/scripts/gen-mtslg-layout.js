@@ -15,6 +15,9 @@ const ATTR_FIELDS = [
   ["Name", "name"], ["Icon", "icon"], ["TopLeftContent", "topLeftContent"], ["Index", "index"],
   ["LangName", "langName"], ["PageName", "pageName"], ["IOCommand", "ioCommand"], ["IOVisible", "ioVisible"],
   ["IOEnable", "ioEnable"], ["UserRightId", "userRightId"],
+  // 设计稿标记（只在成立时由 layout 清单给出 true，其余不发射）：
+  //   红字文案 → IsNeedRedMark；左上角状态方框 → IsShowStatus。
+  ["IsShowStatus", "isShowStatus"], ["IsNeedRedMark", "isNeedRedMark"],
   ["IconWidth", "iconWidth"], ["IconHeight", "iconHeight"]
 ];
 
@@ -64,7 +67,8 @@ function xmlAttr(value) {
 
 function attrEntries(item) {
   return ATTR_FIELDS.filter(function (pair) {
-    return item[pair[1]] !== undefined && item[pair[1]] !== null;
+    // 布尔标记只在 true 时发射；false / 空值不写这个属性。
+    return item[pair[1]] !== undefined && item[pair[1]] !== null && item[pair[1]] !== false;
   }).map(function (pair) {
     return [pair[0], item[pair[1]]];
   });
