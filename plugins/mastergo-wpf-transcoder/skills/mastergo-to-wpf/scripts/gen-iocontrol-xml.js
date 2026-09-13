@@ -80,7 +80,34 @@ if (!mode || !mappingPath) usage();
 if (mode === 'merge' && !existingPath) usage();
 
 const mapping = JSON.parse(fs.readFileSync(mappingPath, 'utf8'));
-const nodes = mapping.nodes || [];
+// ---------- 节点发射顺序：按设计稿的上下布局 ----------
+// 设计稿的图层树顺序与画面上的上下位置无关（mapping.nodes 由 DSL 树递归遍历产生），
+// 而生成代码必须按设计坐标自上而下、同一行自左向右排列：上下布局容器的子节点顺序
+// 直接决定运行时的显示顺序。排序只改变发射顺序，ID / 坐标 / 属性 / 层级关系都不变。
+// 口径：Top（absY）主序 → Left（absX）次序 → 坐标相同保持映射原顺序（稳定）。
+function sortNodesByDesignOrder(list) {
+  if (!Array.isArray(list)) return [];
+  return list
+    .map(function (node, index) { return { node: node, index: index }; })
+    .sort(function (a, b) {
+      const ay = Number(a.node && a.node.absY);
+      const by = Number(b.node && b.node.absY);
+      const aHasY = Number.isFinite(ay);
+      const bHasY = Number.isFinite(by);
+      if (aHasY && bHasY && ay !== by) return ay - by;
+      if (aHasY !== bHasY) return aHasY ? -1 : 1;
+      const ax = Number(a.node && a.node.absX);
+      const bx = Number(b.node && b.node.absX);
+      const aHasX = Number.isFinite(ax);
+      const bHasX = Number.isFinite(bx);
+      if (aHasX && bHasX && ax !== bx) return ax - bx;
+      if (aHasX !== bHasX) return aHasX ? -1 : 1;
+      return a.index - b.index;
+    })
+    .map(function (item) { return item.node; });
+}
+
+const nodes = sortNodesByDesignOrder(mapping.nodes || []);
 const TOP_PUBLIC_BAR_Y = 126;
 const TOP_ARTIFACT_TITLE_Y = 66;
 const contentOriginY = TOP_PUBLIC_BAR_Y + TOP_ARTIFACT_TITLE_Y;

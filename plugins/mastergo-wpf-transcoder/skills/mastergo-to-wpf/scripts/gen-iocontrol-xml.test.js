@@ -303,6 +303,45 @@ assert.ok(mapStatusTag, 'StatusButton 节点仍应存在');
 assert.ok(!/PageName=|IOParam=/.test(mapStatusTag),
   '模板表里 controlTypes 不含 StatusButton 时，该控件不得再获得按钮族固定参数');
 
+// ---- 发射顺序：按设计稿上下布局（Top 主序、Left 次序），与 mapping 数组顺序无关 ----
+// 设计稿的图层树顺序与画面上下位置无关；上下布局容器的子节点顺序决定运行时显示顺序，
+// 因此 XML 必须按设计坐标重排，而 ID / 坐标 / 属性不变。
+const orderMapping = path.join(dir, 'order-mapping.json');
+const orderOutput = path.join(dir, 'order-page.xml');
+function orderTextNode(ref, xmlId, text, x, y) {
+  return {
+    ref: ref, sourceRef: ref, sourceParent: 'root', id: xmlId, xmlId: xmlId,
+    controlType: 'TextBlock', absX: x, absY: y, w: 80, h: 40,
+    sourceText: text, valueSource: 'dsl.text', attrs: { Value: text }
+  };
+}
+fs.writeFileSync(orderMapping, JSON.stringify({
+  rootRef: 'root',
+  sourceNodes: [
+    { ref: 'root', parentRef: null, pageAbsX: 0, pageAbsY: 0, relativeX: 0, relativeY: 0, width: 1280, height: 1024 },
+    { ref: 'c', parentRef: 'root', pageAbsX: 100, pageAbsY: 283, relativeX: 100, relativeY: 283, width: 80, height: 20, type: 'TEXT', text: '底部' },
+    { ref: 'b', parentRef: 'root', pageAbsX: 200, pageAbsY: 202, relativeX: 200, relativeY: 202, width: 80, height: 20, type: 'TEXT', text: '同一行右侧' },
+    { ref: 'a', parentRef: 'root', pageAbsX: 100, pageAbsY: 202, relativeX: 100, relativeY: 202, width: 80, height: 20, type: 'TEXT', text: '顶部' }
+  ],
+  textAudit: [
+    { sourceRef: 'c', sourceText: '底部', visibility: true, role: 'content', decision: 'emit', outputRefs: ['MG_C'] },
+    { sourceRef: 'b', sourceText: '同一行右侧', visibility: true, role: 'content', decision: 'emit', outputRefs: ['MG_B'] },
+    { sourceRef: 'a', sourceText: '顶部', visibility: true, role: 'content', decision: 'emit', outputRefs: ['MG_A'] }
+  ],
+  // 故意与上下顺序相反：底部 → 同行右侧 → 顶部
+  nodes: [
+    orderTextNode('c', 'MG_C', '底部', 100, 283),
+    orderTextNode('b', 'MG_B', '同一行右侧', 200, 202),
+    orderTextNode('a', 'MG_A', '顶部', 100, 202)
+  ]
+}, null, 2));
+const orderRun = spawnSync(process.execPath, [path.join(__dirname, 'gen-iocontrol-xml.js'),
+  '--fresh', orderMapping, '--out', orderOutput], { encoding: 'utf8' });
+assert.strictEqual(orderRun.status, 0, '顺序用例必须能渲染: ' + orderRun.stderr);
+const orderIds = [...fs.readFileSync(orderOutput, 'utf8').matchAll(/ID="(MG_[A-Z])"/g)].map((match) => match[1]);
+assert.deepStrictEqual(orderIds, ['MG_A', 'MG_B', 'MG_C'],
+  '页面 XML 必须按设计稿上下顺序发射（Top 主序、同一行 Left 次序），与 mapping 数组顺序无关');
+
 console.log('PASS IOContorl typed-node gate regression test');
 console.log('PASS IconButton fixed-attribute regression test');
 console.log('PASS button-family rules are read from the template map');
