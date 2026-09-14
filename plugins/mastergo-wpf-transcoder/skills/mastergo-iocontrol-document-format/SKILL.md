@@ -76,7 +76,7 @@ description: 强制规范 MasterGo → MTSLG IOContorl 映射文档的写法。�
 
 文案→Value；业务字段/动作→IOName/IOCommand；位置尺寸→Left/Top/Width/Height。
 固定模板中已声明但 MasterGo 或目标项目没有可靠来源的可选属性，保留属性并输出空字符串值；不在固定模板中的属性不新增。节点本身只有在可见性规则、页面根级大标题规则或宿主结构边界明确剥离时才省略；组件库 placeholder 标记不构成省略理由。
-例外：按钮族（IconButton / Button / StatusButton）的 `PageName`、`IOVisible`、`IOCommand` 属于按钮族固定参数，无论固定模板是否逐条声明、无论能否取到来源都必须发射（取不到写空字符串值）；`IconWidth`/`IconHeight` 只在按钮有图标槽位时发射，取图标图形节点自身 bbox，没有图标槽位时不发射这三项。
+例外：按钮族（IconButton / Button / StatusButton）的 `PageName`、`IOVisible`、`IOCommand`、`IOEnable`，以及模板含图标字段的 `IconButton` 的 `Icon`、`IconWidth`、`IconHeight`，都属于固定字段：无论固定模板是否逐条声明、无论能否取到来源都必须发射，取不到时写空字符串值（`IconWidth`/`IconHeight` 有图标槽位时改取图标图形节点自身 bbox，四舍五入取整）。模板不含图标字段的 `Button`、`StatusButton` 不发射 `Icon`/`IconWidth`/`IconHeight`。该口径以 `mtslg-iocontrol-map.json` 的 `buttonFamily` 与 `controlTypeRequiredAttrs` 为准，冲突时以映射表为准。
 ```
 
 如果多个真实属性值的输出结构完全相同，可以在一个固定模板中明确列出这些真实值；如果结构、Style、节点数量或槽位有任何差异，必须拆成独立固定模板。Table、信息分组、输入框等组件集与 IconButton 使用完全相同的文档结构，不得另起“表格专用”或“组件说明”格式。
@@ -106,7 +106,7 @@ description: 强制规范 MasterGo → MTSLG IOContorl 映射文档的写法。�
 
 ## 特殊规则
 
-- 无图标组件不得生成 `Icon`、`IconWidth`、`IconHeight`；没有图标槽位时不要在模板中保留这些属性。按钮族有图标槽位时必须写 `IconWidth`/`IconHeight`，取值是图标图形节点自身的 bbox（不是控件宽高、也不是图标容器尺寸）。
+- 图标字段随 `ControlType` 的固定模板决定：模板含图标字段的 `IconButton` 恒写 `Icon`、`IconWidth`、`IconHeight`，无图标槽位时写空字符串值；有图标槽位时 `IconWidth`/`IconHeight` 取值是图标图形节点自身的 bbox（不是控件宽高、也不是图标容器尺寸），`Icon` 取已登记的资源键。模板不含图标字段的 `Button`、`StatusButton` 以及其余无图标控件不得出现 `Icon`、`IconWidth`、`IconHeight`。
 - `FontSize`、`Height`、`Width` 始终分开表达；`TextBlock` 的 `Height` 固定 `40`、`Width` 固定 `NaN`，不得用字号、行高、文本 bbox 高度或文本 bbox 宽度替代；非 TextBlock 控件的宽高必须来自对应 MasterGo bbox。
 - 坐标必须来自对应 MasterGo bbox，并按项目统一内容区坐标规则计算；模板不能决定实例坐标。
 - 根级示例标题/工件示教标题按 `design-artifact-title` 规则处理，不得混入业务 XML；保留或剥离都要记录原因。

@@ -30,10 +30,11 @@
  * 页面坐标固定扣除顶部公共栏 126px，再扣除被剥离的示例标题 66px；总偏移 192px。
  *
  * 按钮族固定参数（IconButton / Button / StatusButton 无差别发射）：
- *   PageName / IOVisible / IOCommand —— 无差别恒写；映射没有可靠来源时写空字符串占位，
+ *   PageName / IOVisible / IOCommand / IOEnable —— 无差别恒写；映射没有可靠来源时写空字符串占位，
  *   映射提供真实值时按真实值发射（merge 时保留现有真实值）。
- *   IconWidth / IconHeight —— 只在按钮有图标时发射，机械取「图标图形节点」bbox（映射字段 iconSize，
- *   四舍五入取整）；无图标槽位时 Icon / IconWidth / IconHeight 都不发射；
+ *   Icon / IconWidth / IconHeight —— 属 ControlType 固定必写字段：模板含图标字段的 IconButton 恒写，
+ *   有图标槽位时 IconWidth / IconHeight 机械取「图标图形节点」bbox（映射字段 iconSize，四舍五入取整），
+ *   无图标槽位时三项写空字符串占位；模板不含图标字段的 Button / StatusButton 不发射这三项；
  *   带 Icon 却没有 iconSize 视为映射不完整，直接失败，禁止猜图标尺寸。
  *
  * TextBlock 固定属性：Height 固定 40；Width 固定 "NaN"（不用设计稿文本 bbox 宽度），

@@ -52,7 +52,7 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 3. **MasterGo DSL**为映射槽位提供真实文本、实例属性、图标来源、尺寸和逐级坐标。
 4. 图层名称、组件名称和视觉外观不得触发额外推断；没有映射的组件不得静默改成 `Button`、`Border`、无类型容器或其他近似控件。
 
-当前 MTSLG 结构映射稿与运行时交付使用同一条生成链路：目标项目缺失时仍必须创建完整 IOContorl 脚手架，并生成与正式运行结构一致的 `.csproj`、`framework.config.json`、页面 XML、页面 Icon、Layout 壳层和 mapping/provenance。固定模板中已经声明的可选运行时属性，映射清单缺少来源时必须显式写成空字符串值，并在 mapping/manifest 中标记待配置；不在当前固定模板中的属性不新增，尤其是没有 Icon 槽位的变体不得写 `Icon=""`。只有项目引用、真实运行时资源、可编译宿主和加载验证都通过后，才能称为“完整可运行页面”。
+当前 MTSLG 结构映射稿与运行时交付使用同一条生成链路：目标项目缺失时仍必须创建完整 IOContorl 脚手架，并生成与正式运行结构一致的 `.csproj`、`framework.config.json`、页面 XML、页面 Icon、Layout 壳层和 mapping/provenance。固定模板中已经声明的可选运行时属性，映射清单缺少来源时必须显式写成空字符串值，并在 mapping/manifest 中标记待配置；不在当前固定模板中的属性不新增：`ControlType` 的模板不含图标字段时不写 `Icon`/`IconWidth`/`IconHeight`，模板含图标字段的 `IconButton` 没有图标槽位时仍按必写字段发射空字符串占位。只有项目引用、真实运行时资源、可编译宿主和加载验证都通过后，才能称为“完整可运行页面”。
 
 ### 空项目脚手架模式
 
