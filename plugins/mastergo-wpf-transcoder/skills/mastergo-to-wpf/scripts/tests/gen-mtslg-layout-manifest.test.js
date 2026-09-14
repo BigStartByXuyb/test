@@ -93,13 +93,10 @@ fs.writeFileSync(path.join(root, "icon-map.json"), JSON.stringify(iconMap, null,
 const map = {
   layoutRules: {
     bottomBar: {
-      componentSet: "底部栏",
       match: { componentName: true },
       residentGroupPattern: "常驻(button|按钮|分组)",
       fKeyPattern: "^F\\d+$",
       decorativeNamePattern: "背景|分割",
-      repeatPlaceholderThreshold: 2,
-      placeholderTexts: ["文案", "文案展示"],
       menuItemAlwaysWrittenAttrs: ["LangName", "PageName", "IOCommand", "IOVisible"],
       iconSizeAttrs: ["IconWidth", "IconHeight"],
       variants: {
