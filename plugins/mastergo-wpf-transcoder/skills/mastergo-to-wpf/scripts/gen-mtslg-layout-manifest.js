@@ -216,7 +216,7 @@ const residentGroupItems = residentGroups.reduce(function (sum, group) {
 // 唯一的底部栏变体解析入口：按登记的键取值，命中 variants 才返回（与组件模板族同一套机制）。
 function resolveBottomBarVariant(node) {
   if (!node || node.type !== "INSTANCE") return "";
-  if (bottomBarMatch.componentName === true || bottomBarMatch.componentSet === true) {
+  if (bottomBarMatch.componentName === true) {
     return typeof node.name === "string" && variantNames.has(node.name) ? node.name : "";
   }
   if (typeof bottomBarMatch.property === "string") {
@@ -299,7 +299,6 @@ const raw = candidateEntries.map(function (item) {
   const fKeyText = texts.find(function (entry) { return fKeyPattern.test(entry.text); });
   const iconEntry = iconEntryOf(node);
   const geometryNode = iconEntry ? nodeById.get(iconEntry.sourceRef || iconEntry.sourceId) : null;
-  const props = (node.componentInfo && node.componentInfo.properties) || {};
   return {
     ref: node.id,
     position: position,

@@ -1220,68 +1220,52 @@
       ],
       "variants": {
         "首页-长方形": {
-          "topLeftContent": "none",
-          "iconPolicy": "single-path"
+          "topLeftContent": "none"
         },
         "非首页-长方形": {
-          "topLeftContent": "text",
-          "iconPolicy": "single-path"
+          "topLeftContent": "text"
         },
         "方-icon+文案": {
-          "topLeftContent": "none",
-          "iconPolicy": "single-path"
+          "topLeftContent": "none"
         },
         "方-icon": {
-          "topLeftContent": "none",
-          "iconPolicy": "single-path"
+          "topLeftContent": "none"
         },
         "非首页-F": {
-          "topLeftContent": "text",
-          "iconPolicy": "none"
+          "topLeftContent": "text"
         },
         "非首页-文案": {
-          "topLeftContent": "none",
-          "iconPolicy": "none"
+          "topLeftContent": "none"
         },
         "非首页- F": {
-          "topLeftContent": "text",
-          "iconPolicy": "none"
+          "topLeftContent": "text"
         },
         "DI 显示-0": {
-          "topLeftContent": "none",
-          "iconPolicy": "single-path"
+          "topLeftContent": "none"
         },
         "DI 显示-1000": {
-          "topLeftContent": "none",
-          "iconPolicy": "single-path"
+          "topLeftContent": "none"
         },
         "DI 显示-2000": {
-          "topLeftContent": "none",
-          "iconPolicy": "single-path"
+          "topLeftContent": "none"
         },
         "DI 显示-3000": {
-          "topLeftContent": "none",
-          "iconPolicy": "single-path"
+          "topLeftContent": "none"
         },
         "DI 显示-4000": {
-          "topLeftContent": "none",
-          "iconPolicy": "single-path"
+          "topLeftContent": "none"
         },
         "DI 显示-5000": {
-          "topLeftContent": "none",
-          "iconPolicy": "single-path"
+          "topLeftContent": "none"
         },
         "DO 显示-0": {
-          "topLeftContent": "none",
-          "iconPolicy": "single-path"
+          "topLeftContent": "none"
         },
         "DO 显示-1000": {
-          "topLeftContent": "none",
-          "iconPolicy": "single-path"
+          "topLeftContent": "none"
         },
         "DO 显示-2000": {
-          "topLeftContent": "none",
-          "iconPolicy": "single-path"
+          "topLeftContent": "none"
         }
       }
     }

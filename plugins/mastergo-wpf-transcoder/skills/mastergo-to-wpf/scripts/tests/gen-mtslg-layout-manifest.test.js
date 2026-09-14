@@ -103,9 +103,9 @@ const map = {
       menuItemAlwaysWrittenAttrs: ["LangName", "PageName", "IOCommand", "IOVisible"],
       iconSizeAttrs: ["IconWidth", "IconHeight"],
       variants: {
-        "首页-长方形": { topLeftContent: "none", iconPolicy: "single-path" },
-        "非首页-长方形": { topLeftContent: "text", iconPolicy: "single-path" },
-        "方-icon": { topLeftContent: "none", iconPolicy: "single-path" },
+        "首页-长方形": { topLeftContent: "none" },
+        "非首页-长方形": { topLeftContent: "text" },
+        "方-icon": { topLeftContent: "none" },
       },
     },
   },
