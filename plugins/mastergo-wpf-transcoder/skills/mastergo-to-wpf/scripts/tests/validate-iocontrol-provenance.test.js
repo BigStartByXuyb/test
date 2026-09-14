@@ -251,9 +251,13 @@ const noMapRun = spawnSync(process.execPath, [cliScript, '--xml', scopedXmlPath,
   '--mapping', scopedMappingPath], { encoding: 'utf8' });
 assert.strictEqual(noMapRun.status, 0,
   '未传 --map 时也要与生成器内置口径一致：Button 不得因映射残留 Icon 触发图标尺寸校验: ' + noMapRun.stderr + noMapRun.stdout);
-// 传入了表但表里没有该 ControlType 条目：与生成器同样视为「模板不含图标字段」。
-const mapWithoutIconButtonEntry = path.join(dir, 'template-map-without-entry.json');
-fs.writeFileSync(mapWithoutIconButtonEntry, JSON.stringify({
+// ---- 表已提供但确实缺该 ControlType 条目：走「无该条目」分支，与生成器一致视为模板不含图标字段 ----
+// 节点用 IconButton、表只登记 Button，才能让 requiredAttrs 为 undefined，真正覆盖该分支。
+const missingEntryMapPath = path.join(dir, 'template-map-missing-entry.json');
+const missingEntryXmlPath = path.join(dir, 'iconbutton-missing-entry.xml');
+const missingEntryBadXmlPath = path.join(dir, 'iconbutton-missing-entry-bad.xml');
+const missingEntryMappingPath = path.join(dir, 'iconbutton-missing-entry-mapping.json');
+fs.writeFileSync(missingEntryMapPath, JSON.stringify({
   buttonFamily: {
     controlTypes: ['IconButton', 'Button'],
     alwaysWrittenAttrs: ['PageName', 'IOVisible', 'IOCommand', 'IOEnable'],
@@ -263,9 +267,35 @@ fs.writeFileSync(mapWithoutIconButtonEntry, JSON.stringify({
     Button: ['Style', 'Value', 'PageName', 'IOCommand', 'IOEnable', 'IOVisible']
   }
 }, null, 2));
-const noEntryRun = spawnSync(process.execPath, [cliScript, '--xml', scopedXmlPath,
-  '--mapping', scopedMappingPath, '--map', mapWithoutIconButtonEntry], { encoding: 'utf8' });
-assert.strictEqual(noEntryRun.status, 0,
-  '表里没有该 ControlType 条目时必须与生成器一致（视为不含图标字段），不得按 IconButton 反推: ' + noEntryRun.stderr + noEntryRun.stdout);
+const missingEntryNode = '<IOContorl ID="BTN" ControlType="IconButton" PageName="" IOVisible="" IOCommand="" ' +
+  'IOEnable="" Left="600" Top="108" Width="60" Height="60"';
+fs.writeFileSync(missingEntryXmlPath,
+  '<IOContorl ID="" Left="NaN" Top="NaN" Width="NaN" Height="NaN">' + missingEntryNode + ' /></IOContorl>');
+fs.writeFileSync(missingEntryBadXmlPath,
+  '<IOContorl ID="" Left="NaN" Top="NaN" Width="NaN" Height="NaN">' + missingEntryNode +
+  ' IconWidth="50" IconHeight="40" /></IOContorl>');
+fs.writeFileSync(missingEntryMappingPath, JSON.stringify({
+  contentOriginY: 192,
+  sourceNodes: [
+    { ref: 'root', parentRef: null, pageAbsX: 0, pageAbsY: 0, relativeX: 0, relativeY: 0, width: 1280, height: 1024 },
+    { ref: 'plain', parentRef: 'root', pageAbsX: 600, pageAbsY: 300, relativeX: 600, relativeY: 300, width: 60, height: 60 }
+  ],
+  nodes: [{
+    xmlId: 'BTN', sourceRef: 'plain', sourceParent: 'root', controlType: 'IconButton',
+    expectedLeft: 600, expectedTop: 108, expectedWidth: 60, expectedHeight: 60,
+    attrs: { ControlType: 'IconButton' }
+  }]
+}, null, 2));
+const missingEntryRun = spawnSync(process.execPath, [cliScript, '--xml', missingEntryXmlPath,
+  '--mapping', missingEntryMappingPath, '--map', missingEntryMapPath], { encoding: 'utf8' });
+assert.strictEqual(missingEntryRun.status, 0,
+  '表里缺该 ControlType 条目时必须与生成器一致（视为模板不含图标字段），不得按 IconButton 反推图标尺寸: ' +
+  missingEntryRun.stderr + missingEntryRun.stdout);
+const missingEntryBadRun = spawnSync(process.execPath, [cliScript, '--xml', missingEntryBadXmlPath,
+  '--mapping', missingEntryMappingPath, '--map', missingEntryMapPath], { encoding: 'utf8' });
+assert.notStrictEqual(missingEntryBadRun.status, 0,
+  '表里缺该 ControlType 条目时，发射了图标尺寸字段必须失败（证明走的是「模板不含图标字段」分支）');
+assert.match(missingEntryBadRun.stderr + missingEntryBadRun.stdout, /模板不含图标字段，不得发射 IconWidth/,
+  '失败信息必须来自「模板不含图标字段」分支，而不是按 IconButton 反推出的无图标占位分支');
 
 console.log('PASS provenance regression test');

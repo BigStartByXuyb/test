@@ -19,8 +19,10 @@ const DEFAULT_BUTTON_FAMILY_RULES = {
 // 图标字段名：与映射表 buttonFamily.iconSizeAttrs 一致（生成器用同一组名字）。
 const BUTTON_ICON_SIZE_ATTR_NAMES = ['IconWidth', 'IconHeight'];
 // 无模板信息时的内置图标口径：按钮族里只有 IconButton 的模板含图标字段。
-// 适用场景：未传 --map，或传入的表里没有该 ControlType 条目（与 gen-iocontrol-xml.js 的
-// DEFAULT_CONTROL_TYPE_REQUIRED_ATTRS 一致，由 doc-rule-consistency.test.js 守护一致性）。
+// 适用场景只有「整张表缺失」——未传 --map，或传入的表没有 controlTypeRequiredAttrs 字段；
+// 表已提供但缺某个 ControlType 条目时不算无模板信息，与生成器一致地按「模板不含图标字段」处理。
+// 与 gen-iocontrol-xml.js 的 DEFAULT_CONTROL_TYPE_REQUIRED_ATTRS 一致，由
+// doc-rule-consistency.test.js 守护该集合的一致性。
 const DEFAULT_ICON_TEMPLATE_CONTROL_TYPES = ['IconButton'];
 
 // 每个 ControlType 的固定必写字段集（设计方模板）：真值来源 mtslg-iocontrol-map.json 的
