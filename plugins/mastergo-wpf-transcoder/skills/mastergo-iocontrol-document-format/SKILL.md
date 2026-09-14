@@ -44,7 +44,7 @@ description: 强制规范 MasterGo → MTSLG IOContorl 映射文档的写法，�
 独立组件集名称 + MasterGo 公开变体/属性名 + 真实属性值
 ```
 
-“完整父节点语义”不作为匹配键：映射表的 `*Templates` 族里没有 `parentVariants` 这类按父节点分流的字段；右栏按公开属性“按钮类型”匹配（`rightSidebarTemplates.match.property` = `按钮类型`，变体值为 `enter` / `exit`），右栏那种“左右结构 / 上下结构”的独立组件则由 `rightSidebarComponentTemplates` 按组件集名匹配（`match.componentSet: true`，变体值为组件名 `右侧栏-左右结构-icon+文案`）。父节点链只用于定位实例、读取证据与回溯，不参与变体匹配。
+“完整父节点语义”不作为匹配键：映射表的模板族里没有按父节点分流的字段。右栏按公开属性“按钮类型”匹配（`rightSidebarTemplates.match.property` = `按钮类型`，变体值包含 `enter`、`exit`、`上下结构-icon+文案` 等）；团队组件库里可直接放置的独立组件则由 `rightSidebarComponentTemplates` 按组件集名匹配（`match.componentSet: true`，已登记 `右侧栏-左右结构-icon+文案` 与 `start`）。父节点链只用于定位实例、读取证据与回溯，不参与变体匹配。
 
 组件集 ID、实例 ID、图层 ID 和设计师自定义名称只用于内部来源追踪，不参与唯一匹配。来源追踪信息用于读取证据、审计和回溯，默认不要作为“来源：MasterGo 文件……”等独立正文行写入飞书映射文档；只有全文已有同类来源字段或用户明确要求时才写入。文档里需要写明组件集的真实名称；不能只写“左右结构”“上下结构”这类缩写。
 
