@@ -34,11 +34,11 @@ MasterGo 转换默认优先检查并调用 MasterGo MCP；浏览器、截图和�
 
 ## 真实项目接入
 
-项目运行时交付直接读取目标项目的 `framework.config.json`、`.csproj`、现有页面、Icon、Layout 和项目本地索引，确认框架 Profile、源码、资源键、页面宿主和运行目录。该事实读取适用于当前启用的 `mtslg-iocontrol`；`mw-wpf` 路线需在其按上文复核前置条件重新启用后才适用。没有目标项目时仍可生成正式静态结构和完整脚手架，但不能宣称编译、加载或运行时验证已完成。
+项目运行时交付直接读取目标项目的 `framework.config.json`、`.csproj`、现有页面、Icon、Layout 和项目本地索引，确认框架 Profile、源码、资源键、页面宿主和运行目录。该事实读取适用于当前启用的 `mtslg-iocontrol`。没有目标项目时仍可生成正式静态结构和完整脚手架，但不能宣称编译、加载或运行时验证已完成。
 
 可见性脚本的输出是 AI 映射的事实输入，不是最终页面文件。AI 仍需结合原始 DSL、visibility audit、正式组件映射和目标运行时资料生成 mapping；mapping 再由 Bundle 生成 XML、Icon、Layout 和宿主文件。
 
-当前启用的 `mtslg-iocontrol` 在没有目标项目时也生成完整项目脚手架：`.csproj`、`framework.config.json`、WPF 宿主壳、页面 XML、Icon 资源容器、Layout 壳层、mapping/provenance 和待配置清单都必须存在；只跳过编译、WPF 加载和真实运行时验证。脚手架与正式项目使用同一套页面生成结构；`mw-wpf` 路线的同等能力待其重新启用时单独复核。
+当前启用的 `mtslg-iocontrol` 在没有目标项目时也生成完整项目脚手架：`.csproj`、`framework.config.json`、WPF 宿主壳、页面 XML、Icon 资源容器、Layout 壳层、mapping/provenance 和待配置清单都必须存在；只跳过编译、WPF 加载和真实运行时验证。脚手架与正式项目使用同一套页面生成结构。
 
 ## Claude Code 安装
 
