@@ -760,6 +760,9 @@ function validateBundleOutputs(info) {
   const mapping = info.mapping;
   if (Array.isArray(mapping.nodes) && mapping.nodes.length > 0) {
     const sourceByRef = new Map((mapping.sourceNodes || []).map(function (node) { return [node.ref, node]; }));
+    const outputRefs = new Set(mapping.nodes.map(function (node) { return node.ref; })
+      .filter(function (ref) { return typeof ref === "string" && ref !== ""; }));
+    const unusableParents = [];
     const rootRef = mapping.rootRef || null;
     const coordNodes = mapping.nodes.map(function (node) {
       const source = sourceByRef.get(node.sourceRef || node.ref) || {};
@@ -773,6 +776,12 @@ function validateBundleOutputs(info) {
         : (node.parent !== undefined ? node.parent : (source.parentRef || null));
       const parentSource = outputParentRef ? (sourceByRef.get(outputParentRef) || null) : null;
       const parentIsRoot = !parentSource || (rootRef !== null && parentSource.ref === rootRef);
+      // 输出父节点必须能落到已发射的输出节点上（或页面根）：与 gen-iocontrol-xml.js 的 parentRefOf()、
+      // provenance 校验器同一口径。解析不到就整段按根级核对会掩盖「XML 无法表达该嵌套」的错误，
+      // 因此这里显式收集并失败，而不是静默按根级处理。
+      if (outputParentRef && !parentIsRoot && !outputRefs.has(outputParentRef)) {
+        unusableParents.push(node.xmlId || node.id || node.ref + " → " + outputParentRef);
+      }
       const originX = parentSource ? (Number(parentSource.pageAbsX) || 0) : 0;
       const originY = parentIsRoot ? 192 : (parentSource ? (Number(parentSource.pageAbsY) || 0) : 192);
       const isTextBlock = (node.controlType || (node.attrs && node.attrs.ControlType)) === "TextBlock";
@@ -811,6 +820,10 @@ function validateBundleOutputs(info) {
       }
       return Object.assign({}, node, meters);
     });
+    if (unusableParents.length > 0) {
+      fail("映射的输出父节点不是已发射的输出节点，XML 无法表达该嵌套（与 gen-iocontrol-xml 的输出父节点门禁同口径）—— " +
+        unusableParents.join("、") + "；请把 layoutParent 登记为 mapping.nodes 里已发射节点的 ref，或用 null 表示页面根级");
+    }
     if (unusableCoordNodes.length > 0) {
       fail("坐标核对无法执行：以下节点的度量表缺少数值（x/y 必须是数值，w/h 必须是数值或 TextBlock 的 NaN）—— " +
         unusableCoordNodes.join("、") +

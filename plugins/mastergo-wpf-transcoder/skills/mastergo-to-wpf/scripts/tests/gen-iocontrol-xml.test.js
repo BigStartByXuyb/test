@@ -464,3 +464,63 @@ assert.match(panelBlock, /ID="ITEM_1"/,
 assert.match(panelBlock, /ID="ITEM_1"[\s\S]*?Left="10"[\s\S]*?Top="0"/,
   'merge 新增的嵌套节点必须按输出父节点计算相对坐标（Left=10 / Top=0）');
 console.log('PASS merge insertion point follows output parent');
+
+// merge 路径：新父节点整链新增时，子节点必须随父块递归发射一次（不得再插入一次、也不得落到页面根）——
+// 覆盖 CI REVIEW-002 指出的「输出父节点本身也是新节点」情形。
+const newChainMapping = path.join(dir, 'new-chain-mapping.json');
+const newChainExistingXml = path.join(dir, 'new-chain-existing-page.xml');
+const newChainOutput = path.join(dir, 'new-chain-page.xml');
+fs.writeFileSync(newChainMapping, JSON.stringify({
+  rootRef: 'root',
+  sourceNodes: [
+    { ref: 'root', parentRef: null, pageAbsX: 0, pageAbsY: 0, relativeX: 0, relativeY: 0, width: 1280, height: 1024 },
+    { ref: 'grp', parentRef: 'root', pageAbsX: 600, pageAbsY: 200, relativeX: 600, relativeY: 200, width: 200, height: 140 },
+    { ref: 'grp/child', parentRef: 'grp', pageAbsX: 620, pageAbsY: 220, relativeX: 20, relativeY: 20, width: 60, height: 60 }
+  ],
+  nodes: [
+    {
+      ref: 'grp', sourceRef: 'grp', sourceParent: 'root', id: 'GRP_1', xmlId: 'GRP_1',
+      controlType: 'GroupBox', layoutParent: null, parent: null, absX: 600, absY: 200, w: 200, h: 140,
+      expectedLeft: 600, expectedTop: 8, expectedWidth: 200, expectedHeight: 140, attrs: {}
+    },
+    {
+      ref: 'grp/child', sourceRef: 'grp/child', sourceParent: 'grp', id: 'GRP_1_CHILD', xmlId: 'GRP_1_CHILD',
+      controlType: 'Border', layoutParent: 'grp', parent: 'grp', absX: 620, absY: 220, w: 60, h: 60,
+      expectedLeft: 20, expectedTop: 20, expectedWidth: 60, expectedHeight: 60, attrs: {}
+    }
+  ]
+}, null, 2));
+fs.writeFileSync(newChainExistingXml, [
+  '<?xml version="1.0" encoding="utf-8"?>',
+  '<IOContorl',
+  '    ID=""',
+  '    Left="NaN"',
+  '    Top="NaN"',
+  '    Width="NaN"',
+  '    Height="NaN">',
+  '</IOContorl>',
+  ''
+].join('\n'));
+const newChainRun = spawnSync(process.execPath, [path.join(__dirname, '..', 'gen-iocontrol-xml.js'),
+  '--merge', newChainExistingXml, newChainMapping, '--out', newChainOutput], { encoding: 'utf8' });
+assert.strictEqual(newChainRun.status, 0, '新增父子链必须能 merge: ' + newChainRun.stderr);
+const newChainText = fs.readFileSync(newChainOutput, 'utf8');
+assert.strictEqual((newChainText.match(/ID="GRP_1_CHILD"/g) || []).length, 1,
+  '新父节点下的子节点必须只发射一次（不得既随父块递归又单独插入）');
+const newGroupBlock = (newChainText.match(/<IOContorl[^>]*ID="GRP_1"[\s\S]*?<\/IOContorl>/) || [''])[0];
+assert.match(newGroupBlock, /ID="GRP_1_CHILD"/,
+  '子节点必须嵌在新父节点块内，而不是被落到页面根');
+console.log('PASS merge new subtree is inserted once, nested');
+
+// 门禁：layoutParent 指向未发射节点时必须直接失败并点名字段
+const badParentMapping = path.join(dir, 'bad-parent-mapping.json');
+const badParentOutput = path.join(dir, 'bad-parent-page.xml');
+const badParentDoc = JSON.parse(fs.readFileSync(layoutParentMapping, 'utf8'));
+badParentDoc.nodes.find(n => n.ref === 'item').layoutParent = 'panel/inner-not-emitted';
+fs.writeFileSync(badParentMapping, JSON.stringify(badParentDoc, null, 2));
+const badParentRun = spawnSync(process.execPath, [path.join(__dirname, '..', 'gen-iocontrol-xml.js'),
+  '--fresh', badParentMapping, '--out', badParentOutput], { encoding: 'utf8' });
+assert.notStrictEqual(badParentRun.status, 0, 'layoutParent 指向未发射节点必须被拒绝');
+assert.match(badParentRun.stderr + badParentRun.stdout, /输出父节点（layoutParent=/,
+  '失败信息必须点名 layoutParent 与实际 ref');
+console.log('PASS output parent must be an emitted node');

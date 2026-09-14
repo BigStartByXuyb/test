@@ -17,7 +17,8 @@
  *       "valueSource": "dsl.text（TextBlock 必须为此值）",
  *       "id": "XML ID 属性值（可选；省略则节点不带 ID）",
  *       "controlType": "IconButton | GroupBox | ...（必填；页面根 IOContorl 不在 nodes 中）",
- *       "parent": null | "某节点 ref"（null = 页面根 IOContorl 的直接子级）",
+ *       "layoutParent": null | "某节点 ref"（**输出父节点首选项**；null = 页面根 IOContorl 的直接子级）",
+ *       "parent": null | "某节点 ref"（同 layoutParent，二选一或同时登记；未登记 layoutParent 时由它决定）",
  *       "absX": 10, "absY": 35,          // 页面绝对 bbox（double）
  *       "w": 160, "h": 150,              // 可省略（无宽高）；NaN 原样输出
  *       "attrs": { "Style": "MainButtonStyle", "Value": "全自动操作", ... },  // 业务属性
@@ -115,8 +116,9 @@ const nodes = sortNodesByDesignOrder(mapping.nodes || []);
 //   layoutParent → parent → DSL sourceParent（sourceNodes.parentRef）
 // 与 validate-iocontrol-provenance.js、gen-mastergo-page-bundle.js 的坐标门禁一致；
 // 当前 DSL→mapping 生成器把 parent / layoutParent 写成同一个值，二者不同只来自显式登记的 layoutParent。
-// 唯一约束：输出父节点必须是**已发射的输出节点**（mapping.nodes 的 ref）或页面根；
-// 指向未发射节点时 XML 无法表达该嵌套（按根级发射会与校验器重算的相对坐标相反），因此直接失败，不静默降级。
+// 唯一约束：输出父节点必须是**已发射的输出节点**（既在 mapping.nodes 的 ref 里、又在 sourceNodes 里有 bbox）
+// 或页面根（null / mapping.rootRef）；指向未发射节点时 XML 无法表达该嵌套（按根级发射会与校验器重算的
+// 相对坐标相反），因此这里直接失败，不静默降级。
 const sourceByRef = new Map((mapping.sourceNodes || []).map(function (s) { return [s.ref, s]; }));
 const nodeRefs = new Set((mapping.nodes || []).map(function (n) { return n.ref; }));
 function parentRefOf(node) {
@@ -130,9 +132,10 @@ function parentRefOf(node) {
     field = 'DSL sourceParent';
   }
   if (!ref || ref === mapping.rootRef) return null;
-  if (!nodeRefs.has(ref)) {
+  if (!nodeRefs.has(ref) || !sourceByRef.has(ref)) {
     throw new Error('映射门禁失败: ' + node.ref + ' 的输出父节点（' + field + '=' + ref +
-      '）不是已发射的输出节点；请把 layoutParent 登记为已发射节点的 ref，或用 null 表示页面根级');
+      '）不是已发射的输出节点（要求同时是 mapping.nodes 的 ref 与 sourceNodes 的记录）；' +
+      '请把 layoutParent 登记为该节点的 ref，或用 null 表示页面根级');
   }
   return ref;
 }
@@ -604,8 +607,8 @@ function mergeMode() {
   function resolveParentAbs(n) {
     const p = parentRefOf(n);
     if (p === null) return { x: 0, y: 0 };
+    // parentRefOf() 已保证 p 是 mapping.nodes 的成员（absOf 的键来自同一批节点），无需再判空。
     const pn = absOf.get(p);
-    if (!pn) throw new Error(`映射节点的输出父节点（layoutParent/parent=${p}）不是已发射的输出节点（来自 ref=${n.ref}）`);
     return { x: pn.absX, y: pn.absY };
   }
 
@@ -726,9 +729,16 @@ function mergeMode() {
   };
 
   const insertions = new Map(); // closeTokenIdx -> [chunks]
+  // 新增子树只以「子树根」为单位插入：输出父节点本身也是本次新增节点时，
+  // 该节点已在父块的 renderSub/kids 递归里发射，不能再单独插入（否则会重复发射并被落到页面根）。
+  const isNewNode = (parentRef) => {
+    const parentRender = parentRef === null ? null : rendered.get(parentRef);
+    return Boolean(parentRender && parentRender.tokenIdx === null);
+  };
   for (const [ref, r] of rendered) {
     if (r.tokenIdx !== null) continue;
     const { n, attrMap } = r;
+    if (isNewNode(parentRefOf(n))) continue;
     const pa = resolveParentAbs(n);
     const attrMap2 = Object.assign({}, attrMap);
     attrMap2.Left = fmtNum(n.absX - pa.x);

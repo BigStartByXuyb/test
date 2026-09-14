@@ -191,6 +191,9 @@ function validate(xmlPath, manifestPath) {
   const actual = tags.filter(a => a.ID !== '' || a.ControlType);
   const byId = new Map(actual.filter(a => a.ID).map(a => [a.ID, a]));
   const mappedIds = new Set();
+  // 输出父节点必须是「已发射的输出节点」（mapping.nodes 里存在 ref）或页面根，
+  // 与 gen-iocontrol-xml.js 的 parentRefOf()、bundle 坐标门禁同一口径。
+  const emittedRefs = new Set(entries.map(e => e.ref).filter(r => typeof r === 'string' && r !== ''));
 
   for (const n of entries) {
     if (!n.xmlId || !n.sourceRef) { errors.push('映射节点缺少 xmlId 或 sourceRef'); continue; }
@@ -215,6 +218,9 @@ function validate(xmlPath, manifestPath) {
     const outputParent = outputParentRef ? sourceMap.get(outputParentRef) : null;
     if (outputParentRef && !outputParent) {
       errors.push('[' + n.xmlId + '] layoutParent 不存在: ' + outputParentRef);
+    }
+    if (outputParent && outputParent.ref !== rootRef && !emittedRefs.has(outputParentRef)) {
+      errors.push('[' + n.xmlId + '] 输出父节点不是已发射的输出节点（不在 mapping.nodes 的 ref 里）: ' + outputParentRef);
     }
     // Root-level output is content-relative: subtract the public shell/title once.
     // Nested output is parent-relative: subtract only the output parent's raw page bbox.
