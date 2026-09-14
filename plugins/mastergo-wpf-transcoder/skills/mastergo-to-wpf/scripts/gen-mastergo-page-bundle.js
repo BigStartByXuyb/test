@@ -44,6 +44,14 @@ function pageLangPaths(pageName, locales) {
 
 function fail(message) { throw new Error(message); }
 
+// 坐标度量的数值归一化：与 validate-iocontrol-provenance.js 的 num()、check-iocontrol-coords.js 的 num() 同口径——
+// 数值字符串（如 "100"）视为数值，空值或无法归一化的值返回 null（= 缺度量）。
+function coordNumber(value) {
+  if (value === undefined || value === null || value === "") return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
 function parseArgs(argv) {
   let manifestPath = null;
   let overwrite = false;
@@ -785,16 +793,31 @@ function validateBundleOutputs(info) {
     });
     // TextBlock 的宽度按规则固定为 NaN（自适应），此时 w 传 "NaN" 是合法的：
     // 只要求 x/y 必须是数值，w/h 允许是数值或 "NaN"（NaN 只与 NaN 匹配，见 check-iocontrol-coords.js）。
-    const coordNodesUsable = coordNodes.every(function (node) {
-      return Number.isFinite(node.x) && Number.isFinite(node.y) &&
-        (node.w === "NaN" || Number.isFinite(node.w)) &&
-        (node.h === "NaN" || Number.isFinite(node.h));
+    // 度量先按 coordNumber() 归一化（数值字符串算数值，与 provenance / 坐标核对器一致），
+    // 归一化后仍为 null 才算「缺度量」；**不允许静默跳过**——坐标核对是硬门禁，
+    // 缺度量必须报错，否则审计里会出现 "static: passed" 而实际根本没跑核对。
+    const unusableCoordNodes = [];
+    const normalizedCoordNodes = coordNodes.map(function (node) {
+      const meters = {
+        x: coordNumber(node.x),
+        y: coordNumber(node.y),
+        w: node.w === "NaN" ? "NaN" : coordNumber(node.w),
+        h: node.h === "NaN" ? "NaN" : coordNumber(node.h)
+      };
+      if (meters.x === null || meters.y === null || meters.w === null || meters.h === null) {
+        unusableCoordNodes.push(node.id + "(x=" + node.x + ",y=" + node.y +
+          ",w=" + node.w + ",h=" + node.h + ")");
+      }
+      return Object.assign({}, node, meters);
     });
-    if (coordNodesUsable) {
-      const coordsPath = path.join(info.tempRoot, "coords.json");
-      fs.writeFileSync(coordsPath, JSON.stringify(coordNodes), "utf8");
-      run(COORDS_SCRIPT, ["--xml", info.pageXmlPath, "--nodes", coordsPath]);
+    if (unusableCoordNodes.length > 0) {
+      fail("坐标核对无法执行：以下节点的度量表缺少数值（x/y 必须是数值，w/h 必须是数值或 TextBlock 的 NaN）—— " +
+        unusableCoordNodes.join("、") +
+        "；请补齐 mapping/sourceNodes 的 bbox 后重跑，不要跳过坐标门禁");
     }
+    const coordsPath = path.join(info.tempRoot, "coords.json");
+    fs.writeFileSync(coordsPath, JSON.stringify(normalizedCoordNodes), "utf8");
+    run(COORDS_SCRIPT, ["--xml", info.pageXmlPath, "--nodes", coordsPath]);
   }
 
   // 多语言：各语言 key 必须完全一致，且 LangName 必须命中本页字典。
