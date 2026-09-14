@@ -15,7 +15,7 @@ fs.writeFileSync(nodesPath, JSON.stringify([{
   contentOriginX: 0, contentOriginY: 192
 }]));
 
-const result = spawnSync(process.execPath, [path.join(__dirname, 'check-iocontrol-coords.js'), '--xml', xmlPath, '--nodes', nodesPath], { encoding: 'utf8' });
+const result = spawnSync(process.execPath, [path.join(__dirname, '..', 'check-iocontrol-coords.js'), '--xml', xmlPath, '--nodes', nodesPath], { encoding: 'utf8' });
 if (result.status !== 0) {
   throw new Error(`absolute coordinate regression failed:\n${result.stdout}\n${result.stderr}`);
 }

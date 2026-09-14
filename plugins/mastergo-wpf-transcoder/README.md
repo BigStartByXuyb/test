@@ -7,6 +7,8 @@
 - `skills/mastergo-to-wpf/` — 转码流程、组件映射参考、MTSLG 来源验证和坐标回归检查。
 - `skills/mastergo-iocontrol-document-format/` — 编写和审查 MasterGo → MTSLG IOContorl 映射文档的统一格式规范。
 
+架构与关键组成（目录分层、交付链路、规则事实源、产物布局、门禁与扩展点）见 [`ARCHITECTURE.md`](./ARCHITECTURE.md)。
+
 插件内保留两条路线的资料，但**当前版本只启用 `mtslg-iocontrol`**；`mw-wpf`（作业 A）暂不进入分流或生成流程，仅在显式重新启用前完成全篇复核：
 
 - `Adapter: mw-wpf`：生成真实 MW WPF 页面、XAML、C# 宿主和项目注册。
@@ -47,9 +49,9 @@ MasterGo 转换默认优先检查并调用 MasterGo MCP；浏览器、截图和�
 ## 本地验证
 
 ```powershell
-node --test "skills/mastergo-to-wpf/scripts/*.test.js"
+node --test "skills/mastergo-to-wpf/scripts/tests/*.test.js"
 ```
 
-该命令运行全部 17 个回归测试；需要单跑某一个时直接指定文件名，例如 `node skills/mastergo-to-wpf/scripts/gen-mastergo-page-bundle.test.js`。
+该命令运行全部 17 个回归测试（测试统一放在 `scripts/tests/`，与交付链路脚本 `scripts/` 分开）；需要单跑某一个时直接指定文件名，例如 `node skills/mastergo-to-wpf/scripts/tests/gen-mastergo-page-bundle.test.js`。PowerShell 流水线回归测试同目录：`scripts/tests/mastergo-dsl-pipeline.tests.ps1`。
 
 Skill 中包含项目专用的 MW/MTSLG 规则。分享给其他团队前，请先检查参考资料，并根据实际项目调整路径和运行时集成方式。

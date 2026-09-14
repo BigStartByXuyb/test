@@ -4,10 +4,10 @@
 const assert = require("assert");
 const fs = require("fs");
 const path = require("path");
-const { auditMappingCoverage } = require("./audit-mtslg-feishu-map.js");
+const { auditMappingCoverage } = require("../audit-mtslg-feishu-map.js");
 
-const docPath = path.join(__dirname, "..", "references", "adapters", "mtslg-iocontrol", "feishu-component-library-mapping.md");
-const mapPath = path.join(__dirname, "..", "references", "adapters", "mtslg-iocontrol", "mtslg-iocontrol-map.json");
+const docPath = path.join(__dirname, "..", "..", "references", "adapters", "mtslg-iocontrol", "feishu-component-library-mapping.md");
+const mapPath = path.join(__dirname, "..", "..", "references", "adapters", "mtslg-iocontrol", "mtslg-iocontrol-map.json");
 const report = auditMappingCoverage(fs.readFileSync(docPath, "utf8"), JSON.parse(fs.readFileSync(mapPath, "utf8")));
 
 assert.deepStrictEqual(report.missing, [], "飞书正式模板不应缺失机器映射");

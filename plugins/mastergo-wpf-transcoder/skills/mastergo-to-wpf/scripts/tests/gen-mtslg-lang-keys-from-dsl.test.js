@@ -7,8 +7,8 @@ const os = require("os");
 const path = require("path");
 const { spawnSync } = require("child_process");
 
-const script = path.join(__dirname, "gen-mtslg-lang-keys-from-dsl.js");
-const LANG = require(path.join(__dirname, "gen-mtslg-page-lang.js"));
+const script = path.join(__dirname, "..", "gen-mtslg-lang-keys-from-dsl.js");
+const LANG = require(path.join(__dirname, "..", "gen-mtslg-page-lang.js"));
 const KEYS = require(script);
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "mtslg-lang-keys-"));
@@ -236,7 +236,7 @@ assert.strictEqual(spec.titleKey, "DemoRecipePageTitle");
 assert.strictEqual(spec.keys.length, languages.keys.length);
 const langOutDir = path.join(root, "lang-out");
 const langRun = spawnSync(process.execPath, [
-  path.join(__dirname, "gen-mtslg-page-lang.js"),
+  path.join(__dirname, "..", "gen-mtslg-page-lang.js"),
   "--page", "DemoRecipe",
   "--manifest", outPath,
   "--out-dir", langOutDir

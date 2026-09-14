@@ -4,7 +4,7 @@
 const fs = require("fs");
 const path = require("path");
 
-const skillPath = path.join(__dirname, "..", "SKILL.md");
+const skillPath = path.join(__dirname, "..", "..", "SKILL.md");
 const skill = fs.readFileSync(skillPath, "utf8");
 
 function assert(condition, message) {

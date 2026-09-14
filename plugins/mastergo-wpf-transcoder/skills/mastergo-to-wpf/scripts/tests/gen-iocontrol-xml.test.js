@@ -21,7 +21,7 @@ fs.writeFileSync(mapping, JSON.stringify({
   }]
 }, null, 2));
 
-const result = spawnSync(process.execPath, [path.join(__dirname, 'gen-iocontrol-xml.js'), '--fresh', mapping, '--out', output], { encoding: 'utf8' });
+const result = spawnSync(process.execPath, [path.join(__dirname, '..', 'gen-iocontrol-xml.js'), '--fresh', mapping, '--out', output], { encoding: 'utf8' });
 assert.notStrictEqual(result.status, 0, '无 ControlType 的非根节点必须被拒绝');
 assert.match(result.stderr + result.stdout, /缺少 ControlType/);
 
@@ -39,7 +39,7 @@ fs.writeFileSync(duplicateMapping, JSON.stringify({
     { ref: 'b', sourceRef: 'b', sourceParent: 'root', id: 'DUPLICATE', xmlId: 'DUPLICATE', controlType: 'IconButton', absX: 40, absY: 202, w: 20, h: 20 }
   ]
 }, null, 2));
-const duplicateResult = spawnSync(process.execPath, [path.join(__dirname, 'gen-iocontrol-xml.js'), '--fresh', duplicateMapping, '--out', duplicateOutput], { encoding: 'utf8' });
+const duplicateResult = spawnSync(process.execPath, [path.join(__dirname, '..', 'gen-iocontrol-xml.js'), '--fresh', duplicateMapping, '--out', duplicateOutput], { encoding: 'utf8' });
 assert.notStrictEqual(duplicateResult.status, 0, '重复 XML ID 必须被拒绝');
 assert.match(duplicateResult.stderr + duplicateResult.stdout, /XML ID 必须唯一/);
 
@@ -80,7 +80,7 @@ fs.writeFileSync(buttonMapping, JSON.stringify({
     }
   ]
 }, null, 2));
-const fresh = spawnSync(process.execPath, [path.join(__dirname, 'gen-iocontrol-xml.js'), '--fresh', buttonMapping, '--out', buttonOutput], { encoding: 'utf8' });
+const fresh = spawnSync(process.execPath, [path.join(__dirname, '..', 'gen-iocontrol-xml.js'), '--fresh', buttonMapping, '--out', buttonOutput], { encoding: 'utf8' });
 assert.strictEqual(fresh.status, 0, '按钮族映射必须能正常渲染: ' + fresh.stderr);
 const buttonXml = fs.readFileSync(buttonOutput, 'utf8');
 const buttonTag = (buttonXml.match(/<IOContorl[^>]*ID="BTN_1"[\s\S]*?\/>/) || [''])[0];
@@ -183,7 +183,7 @@ fs.writeFileSync(typedMapping, JSON.stringify({
     { ref: 'bdr', sourceRef: 'bdr', sourceParent: 'root', id: 'BDR_1', xmlId: 'BDR_1', controlType: 'Border', absX: 10, absY: 400, w: 300, h: 2, attrs: {} }
   ]
 }, null, 2));
-const typedRun = spawnSync(process.execPath, [path.join(__dirname, 'gen-iocontrol-xml.js'), '--fresh', typedMapping, '--out', typedOutput], { encoding: 'utf8' });
+const typedRun = spawnSync(process.execPath, [path.join(__dirname, '..', 'gen-iocontrol-xml.js'), '--fresh', typedMapping, '--out', typedOutput], { encoding: 'utf8' });
 assert.strictEqual(typedRun.status, 0, '各 ControlType 必写字段映射必须能正常渲染: ' + typedRun.stderr);
 const typedXml = fs.readFileSync(typedOutput, 'utf8');
 function tagOf(xml, id) { return (xml.match(new RegExp('<IOContorl[^>]*ID="' + id + '"[\\s\\S]*?/>')) || [''])[0]; }
@@ -212,7 +212,7 @@ const badOutput = path.join(dir, 'button-missing-iconsize.xml');
 const bad = JSON.parse(fs.readFileSync(buttonMapping, 'utf8'));
 delete bad.nodes.find(node => node.ref === 'btnIcon').iconSize;
 fs.writeFileSync(badMapping, JSON.stringify(bad, null, 2));
-const badResult = spawnSync(process.execPath, [path.join(__dirname, 'gen-iocontrol-xml.js'), '--fresh', badMapping, '--out', badOutput], { encoding: 'utf8' });
+const badResult = spawnSync(process.execPath, [path.join(__dirname, '..', 'gen-iocontrol-xml.js'), '--fresh', badMapping, '--out', badOutput], { encoding: 'utf8' });
 assert.notStrictEqual(badResult.status, 0, '带图标但没有 iconSize 的按钮必须被拒绝');
 assert.match(badResult.stderr + badResult.stdout, /缺少 iconSize/);
 
@@ -261,7 +261,7 @@ fs.writeFileSync(existingXml, [
   '</IOContorl>',
   ''
 ].join('\n'));
-const merge = spawnSync(process.execPath, [path.join(__dirname, 'gen-iocontrol-xml.js'), '--merge', existingXml, buttonMapping, '--out', mergedXml], { encoding: 'utf8' });
+const merge = spawnSync(process.execPath, [path.join(__dirname, '..', 'gen-iocontrol-xml.js'), '--merge', existingXml, buttonMapping, '--out', mergedXml], { encoding: 'utf8' });
 assert.strictEqual(merge.status, 0, 'merge 必须成功: ' + merge.stderr);
 const mergedXmlText = fs.readFileSync(mergedXml, 'utf8');
 const mergedButtonTag = (mergedXmlText.match(/<IOContorl[^>]*ID="BTN_1"[\s\S]*?\/>/) || [''])[0];
@@ -292,7 +292,7 @@ fs.writeFileSync(mapPath, JSON.stringify({
     Button: ['PageName', 'IOVisible', 'IOCommand', 'IOParam', 'Value']
   }
 }, null, 2));
-const mapRun = spawnSync(process.execPath, [path.join(__dirname, 'gen-iocontrol-xml.js'),
+const mapRun = spawnSync(process.execPath, [path.join(__dirname, '..', 'gen-iocontrol-xml.js'),
   '--fresh', buttonMapping, '--out', mapOutput, '--map', mapPath], { encoding: 'utf8' });
 assert.strictEqual(mapRun.status, 0, '带 --map 必须能正常渲染: ' + mapRun.stderr);
 const mapXml = fs.readFileSync(mapOutput, 'utf8');
@@ -335,7 +335,7 @@ fs.writeFileSync(orderMapping, JSON.stringify({
     orderTextNode('a', 'MG_A', '顶部', 100, 202)
   ]
 }, null, 2));
-const orderRun = spawnSync(process.execPath, [path.join(__dirname, 'gen-iocontrol-xml.js'),
+const orderRun = spawnSync(process.execPath, [path.join(__dirname, '..', 'gen-iocontrol-xml.js'),
   '--fresh', orderMapping, '--out', orderOutput], { encoding: 'utf8' });
 assert.strictEqual(orderRun.status, 0, '顺序用例必须能渲染: ' + orderRun.stderr);
 const orderIds = [...fs.readFileSync(orderOutput, 'utf8').matchAll(/ID="(MG_[A-Z])"/g)].map((match) => match[1]);

@@ -8,7 +8,7 @@ const os = require("os");
 const path = require("path");
 const { spawnSync } = require("child_process");
 
-const script = path.join(__dirname, "call-mastergo-mcp.js");
+const script = path.join(__dirname, "..", "call-mastergo-mcp.js");
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "mastergo-mcp-call-"));
 
 const PAYLOAD_MARKER = "PAYLOAD_MARKER_SHOULD_NOT_APPEAR_IN_CONTEXT";
@@ -97,7 +97,7 @@ assert.strictEqual(listed.status, 0, listed.stderr);
 assert.deepStrictEqual(JSON.parse(listed.stdout.trim()).tools, ["mcp__getDsl", "mcp__extractSvg"]);
 
 // Skill 必须要求走这个脚本，且响应只落盘
-const skill = fs.readFileSync(path.join(__dirname, "..", "SKILL.md"), "utf8");
+const skill = fs.readFileSync(path.join(__dirname, "..", "..", "SKILL.md"), "utf8");
 assert.ok(skill.includes("call-mastergo-mcp.js"), "Skill 必须指定通过 call-mastergo-mcp.js 调用 MCP");
 assert.ok(skill.includes("只落盘"), "Skill 必须声明响应只落盘、不进上下文");
 

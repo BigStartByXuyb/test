@@ -7,7 +7,7 @@ const os = require("os");
 const path = require("path");
 const { spawnSync } = require("child_process");
 
-const script = path.join(__dirname, "gen-mtslg-layout.js");
+const script = path.join(__dirname, "..", "gen-mtslg-layout.js");
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "mtslg-layout-"));
 const manifest = path.join(root, "layout.json");
 const layout = path.join(root, "Layout.xml");
@@ -315,7 +315,7 @@ assert.match(text, /Name="恒写false"[\s\S]*?IOVisible="false"/,
   "恒写字段取到布尔 false 时仍必须发射（布尔过滤只能作用于设计稿标记）");
 
 // 属性名真值源：用真实模板表运行时，标记属性名必须取自 layoutRules.bottomBar.menuItemFlags.*.attr
-const realMapForFlags = path.resolve(__dirname, "..", "references", "adapters", "mtslg-iocontrol", "mtslg-iocontrol-map.json");
+const realMapForFlags = path.resolve(__dirname, "..", "..", "references", "adapters", "mtslg-iocontrol", "mtslg-iocontrol-map.json");
 const mapFlagLayout = path.join(root, "MenuFlagsFromMapLayout.xml");
 const mapFlagManifest = path.join(root, "menu-flags-from-map.json");
 const mapFlagSource = JSON.parse(fs.readFileSync(flagManifest, "utf8"));
@@ -329,7 +329,7 @@ assert.match(text, /IsShowStatus="true" IsNeedRedMark="true"/,
 
 // 真值源回归锁：模板表（mtslg-iocontrol-map.json）与脚本内置默认必须一致，
 // 且右栏“父节点语义（parentVariants）”建模必须保持作废状态。
-const realMapPath = path.resolve(__dirname, "..", "references", "adapters", "mtslg-iocontrol", "mtslg-iocontrol-map.json");
+const realMapPath = path.resolve(__dirname, "..", "..", "references", "adapters", "mtslg-iocontrol", "mtslg-iocontrol-map.json");
 const realMap = JSON.parse(fs.readFileSync(realMapPath, "utf8"));
 assert.deepStrictEqual(
   realMap.layoutRules.bottomBar.menuItemAlwaysWrittenAttrs,

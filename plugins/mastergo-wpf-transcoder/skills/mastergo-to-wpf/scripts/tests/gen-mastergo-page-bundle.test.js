@@ -7,7 +7,7 @@ const os = require("os");
 const path = require("path");
 const { spawnSync } = require("child_process");
 
-const script = path.join(__dirname, "gen-mastergo-page-bundle.js");
+const script = path.join(__dirname, "..", "gen-mastergo-page-bundle.js");
 const scriptText = fs.readFileSync(script, "utf8");
 assert.match(
   scriptText,

@@ -7,7 +7,7 @@ const os = require("os");
 const path = require("path");
 const { spawnSync } = require("child_process");
 
-const script = path.join(__dirname, "gen-mtslg-page-lang.js");
+const script = path.join(__dirname, "..", "gen-mtslg-page-lang.js");
 const LANG = require(script);
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "mtslg-lang-"));

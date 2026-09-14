@@ -7,7 +7,7 @@ const os = require("os");
 const path = require("path");
 const { spawnSync } = require("child_process");
 
-const script = path.join(__dirname, "gen-mtslg-layout-manifest.js");
+const script = path.join(__dirname, "..", "gen-mtslg-layout-manifest.js");
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "mtslg-layout-manifest-"));
 
 function text(text, id) {
