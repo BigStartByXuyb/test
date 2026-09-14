@@ -38,8 +38,9 @@ function extractDocumentedRules(markdown) {
     if (values.includes("输入框-")) families.inputTemplates.push(...splitVariants(values));
   }
 
-  // `### 固定模板：属性 1=…` 标题里列出的变体先原样收集，随后由映射表归属到真实模板族——
-  // 新增模板族因此不需要在本文件里手工登记家族清单。
+  // `### 固定模板：属性 1=…` 标题里列出的变体先原样收集，随后由映射表归属到真实模板族，
+  // 因此这类变体不依赖本文件里的家族清单就能被核对。但家族清单本身仍是新增模板族的登记位
+  // （`missing` 方向按它遍历），未登记的族由 unregisteredFamilies 报出并以退出码 2 结束。
   const headingVariants = [];
   const operationHeadings = markdown.match(/^### 固定模板：属性 1=([^\r\n]+)/gm) || [];
   for (const heading of operationHeadings) {

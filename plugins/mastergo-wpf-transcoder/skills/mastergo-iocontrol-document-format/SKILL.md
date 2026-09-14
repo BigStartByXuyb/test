@@ -114,13 +114,14 @@ description: 强制规范 MasterGo → MTSLG IOContorl 映射文档的写法，�
 
 ## 新增/修改映射的同步清单
 
-新增、修改或删除**任意一条映射**时，下列位置要在同一批改动里保持一致；只改其中一处就等于制造漂移，而漂移不会立刻报错，只会在后续页面生成时才暴露。第 1~4 项是硬性要求；第 5 项按发版节奏处理，不阻塞本次改动：
+新增、修改或删除**任意一条映射**时，下列位置要在同一批改动里保持一致；只改其中一处就等于制造漂移，而漂移不会立刻报错，只会在后续页面生成时才暴露。第 1~5 项是硬性要求；第 6 项按发版节奏处理，不阻塞本次改动：
 
 1. **机器真值源**：`skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/mtslg-iocontrol-map.json`（以插件根为基准）——模板族结构、`match.property`、`variants` 真实属性值、`controlTypeRequiredAttrs` 必写字段、按钮族 `iconSize` 等。同一个「匹配属性名 + 属性值」只能登记在一个模板族。
 2. **人读口径**：本规范约束的映射文档 `skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/feishu-component-library-mapping.md`——按上面的层级、匹配规则、固定模板和 XML 格式补齐同一条映射。
-3. **回归用例**：在 `skills/mastergo-to-wpf/scripts/tests/` 下按需补断言（文档覆盖、模板匹配、按钮族图标字段口径、TextBlock 尺寸、坐标等）。
-4. **版本号**：`.claude-plugin/plugin.json` 递增；不要在上一轮 CI 未结束时连续推送。
-5. **在线同步副本**：发版前把映射文档同步到对应的飞书在线文档（按标题检索定位、不写死地址、整篇重建并记录 revision）。同步工具是可选项、不是交付链路的运行依赖：本机没有该工具时，在交付说明里标注"在线文档未同步"即可，不阻塞本次改动。
+3. **审计脚本的家族登记**：映射表里新出现 `*Templates` 族时，同步登记到 `skills/mastergo-to-wpf/scripts/audit-mtslg-feishu-map.js` 的家族清单；漏登记会被覆盖审计的 `unregisteredFamilies` 报出并以退出码 2 结束（该族的 `missing` 方向会整族失效）。
+4. **回归用例**：在 `skills/mastergo-to-wpf/scripts/tests/` 下按需补断言（文档覆盖、模板匹配、按钮族图标字段口径、TextBlock 尺寸、坐标等）。
+5. **版本号**：`.claude-plugin/plugin.json` 递增；不要在上一轮 CI 未结束时连续推送。
+6. **在线同步副本**：发版前把映射文档同步到对应的飞书在线文档（按标题检索定位、不写死地址、整篇重建并记录 revision）。同步工具是可选项、不是交付链路的运行依赖：本机没有该工具时，在交付说明里标注"在线文档未同步"即可，不阻塞本次改动。
 
 新增模板族时不必先判断它属于哪类写法：直接跑下面的覆盖审计，报告里的 `missing`、`unregisteredFamilies`、`unregisteredVariants`、`undocumented` 会指出该族还差哪一项（映射表条目、映射文档条目，或审计脚本的家族清单登记），按报告补齐后再重跑，直到全部为空。
 
