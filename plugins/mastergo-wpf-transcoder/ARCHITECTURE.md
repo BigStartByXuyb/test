@@ -82,14 +82,7 @@ flowchart LR
 | 流程路由与硬规则 | `skills/mastergo-to-wpf/SKILL.md` | **唯一流程路由**；不在别处复制流程 |
 | 跨适配器语义 | `references/mastergo-component-mapping-rules.md` | 组件身份与来源链通用规则 |
 | 跨适配器样式库 | `references/style-library-profiles.md` | 样式库 Profile 的划分、版本选择与冲突处理；由 `SKILL.md`「公共参考」登记，并在项目首次适配阶段由 `project-adapter-initialization.md` 按条件引用 |
-| 团队/设计师口径 | 飞书在线文档 4 份（见下） | 权威阅读版本，与本地规则保持同步 |
-
-4 份飞书在线文档（权威阅读版本）：
-
-1. MasterGo 组件库 → MTSLG IOContorl 映射标准（Wiki `SOWvw4Srui5G5XkFKsNcvY2Fnwg`）
-2. MasterGo 页面壳层 → MTSLG Layout.xml 映射标准（docx `RT3Odwht3oFvl2x26sGcBbZMnMu`）
-3. MasterGo → MTSLG/WPF 完整页面转换流程与维护指南（docx `Ee6WdMH69o5XiuxUFUTcLegBnIH`）
-4. MasterGo AI 转码原理（docx `BNFUddlBWohqD4xQhJAcRrAknUS`）
+| 团队/设计师口径 | 飞书在线文档（组件库映射标准 / 页面壳层 Layout 映射标准 / 完整页面转换流程与维护指南 / 转码原理） | 权威阅读版本，与本地规则保持同步；**不在仓库内写死文档地址**，需要时用 `lark-cli drive +search` 按标题定位并用 `docs +fetch` 比对确认 |
 
 原则：**一个规则只保留一个权威来源**；改规则时同步"映射表 → 说明文档 → 在线文档 → 生成/校验脚本 → 回归测试"。
 
@@ -157,6 +150,6 @@ DSL/mapping 文案 ──► 机械派生语言键（标题 / MenuItem / 页面�
 ## 11. 维护约定
 
 - 规则/脚本改动只提交到插件仓库 `plugins/mastergo-wpf-transcoder/`（`master_go` 产物不提交）。
-- 每次插件发版前，把本地规则文档按"整篇重建"同步到 4 份飞书在线文档，并记录 revision 便于回滚。
+- 每次插件发版前，把本地规则文档按"整篇重建"同步到对应的飞书在线文档（用 `lark-cli drive +search` 按标题定位，不写死地址），并记录 revision 便于回滚。
 - 版本号写在 `.claude-plugin/plugin.json`；发版时递增，避免同版本号内容漂移。
 - 不要在上一次 CI run 未结束时连续 push（会被 concurrency 取消，产生空审计报告）。
