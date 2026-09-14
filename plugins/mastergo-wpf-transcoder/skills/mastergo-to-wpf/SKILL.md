@@ -103,14 +103,14 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 
 本作业不得写入 WPF 私有协议，例如 `s:Action`、WPF `PageName` 或 WPF ResourceDictionary/绑定语法；没有正式映射时不得降级为普通 Button、无类型容器或静态占位结构。未映射组件仅进入静态来源清单，不进入伪造的 IOContorl 节点。
 
-## 页面 Icon 文件（当前 MTSLG 路线）
+## 页面 Icon 文件（按路线区分）
 
 每个页面使用自己的 Icon 文件，文件名固定由页面 `name` 派生为 `Resources/Pages/{name}/{name}Icons.xaml`，与页面 XML 同处该页专属目录。新页面不得复用或覆盖其他页面的 Icon 文件。`gen-mtslg-page-icons.js` 只负责创建当前页面的新 ResourceDictionary，目标文件已存在时失败，不执行 Icon 合并。
 
 **View 是否合并本页 Icon 资源字典按路线区分（两条路线不能混用同一套说法）**：
 
 - **`mtslg-iocontrol`（作业 B，当前唯一启用）**：生成的 View（`<Page>View.xaml`）**不合并**本页 Icon 资源字典——宿主壳只输出 `UserControl` 头 + `PageDesign`，不写 `<UserControl.Resources><ResourceDictionary Source="…/<页面名>Icons.xaml" /></UserControl.Resources>`；页面 Icon 文件仍照常生成并按 Icon Page 注册进 `.csproj`。
-- **`mw-wpf`（作业 A，当前停用）**：该路线页面用 `{StaticResource …Geometry}` 引用图标，`StaticResource` 是加载期解析——页面自身不合并本页 Icon 字典时，键没有来源，加载即抛 `XamlParseException`（框架规则 R5）。因此 **作业 A 重新启用前必须复核并保证本页 Icon 字典有合并点（页面或宿主）**，不得直接沿用作业 B 的"View 不合并"结论。
+- **`mw-wpf`（作业 A，当前停用）**：该路线页面用 `{StaticResource …Geometry}` 引用图标，`StaticResource` 是加载期解析——页面自身不合并本页 Icon 字典时，键没有来源，加载即抛 `XamlParseException`（框架规则 R5）。注意 `gen-mw-wpf-page.js` 的 `renderView` **没有路线分支**，两条路线都恒不发射这段合并声明，所以作业 A 目前是缺口：**重新启用前必须给该脚本加路线分支（或由另一生成器）补上本页 Icon 字典的合并点，并做加载验证**，不能只做文档确认。
 
 `extractSvg` 只返回 PATH 自身的 `d` + `transform`，**几何完全相同的复用实例会被去重**（典型场景：同一个方向图标被旋转/翻转复用，例如「向上/向下」只差组级 `flipV`、「向左/向右」只差组级 `rotate`），因此某些方向按钮拿不到条目，页面就会出现「有图标槽位但无 Icon」的节点。补救方式：给 `gen-mtslg-page-icons.js` 传入第 4 个参数（DSL 快照路径 `dsl.snapshot.json`），并在页面图标映射里把这类条目写成 `"fromDsl": true`：
 
