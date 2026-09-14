@@ -391,3 +391,40 @@ console.log('PASS IOContorl typed-node gate regression test');
 console.log('PASS IconButton fixed-attribute regression test');
 console.log('PASS button-family rules are read from the template map');
 console.log('PASS icon attributes follow the ControlType template scope');
+
+// ---- 输出父节点真值源：layoutParent → parent → DSL sourceParent（CI REVIEW-001）----
+// item 的 DSL 父节点是 root，但映射显式登记 layoutParent=panel：发射器必须与 provenance / 坐标门禁
+// 一样按 layoutParent 嵌套发射（Left/Top 相对 panel），否则校验器重算得出的 expectedLeft/Top 会与
+// XML 不符而硬失败。
+const layoutParentMapping = path.join(dir, 'layout-parent-mapping.json');
+const layoutParentOutput = path.join(dir, 'layout-parent-page.xml');
+fs.writeFileSync(layoutParentMapping, JSON.stringify({
+  rootRef: 'root',
+  sourceNodes: [
+    { ref: 'root', parentRef: null, pageAbsX: 0, pageAbsY: 0, relativeX: 0, relativeY: 0, width: 1280, height: 1024 },
+    { ref: 'panel', parentRef: 'root', pageAbsX: 600, pageAbsY: 200, relativeX: 600, relativeY: 200, width: 200, height: 120 },
+    { ref: 'item', parentRef: 'root', pageAbsX: 610, pageAbsY: 200, relativeX: 610, relativeY: 200, width: 60, height: 60 }
+  ],
+  nodes: [
+    {
+      ref: 'panel', sourceRef: 'panel', sourceParent: 'root', id: 'PANEL_1', xmlId: 'PANEL_1',
+      controlType: 'Border', absX: 600, absY: 200, w: 200, h: 120,
+      expectedLeft: 600, expectedTop: 8, expectedWidth: 200, expectedHeight: 120, attrs: {}
+    },
+    {
+      ref: 'item', sourceRef: 'item', sourceParent: 'root', id: 'ITEM_1', xmlId: 'ITEM_1',
+      controlType: 'Border', parent: null, layoutParent: 'panel', absX: 610, absY: 200, w: 60, h: 60,
+      expectedLeft: 10, expectedTop: 0, expectedWidth: 60, expectedHeight: 60, attrs: {}
+    }
+  ]
+}, null, 2));
+const layoutParentRun = spawnSync(process.execPath, [path.join(__dirname, '..', 'gen-iocontrol-xml.js'),
+  '--fresh', layoutParentMapping, '--out', layoutParentOutput], { encoding: 'utf8' });
+assert.strictEqual(layoutParentRun.status, 0, 'layoutParent 映射必须能渲染: ' + layoutParentRun.stderr);
+const layoutParentXml = fs.readFileSync(layoutParentOutput, 'utf8');
+assert.ok(!/\n\s{4}<IOContorl[^>]*ID="ITEM_1"/.test(layoutParentXml),
+  'ITEM_1 登记了 layoutParent=panel，不得作为页面根级子节点发射');
+assert.match(layoutParentXml,
+  /ID="PANEL_1"[\s\S]*?<IOContorl[^>]*ID="ITEM_1"[\s\S]*?Left="10"[\s\S]*?Top="0"/,
+  'ITEM_1 必须嵌套在 PANEL_1 内并按输出父节点计算相对坐标（Left=10 / Top=0）');
+console.log('PASS output-parent (layoutParent) regression test');

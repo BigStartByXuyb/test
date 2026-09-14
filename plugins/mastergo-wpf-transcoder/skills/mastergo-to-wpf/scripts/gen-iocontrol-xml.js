@@ -110,6 +110,23 @@ function sortNodesByDesignOrder(list) {
 }
 
 const nodes = sortNodesByDesignOrder(mapping.nodes || []);
+
+// 输出父节点（XML 里真正的父容器）真值源，三处脚本共用同一优先级：
+//   layoutParent → parent → DSL sourceParent（sourceNodes.parentRef）
+// 与 validate-iocontrol-provenance.js、gen-mastergo-page-bundle.js 的坐标门禁一致；
+// 当前 DSL→mapping 生成器把 parent / layoutParent 写成同一个值，二者不同只来自显式登记的 layoutParent。
+const sourceByRef = new Map((mapping.sourceNodes || []).map(function (s) { return [s.ref, s]; }));
+const nodeRefs = new Set((mapping.nodes || []).map(function (n) { return n.ref; }));
+function parentRefOf(node) {
+  if (node.layoutParent !== undefined) return node.layoutParent || null;
+  if (node.parent !== undefined) return node.parent || null;
+  // 未登记 parent/layoutParent 时回落到 DSL 父节点：只有它落在真实输出节点上才嵌套，
+  // 否则按页面根级发射（与 provenance 的 parentIsRoot / !outputParent 口径一致）。
+  const src = sourceByRef.get(node.sourceRef || node.ref);
+  const ref = src ? (src.parentRef || null) : null;
+  if (!ref || ref === mapping.rootRef || !nodeRefs.has(ref)) return null;
+  return ref;
+}
 const TOP_PUBLIC_BAR_Y = 126;
 const TOP_ARTIFACT_TITLE_Y = 66;
 const contentOriginY = TOP_PUBLIC_BAR_Y + TOP_ARTIFACT_TITLE_Y;
@@ -437,7 +454,7 @@ function renderFresh() {
   const childMap = new Map();
   const rootChildren = [];
   for (const n of nodes) {
-    const p = n.parent || null;
+    const p = parentRefOf(n);
     if (p === null) rootChildren.push(n);
     else {
       if (!childMap.has(p)) childMap.set(p, []);
@@ -576,7 +593,7 @@ function mergeMode() {
   nodes.forEach(n => absOf.set(n.ref, { absX: n.absX, absY: normalizedY(n.absY) }));
 
   function resolveParentAbs(n) {
-    const p = n.parent || null;
+    const p = parentRefOf(n);
     if (p === null) return { x: 0, y: 0 };
     const pn = absOf.get(p);
     if (!pn) throw new Error(`映射节点 parent 引用不存在: ${p}（来自 ref=${n.ref}）`);
@@ -693,7 +710,8 @@ function mergeMode() {
   const depthOfRef = (ref) => {
     if (depthOf.has(ref)) return depthOf.get(ref);
     const n = nodes.find(x => x.ref === ref);
-    const d = (n && n.parent) ? depthOfRef(n.parent) + 1 : 1;
+    const parentRef = n ? parentRefOf(n) : null;
+    const d = parentRef ? depthOfRef(parentRef) + 1 : 1;
     depthOf.set(ref, d);
     return d;
   };
@@ -707,7 +725,7 @@ function mergeMode() {
     attrMap2.Left = fmtNum(n.absX - pa.x);
     attrMap2.Top = fmtNum(normalizedY(n.absY) - pa.y);
     const indent = '    '.repeat(depthOfRef(ref));
-    const kids = nodes.filter(k => (k.parent || null) === ref);
+    const kids = nodes.filter(k => parentRefOf(k) === ref);
 
     const renderSub = (node, d) => {
       const pa2 = resolveParentAbs(node);
@@ -720,7 +738,7 @@ function mergeMode() {
       if (outputHeight(node) !== undefined && outputHeight(node) !== null) am.Height = fmtNum(outputHeight(node));
       applyButtonFamilyAttrs(node, am);
       applyRequiredAttrs(node, am);
-      const kk = nodes.filter(x => (x.parent || null) === node.ref);
+      const kk = nodes.filter(x => parentRefOf(x) === node.ref);
       const ind = '    '.repeat(d);
       const parts = [];
       if (node.comment) parts.push(`${ind}<!-- ${node.comment} -->\n`);

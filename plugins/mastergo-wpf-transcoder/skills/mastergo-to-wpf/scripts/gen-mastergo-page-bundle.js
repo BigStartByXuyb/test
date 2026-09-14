@@ -44,8 +44,9 @@ function pageLangPaths(pageName, locales) {
 
 function fail(message) { throw new Error(message); }
 
-// 坐标度量的数值归一化：与 validate-iocontrol-provenance.js 的 num()、check-iocontrol-coords.js 的 num() 同口径——
-// 数值字符串（如 "100"）视为数值，空值或无法归一化的值返回 null（= 缺度量）。
+// 坐标度量的数值归一化：与 validate-iocontrol-provenance.js 的 num() 同为 Number() 口径（比
+// check-iocontrol-coords.js 的 parseFloat() 更严格）——数值字符串（如 "100"）视为数值，
+// 空值或无法归一化的值返回 null（= 缺度量）；归一化后的数值再交给坐标核对器。
 function coordNumber(value) {
   if (value === undefined || value === null || value === "") return null;
   const n = Number(value);
