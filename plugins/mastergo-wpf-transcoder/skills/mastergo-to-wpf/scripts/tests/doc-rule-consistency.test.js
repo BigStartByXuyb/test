@@ -148,6 +148,7 @@ for (const [file, source] of [
 // ---------- 6. 已作废表述不得在文档里残留；关键文档必须写明新口径 ----------
 // 背景：口径迁移（例如「父节点语义不再作为匹配键」）要改 5~6 份文档，只改一处就会被 CI 判矛盾。
 // 这里把"已作废表述"和"必须出现的新口径"都变成字符串断言，本地跑一次就知道有没有漏改。
+// 覆盖范围：插件根目录下的全部 .md（不含仓库外的快照文档）。
 const PLUGIN_ROOT = path.join(__dirname, "..", "..", "..", "..");
 const RETIRED_PHRASES = [
   "父节点语义 + 公开属性名",
@@ -179,9 +180,11 @@ const MUST_STATE_NO_PARENT_MATCH_KEY = [
 ];
 for (const rel of MUST_STATE_NO_PARENT_MATCH_KEY) {
   const text = fs.readFileSync(path.join(PLUGIN_ROOT, rel), "utf8");
-  assert.ok(/不作为匹配键|不是匹配键|不参与匹配/.test(text),
-    `${rel} 必须写明「父节点语义不作为匹配键」（口径迁移后的新表述）`);
+  const stated = skillLines(text).some((line) =>
+    line.includes("父节点语义") && /不作为匹配键|不是匹配键|不参与匹配/.test(line));
+  assert.ok(stated,
+    `${rel} 必须有一句同时出现「父节点语义」与「不作为匹配键 / 不是匹配键 / 不参与匹配」`);
 }
 
 console.log("PASS 按钮族固定字段单一真值源（映射表 ↔ 脚本默认 ↔ 两份 Skill ↔ 两份人读参考）一致性回归测试");
-console.log("PASS 已作废表述（父节点语义匹配键 / parentVariants）全仓扫描");
+console.log("PASS 已作废表述（父节点语义匹配键 / parentVariants）插件根 .md 扫描");
