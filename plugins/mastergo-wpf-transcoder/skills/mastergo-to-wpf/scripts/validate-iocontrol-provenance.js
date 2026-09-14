@@ -16,6 +16,8 @@ const DEFAULT_BUTTON_FAMILY_RULES = {
   controlTypes: ['IconButton', 'Button', 'StatusButton'],
   alwaysWrittenAttrs: ['PageName', 'IOVisible', 'IOCommand', 'IOEnable'],
 };
+// 图标字段名：与映射表 buttonFamily.iconSizeAttrs 一致（生成器用同一组名字）。
+const BUTTON_ICON_SIZE_ATTR_NAMES = ['IconWidth', 'IconHeight'];
 
 // 每个 ControlType 的固定必写字段集（设计方模板）：真值来源 mtslg-iocontrol-map.json 的
 // controlTypeRequiredAttrs；未传入 --map 或表缺该字段时不做必写字段校验。
@@ -272,33 +274,47 @@ function validate(xmlPath, manifestPath) {
       for (const attr of BUTTON_ALWAYS_ATTRS) {
         if (x[attr] === undefined) errors.push('[' + n.xmlId + '] 按钮族缺少必写属性 ' + attr);
       }
-      const mappingIcon = n.attrs && n.attrs.Icon;
-      const hasIcon = (typeof mappingIcon === 'string' && mappingIcon.trim() !== '') ||
-        (typeof x.Icon === 'string' && x.Icon.trim() !== '');
-      if (hasIcon) {
-        const size = n.iconSize;
-        if (!size || typeof size !== 'object') {
-          errors.push('[' + n.xmlId + '] 按钮族带 Icon 但映射缺少 iconSize（图标图形节点 bbox）');
-        } else {
-          const iconSource = sourceMap.get(size.sourceRef);
-          if (!iconSource) {
-            errors.push('[' + n.xmlId + '] iconSize.sourceRef 不存在于 sourceNodes: ' + size.sourceRef);
-          } else if (!sameNumber(iconSource.width, size.width) || !sameNumber(iconSource.height, size.height)) {
-            errors.push('[' + n.xmlId + '] iconSize 与图标图形节点 bbox 不一致');
-          }
-          if (!sameNumber(x.IconWidth, Math.round(Number(size.width))) ||
-              !sameNumber(x.IconHeight, Math.round(Number(size.height)))) {
-            errors.push('[' + n.xmlId + '] IconWidth/IconHeight 必须等于图标图形节点 bbox 取整值');
+      // 图标字段判据与生成器保持一致：先看该 ControlType 的模板是否含图标字段。
+      // 未提供 --map（requiredAttrs 缺失）时不做模板收窄，按旧口径校验。
+      const declaresIconAttrs = Array.isArray(requiredAttrs)
+        ? (requiredAttrs.includes('Icon') || requiredAttrs.includes(BUTTON_ICON_SIZE_ATTR_NAMES[0]))
+        : null;
+      if (declaresIconAttrs === false) {
+        // 模板不含图标字段（如 Button / StatusButton）：不得发射这三项，映射里的残留 Icon 不参与判定。
+        for (const attr of ['Icon'].concat(BUTTON_ICON_SIZE_ATTR_NAMES)) {
+          if (x[attr] !== undefined && String(x[attr]).trim() !== '') {
+            errors.push('[' + n.xmlId + '] ' + controlType + ' 的模板不含图标字段，不得发射 ' + attr);
           }
         }
       } else {
-        // 无图标槽位：Icon / IconWidth / IconHeight 字段仍恒写，但值必须为空字符串。
-        if (x.Icon !== undefined && String(x.Icon).trim() !== '') {
-          errors.push('[' + n.xmlId + '] 无图标按钮的 Icon 必须为空值');
-        }
-        for (const attr of ['IconWidth', 'IconHeight']) {
-          if (x[attr] !== undefined && String(x[attr]).trim() !== '') {
-            errors.push('[' + n.xmlId + '] 无图标按钮的 ' + attr + ' 必须为空值');
+        const mappingIcon = n.attrs && n.attrs.Icon;
+        const hasIcon = (typeof mappingIcon === 'string' && mappingIcon.trim() !== '') ||
+          (typeof x.Icon === 'string' && x.Icon.trim() !== '');
+        if (hasIcon) {
+          const size = n.iconSize;
+          if (!size || typeof size !== 'object') {
+            errors.push('[' + n.xmlId + '] 按钮族带 Icon 但映射缺少 iconSize（图标图形节点 bbox）');
+          } else {
+            const iconSource = sourceMap.get(size.sourceRef);
+            if (!iconSource) {
+              errors.push('[' + n.xmlId + '] iconSize.sourceRef 不存在于 sourceNodes: ' + size.sourceRef);
+            } else if (!sameNumber(iconSource.width, size.width) || !sameNumber(iconSource.height, size.height)) {
+              errors.push('[' + n.xmlId + '] iconSize 与图标图形节点 bbox 不一致');
+            }
+            if (!sameNumber(x.IconWidth, Math.round(Number(size.width))) ||
+                !sameNumber(x.IconHeight, Math.round(Number(size.height)))) {
+              errors.push('[' + n.xmlId + '] IconWidth/IconHeight 必须等于图标图形节点 bbox 取整值');
+            }
+          }
+        } else {
+          // 无图标槽位：Icon / IconWidth / IconHeight 字段仍恒写，但值必须为空字符串。
+          if (x.Icon !== undefined && String(x.Icon).trim() !== '') {
+            errors.push('[' + n.xmlId + '] 无图标按钮的 Icon 必须为空值');
+          }
+          for (const attr of BUTTON_ICON_SIZE_ATTR_NAMES) {
+            if (x[attr] !== undefined && String(x[attr]).trim() !== '') {
+              errors.push('[' + n.xmlId + '] 无图标按钮的 ' + attr + ' 必须为空值');
+            }
           }
         }
       }

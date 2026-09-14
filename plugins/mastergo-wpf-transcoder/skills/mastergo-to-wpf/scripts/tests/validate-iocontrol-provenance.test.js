@@ -209,4 +209,42 @@ const strictRun = spawnSync(process.execPath, [cliScript, '--xml', cliXmlPath, '
 assert.notStrictEqual(strictRun.status, 0, '模板表要求 IOParam 时，缺该属性的按钮必须校验失败');
 assert.match(strictRun.stderr + strictRun.stdout, /IOParam/, '失败信息必须指出缺失的按钮族常驻属性');
 
+// ---- 模板不含图标字段的按钮族：映射残留 Icon/iconSize 不得被当成「有图标」 ----
+const scopedMapPath = path.join(dir, 'template-map-button-without-icon.json');
+const scopedXmlPath = path.join(dir, 'button-without-icon.xml');
+const scopedMappingPath = path.join(dir, 'button-without-icon-mapping.json');
+fs.writeFileSync(scopedMapPath, JSON.stringify({
+  buttonFamily: {
+    controlTypes: ['IconButton', 'Button'],
+    alwaysWrittenAttrs: ['PageName', 'IOVisible', 'IOCommand', 'IOEnable'],
+    iconSizeAttrs: ['IconWidth', 'IconHeight']
+  },
+  controlTypeRequiredAttrs: {
+    Button: ['Style', 'Value', 'PageName', 'IOCommand', 'IOEnable', 'IOVisible'],
+    IconButton: ['Style', 'Value', 'PageName', 'Icon', 'IOCommand', 'IOEnable', 'IOVisible', 'IconWidth', 'IconHeight']
+  }
+}, null, 2));
+fs.writeFileSync(scopedXmlPath, '<IOContorl ID="" Left="NaN" Top="NaN" Width="NaN" Height="NaN">' +
+  '<IOContorl ID="BTN" ControlType="Button" Style="SmallButton" Value="+5" PageName="" IOVisible="" IOCommand="" ' +
+  'IOEnable="" Left="600" Top="108" Width="60" Height="60" /></IOContorl>');
+fs.writeFileSync(scopedMappingPath, JSON.stringify({
+  contentOriginY: 192,
+  sourceNodes: [
+    { ref: 'root', parentRef: null, pageAbsX: 0, pageAbsY: 0, relativeX: 0, relativeY: 0, width: 1280, height: 1024 },
+    { ref: 'plain', parentRef: 'root', pageAbsX: 600, pageAbsY: 300, relativeX: 600, relativeY: 300, width: 60, height: 60 },
+    { ref: 'plain/icon', parentRef: 'plain', pageAbsX: 610, pageAbsY: 310, relativeX: 10, relativeY: 10, width: 40, height: 40 }
+  ],
+  nodes: [{
+    xmlId: 'BTN', sourceRef: 'plain', sourceParent: 'root', controlType: 'Button',
+    expectedLeft: 600, expectedTop: 108, expectedWidth: 60, expectedHeight: 60,
+    // 映射残留图标信息：模板不含图标字段时，两项都不参与校验
+    attrs: { ControlType: 'Button', Icon: 'EnterGeometry' },
+    iconSize: { width: 40, height: 40, sourceRef: 'plain/icon' }
+  }]
+}, null, 2));
+const scopedRun = spawnSync(process.execPath, [cliScript, '--xml', scopedXmlPath,
+  '--mapping', scopedMappingPath, '--map', scopedMapPath], { encoding: 'utf8' });
+assert.strictEqual(scopedRun.status, 0,
+  '模板不含图标字段的 Button 不得因映射残留 Icon/iconSize 触发图标尺寸校验: ' + scopedRun.stderr + scopedRun.stdout);
+
 console.log('PASS provenance regression test');

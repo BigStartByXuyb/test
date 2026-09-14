@@ -37,7 +37,7 @@
       "IconWidth",
       "IconHeight"
     ],
-    "iconSizeRule": "IconWidth/IconHeight 取图标图形节点 bbox（映射字段 iconSize，四舍五入取整）；按钮族的 Icon/IconWidth/IconHeight 属于 controlTypeRequiredAttrs 的恒写字段，无图标槽位时写空字符串；带 Icon 却没有 iconSize 视为映射不完整，生成器直接失败"
+      "iconSizeRule": "IconWidth/IconHeight 取图标图形节点 bbox（映射字段 iconSize，四舍五入取整）；模板含图标字段的 IconButton 的 Icon/IconWidth/IconHeight 属于 controlTypeRequiredAttrs 的恒写字段，无图标槽位时写空字符串；Button/StatusButton 的模板不含图标字段，不发射这三项；iconSize 只在模板含图标字段且节点带 Icon 时被消费，带 Icon 却没有 iconSize 视为映射不完整，生成器直接失败"
   },
   "controlTypeRequiredAttrs": {
     "_note": "每个 ControlType 的固定必写字段集（属性恒写，取不到来源时写空字符串）。ID/ControlType 恒由节点身份发射，Left/Top/Width/Height 恒由 DSL bbox 发射（TextBlock 为 Width=NaN、Height=40），因此不重复登记在这里。LangName 是唯一例外：只在多语言绑定层给出真实 key 时发射，动态值等 noLangRefs 豁免节点不写空占位。真值来源：设计方给定的 IOContorl 字段模板。",
