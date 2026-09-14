@@ -16,12 +16,16 @@ const DOC_FORMAT_SKILL = path.join(__dirname, "..", "..", "..", "mastergo-iocont
 const MAIN_SKILL = path.join(__dirname, "..", "..", "SKILL.md");
 const GENERATOR = path.join(__dirname, "..", "gen-iocontrol-xml.js");
 const VALIDATOR = path.join(__dirname, "..", "validate-iocontrol-provenance.js");
+const FEISHU_MAPPING = path.join(__dirname, "..", "..", "references", "adapters", "mtslg-iocontrol", "feishu-component-library-mapping.md");
+const MODE_DOC = path.join(__dirname, "..", "..", "references", "adapters", "mtslg-iocontrol", "mtslg-mode.md");
 
 const map = JSON.parse(fs.readFileSync(MAP, "utf8"));
 const docFormat = fs.readFileSync(DOC_FORMAT_SKILL, "utf8");
 const mainSkill = fs.readFileSync(MAIN_SKILL, "utf8");
 const generator = fs.readFileSync(GENERATOR, "utf8");
 const validator = fs.readFileSync(VALIDATOR, "utf8");
+const feishuMapping = fs.readFileSync(FEISHU_MAPPING, "utf8");
+const modeDoc = fs.readFileSync(MODE_DOC, "utf8");
 
 const family = map.buttonFamily;
 const required = map.controlTypeRequiredAttrs;
@@ -38,6 +42,13 @@ for (const type of ["Button", "StatusButton"]) {
   for (const attr of ["Icon", ...family.iconSizeAttrs]) {
     assert.ok(!(required[type] || []).includes(attr), `${type} 不含图标字段，不得登记 ${attr}`);
   }
+}
+// 图标三件套必须全有或全无：避免出现「登记了 IconWidth 却没登记 Icon」这类半套模板。
+for (const [type, attrs] of Object.entries(required)) {
+  if (type.startsWith("_") || !Array.isArray(attrs)) continue;
+  const flags = ["Icon", ...family.iconSizeAttrs].map((attr) => attrs.includes(attr));
+  assert.ok(flags.every(Boolean) || flags.every((hit) => !hit),
+    `${type} 的图标字段必须全有或全无: ${JSON.stringify(attrs)}`);
 }
 assert.ok(!JSON.stringify(map).includes("无图标槽位时不发射"),
   "映射表描述不得保留「无图标槽位时不发射」——与 controlTypeRequiredAttrs 的空字符串占位口径相反");
@@ -100,4 +111,15 @@ assert.ok(mainSkill.includes("没有图标槽位时仍按必写字段发射空�
   "主 Skill 必须写明 IconButton 无图标槽位时仍发射空字符串占位");
 assert.ok(!generator.includes("都不发射"), "生成器注释不得保留「无图标槽位时都不发射」的旧口径");
 
-console.log("PASS 按钮族固定字段单一真值源（映射表 ↔ 脚本默认 ↔ 两份 Skill）一致性回归测试");
+// ---------- 5. 两份人读参考文档的口径不得与映射表相反 ----------
+for (const [file, source] of [
+  ["feishu-component-library-mapping.md", feishuMapping],
+  ["mtslg-mode.md", modeDoc],
+]) {
+  const contradicted = skillLines(source).filter((line) => line.includes("无图标槽位时不发射"));
+  assert.deepStrictEqual(contradicted, [], `${file} 不得保留「无图标槽位时不发射」的旧口径`);
+  const stated = skillLines(source).filter((line) => line.includes("无图标槽位时") && line.includes("空字符串"));
+  assert.ok(stated.length > 0, `${file} 必须写明「无图标槽位时…空字符串」`);
+}
+
+console.log("PASS 按钮族固定字段单一真值源（映射表 ↔ 脚本默认 ↔ 两份 Skill ↔ 两份人读参考）一致性回归测试");

@@ -114,9 +114,9 @@ flowchart LR
 | 图标闭合 | `gen-mastergo-page-bundle.js` 内置校验 | Icon 键唯一与引用闭合、页面 Icon 文件结构 |
 | 语言闭环 | Bundle 的语言绑定与字典校验 | `LangName` 引用必须存在于本页字典，各语言 key 一致 |
 | 页面壳层 | `gen-mtslg-layout.js` 校验 | MenuItem 常驻属性、Index、图标尺寸门禁 |
-| 规则与文档一致 | 本地回归 `doc-rule-consistency.test.js` | 按钮族的固定字段口径必须与 `mtslg-iocontrol-map.json` 的 `buttonFamily` / `controlTypeRequiredAttrs` 逐项对齐，两份 Skill 与生成器不得各写一套 |
+| 规则与文档一致（仅本地回归，CI 不执行） | 本地回归 `doc-rule-consistency.test.js` + `gen-iocontrol-xml.test.js` | 覆盖边界：`buttonFamily` / `controlTypeRequiredAttrs` ↔ 脚本内置默认 ↔ 两份 Skill ↔ 两份人读参考的常量与表述一致；发射分支由 `gen-iocontrol-xml.test.js` 的「图标字段按 ControlType 模板收窄」用例覆盖，不依赖源码文本 |
 
-任一门禁以非零退出结束即禁止交付；规则改动后必须同步更新执行者与回归用例。
+任一门禁以非零退出结束即禁止交付；标注「仅本地回归」的行不在 CI 执行，由提交者在本地跑完再推送。规则改动后必须同步更新执行者与回归用例。
 
 ## 8. 多语言链路
 

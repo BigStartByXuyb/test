@@ -342,6 +342,52 @@ const orderIds = [...fs.readFileSync(orderOutput, 'utf8').matchAll(/ID="(MG_[A-Z
 assert.deepStrictEqual(orderIds, ['MG_A', 'MG_B', 'MG_C'],
   '页面 XML 必须按设计稿上下顺序发射（Top 主序、同一行 Left 次序），与 mapping 数组顺序无关');
 
+// ---- 图标字段按 ControlType 模板收窄：非图标模板不发射，iconSize 不脱离 Icon 单独消费 ----
+const iconScopeMapping = path.join(dir, 'icon-scope-mapping.json');
+const iconScopeOutput = path.join(dir, 'icon-scope-page.xml');
+fs.writeFileSync(iconScopeMapping, JSON.stringify({
+  rootRef: 'root',
+  sourceNodes: [
+    { ref: 'root', parentRef: null, pageAbsX: 0, pageAbsY: 0, relativeX: 0, relativeY: 0, width: 1280, height: 1024 },
+    { ref: 'plain', parentRef: 'root', pageAbsX: 100, pageAbsY: 292, relativeX: 100, relativeY: 292, width: 60, height: 44 },
+    { ref: 'plain/icon', parentRef: 'plain', pageAbsX: 110, pageAbsY: 300, relativeX: 10, relativeY: 8, width: 40.4, height: 30.6 },
+    { ref: 'stale', parentRef: 'root', pageAbsX: 300, pageAbsY: 292, relativeX: 300, relativeY: 292, width: 170, height: 80 },
+    { ref: 'stale/icon', parentRef: 'stale', pageAbsX: 310, pageAbsY: 300, relativeX: 10, relativeY: 8, width: 50, height: 40 }
+  ],
+  textAudit: [],
+  nodes: [
+    // Button 的模板不含图标字段：即使映射残留 Icon 与 iconSize 也不得发射这三项。
+    {
+      ref: 'plain', sourceRef: 'plain', sourceParent: 'root', id: 'PLAIN_1', xmlId: 'PLAIN_1',
+      controlType: 'Button', absX: 100, absY: 292, w: 60, h: 44,
+      attrs: { Style: 'SmallButton', Icon: 'EnterGeometry' },
+      iconSize: { width: 40.4, height: 30.6, sourceRef: 'plain/icon' }
+    },
+    // IconButton 的模板含图标字段但 Icon 为空：iconSize 不得被单独消费，三项写空占位。
+    {
+      ref: 'stale', sourceRef: 'stale', sourceParent: 'root', id: 'STALE_1', xmlId: 'STALE_1',
+      controlType: 'IconButton', absX: 300, absY: 292, w: 170, h: 80,
+      attrs: { Style: 'RightButtonStyle' },
+      iconSize: { width: 50, height: 40, sourceRef: 'stale/icon' }
+    }
+  ]
+}, null, 2));
+const iconScopeRun = spawnSync(process.execPath, [path.join(__dirname, '..', 'gen-iocontrol-xml.js'),
+  '--fresh', iconScopeMapping, '--out', iconScopeOutput], { encoding: 'utf8' });
+assert.strictEqual(iconScopeRun.status, 0, '图标字段收窄用例必须能渲染: ' + iconScopeRun.stderr);
+const iconScopeXml = fs.readFileSync(iconScopeOutput, 'utf8');
+const plainButtonTag = (iconScopeXml.match(/<IOContorl[^>]*ID="PLAIN_1"[\s\S]*?\/>/) || [''])[0];
+assert.ok(plainButtonTag, '必须包含 Button 节点');
+assert.doesNotMatch(plainButtonTag, /Icon="/, 'Button 模板不含图标字段，不得发射 Icon');
+assert.doesNotMatch(plainButtonTag, /IconWidth="/, 'Button 模板不含图标字段，不得发射 IconWidth');
+assert.doesNotMatch(plainButtonTag, /IconHeight="/, 'Button 模板不含图标字段，不得发射 IconHeight');
+const staleIconButtonTag = (iconScopeXml.match(/<IOContorl[^>]*ID="STALE_1"[\s\S]*?\/>/) || [''])[0];
+assert.ok(staleIconButtonTag, '必须包含 IconButton 节点');
+assert.match(staleIconButtonTag, /Icon=""/, 'IconButton 无 Icon 时仍要发射空 Icon 占位');
+assert.match(staleIconButtonTag, /IconWidth=""/, 'IconButton 无 Icon 时 iconSize 不得单独生效，IconWidth 写空占位');
+assert.match(staleIconButtonTag, /IconHeight=""/, 'IconButton 无 Icon 时 iconSize 不得单独生效，IconHeight 写空占位');
+
 console.log('PASS IOContorl typed-node gate regression test');
 console.log('PASS IconButton fixed-attribute regression test');
 console.log('PASS button-family rules are read from the template map');
+console.log('PASS icon attributes follow the ControlType template scope');

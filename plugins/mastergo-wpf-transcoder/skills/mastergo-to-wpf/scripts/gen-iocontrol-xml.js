@@ -35,6 +35,7 @@
  *   Icon / IconWidth / IconHeight —— 属 ControlType 固定必写字段：模板含图标字段的 IconButton 恒写，
  *   有图标槽位时 IconWidth / IconHeight 机械取「图标图形节点」bbox（映射字段 iconSize，四舍五入取整），
  *   无图标槽位时三项写空字符串占位；模板不含图标字段的 Button / StatusButton 不发射这三项；
+ *   iconSize 只在「模板含图标字段」且「节点带 Icon」时被消费，映射残留的尺寸不单独生效；
  *   带 Icon 却没有 iconSize 视为映射不完整，直接失败，禁止猜图标尺寸。
  *
  * TextBlock 固定属性：Height 固定 40；Width 固定 "NaN"（不用设计稿文本 bbox 宽度），
@@ -230,27 +231,30 @@ function applyButtonFamilyAttrs(node, attrMap) {
   for (const key of BUTTON_ALWAYS_ATTRS) {
     if (attrMap[key] === undefined || attrMap[key] === null) attrMap[key] = '';
   }
-  const size = iconSizeOf(node);
   const type = node.controlType || (node.attrs && node.attrs.ControlType);
   const required = REQUIRED_ATTRS_BY_CONTROL_TYPE[type] || [];
+  // 该 ControlType 的模板是否含图标字段：Button / StatusButton 的模板不含，恒不发射这三项。
   const wantsIconAttrs = required.indexOf('Icon') >= 0 || required.indexOf(BUTTON_ICON_SIZE_ATTRS[0]) >= 0;
+  // 图标尺寸只在「模板含图标字段」且「节点带 Icon」时消费；映射残留的 iconSize 既不脱离
+  // Icon 单独生效，也不越过 ControlType 模板生效——与 provenance 校验的「有图标」判据一致。
+  const size = wantsIconAttrs && hasIconAttr(node) ? iconSizeOf(node) : null;
   if (size) {
     attrMap[BUTTON_ICON_SIZE_ATTRS[0]] = size.width;
     attrMap[BUTTON_ICON_SIZE_ATTRS[1]] = size.height;
   }
+  else if (!wantsIconAttrs) {
+    // 模板不含图标字段（如 Button / StatusButton）：不发射 Icon / IconWidth / IconHeight，
+    // 即使映射里残留 Icon 或 iconSize。
+    delete attrMap.Icon;
+    delete attrMap[BUTTON_ICON_SIZE_ATTRS[0]];
+    delete attrMap[BUTTON_ICON_SIZE_ATTRS[1]];
+  }
   else if (!hasIconAttr(node)) {
-    if (wantsIconAttrs) {
-      // 该 ControlType 的模板含图标字段（如 IconButton）：字段恒写，值写空字符串，
-      // 同时丢弃映射里可能残留的陈旧尺寸。
-      attrMap.Icon = '';
-      attrMap[BUTTON_ICON_SIZE_ATTRS[0]] = '';
-      attrMap[BUTTON_ICON_SIZE_ATTRS[1]] = '';
-    } else {
-      // 模板不含图标字段（如 Button / StatusButton）：不发射 Icon / IconWidth / IconHeight。
-      delete attrMap.Icon;
-      delete attrMap[BUTTON_ICON_SIZE_ATTRS[0]];
-      delete attrMap[BUTTON_ICON_SIZE_ATTRS[1]];
-    }
+    // 该 ControlType 的模板含图标字段（如 IconButton）但没有图标槽位：字段恒写，值写空字符串，
+    // 同时丢弃映射里可能残留的陈旧尺寸。
+    attrMap.Icon = '';
+    attrMap[BUTTON_ICON_SIZE_ATTRS[0]] = '';
+    attrMap[BUTTON_ICON_SIZE_ATTRS[1]] = '';
   }
 }
 
@@ -272,7 +276,12 @@ function applyRequiredAttrs(node, attrMap) {
 
 // 按钮族中由生成器按图标 bbox 计算的属性（merge 时按几何语义覆盖并报告）
 function buttonFamilyIconSizeAttrNames(node) {
-  return isButtonFamily(node) && iconSizeOf(node) ? BUTTON_ICON_SIZE_ATTRS.slice() : [];
+  const type = node.controlType || (node.attrs && node.attrs.ControlType);
+  const required = REQUIRED_ATTRS_BY_CONTROL_TYPE[type] || [];
+  const wantsIconAttrs = required.indexOf('Icon') >= 0 || required.indexOf(BUTTON_ICON_SIZE_ATTRS[0]) >= 0;
+  return isButtonFamily(node) && wantsIconAttrs && hasIconAttr(node) && iconSizeOf(node)
+    ? BUTTON_ICON_SIZE_ATTRS.slice()
+    : [];
 }
 
 function validateFreshMapping() {

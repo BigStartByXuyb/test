@@ -112,6 +112,9 @@ function validateSlot(spec, slot, sourceMap, nodeMap, variant, usedSources) {
     delete attrs.Icon;
     delete attrs.IconWidth;
     delete attrs.IconHeight;
+    // 节点级图标尺寸同样作废：iconSize 只允许与 Icon 同现，避免留下会被
+    // 生成器/校验器以不同判据解释的「有尺寸无 Icon」映射。
+    delete nodeMap.get(slot.sourceRef).iconSize;
   }
   if (spec.iconRequired && typeof attrs.Icon !== "string") {
     fail("固定模板槽位缺少 DSL 图标来源: " + variant + "/" + slot.slot);
