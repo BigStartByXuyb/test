@@ -320,5 +320,6 @@ AI 必须同时读取原始 DSL、`visibility.json` 和正式组件映射，按�
 - 框架发现、路径绑定和索引：当前 MTSLG 路线直接读取目标项目的 `framework.config.json`、`.csproj`、项目本地 `docs/ai-index/`、源码和现有页面。缺少目标项目事实时只能完成静态映射/脚手架，不能宣称运行时交付验证通过。
 - 项目首次适配：`references/project-adapter-initialization.md`；仅在有效 `framework.config.json`、组件目录或资源目录尚未确认时使用。它不选择适配器。
 - 跨适配器组件语义：`references/mastergo-component-mapping-rules.md`；仅用于两条作业共用的设计来源、组件身份与来源链规则。
+- 样式库 Profile：`references/style-library-profiles.md`；当目标框架存在多个可复用的样式/主题/图标/资源库、需要区分「框架适配器」与「样式 Profile」并处理版本选择与冲突时读取（通常在项目首次适配阶段判断）。
 
 不得默认加载全部 references；适配器专用参考和脚本只按各自作业链读取与执行。

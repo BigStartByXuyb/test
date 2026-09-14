@@ -1,6 +1,6 @@
 # mastergo-wpf-transcoder 项目架构
 
-> 本文只讲**架构与关键组成**，不逐文件罗列。字段级规则请看 `skills/mastergo-to-wpf/references/`，流程细节看 `skills/mastergo-to-wpf/SKILL.md`，团队/设计师口径看飞书在线文档（见文末"文档分层"）。
+> 本文只讲**架构与关键组成**，不逐文件罗列、也不复制任何规则正文。字段级规则看 `skills/mastergo-to-wpf/references/`，流程与硬规则看 `skills/mastergo-to-wpf/SKILL.md`（唯一流程路由），团队/设计师口径看 4 份飞书在线文档（见 §5 规则与文档分层）。
 
 ## 1. 插件是什么
 
@@ -27,7 +27,6 @@ plugins/mastergo-wpf-transcoder/
 │  │  └─ scripts/                  # 交付链路脚本（运行时）
 │  │     └─ tests/                 # 开发期回归测试（CI 不跑，本地跑）
 │  └─ mastergo-iocontrol-document-format/   # 映射文档写作规范 Skill
-└─ docs/                           # 插件级说明文档
 ```
 
 ## 3. 交付链路（数据流）
@@ -54,11 +53,7 @@ flowchart LR
   O --> P[项目登记与运行时加载验证]
 ```
 
-要点：
-
-- **整页 DSL 只读一次**，响应只落盘、不进模型上下文；`coverage` 必须 `complete`。
-- **出码由脚本完成**，模型只负责组件语义映射与待确认清单；未命中映射的组件不降级。
-- **门禁是硬失败**（非零退出即禁止交付），不是警告报告。
+本图只表达**数据流与责任边界**；每一步的规则文本、门禁条件与字段口径以 `SKILL.md` 与 `references/` 为准，本文不复制。
 
 ## 4. 关键脚本（按阶段）
 
@@ -86,7 +81,15 @@ flowchart LR
 | 页面格式与验证 | `references/adapters/mtslg-iocontrol/mtslg-mode.md` | 坐标、TextBlock 尺寸、运行时约束、验证流程 |
 | 流程路由与硬规则 | `skills/mastergo-to-wpf/SKILL.md` | **唯一流程路由**；不在别处复制流程 |
 | 跨适配器语义 | `references/mastergo-component-mapping-rules.md` | 组件身份与来源链通用规则 |
-| 团队/设计师口径 | 飞书在线文档 ×4 | 权威阅读版本，与本地规则保持同步 |
+| 跨适配器样式库 | `references/style-library-profiles.md` | 样式库 Profile 的划分、版本选择与冲突处理；由 `project-adapter-initialization.md` 在项目适配阶段按条件引用 |
+| 团队/设计师口径 | 飞书在线文档 4 份（见下） | 权威阅读版本，与本地规则保持同步 |
+
+4 份飞书在线文档（权威阅读版本）：
+
+1. MasterGo 组件库 → MTSLG IOContorl 映射标准（Wiki `SOWvw4Srui5G5XkFKsNcvY2Fnwg`）
+2. MasterGo 页面壳层 → MTSLG Layout.xml 映射标准（docx `RT3Odwht3oFvl2x26sGcBbZMnMu`）
+3. MasterGo → MTSLG/WPF 完整页面转换流程与维护指南（docx `Ee6WdMH69o5XiuxUFUTcLegBnIH`）
+4. MasterGo AI 转码原理（docx `BNFUddlBWohqD4xQhJAcRrAknUS`）
 
 原则：**一个规则只保留一个权威来源**；改规则时同步"映射表 → 说明文档 → 在线文档 → 生成/校验脚本 → 回归测试"。
 
@@ -107,15 +110,19 @@ flowchart LR
 - 旧路径（`Common/Pages`、`Resources/Icons`、`Resources/Files/Layout.xml`）**已废弃**。
 - `framework.config.json` 的 `pages_root` / `icons_root` / `layout_file` 必须与实际产物一致（`sync-to-mt.ps1` 依赖 `pages_root`），`key_catalog` 默认空。
 
-## 7. 硬门禁与质量约束
+## 7. 门禁落点（规则正文以 SKILL.md / references 为准）
 
-1. **来源闭环**：每个节点可回溯到唯一 DSL ref 与父节点链，`Value` 与设计文本一致。
-2. **必写字段**：每个 ControlType 按 `controlTypeRequiredAttrs` 恒写；按钮族（IconButton / Button / StatusButton）恒写 `PageName` / `IOVisible` / `IOCommand` / `IOEnable`，IconButton 另有 `Icon` / `IconWidth` / `IconHeight`。
-3. **坐标**：`contentOriginY = 192` 全局固定；TextBlock `Width=NaN` / `Height=40`；坐标 0 MISMATCH / 0 EXTRA。
-4. **Layout**：`menuItems` 机械推导；MenuItem 常驻属性恒写；`IsNeedRedMark`（红字文案）/ `IsShowStatus`（左上角状态方框）命中才写；带 `Icon` 必须有 `iconSize`。
-5. **Icon**：键页面内唯一且闭合，页面 XML / Layout 引用的键必须存在于本页 Icon 文件；View 不合并本页 Icon 字典。
-6. **多语言**：默认开启，`LangName` 引用闭环；同一文案共用一个键；标题取 `textAudit` 的 `page-title`（来源写入 `titleSource`）。
-7. **发射顺序**：同一父节点下按设计坐标 Top → Left，与 DSL 图层树顺序解耦。
+本节只说明**校验发生在哪里**，不复述规则本身：
+
+| 门禁 | 执行者 | 覆盖范围（规则见 SKILL.md / 映射表） |
+|---|---|---|
+| 来源与固定字段 | `validate-iocontrol-provenance.js` | 节点 ↔ DSL ref ↔ 父链 ↔ 文本的闭环、`ControlType` 必写字段、TextBlock 尺寸约束 |
+| 坐标 | `check-iocontrol-coords.js` | Left/Top/Width/Height 独立重算，要求 0 MISMATCH / 0 EXTRA |
+| 图标闭合 | `gen-mastergo-page-bundle.js` 内置校验 | Icon 键唯一与引用闭合、页面 Icon 文件结构 |
+| 语言闭环 | Bundle 的语言绑定与字典校验 | `LangName` 引用必须存在于本页字典，各语言 key 一致 |
+| 页面壳层 | `gen-mtslg-layout.js` 校验 | MenuItem 常驻属性、Index、图标尺寸门禁 |
+
+任一门禁以非零退出结束即禁止交付；规则改动后必须同步更新执行者与回归用例。
 
 ## 8. 多语言链路
 
