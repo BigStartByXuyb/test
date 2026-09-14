@@ -38,13 +38,12 @@ function extractDocumentedRules(markdown) {
     if (values.includes("输入框-")) families.inputTemplates.push(...splitVariants(values));
   }
 
+  // `### 固定模板：属性 1=…` 标题里列出的变体先原样收集，随后由映射表归属到真实模板族——
+  // 新增模板族因此不需要在本文件里手工登记家族清单。
+  const headingVariants = [];
   const operationHeadings = markdown.match(/^### 固定模板：属性 1=([^\r\n]+)/gm) || [];
   for (const heading of operationHeadings) {
-    const variants = heading.replace(/^### 固定模板：属性 1=/, "").trim();
-    const values = splitVariants(variants);
-    // Main-menu variants belong to mainMenuTemplates, not the generic
-    // componentTemplates family.
-    families.componentTemplates.push(...values.filter(value => !["主菜单button", "主菜单button-文字"].includes(value)));
+    headingVariants.push(...splitVariants(heading.replace(/^### 固定模板：属性 1=/, "").trim()));
   }
 
   const uniqueFamilies = {};
@@ -62,11 +61,36 @@ function extractDocumentedRules(markdown) {
     }
   });
 
-  return { families: uniqueFamilies, unconfirmed, ambiguous };
+  return { families: uniqueFamilies, headingVariants, unconfirmed, ambiguous };
+}
+
+// 变体 → 所属模板族（来自映射表），用于把文档标题里的变体归属到真实家族。
+function buildVariantOwners(templateMap) {
+  const owners = new Map();
+  for (const [family, spec] of Object.entries(templateMap)) {
+    if (family.startsWith("_") || !family.endsWith("Templates")) continue;
+    if (!spec || typeof spec !== "object") continue;
+    if (!spec.variants || typeof spec.variants !== "object") continue;
+    for (const variant of Object.keys(spec.variants)) {
+      if (variant && !owners.has(variant)) owners.set(variant, family);
+    }
+  }
+  return owners;
 }
 
 function auditMappingCoverage(markdown, templateMap) {
   const documented = extractDocumentedRules(markdown);
+  const owners = buildVariantOwners(templateMap);
+  const unregisteredVariants = [];
+  for (const variant of documented.headingVariants) {
+    const owner = owners.get(variant);
+    if (!owner) {
+      unregisteredVariants.push(variant);
+      continue;
+    }
+    if (!documented.families[owner]) documented.families[owner] = [];
+    if (!documented.families[owner].includes(variant)) documented.families[owner].push(variant);
+  }
   const missing = [];
   const covered = [];
   for (const [family, variants] of Object.entries(documented.families)) {
@@ -96,6 +120,7 @@ function auditMappingCoverage(markdown, templateMap) {
     covered,
     missing,
     undocumented: findUndocumentedVariants(markdown, templateMap),
+    unregisteredVariants,
     unconfirmed,
     ambiguous: documented.ambiguous,
     duplicateMatchKeys: findDuplicateMatchKeys(templateMap)
@@ -164,7 +189,8 @@ function main() {
     JSON.parse(fs.readFileSync(mapPath, "utf8"))
   );
   console.log(JSON.stringify(report, null, 2));
-  if (report.missing.length || report.undocumented.length || report.duplicateMatchKeys.length) {
+  if (report.missing.length || report.undocumented.length ||
+      report.unregisteredVariants.length || report.duplicateMatchKeys.length) {
     process.exitCode = 2;
   }
 }
@@ -175,6 +201,7 @@ module.exports = {
   extractDocumentedRules,
   auditMappingCoverage,
   findDuplicateMatchKeys,
+  buildVariantOwners,
   collectMapVariants,
   findUndocumentedVariants,
   isVariantDocumented

@@ -114,14 +114,15 @@ description: 强制规范 MasterGo → MTSLG IOContorl 映射文档的写法，�
 
 ## 新增/修改映射的同步清单
 
-新增、修改或删除**任意一条映射**时，下列位置要在同一批改动里保持一致；只改其中一处就等于制造漂移，而漂移不会立刻报错，只会在后续页面生成时才暴露。第 1、2、4、5 项是硬性要求；第 3 项在本次新增了模板族时必做；第 6 项按发版节奏处理，不阻塞本次改动：
+新增、修改或删除**任意一条映射**时，下列位置要在同一批改动里保持一致；只改其中一处就等于制造漂移，而漂移不会立刻报错，只会在后续页面生成时才暴露。第 1~4 项是硬性要求；第 5 项按发版节奏处理，不阻塞本次改动：
 
 1. **机器真值源**：`skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/mtslg-iocontrol-map.json`（以插件根为基准）——模板族结构、`match.property`、`variants` 真实属性值、`controlTypeRequiredAttrs` 必写字段、按钮族 `iconSize` 等。同一个「匹配属性名 + 属性值」只能登记在一个模板族。
 2. **人读口径**：本规范约束的映射文档 `skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/feishu-component-library-mapping.md`——按上面的层级、匹配规则、固定模板和 XML 格式补齐同一条映射。
-3. **新增模板族时的审计登记**：映射表里新出现 `*Templates` 族时，同步登记到 `skills/mastergo-to-wpf/scripts/audit-mtslg-feishu-map.js` 的家族清单。漏登记不会静默通过：按本规范用 `### 固定模板：属性 1=…` 书写的新族变体会被归到 `componentTemplates` 家族参与比对，脚本会报出归属错误的 `missing` 并以退出码 2 结束，需要靠人工判断这不是真的缺映射。反向检查 `undocumented` 覆盖的是"表登记了、文档没写"方向，不能替代这项登记。
-4. **回归用例**：在 `skills/mastergo-to-wpf/scripts/tests/` 下按需补断言（文档覆盖、模板匹配、按钮族图标字段口径、TextBlock 尺寸、坐标等）。
-5. **版本号**：`.claude-plugin/plugin.json` 递增；不要在上一轮 CI 未结束时连续推送。
-6. **在线同步副本**：发版前把映射文档同步到对应的飞书在线文档（按标题检索定位、不写死地址、整篇重建并记录 revision）。同步工具是可选项、不是交付链路的运行依赖：本机没有该工具时，在交付说明里标注"在线文档未同步"即可，不阻塞本次改动。
+3. **回归用例**：在 `skills/mastergo-to-wpf/scripts/tests/` 下按需补断言（文档覆盖、模板匹配、按钮族图标字段口径、TextBlock 尺寸、坐标等）。
+4. **版本号**：`.claude-plugin/plugin.json` 递增；不要在上一轮 CI 未结束时连续推送。
+5. **在线同步副本**：发版前把映射文档同步到对应的飞书在线文档（按标题检索定位、不写死地址、整篇重建并记录 revision）。同步工具是可选项、不是交付链路的运行依赖：本机没有该工具时，在交付说明里标注"在线文档未同步"即可，不阻塞本次改动。
+
+新增模板族不需要到审计脚本里登记家族名：文档标题里写出的变体会由脚本按映射表自动归属到真实模板族；若某个变体在映射表里找不到归属，审计会以 `unregisteredVariants` 报出并以退出码 2 结束，表示"这条映射还没进映射表"。
 
 改完后按顺序自检，任何一步非零退出都必须修完再提交：
 
@@ -133,7 +134,7 @@ node --test "skills/mastergo-to-wpf/scripts/tests/*.test.js"
 pwsh -NoProfile -File skills/mastergo-to-wpf/scripts/tests/mastergo-dsl-pipeline.tests.ps1
 ```
 
-- 覆盖审计报告里 `missing`（文档声明了但映射表没有）、`undocumented`（映射表登记了但文档正文没提）、`duplicateMatchKeys`（跨模板族重复匹配键）任一非空，都表示这次改动不完整；三者非空时脚本以退出码 2 结束。
+- 覆盖审计报告里 `missing`（文档声明了但映射表没有）、`unregisteredVariants`（文档标题里的变体在映射表里没有归属族）、`undocumented`（映射表登记了但文档正文没提）、`duplicateMatchKeys`（跨模板族重复匹配键）任一非空，都表示这次改动不完整；任一非空时脚本以退出码 2 结束。
 - `undocumented` 是关键词级覆盖检查（文档正文里是否提到该变体，HTML 注释不算），不证明模板已经写全；模板是否成体系仍按本 Skill 的层级、匹配规则和固定模板规则人工审查。
 - 只改映射表或只改映射文档都不算完成；必须文档 + 映射表 + 审计 + 回归同时通过。
 - 新 ControlType 的必写字段只需登记进 `controlTypeRequiredAttrs`，生成器与 provenance 校验会自动读取；若改的是固定字段口径（按钮族、图标字段、TextBlock 尺寸等），还要同步 `doc-rule-consistency.test.js` 覆盖的口径文本。

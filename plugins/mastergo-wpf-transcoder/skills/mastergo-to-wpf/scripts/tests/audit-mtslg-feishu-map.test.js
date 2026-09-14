@@ -13,6 +13,8 @@ const report = auditMappingCoverage(fs.readFileSync(docPath, "utf8"), JSON.parse
 assert.deepStrictEqual(report.missing, [], "飞书正式模板不应缺失机器映射");
 assert.deepStrictEqual(report.undocumented, [],
   "映射表登记的模板族/变体必须都在映射文档里出现（反向覆盖）: " + JSON.stringify(report.undocumented));
+assert.deepStrictEqual(report.unregisteredVariants, [],
+  "文档标题里写出的变体必须能在映射表里找到归属族: " + JSON.stringify(report.unregisteredVariants));
 assert.ok(report.covered.length >= 30, "正式模板覆盖数量异常");
 assert.deepStrictEqual(report.ambiguous, [], "文档不应保留没有组件集/变体标题的孤立结构");
 assert.deepStrictEqual(report.unconfirmed, ["inputTemplates/密码输入框"], "密码框只保留待确认状态");
