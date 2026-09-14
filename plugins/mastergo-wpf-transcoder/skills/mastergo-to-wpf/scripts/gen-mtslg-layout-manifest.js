@@ -45,7 +45,7 @@ const fKeyPattern = new RegExp(bottomBar.fKeyPattern || "^F\\d+$");
 const decorPattern = new RegExp(bottomBar.decorativeNamePattern || "背景|分割");
 const variantNames = new Set(Object.keys(bottomBar.variants));
 // 底部栏变体的匹配键（真值来源：模板表 layoutRules.bottomBar.match，一族一个键）：
-//   componentName / componentSet = true → 变体值 = 被引用组件的名字（实例的 name）
+//   componentName = true                → 变体值 = 被引用组件的名字（实例的 name）
 //   property = "<属性名>"               → 变体值 = 该公开属性的值
 // 未登记匹配键时不做匹配（该实例计入 unresolvedBottomBarItems）。
 const bottomBarMatch = bottomBar.match || {};

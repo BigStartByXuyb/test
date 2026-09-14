@@ -1180,7 +1180,6 @@
   "layoutRules": {
     "_note": "底部栏 → Layout MenuItem 的规则。只有布局侧脚本（gen-mtslg-layout-manifest.js / gen-mtslg-layout.js）读取，不参与 IOContorl 模板匹配。",
     "bottomBar": {
-      "componentSet": "底部栏",
       "match": {
         "_note": "底部栏变体的匹配键：componentName=true 表示「变体值 = 被引用组件的名字（实例的 name）」。实测底部栏实例的属性里没有变体信息（properties 只有 实例/显示icon/显示文案/显示F，或为空），它们引用的是独立组件本体（名字即变体值，如 非首页-长方形、首页-长方形），因此底部栏与右栏独立组件族一样按「组件名」匹配；一族一个键，与组件模板族同一套机制。",
         "componentName": true
