@@ -145,4 +145,43 @@ for (const [file, source] of [
   assert.ok(stated.length > 0, `${file} 必须写明「无图标槽位时…空字符串」`);
 }
 
+// ---------- 6. 已作废表述不得在文档里残留；关键文档必须写明新口径 ----------
+// 背景：口径迁移（例如「父节点语义不再作为匹配键」）要改 5~6 份文档，只改一处就会被 CI 判矛盾。
+// 这里把"已作废表述"和"必须出现的新口径"都变成字符串断言，本地跑一次就知道有没有漏改。
+const PLUGIN_ROOT = path.join(__dirname, "..", "..", "..", "..");
+const RETIRED_PHRASES = [
+  "父节点语义 + 公开属性名",
+  "追加父节点语义",
+  "才使用“完整父节点语义",
+  "parentVariants",
+];
+const RETIRED_EXEMPT = /已作废|不作为匹配键|不是匹配键|不参与匹配|不得使用/;
+const mdFiles = fs.readdirSync(PLUGIN_ROOT, { recursive: true })
+  .filter((entry) => String(entry).endsWith(".md"))
+  .map((entry) => path.join(PLUGIN_ROOT, String(entry)));
+assert.ok(mdFiles.length > 0, "必须能在插件根下枚举到文档");
+for (const file of mdFiles) {
+  skillLines(fs.readFileSync(file, "utf8")).forEach((line, index) => {
+    for (const phrase of RETIRED_PHRASES) {
+      if (!line.includes(phrase)) continue;
+      assert.ok(RETIRED_EXEMPT.test(line),
+        `${path.relative(PLUGIN_ROOT, file)}:${index + 1} 出现已作废表述「${phrase}」，须改成新口径或显式标注已作废`);
+    }
+  });
+}
+
+const MUST_STATE_NO_PARENT_MATCH_KEY = [
+  "skills/mastergo-to-wpf/SKILL.md",
+  "skills/mastergo-iocontrol-document-format/SKILL.md",
+  "skills/mastergo-to-wpf/references/mastergo-component-mapping-rules.md",
+  "skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/mtslg-mode.md",
+  "skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/feishu-component-library-mapping.md",
+];
+for (const rel of MUST_STATE_NO_PARENT_MATCH_KEY) {
+  const text = fs.readFileSync(path.join(PLUGIN_ROOT, rel), "utf8");
+  assert.ok(/不作为匹配键|不是匹配键|不参与匹配/.test(text),
+    `${rel} 必须写明「父节点语义不作为匹配键」（口径迁移后的新表述）`);
+}
+
 console.log("PASS 按钮族固定字段单一真值源（映射表 ↔ 脚本默认 ↔ 两份 Skill ↔ 两份人读参考）一致性回归测试");
+console.log("PASS 已作废表述（父节点语义匹配键 / parentVariants）全仓扫描");
