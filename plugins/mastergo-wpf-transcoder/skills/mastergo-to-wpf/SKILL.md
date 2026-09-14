@@ -43,14 +43,14 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 
 ## 映射表优先级与适配层级
 
-正式组件映射表是“组件结构”的最高优先级。匹配键优先为“独立组件集名称 + MasterGo 公开变体/属性名 + 真实属性值”；只有设计明确存在父子组合关系时才使用“父节点语义 + 公开属性名 + 真实属性值”。组件集 ID、实例 ID、图层名称和截图外观只用于追踪或辅助读取，不能替代匹配键；唯一例外是底部栏变体的识别（`layoutRules.bottomBar.match.layerNameFallback`，规则与实测依据见 `feishu-layout-mapping.md`），它只决定“这个底部槽位属于哪个变体”，不参与 `ControlType`/`Style`/资源键的推断。
+正式组件映射表是“组件结构”的最高优先级。匹配键优先为“独立组件集名称 + MasterGo 公开变体/属性名 + 真实属性值”；只有设计明确存在父子组合关系时才使用“父节点语义 + 公开属性名 + 真实属性值”。组件集 ID、实例 ID、图层名称和截图外观只用于追踪或辅助读取，不能替代匹配键。
 
 按以下层级执行：
 
 1. **正式映射表**决定 `ControlType`、`Style` 槽位/语义类别、节点数量、父子关系、槽位顺序和固定属性；不据此虚构具体资源键。
 2. **目标项目源码/真实页面/键索引**决定已登记的 `Style`/`Icon` 资源键和其他运行时字段；固定模板中存在的 `IOName`、`IOCommand`、`LangName`、`IOEnable`、`IOState`、`PageName` 等字段没有可靠来源时保留对应 XML 属性并输出空字符串值；不在固定模板中的属性不新增，不填猜测值。
 3. **MasterGo DSL**为映射槽位提供真实文本、实例属性、图标来源、尺寸和逐级坐标。
-4. 图层名称、组件名称和视觉外观不得用于推断 `ControlType`、`Style` 或资源键；没有映射的组件不得静默改成 `Button`、`Border`、无类型容器或其他近似控件。（底部栏变体识别按 `layoutRules.bottomBar.match` 的已登记回退键执行，见 `feishu-layout-mapping.md`。）
+4. 图层名称、组件名称和视觉外观不得触发额外推断；没有映射的组件不得静默改成 `Button`、`Border`、无类型容器或其他近似控件。
 
 当前 MTSLG 结构映射稿与运行时交付使用同一条生成链路：目标项目缺失时仍必须创建完整 IOContorl 脚手架，并生成与正式运行结构一致的 `.csproj`、`framework.config.json`、页面 XML、页面 Icon、Layout 壳层和 mapping/provenance。固定模板中已经声明的可选运行时属性，映射清单缺少来源时必须显式写成空字符串值，并在 mapping/manifest 中标记待配置；不在当前固定模板中的属性不新增：`ControlType` 的模板不含图标字段时不写 `Icon`/`IconWidth`/`IconHeight`，模板含图标字段的 `IconButton` 没有图标槽位时仍按必写字段发射空字符串占位。只有项目引用、真实运行时资源、可编译宿主和加载验证都通过后，才能称为“完整可运行页面”。
 
@@ -97,7 +97,7 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 2. 生成真实 `IOContorl` XML、逐节点 mapping/provenance 和必要的 Layout 注册；`ControlType`、固定组件层级和槽位首先使用正式映射表。目标项目已确认的字段按事实填写；固定模板中存在但缺少可靠来源的 `IOName`、`IOCommand`、`LangName`、`IOEnable`、`IOState`、`PageName`、`UserRightId` 等保留属性并输出空字符串值，不删除整个节点；不在模板中的属性不新增。使用 `scripts/gen-iocontrol-xml.js` 发射 XML；先发现当前页面 PATH/SVG 候选，再由 `scripts/gen-mtslg-page-icons.js` 生成当前页面的 Icon 文件。Icon 资源名优先使用中文语义对应的英文键；无法形成可靠语义名时才使用当前页面内唯一的临时键。临时键必须写入 mapping/manifest，不能使用 `MGIcon_<layer-id>`，并必须保持页面内唯一。Layout 只引用该页面 Icon 文件中已生成的键。
    - 新页面默认禁止覆盖页面 XML、Icon、View、ViewModel 或审计文件；同名目标存在时停止并要求确认。用户明确要求替换时，必须使用 `operation=replace-existing` + `--overwrite`，并为所有被替换文件保留备份。Layout 仍由 `gen-mtslg-layout.js` 负责增量追加；已有同名 `Page Target` 默认停止，用户明确要求替换并传入 `--overwrite` 时才定点更新并备份。
    - 页面可以没有任何运行时 Icon。PATH/SVG 候选只是来源审计；只有 IOContorl 节点或 Layout 菜单实际引用的 Icon，才必须在当前页面 Icon 文件中存在对应 Geometry 资源键。
-    - **Layout 必须先完成映射清单，再生成 XML。** 读取完全部 MasterGo DSL 后，按 `feishu-layout-mapping.md` 生成 Layout manifest；已命中的底部栏组件必须生成对应的 `menuItems`——**包括空位占位项**（命中变体却没有组件属性、文案和图标，照发 `<MenuItem Name="" Icon="" TopLeftContent="" Index="N" />`），只有右下角常驻分组内的实例不生成 MenuItem，但保留它们占的 Index 空档。当前固定模板声明的运行时字段缺失时写入空字符串并标记待配置；没有声明的字段不新增，不能因此把整个 `Menu` 留空。`layoutStatus`、`layoutEvidence`（含 `residentGroupItems` / `emptyPlaceholderItems`）和数量一致性由 `gen-mtslg-layout.js` 强制校验；校验失败表示“清单不完整”，不是拒绝生成页面，补齐清单后重新运行即可。
+   - **Layout 必须先完成映射清单，再生成 XML。** 读取完全部 MasterGo DSL 后，按 `feishu-layout-mapping.md` 生成 Layout manifest；已命中的底部栏组件必须生成对应的 `menuItems`。当前固定模板声明的运行时字段缺失时写入空字符串并标记待配置；没有声明的字段不新增，不能因此把整个 `Menu` 留空。`layoutStatus`、`layoutEvidence` 和数量一致性由 `gen-mtslg-layout.js` 强制校验；校验失败表示“清单不完整”，不是拒绝生成页面，补齐清单后重新运行即可。
    - 顶部栏 `HeaderItem` 的运行时 `Id/Target` 仍须来自目标项目事实源；无法确认时单独标记待确认，不得用顶部文字或图标名称猜写。页面中间的 `主菜单button` 也不因存在 F 键就自动写入 Layout，只有正式 Layout 映射命中时才写入。
 3. 在 XML 结构检查前运行 `scripts/validate-iocontrol-provenance.js`；需要独立坐标检查时以节点数组调用 `scripts/check-iocontrol-coords.js`，有 Geometry 时调用 `scripts/scan-icon-coords.js`，再执行宿主加载与视觉核对。
 
@@ -225,7 +225,7 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 - WPF 控件、Style、资源和协议以源码/真实页面为事实源；IOContorl 的组件结构和 `ControlType` 以正式映射表为事实源，目标项目运行时资料用于核对属性、资源键和绑定。
 - 组件实例优先于原始图层；未登记的业务组合必须标记待确认。
 - 未确认的运行时字段只能写入 mapping manifest 或 XML 注释，禁止把“待人工绑定”作为可见 `Value`、伪造 `IOName` 或伪造 `IOCommand`。
-- 每个 ControlType 按 `mtslg-iocontrol-map.json` 的 `controlTypeRequiredAttrs` 发射固定必写字段：**属性恒写，取不到来源时写空字符串占位**（`ID`/`ControlType` 恒由节点身份发射，`Left`/`Top`/`Width`/`Height` 恒由 DSL bbox 发射，TextBlock 为 `Width=NaN`、`Height=40`）。按钮族（`IconButton` / `Button` / `StatusButton`）在此基础上恒写 `PageName`、`IOVisible`、`IOCommand`、`IOEnable`；`IconButton` 的 `Icon`/`IconWidth`/`IconHeight` 恒写，有图标槽位时取**图标图形节点自身 bbox**（不是控件宽高）并四舍五入取整，无图标槽位时写空字符串；`Button`/`StatusButton` 不含图标字段，不发射这三项；映射带 `Icon` 却没有图标尺寸来源时生成器直接失败。`LangName` 是唯一例外：只在多语言绑定层给出真实 key 时发射，动态值等 `noLangRefs` 豁免节点不写空占位。组件族匹配使用“组件集名 + 公开属性名 + 真实属性值”，图层名称只作核对、不参与组件模板族匹配；底部栏变体的图层名回退单独登记在 `layoutRules.bottomBar.match`，不适用于组件模板族。
+- 每个 ControlType 按 `mtslg-iocontrol-map.json` 的 `controlTypeRequiredAttrs` 发射固定必写字段：**属性恒写，取不到来源时写空字符串占位**（`ID`/`ControlType` 恒由节点身份发射，`Left`/`Top`/`Width`/`Height` 恒由 DSL bbox 发射，TextBlock 为 `Width=NaN`、`Height=40`）。按钮族（`IconButton` / `Button` / `StatusButton`）在此基础上恒写 `PageName`、`IOVisible`、`IOCommand`、`IOEnable`；`IconButton` 的 `Icon`/`IconWidth`/`IconHeight` 恒写，有图标槽位时取**图标图形节点自身 bbox**（不是控件宽高）并四舍五入取整，无图标槽位时写空字符串；`Button`/`StatusButton` 不含图标字段，不发射这三项；映射带 `Icon` 却没有图标尺寸来源时生成器直接失败。`LangName` 是唯一例外：只在多语言绑定层给出真实 key 时发射，动态值等 `noLangRefs` 豁免节点不写空占位。组件族匹配使用“组件集名 + 公开属性名 + 真实属性值”，图层名称只作核对、不参与匹配。
 - **属性顺序固定（页面 XML 与 Layout 统一）**：`ID` → `ControlType` → `Style` → `Icon` → 文本（`TopLeftContent` / `Value` / `Header`）→ `LangName` → 运行时字段（`PageName` / `IOName` / `IOCommand` / `IOVisible` / `IOEnable` / 其余 `IO*`）→ 控件尺寸（`Width` / `Height`）→ 图标尺寸（`IconWidth` / `IconHeight`）→ 位置（`Left` / `Top`）。Layout 的 `MenuItem` 按同一约定排列：`Name` → `Icon` → `TopLeftContent` → `Index` → `LangName` → `PageName` / `IO*` → `UserRightId` → `IconWidth` / `IconHeight`。`gen-iocontrol-xml.js` 的 `ATTR_ORDER` 与 `gen-mtslg-layout.js` 的 `ATTR_FIELDS` 是唯一真值源，不得按单个页面另排顺序。
 - **节点发射顺序按设计稿上下布局（仅页面 XML）**：同一父节点下的子节点按设计坐标 **Top（Y）主序 → Left（X）次序** 发射（坐标完全相同时保持 `mapping.nodes` 原顺序）。作用域是**所有父节点**，不区分横向/纵向容器——理由是 DSL 图层树顺序与画面位置无关，而上下布局容器的子节点顺序决定运行时显示顺序。只改变排列顺序，`ID` / 坐标 / 属性 / 层级关系都不变。排序的唯一真值源是 `gen-iocontrol-xml.js` 的 `sortNodesByDesignOrder()`。
   - **fresh 与 merge 的差异**：排序在读取 mapping 时统一生效，但 merge 只为**新节点**计算插入点、既有节点按原 XML 顺序原样保留，因此 **merge 不会纠正既有节点的排列顺序**；需要整页设计顺序时用 `--fresh` 重建。

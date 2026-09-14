@@ -10,31 +10,29 @@
 
 ## 底部按钮组件集结构映射
 
-底部菜单按团队组件库中独立组件集“底部栏”的公开属性“属性 1”及其真实子节点匹配；变体的识别键登记在模板表 `layoutRules.bottomBar.match`：`properties` 列出的公开属性值精确等于 `variants` 的键，或 `layerNameFallback=true` 时图层名精确等于 `variants` 的键（实测依据见下文“底部栏变体的匹配键”）。业务页面中的底栏实例仅用于读取本次实例的文本、图标、键盘提示和排列顺序；图层 ID、设计坐标和显示文案不作为匹配键。
+底部菜单只按团队组件库中独立组件集“底部栏”的公开属性“属性 1”及其真实子节点匹配。业务页面中的底栏实例仅用于读取本次实例的文本、图标、键盘提示和排列顺序；图层 ID、实例名称、设计坐标和显示文案均不作为匹配键。
 
 ### 组件集：底部栏
 
 #### 匹配规则
 
-先沿实例的真实父子链定位到“底部栏”组件集，再按模板表 `layoutRules.bottomBar.match` 判定变体：`properties` 列出的公开属性（默认“属性 1”）的值精确等于本节列出的一个变体值即命中；`layerNameFallback=true` 时，图层名精确等于变体值同样算命中（实测部分设计稿的底部栏实例没有“属性 1”，变体名只落在图层名上）。两者都未命中时不得生成 MenuItem。
+先沿实例的真实父子链定位到“底部栏”组件集，再读取该实例的公开属性“属性 1”。属性值必须精确等于本节列出的一个变体值；未命中时不得生成 MenuItem。
 
 #### 固定模板
 
-一个页面底部栏对应一个 Page 下的一个 Menu；底部栏横排每一个命中变体的实例都生成 MenuItem，**包括空位占位项**（命中底部栏变体，但整棵子树既没有组件属性、没有文案、也没有图标——设计稿里预留但本页未配置的 F 键位，产物形如 `<MenuItem Name="" Icon="" TopLeftContent="" Index="N" />`）。以下不生成 MenuItem：底部栏容器本身、右下角常驻分组（`右侧底部-常驻button`）及其分组内的全部子实例。
+一个页面底部栏对应一个 Page 下的一个 Menu；只有底部栏横排的命中变体实例生成 MenuItem。底部栏容器、右下角常驻分组（`右侧底部-常驻button`）以及分组内的全部子实例都不生成 MenuItem。
 
-命中底部栏变体的槽位分两类，换算关系固定为 `matchedBottomBarItems = menuItems.length + residentGroupItems`：生成 MenuItem 的槽位（**含空位占位项**）、右下角常驻分组内的实例（`layoutEvidence.residentGroupItems`，不生成 MenuItem）。空位占位项的数量作为 `menuItems` 的子集登记在 `layoutEvidence.emptyPlaceholderItems`，只作报告用。生成脚本按上式强制校验，并在 `menuItems` 里出现常驻分组实例时直接失败。**Index 按底部栏的视觉排列位置取值、保留空档，不重排**：不生成 MenuItem 的常驻分组照样占位，后续 MenuItem 的编号不因此提前（详见下一节示例）。
-
-**底部栏变体的匹配键**（与组件模板族不同，单独登记在 `mtslg-iocontrol-map.json` 的 `layoutRules.bottomBar.match`）：`properties` 列出的公开属性（默认 `属性 1`）的值精确等于 `variants` 的键，**或**（`layerNameFallback=true` 时）图层名精确等于 `variants` 的键。保留图层名回退的原因：实测 `SSD 隐切项目`（file 181586559903927 / layer 42:008605）的 10 个「非首页-长方形」菜单按钮没有 `属性 1`，变体名只落在图层名上。该回退只用于识别底部栏变体，**不参与 `ControlType`/`Style`/资源键推断**——组件模板族的匹配键仍按《组件库映射规范》执行，不使用图层名。
+常驻分组内的实例数量登记在 `layoutEvidence.residentGroupItems`，与 `matchedBottomBarItems` 的换算关系为 `matchedBottomBarItems = menuItems.length + residentGroupItems`；生成脚本会按此校验并在 `menuItems` 里出现常驻分组实例时直接失败。Index 只对实际生成的 MenuItem 按它们在底部栏中的排列顺序连续编号（不含常驻分组）。
 
 ```xml
 <Page Target="{target}" LangName="{page_lang_name}">
   <Menu>
-    <!-- 每个底部栏横排命中变体实例生成一个 MenuItem（常驻分组除外；空位占位项照发空 MenuItem） -->
+    <!-- 每个底部栏横排命中变体实例生成一个 MenuItem（右下角常驻分组除外） -->
   </Menu>
 </Page>
 ```
 
-新建页面时，Index 取当前页面底部栏中该实例的实际**排列位置**，**从 1 起**（第 1 个位置 = 1，按底部栏视觉排列顺序，**含**不生成 MenuItem 的常驻分组）；不生成 MenuItem 的常驻分组保留空档，不重排后续编号；空位占位项按自己的位置正常发射空 MenuItem。例如底部栏共 12 个位置，其中第 1~3 位是空位、第 6~7 位是常驻分组（第 4、5、8~12 位是已配置按钮），则 Index 为 `1,2,3,4,5,8,9,10,11,12`（空位项 1~3 发空 MenuItem）。不写入 Left、Top、Width、Height。增量修改已有 Layout 时，已有页面和已有 MenuItem 的 Index 原样保留，不用设计稿顺序覆盖。固定模板已经声明的 `PageName`、`IOEnable`、`UserRightId` 等可选属性，目标项目未提供时保留属性并输出空字符串；当前变体没有声明的属性不新增。
+新建页面时，Index 取当前页面底部栏中该实例的实际排列顺序，**从 1 起**（第 1 个按钮 = 1，按底部栏的视觉排列顺序，含没有生成 MenuItem 的按钮）；不生成 MenuItem 的按钮（如右下角常驻分组）在 Index 上保留空档，不重排后续编号。例如底部栏第 1~5 个按钮生成 MenuItem、第 6~7 个是常驻分组不生成、第 8~12 个再生成，则 Index 为 `1,2,3,4,5,8,9,10,11,12`。不写入 Left、Top、Width、Height。增量修改已有 Layout 时，已有页面和已有 MenuItem 的 Index 原样保留，不用设计稿顺序覆盖。固定模板已经声明的 `PageName`、`IOEnable`、`UserRightId` 等可选属性，目标项目未提供时保留属性并输出空字符串；当前变体没有声明的属性不新增。
 
 **MenuItem 常驻属性（恒写）**：`LangName`、`PageName`、`IOCommand`、`IOVisible`、`IOEnable` 与页面 XML 按钮族的 `PageName` / `IOVisible` / `IOCommand` / `IOEnable` 同一策略——无论变体是否声明、来源是否取到，都写出该属性；没有可靠来源时写空字符串占位，不允许因为"没取到"而丢字段。`Value` 不写（菜单文本只放在 `Name`）。常驻集合的真值源是 `mtslg-iocontrol-map.json` 的 `layoutRules.bottomBar.menuItemAlwaysWrittenAttrs`；需要额外追加时用 manifest 的 `menuItemAlwaysAttrs`（例如 `["UserRightId"]`）扩展。
 
@@ -52,13 +50,11 @@
 底部栏菜单不再人工登记，由 `gen-mtslg-layout-manifest.js` 从 DSL 快照 + 当前页面 Icon 映射 + 模板表机械推导，规则全部登记在 `mtslg-iocontrol-map.json` 的 `layoutRules.bottomBar`：
 
 - **底部栏容器**：任一"直接子节点里含右下角常驻分组"的容器（不记图层 ID、不记页面路径）。
-- **变体匹配**：`layoutRules.bottomBar.match` —— `properties` 列出的公开属性值命中 `variants` 键，或 `layerNameFallback` 允许时图层名命中 `variants` 键（见上文"底部栏变体的匹配键"）。
 - **排列顺序**：视觉行序——先按 `y` 分行（同一行内 `y` 差不超过行高一半视为同行），行内按 `x` 升序；与运行目录参考 Layout 的 Index 形态一致。
-- **Index**：从 1 起，包含不生成 MenuItem 的常驻分组位置；常驻分组内按钮占位并留下空档，不重排后续编号；空位占位项按自己的位置正常发射。
+- **Index**：从 1 起，包含不生成 MenuItem 的按钮；常驻分组内的按钮占位并留下空档。
 - **Name / TopLeftContent**：取该实例的真实文本槽位与 F 键槽位，**照设计稿原样写入**（不做"占位符"判定、不登记默认值；设计里是 `文案展示` / `F1` 就写 `文案展示` / `F1`）。
 - **Icon / IconWidth / IconHeight**：从页面 Icon 映射与图标图形节点 bbox 取；`extractSvg` 去重导致映射缺条目时按几何指纹回退匹配同一资源名。
-- **空位占位项**：命中底部栏变体，但整棵子树既没有组件属性、没有文案、也没有图标（三者同时为空）时视为空位，照旧生成空 MenuItem 对位；数量写入 `layoutEvidence.emptyPlaceholderItems`（`menuItems` 的子集，报告用）。
-- **常驻分组**：分组内实例数写入 `layoutEvidence.residentGroupItems`；换算 `matchedBottomBarItems = menuItems.length + residentGroupItems`。
+- **常驻分组**：分组内实例数写入 `layoutEvidence.residentGroupItems`，换算 `matchedBottomBarItems = menuItems.length + residentGroupItems`。
 
 推导结果是一次性输入，仍需经 `gen-mtslg-layout.js`（常驻属性恒写、图标尺寸门禁、Index 门禁）发射。
 

@@ -94,7 +94,7 @@ const map = {
   layoutRules: {
     bottomBar: {
       componentSet: "底部栏",
-      match: { properties: ["属性 1"], layerNameFallback: true },
+      matchProperty: "属性 1",
       residentGroupPattern: "常驻(button|按钮|分组)",
       fKeyPattern: "^F\\d+$",
       decorativeNamePattern: "背景|分割",
@@ -224,68 +224,5 @@ assert.strictEqual(byName.get("开关").isShowStatus, true, "左上角有状态�
 assert.strictEqual(byName.get("普通").isShowStatus, undefined, "没有状态方框不得写 IsShowStatus");
 assert.strictEqual(byName.get("小图标").isShowStatus, undefined,
   "左上角的小图标（INSTANCE + PATH）不得被误判成状态方框");
-
-// ---- 空占位槽位：命中变体但没有组件属性/文案/图标 → 不生成 MenuItem，Index 空档保留 ----
-function emptyPlaceholder(id, x, y) {
-  return {
-    type: "INSTANCE",
-    id: id,
-    name: "非首页-长方形",
-    layoutStyle: { width: 180, height: 84, relativeX: x, relativeY: y },
-    componentInfo: {},
-    children: [{
-      type: "INSTANCE",
-      id: id + "/bg",
-      name: "背景区域",
-      layoutStyle: { width: 180, height: 84, relativeX: 0, relativeY: 0 },
-      componentInfo: {},
-      children: [],
-    }],
-  };
-}
-const placeholderDsl = {
-  dsl: {
-    nodes: [{
-      type: "INSTANCE", id: "42:7", name: "页面",
-      layoutStyle: { width: 1280, height: 1024, relativeX: 0, relativeY: 0 },
-      children: [{
-        type: "FRAME", id: "42:7/bar", name: "底部button",
-        layoutStyle: { width: 1280, height: 202, relativeX: 0, relativeY: 822 },
-        children: [
-          { type: "INSTANCE", id: "42:7/bar/resident", name: "右侧底部-常驻button", layoutStyle: { width: 200, height: 200, relativeX: 1000, relativeY: 0 }, children: [{ type: "INSTANCE", id: "42:7/bar/resident/a", name: "底部栏", layoutStyle: { width: 84, height: 84, relativeX: 16, relativeY: 12 }, componentInfo: { properties: { "属性 1": "方-icon" } } }, { type: "INSTANCE", id: "42:7/bar/resident/b", name: "底部栏", layoutStyle: { width: 84, height: 84, relativeX: 110, relativeY: 12 }, componentInfo: { properties: { "属性 1": "方-icon" } } }] },
-          menuItemButton("42:7/bar/1", 28, 12, "唯一菜单项", "F1"),
-          emptyPlaceholder("42:7/bar/2", 236, 12),
-        ],
-      }],
-    }],
-    styles: {},
-    components: [],
-  },
-};
-fs.writeFileSync(path.join(root, "placeholder-dsl.json"), JSON.stringify(placeholderDsl, null, 2), "utf8");
-fs.writeFileSync(path.join(root, "placeholder-icon-map.json"), JSON.stringify({ icons: [] }, null, 2), "utf8");
-const placeholderOut = path.join(root, "placeholder-layout-manifest.json");
-const placeholderResult = spawnSync(process.execPath, [script,
-  "--dsl", path.join(root, "placeholder-dsl.json"),
-  "--icon-map", path.join(root, "placeholder-icon-map.json"),
-  "--map", path.join(root, "map.json"),
-  "--page-target", "PlaceholderPage",
-  "--page-lang-name", "",
-  "--layout-path", "Resources/Layout/Layout.xml",
-  "--out", placeholderOut,
-], { encoding: "utf8" });
-assert.strictEqual(placeholderResult.status, 0, placeholderResult.stderr);
-const placeholderManifest = JSON.parse(fs.readFileSync(placeholderOut, "utf8"));
-assert.deepStrictEqual(placeholderManifest.menuItems.map((item) => item.sourceRef), ["42:7/bar/1", "42:7/bar/2"],
-  "空位占位项照旧生成 MenuItem，Index 按视觉位置");
-assert.deepStrictEqual(placeholderManifest.menuItems.map((item) => item.index), [1, 2]);
-assert.strictEqual(placeholderManifest.menuItems[1].name, "", "空位占位项的 Name 为空");
-assert.strictEqual(placeholderManifest.menuItems[1].icon, "", "空位占位项的 Icon 为空");
-assert.strictEqual(placeholderManifest.menuItems[1].topLeftContent, "", "空位占位项不写 TopLeftContent");
-assert.strictEqual(placeholderManifest.layoutEvidence.emptyPlaceholderItems, 1,
-  "空位占位项数量必须登记到 layoutEvidence.emptyPlaceholderItems（menuItems 的子集）");
-assert.strictEqual(placeholderManifest.layoutEvidence.residentGroupItems, 2);
-assert.strictEqual(placeholderManifest.layoutEvidence.matchedBottomBarItems, 4,
-  "matchedBottomBarItems = menuItems + residentGroupItems");
 
 console.log("PASS MTSLG Layout manifest derivation regression test");

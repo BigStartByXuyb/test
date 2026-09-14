@@ -44,17 +44,6 @@ const residentPattern = new RegExp(bottomBar.residentGroupPattern || "常驻(but
 const fKeyPattern = new RegExp(bottomBar.fKeyPattern || "^F\\d+$");
 const decorPattern = new RegExp(bottomBar.decorativeNamePattern || "背景|分割");
 const variantNames = new Set(Object.keys(bottomBar.variants));
-// 底部栏变体的匹配键登记在 layoutRules.bottomBar.match：
-//   properties        —— 公开属性名清单（默认 ["属性 1"]），属性值精确等于 variants 的键即命中；
-//   layerNameFallback —— 图层名精确等于 variants 的键是否也算命中（默认 true）。
-// 实测部分设计稿的底部栏实例没有"属性 1"，变体名只落在图层名上，关掉回退会整排菜单识别不出来。
-const bottomBarMatch = bottomBar.match || {};
-const matchProperties = Array.isArray(bottomBarMatch.properties) && bottomBarMatch.properties.length
-  ? bottomBarMatch.properties.map(String)
-  : ["属性 1"];
-const layerNameFallback = bottomBarMatch.layerNameFallback === undefined
-  ? true
-  : Boolean(bottomBarMatch.layerNameFallback);
 // 底部栏标记的判定参数（真值来源：模板表 layoutRules.bottomBar.menuItemFlags）。
 const flagSpec = bottomBar.menuItemFlags || {};
 const redSpec = flagSpec.redText || {};
@@ -219,21 +208,13 @@ const residentGroupItems = residentGroups.reduce(function (sum, group) {
   }).length;
 }, 0);
 
-// 唯一的底部栏变体解析入口：按登记的顺序取属性值，再按需回退图层名。
-// isBottomBarVariant 与 MenuItem.variant 都走这里，避免"判定用一套、取值用另一套"。
-function resolveBottomBarVariant(node) {
-  if (!node || node.type !== "INSTANCE") return "";
-  const props = (node.componentInfo && node.componentInfo.properties) || {};
-  for (const name of matchProperties) {
-    const value = props[name];
-    if (typeof value === "string" && variantNames.has(value)) return value;
-  }
-  if (layerNameFallback && typeof node.name === "string" && variantNames.has(node.name)) return node.name;
-  return "";
-}
-
 function isBottomBarVariant(node) {
-  return resolveBottomBarVariant(node) !== "";
+  if (node.type !== "INSTANCE") return false;
+  const props = (node.componentInfo && node.componentInfo.properties) || {};
+  const byProperty = Object.keys(props).map(function (key) { return props[key]; })
+    .some(function (value) { return typeof value === "string" && variantNames.has(value); });
+  const byName = typeof node.name === "string" && variantNames.has(node.name);
+  return byProperty || byName;
 }
 
 const residentRefs = new Set(residentGroups.map(function (node) { return node.id; }));
@@ -256,17 +237,7 @@ const orderedEntries = visualOrder(
     }, [])
   )
 );
-// 空占位槽位（命中变体但没有组件属性/文案/图标）照旧生成 MenuItem —— 产物里保留
-// `<MenuItem Name="" Icon="" TopLeftContent="" Index="N" />` 这样的空项对位；
-// 这里只统计它们的数量，供 layoutEvidence 报告使用。
-const placeholderRefs = new Set(
-  orderedEntries.filter(function (item) {
-    return !item.entry.resident && isEmptyBottomBarPlaceholder(item.node);
-  }).map(function (item) { return item.node.id; })
-);
-const candidateEntries = orderedEntries.filter(function (item) {
-  return !item.entry.resident;
-});
+const candidateEntries = orderedEntries.filter(function (item) { return !item.entry.resident; });
 if (process.env.DEBUG_LAYOUT_MANIFEST) {
   orderedEntries.forEach(function (item, i) {
     console.error('  ' + (i + 1) + ') ' + String(item.node.id).split('/').pop() + ' ' +
@@ -301,16 +272,6 @@ function iconEntryOf(node) {
   return hit;
 }
 
-// 空占位槽位：命中底部栏变体，但整棵子树既没有组件属性、没有文案、也没有图标
-// （设计稿里预留但本页未配置的 F 键位）。不生成 MenuItem，只保留它占的 Index 空档。
-function isEmptyBottomBarPlaceholder(node) {
-  const props = (node.componentInfo && node.componentInfo.properties) || {};
-  if (Object.keys(props).length > 0) return false;
-  if (textNodesOf(node).length > 0) return false;
-  if (iconEntryOf(node)) return false;
-  return true;
-}
-
 const raw = candidateEntries.map(function (item) {
   const node = item.node;
   const position = orderedEntries.indexOf(item) + 1;
@@ -319,10 +280,12 @@ const raw = candidateEntries.map(function (item) {
   const fKeyText = texts.find(function (entry) { return fKeyPattern.test(entry.text); });
   const iconEntry = iconEntryOf(node);
   const geometryNode = iconEntry ? nodeById.get(iconEntry.sourceRef || iconEntry.sourceId) : null;
+  const props = (node.componentInfo && node.componentInfo.properties) || {};
   return {
     ref: node.id,
     position: position,
-    variant: resolveBottomBarVariant(node),
+    variant: Object.keys(props).map(function (key) { return props[key]; })
+      .find(function (value) { return typeof value === "string" && variantNames.has(value); }) || node.name,
     name: nameText ? nameText.text : "",
     topLeftContent: fKeyText ? fKeyText.text : "",
     // 红字文案（实测 #F8274B）→ IsNeedRedMark；左上角状态方框 → IsShowStatus。
@@ -362,15 +325,11 @@ const manifest = {
   pageLangName: args["page-lang-name"] === undefined ? "" : args["page-lang-name"],
   layoutStatus: menuItems.length + residentGroupItems === 0 ? "none" : "complete",
   layoutEvidence: {
-    // 命中底部栏变体的槽位总数 = 生成 MenuItem 的（含空位占位项）+ 常驻分组内的
     matchedBottomBarItems: menuItems.length + residentGroupItems,
     unresolvedBottomBarItems: 0,
     residentGroupItems: residentGroupItems,
-    // 其中 Name / Icon / TopLeftContent 全空的占位项数量（是 menuItems 的子集）
-    emptyPlaceholderItems: placeholderRefs.size,
     note: "由 gen-mtslg-layout-manifest.js 从 DSL 机械推导：底部栏 " + bar.id +
-      "，菜单项 " + menuItems.length + " 项（其中空位占位项 " + placeholderRefs.size +
-      " 项照发空 MenuItem 对位），右下角常驻分组 " + residentGroupItems +
+      "，菜单项 " + menuItems.length + " 项，右下角常驻分组 " + residentGroupItems +
       " 项不生成 MenuItem（Index 空档保留），文本按设计稿原样写入。",
   },
   menuItems: menuItems,
