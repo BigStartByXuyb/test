@@ -70,7 +70,7 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 
 ## 作业 A：MW 框架 WPF（`Adapter: mw-wpf`，当前暂不启用）
 
-本节保留未来 MW WPF 路线的参考内容，但当前版本的全局门禁不会进入本节，也不会因为用户提供 WPF 目标而自动启用本节。重新启用作业 A 前，必须单独完成适配器分流、输出目录、页面壳、Icon 和验证流程的全篇复核。
+本节保留未来 MW WPF 路线的参考内容，但当前版本的全局门禁不会进入本节，也不会因为用户提供 WPF 目标而自动启用本节。重新启用作业 A 前，必须单独完成适配器分流、输出目录、页面壳、Icon 和验证流程的全篇复核；其中 Icon 一项的验收以「页面 Icon 文件（按路线区分）」一节的路线条目为准（必须补上本页 Icon 字典的合并点并做加载验证，只做文档复核不满足）。
 
 新增独立 MW WPF 页面时，先按本作业读取项目适配与 MW WPF 参考文档，形成页面清单，再使用 scripts/gen-mw-wpf-page.js 生成固定的 View、View.xaml.cs、ViewModel 和 csproj 注册。清单可显式提供 `viewPath`、`codeBehindPath`、`viewModelPath`；未提供时按 `.csproj` 同区域 View/ViewModel 声明、项目目录证据、最后的 `Pages/` 兜底顺序解析，绝不为同一页面生成两套目录。若 MaxWell SSD 页面需要一个负责加载 MTSLG 页面 XML 的 WPF 宿主壳，必须改用作业 B 的 bundle 入口；作业 A 单独生成的 WPF 页面不得猜写 IOContorl 控件。页面控件、文本、坐标、Style、协议绑定、页面 XML 和 Icon 仍必须分别依据项目事实源、MasterGo DSL 与对应生成器完成。
 
