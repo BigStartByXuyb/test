@@ -60,7 +60,7 @@ The exact field names may be extended by an adapter, but paths must be project-r
 
 When `framework.config.json` is absent, the confirmed project-file paths may be recorded in a newly created project-local configuration. Keep generated provenance under `Generated/` (or another explicitly named audit directory) while writing runtime page, icon, and Layout files to the project-file paths.
 
-If the project uses reusable style libraries, add the selected library ID and version to the project configuration or a project-local lock file. Do not copy all available libraries into the project catalog and do not overwrite an existing profile version.
+If the project uses reusable style libraries, add the selected library ID and version to the project configuration or a project-local lock file. Do not copy all available libraries into the project catalog and do not overwrite an existing profile version. Profile separation, version selection, and conflict handling are defined in [`style-library-profiles.md`](./style-library-profiles.md); read it when the project has more than one reusable style/theme/icon/resource library.
 
 ```json
 {

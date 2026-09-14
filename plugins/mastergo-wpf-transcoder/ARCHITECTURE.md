@@ -81,7 +81,7 @@ flowchart LR
 | 页面格式与验证 | `references/adapters/mtslg-iocontrol/mtslg-mode.md` | 坐标、TextBlock 尺寸、运行时约束、验证流程 |
 | 流程路由与硬规则 | `skills/mastergo-to-wpf/SKILL.md` | **唯一流程路由**；不在别处复制流程 |
 | 跨适配器语义 | `references/mastergo-component-mapping-rules.md` | 组件身份与来源链通用规则 |
-| 跨适配器样式库 | `references/style-library-profiles.md` | 样式库 Profile 的划分、版本选择与冲突处理；由 `project-adapter-initialization.md` 在项目适配阶段按条件引用 |
+| 跨适配器样式库 | `references/style-library-profiles.md` | 样式库 Profile 的划分、版本选择与冲突处理；由 `SKILL.md`「公共参考」登记，并在项目首次适配阶段由 `project-adapter-initialization.md` 按条件引用 |
 | 团队/设计师口径 | 飞书在线文档 4 份（见下） | 权威阅读版本，与本地规则保持同步 |
 
 4 份飞书在线文档（权威阅读版本）：
