@@ -44,6 +44,11 @@ const residentPattern = new RegExp(bottomBar.residentGroupPattern || "常驻(but
 const fKeyPattern = new RegExp(bottomBar.fKeyPattern || "^F\\d+$");
 const decorPattern = new RegExp(bottomBar.decorativeNamePattern || "背景|分割");
 const variantNames = new Set(Object.keys(bottomBar.variants));
+// 底部栏变体的匹配键（真值来源：模板表 layoutRules.bottomBar.match，一族一个键）：
+//   componentName / componentSet = true → 变体值 = 被引用组件的名字（实例的 name）
+//   property = "<属性名>"               → 变体值 = 该公开属性的值
+// 未登记匹配键时不做匹配（该实例计入 unresolvedBottomBarItems）。
+const bottomBarMatch = bottomBar.match || {};
 // 底部栏标记的判定参数（真值来源：模板表 layoutRules.bottomBar.menuItemFlags）。
 const flagSpec = bottomBar.menuItemFlags || {};
 const redSpec = flagSpec.redText || {};
@@ -208,16 +213,30 @@ const residentGroupItems = residentGroups.reduce(function (sum, group) {
   }).length;
 }, 0);
 
+// 唯一的底部栏变体解析入口：按登记的键取值，命中 variants 才返回（与组件模板族同一套机制）。
+function resolveBottomBarVariant(node) {
+  if (!node || node.type !== "INSTANCE") return "";
+  if (bottomBarMatch.componentName === true || bottomBarMatch.componentSet === true) {
+    return typeof node.name === "string" && variantNames.has(node.name) ? node.name : "";
+  }
+  if (typeof bottomBarMatch.property === "string") {
+    const props = (node.componentInfo && node.componentInfo.properties) || {};
+    const value = props[bottomBarMatch.property];
+    return typeof value === "string" && variantNames.has(value) ? value : "";
+  }
+  return "";
+}
+
 function isBottomBarVariant(node) {
-  if (node.type !== "INSTANCE") return false;
-  const props = (node.componentInfo && node.componentInfo.properties) || {};
-  const byProperty = Object.keys(props).map(function (key) { return props[key]; })
-    .some(function (value) { return typeof value === "string" && variantNames.has(value); });
-  const byName = typeof node.name === "string" && variantNames.has(node.name);
-  return byProperty || byName;
+  return resolveBottomBarVariant(node) !== "";
 }
 
 const residentRefs = new Set(residentGroups.map(function (node) { return node.id; }));
+// 底部栏里既非装饰、又不在常驻分组、也没命中变体的实例：必须报出来，不允许静默丢按钮。
+const unresolvedNodes = barChildren.filter(function (child) {
+  return child.type === "INSTANCE" && !decorPattern.test(child.name || "") &&
+    !residentRefs.has(child.id) && !isBottomBarVariant(child);
+});
 // 参与定位的按钮 = 底部菜单按钮 + 常驻分组内的按钮（后者只占 Index 位置、不生成 MenuItem）
 const orderedEntries = visualOrder(
   barChildren.filter(isBottomBarVariant).map(function (node) { return { node: node, resident: false }; }).concat(
@@ -284,8 +303,7 @@ const raw = candidateEntries.map(function (item) {
   return {
     ref: node.id,
     position: position,
-    variant: Object.keys(props).map(function (key) { return props[key]; })
-      .find(function (value) { return typeof value === "string" && variantNames.has(value); }) || node.name,
+    variant: resolveBottomBarVariant(node),
     name: nameText ? nameText.text : "",
     topLeftContent: fKeyText ? fKeyText.text : "",
     // 红字文案（实测 #F8274B）→ IsNeedRedMark；左上角状态方框 → IsShowStatus。
@@ -326,11 +344,15 @@ const manifest = {
   layoutStatus: menuItems.length + residentGroupItems === 0 ? "none" : "complete",
   layoutEvidence: {
     matchedBottomBarItems: menuItems.length + residentGroupItems,
-    unresolvedBottomBarItems: 0,
+    unresolvedBottomBarItems: unresolvedNodes.length,
     residentGroupItems: residentGroupItems,
     note: "由 gen-mtslg-layout-manifest.js 从 DSL 机械推导：底部栏 " + bar.id +
       "，菜单项 " + menuItems.length + " 项，右下角常驻分组 " + residentGroupItems +
-      " 项不生成 MenuItem（Index 空档保留），文本按设计稿原样写入。",
+      " 项不生成 MenuItem（Index 空档保留），文本按设计稿原样写入；" +
+      "未命中变体的实例 " + unresolvedNodes.length + " 个" +
+      (unresolvedNodes.length
+        ? "（" + unresolvedNodes.map(function (node) { return node.id + " " + JSON.stringify(node.name); }).join("、") + "）"
+        : "") + "。",
   },
   menuItems: menuItems,
 };

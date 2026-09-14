@@ -199,7 +199,9 @@ function validateLayoutManifest(manifest) {
     fail("layoutStatus=complete 但没有任何已命中的底部栏组件；无菜单页面必须标记为 none");
   }
   if (unresolved !== 0) {
-    fail("Layout 仍存在未决底部栏组件，不能标记为 complete");
+    fail("Layout 仍存在未决底部栏组件（" + unresolved + " 个）：底部栏里既非装饰、又不在常驻分组、" +
+      "也没按 layoutRules.bottomBar.match 登记的键命中 variants 的实例。" +
+      "请在映射表登记该变体（或修正实例/组件名），不要让它静默消失");
   }
   if (manifest.menuItems.length + resident !== matched) {
     fail("Layout 映射数量不一致：matchedBottomBarItems=" + matched +

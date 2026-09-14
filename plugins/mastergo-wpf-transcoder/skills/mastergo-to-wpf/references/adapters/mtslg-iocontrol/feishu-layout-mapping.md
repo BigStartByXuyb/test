@@ -16,13 +16,13 @@
 
 #### 匹配规则
 
-先沿实例的真实父子链定位到“底部栏”组件集，再读取该实例的公开属性“属性 1”。属性值必须精确等于本节列出的一个变体值；未命中时不得生成 MenuItem。
+底部栏变体按模板表 `layoutRules.bottomBar.match` 登记的**一个**键判定（一族一个键，与组件模板族同一套机制）：`componentName: true` 表示**变体值 = 被引用组件的名字**（实例的 `name`）。实测底部栏实例的 `componentInfo.properties` 里没有变体信息（只有 `实例`/`显示icon`/`显示文案`/`显示F`，或为空），它们引用的是独立组件本体（名字即变体值，如 `非首页-长方形`、`首页-长方形`），因此底部栏与右栏独立组件族 `rightSidebarComponentTemplates`（`componentSet: true`）走同一条「按组件名匹配」的路。取到的值必须精确等于本节列出的一个变体值；未命中时不得生成 MenuItem，并计入 `layoutEvidence.unresolvedBottomBarItems`（非 0 时 `gen-mtslg-layout.js` 拒绝生成 Layout）。
 
 #### 固定模板
 
 一个页面底部栏对应一个 Page 下的一个 Menu；只有底部栏横排的命中变体实例生成 MenuItem。底部栏容器、右下角常驻分组（`右侧底部-常驻button`）以及分组内的全部子实例都不生成 MenuItem。
 
-常驻分组内的实例数量登记在 `layoutEvidence.residentGroupItems`，与 `matchedBottomBarItems` 的换算关系为 `matchedBottomBarItems = menuItems.length + residentGroupItems`；生成脚本会按此校验并在 `menuItems` 里出现常驻分组实例时直接失败。Index 只对实际生成的 MenuItem 按它们在底部栏中的排列顺序连续编号（不含常驻分组）。
+常驻分组内的实例数量登记在 `layoutEvidence.residentGroupItems`，与 `matchedBottomBarItems` 的换算关系为 `matchedBottomBarItems = menuItems.length + residentGroupItems`；生成脚本会按此校验并在 `menuItems` 里出现常驻分组实例时直接失败。Index 按底部栏的视觉排列顺序取值（从 1 起）、保留常驻分组留下的空档，不重排后续编号。**未命中变体的实例**（既非装饰、又不在常驻分组、也没按 `layoutRules.bottomBar.match` 命中变体）计入 `layoutEvidence.unresolvedBottomBarItems`，非 0 时拒绝生成——不允许静默丢按钮。
 
 ```xml
 <Page Target="{target}" LangName="{page_lang_name}">
@@ -50,6 +50,8 @@
 底部栏菜单不再人工登记，由 `gen-mtslg-layout-manifest.js` 从 DSL 快照 + 当前页面 Icon 映射 + 模板表机械推导，规则全部登记在 `mtslg-iocontrol-map.json` 的 `layoutRules.bottomBar`：
 
 - **底部栏容器**：任一"直接子节点里含右下角常驻分组"的容器（不记图层 ID、不记页面路径）。
+- **变体匹配键**：`layoutRules.bottomBar.match` —— `componentName: true` 时用实例名（被引用组件的名字）当变体值；也可登记 `property: "属性名"` 改用公开属性值。一族一个键，与组件模板族同一套机制。
+- **变体清单**：`layoutRules.bottomBar.variants` 共 16 个 —— 7 个基础变体（首页-长方形 / 非首页-长方形 / 方-icon+文案 / 方-icon / 非首页-F / 非首页-文案 / 非首页- F）加 9 个 `DI 显示-0/1000/2000/3000/4000/5000`、`DO 显示-0/1000/2000`。`DI/DO 显示-*` 是 84×84 的图标+文案按钮：不写 `TopLeftContent`（没有 F 键槽位），图标按图标映射发射，`Name` 照设计稿文本写入。
 - **排列顺序**：视觉行序——先按 `y` 分行（同一行内 `y` 差不超过行高一半视为同行），行内按 `x` 升序；与运行目录参考 Layout 的 Index 形态一致。
 - **Index**：从 1 起，包含不生成 MenuItem 的按钮；常驻分组内的按钮占位并留下空档。
 - **Name / TopLeftContent**：取该实例的真实文本槽位与 F 键槽位，**照设计稿原样写入**（不做"占位符"判定、不登记默认值；设计里是 `文案展示` / `F1` 就写 `文案展示` / `F1`）。

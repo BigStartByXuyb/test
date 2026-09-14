@@ -94,7 +94,7 @@ const map = {
   layoutRules: {
     bottomBar: {
       componentSet: "底部栏",
-      matchProperty: "属性 1",
+      match: { componentName: true },
       residentGroupPattern: "常驻(button|按钮|分组)",
       fKeyPattern: "^F\\d+$",
       decorativeNamePattern: "背景|分割",
@@ -224,5 +224,48 @@ assert.strictEqual(byName.get("开关").isShowStatus, true, "左上角有状态�
 assert.strictEqual(byName.get("普通").isShowStatus, undefined, "没有状态方框不得写 IsShowStatus");
 assert.strictEqual(byName.get("小图标").isShowStatus, undefined,
   "左上角的小图标（INSTANCE + PATH）不得被误判成状态方框");
+
+// ---- 未命中变体的实例：必须计入 unresolvedBottomBarItems，且 Layout 生成器拒绝生成 ----
+const unknownDsl = {
+  dsl: {
+    nodes: [{
+      type: "INSTANCE", id: "42:8", name: "页面",
+      layoutStyle: { width: 1280, height: 1024, relativeX: 0, relativeY: 0 },
+      children: [{
+        type: "FRAME", id: "42:8/bar", name: "底部button",
+        layoutStyle: { width: 1280, height: 202, relativeX: 0, relativeY: 822 },
+        children: [
+          { type: "INSTANCE", id: "42:8/bar/resident", name: "右侧底部-常驻button", layoutStyle: { width: 200, height: 200, relativeX: 1000, relativeY: 0 }, children: [] },
+          menuItemButton("42:8/bar/1", 28, 12, "已登记按钮", "F1"),
+          { type: "INSTANCE", id: "42:8/bar/unknown", name: "未登记按钮", layoutStyle: { width: 180, height: 84, relativeX: 236, relativeY: 12 }, componentInfo: {}, children: [] },
+        ],
+      }],
+    }],
+    styles: {},
+    components: [],
+  },
+};
+fs.writeFileSync(path.join(root, "unknown-dsl.json"), JSON.stringify(unknownDsl, null, 2), "utf8");
+const unknownOut = path.join(root, "unknown-layout-manifest.json");
+const unknownResult = spawnSync(process.execPath, [script,
+  "--dsl", path.join(root, "unknown-dsl.json"),
+  "--icon-map", path.join(root, "flag-icon-map.json"),
+  "--map", path.join(root, "map.json"),
+  "--page-target", "UnknownPage",
+  "--page-lang-name", "",
+  "--layout-path", path.join(root, "UnknownLayout.xml"),
+  "--out", unknownOut,
+], { encoding: "utf8" });
+assert.strictEqual(unknownResult.status, 0, unknownResult.stderr);
+const unknownManifest = JSON.parse(fs.readFileSync(unknownOut, "utf8"));
+assert.strictEqual(unknownManifest.layoutEvidence.unresolvedBottomBarItems, 1,
+  "未命中变体的实例必须计入 unresolvedBottomBarItems，不允许静默跳过");
+assert.match(unknownManifest.layoutEvidence.note, /未登记按钮/, "证据里要能看出是哪个实例没识别");
+assert.deepStrictEqual(unknownManifest.menuItems.map((item) => item.sourceRef), ["42:8/bar/1"]);
+// Layout 生成器：未决项非 0 时直接拒绝，避免静默少一个按钮
+const layoutScript = path.join(__dirname, "..", "gen-mtslg-layout.js");
+const unknownLayoutRun = spawnSync(process.execPath, [layoutScript, "--manifest", unknownOut, "--map", path.join(root, "map.json")], { encoding: "utf8" });
+assert.notStrictEqual(unknownLayoutRun.status, 0, "存在未决底部栏组件时必须拒绝生成 Layout");
+assert.match(unknownLayoutRun.stderr + unknownLayoutRun.stdout, /未决底部栏组件/, "失败信息必须指出未决底部栏组件");
 
 console.log("PASS MTSLG Layout manifest derivation regression test");
