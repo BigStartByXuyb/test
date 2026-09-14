@@ -94,7 +94,7 @@ const map = {
   layoutRules: {
     bottomBar: {
       componentSet: "底部栏",
-      matchProperty: "属性 1",
+      match: { properties: ["属性 1"], layerNameFallback: true },
       residentGroupPattern: "常驻(button|按钮|分组)",
       fKeyPattern: "^F\\d+$",
       decorativeNamePattern: "背景|分割",

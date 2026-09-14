@@ -51,7 +51,7 @@ const variantNames = new Set(Object.keys(bottomBar.variants));
 const bottomBarMatch = bottomBar.match || {};
 const matchProperties = Array.isArray(bottomBarMatch.properties) && bottomBarMatch.properties.length
   ? bottomBarMatch.properties.map(String)
-  : [String(bottomBarMatch.property || bottomBar.matchProperty || "属性 1")];
+  : ["属性 1"];
 const layerNameFallback = bottomBarMatch.layerNameFallback === undefined
   ? true
   : Boolean(bottomBarMatch.layerNameFallback);
