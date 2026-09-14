@@ -16,7 +16,7 @@
 
 完整页面转换包含三项强制工具：
 
-- `skills/mastergo-to-wpf/scripts/mastergo-dsl-pipeline.ps1` — 管理 MasterGo 总览、逐 section DSL 快照、覆盖校验和失败重试；只有覆盖报告为 `complete` 才能继续生成。
+- `skills/mastergo-to-wpf/scripts/mastergo-dsl-pipeline.ps1` — 用 `-Action Capture` 把一次性 `getDsl` 响应固化为唯一的 `dsl.snapshot.json`，并校验根节点、递归节点、唯一 ref 和父子链；只有覆盖报告为 `complete` 才能继续生成。
 - `skills/mastergo-to-wpf/scripts/resolve-mastergo-visibility.js` — 从 DSL 机械提取节点可见属性、祖先继承后的有效可见状态、TEXT/PATH 索引和可见性来源；只生成 visibility audit，不直接生成 mapping。
 - `skills/mastergo-to-wpf/scripts/gen-mastergo-page-bundle.js` — 接收已确认的页面 mapping，统一生成页面 XML、Icon、Layout、WPF 宿主和审计产物。
 
@@ -28,7 +28,7 @@ Layout 增量注册与 `--overwrite` 的语义：
 
 页面可以没有任何运行时 Icon。Bundle 不以 PATH 候选数量或 Geometry 数量判断页面是否需要图标；只有 IOContorl 节点或 Layout 菜单实际引用了 Icon 时，才要求对应 Geometry 已生成。
 
-Agent 的完整工作流是：MasterGo MCP 总览 → DSL pipeline `Init/Write/Merge` → coverage complete → 组件映射 → page bundle。DSL pipeline 不负责猜测控件、资源键或运行时业务绑定。
+Agent 的完整工作流是：MasterGo MCP 一次性 `getDsl` → DSL pipeline `Capture` → coverage complete → 组件映射 → page bundle。完整页面或容器只允许用这一次 `getDsl` 响应作为设计数据源，不得拆成 section 分段采集，也不得用多个局部响应拼接页面；DSL pipeline 不负责猜测控件、资源键或运行时业务绑定。
 
 MasterGo 转换默认优先检查并调用 MasterGo MCP；浏览器、截图和其他设计稿兜底只允许在 MCP 确认不可用后使用，并须记录兜底原因。
 
@@ -47,11 +47,9 @@ MasterGo 转换默认优先检查并调用 MasterGo MCP；浏览器、截图和�
 ## 本地验证
 
 ```powershell
-node skills/mastergo-to-wpf/scripts/check-iocontrol-coords.test.js
-node skills/mastergo-to-wpf/scripts/validate-iocontrol-provenance.test.js
-node skills/mastergo-to-wpf/scripts/gen-mtslg-mapping-from-dsl.test.js
-node skills/mastergo-to-wpf/scripts/gen-mastergo-page-bundle.test.js
-node skills/mastergo-to-wpf/scripts/gen-mtslg-page-icons.test.js
+node --test "skills/mastergo-to-wpf/scripts/*.test.js"
 ```
+
+该命令运行全部 17 个回归测试；需要单跑某一个时直接指定文件名，例如 `node skills/mastergo-to-wpf/scripts/gen-mastergo-page-bundle.test.js`。
 
 Skill 中包含项目专用的 MW/MTSLG 规则。分享给其他团队前，请先检查参考资料，并根据实际项目调整路径和运行时集成方式。
