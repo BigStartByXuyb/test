@@ -283,7 +283,7 @@ assert.deepStrictEqual(placeholderManifest.menuItems.map((item) => item.index), 
 assert.strictEqual(placeholderManifest.layoutEvidence.emptyPlaceholderItems, 1,
   "空占位槽位数量必须登记到 layoutEvidence.emptyPlaceholderItems");
 assert.strictEqual(placeholderManifest.layoutEvidence.residentGroupItems, 2);
-assert.strictEqual(placeholderManifest.layoutEvidence.matchedBottomBarItems, 3,
-  "matchedBottomBarItems = menuItems + residentGroupItems（空占位不计入）");
+assert.strictEqual(placeholderManifest.layoutEvidence.matchedBottomBarItems, 4,
+  "matchedBottomBarItems = menuItems + residentGroupItems + emptyPlaceholderItems");
 
 console.log("PASS MTSLG Layout manifest derivation regression test");

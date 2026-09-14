@@ -44,6 +44,17 @@ const residentPattern = new RegExp(bottomBar.residentGroupPattern || "常驻(but
 const fKeyPattern = new RegExp(bottomBar.fKeyPattern || "^F\\d+$");
 const decorPattern = new RegExp(bottomBar.decorativeNamePattern || "背景|分割");
 const variantNames = new Set(Object.keys(bottomBar.variants));
+// 底部栏变体的匹配键登记在 layoutRules.bottomBar.match：
+//   properties        —— 公开属性名清单（默认 ["属性 1"]），属性值精确等于 variants 的键即命中；
+//   layerNameFallback —— 图层名精确等于 variants 的键是否也算命中（默认 true）。
+// 实测部分设计稿的底部栏实例没有"属性 1"，变体名只落在图层名上，关掉回退会整排菜单识别不出来。
+const bottomBarMatch = bottomBar.match || {};
+const matchProperties = Array.isArray(bottomBarMatch.properties) && bottomBarMatch.properties.length
+  ? bottomBarMatch.properties.map(String)
+  : [String(bottomBarMatch.property || bottomBar.matchProperty || "属性 1")];
+const layerNameFallback = bottomBarMatch.layerNameFallback === undefined
+  ? true
+  : Boolean(bottomBarMatch.layerNameFallback);
 // 底部栏标记的判定参数（真值来源：模板表 layoutRules.bottomBar.menuItemFlags）。
 const flagSpec = bottomBar.menuItemFlags || {};
 const redSpec = flagSpec.redText || {};
@@ -211,10 +222,13 @@ const residentGroupItems = residentGroups.reduce(function (sum, group) {
 function isBottomBarVariant(node) {
   if (node.type !== "INSTANCE") return false;
   const props = (node.componentInfo && node.componentInfo.properties) || {};
-  const byProperty = Object.keys(props).map(function (key) { return props[key]; })
-    .some(function (value) { return typeof value === "string" && variantNames.has(value); });
+  const byProperty = matchProperties.some(function (name) {
+    const value = props[name];
+    return typeof value === "string" && variantNames.has(value);
+  });
+  if (byProperty) return true;
   const byName = typeof node.name === "string" && variantNames.has(node.name);
-  return byProperty || byName;
+  return layerNameFallback && byName;
 }
 
 const residentRefs = new Set(residentGroups.map(function (node) { return node.id; }));
@@ -343,7 +357,8 @@ const manifest = {
   pageLangName: args["page-lang-name"] === undefined ? "" : args["page-lang-name"],
   layoutStatus: menuItems.length + residentGroupItems === 0 ? "none" : "complete",
   layoutEvidence: {
-    matchedBottomBarItems: menuItems.length + residentGroupItems,
+    // 命中底部栏变体的槽位总数 = 生成 MenuItem 的 + 常驻分组内的 + 空占位槽位
+    matchedBottomBarItems: menuItems.length + residentGroupItems + placeholderRefs.size,
     unresolvedBottomBarItems: 0,
     residentGroupItems: residentGroupItems,
     emptyPlaceholderItems: placeholderRefs.size,
