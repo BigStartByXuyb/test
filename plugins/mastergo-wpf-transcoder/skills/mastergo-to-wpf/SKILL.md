@@ -118,7 +118,7 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 - `"bakeAncestorTransform": true` 时额外把祖先节点的 `rotate` / `flipH` / `flipV`（绕各自盒子中心）烘焙进坐标，用于区分只靠组级变换区分的方向图标；
 - 该模式属于几何推断，交付前必须做一次视觉核对；如果同一组图标在 DSL 里几何完全相同（例如「向左」与「向右」完全一致），说明设计侧缺少独立图形，应标记待确认并要求设计补图，不得自行镜像或猜测朝向。
 
-每个页面必须单独维护一个 Icon 文件。转换时先从当前页 MasterGo PATH/SVG 自动发现候选；图标映射输入逐项提供目标项目已确认或页面内生成的英文资源名、中文注释名和 DSL 来源，禁止从图层 ID、坐标或几何外观直接拼出 `MGIcon_<layer-id>` 形式的资源名。资源名必须是英文标识符且在当前页面唯一；重复名称由生成器按稳定数字后缀处理。没有目标项目键时，允许使用页面内唯一的临时 Geometry 键，状态标记为 `provisional` 并保留 sourceId/sourceRef。只有未被任何实际 Icon 槽位引用的 PATH 候选才进入 `candidates/unmapped` 而不进入 XAML。XAML 注释只写中文名称，溯源和 `keyStatus` 写入 mapping/manifest。`mw-wpf`（作业 A，暂不开放）的页面以 `StaticResource` 引用该页 Geometry（重新启用的前置条件只以本节的路线条目为准）；`mtslg-iocontrol`（作业 B，当前唯一启用）的页面 XML 与 Layout 仅引用该页 Icon 文件中已生成的键。
+每个页面必须单独维护一个 Icon 文件。转换时先从当前页 MasterGo PATH/SVG 自动发现候选；图标映射输入逐项提供目标项目已确认或页面内生成的英文资源名、中文注释名和 DSL 来源，禁止从图层 ID、坐标或几何外观直接拼出 `MGIcon_<layer-id>` 形式的资源名。资源名必须是英文标识符且在当前页面唯一；重复名称由生成器按稳定数字后缀处理。没有目标项目键时，允许使用页面内唯一的临时 Geometry 键，状态标记为 `provisional` 并保留 sourceId/sourceRef。只有未被任何实际 Icon 槽位引用的 PATH 候选才进入 `candidates/unmapped` 而不进入 XAML。XAML 注释只写中文名称，溯源和 `keyStatus` 写入 mapping/manifest。`mw-wpf`（作业 A，暂不开放）的页面以 `StaticResource` 引用该页 Geometry（作业 A 的 Icon 合并前置条件以本节路线条目为准；作业 A 的整体启用前置条件见「作业 A：MW 框架 WPF」一节）；`mtslg-iocontrol`（作业 B，当前唯一启用）的页面 XML 与 Layout 仅引用该页 Icon 文件中已生成的键。
 
 ## 页面多语言文件（当前 MTSLG 路线）
 

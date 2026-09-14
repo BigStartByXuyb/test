@@ -7,12 +7,12 @@
 - `skills/mastergo-to-wpf/` — 转码流程、组件映射参考、MTSLG 来源验证和坐标回归检查。
 - `skills/mastergo-iocontrol-document-format/` — 编写和审查 MasterGo → MTSLG IOContorl 映射文档的统一格式规范。
 
-本插件包含两条并列的完整项目路线：
+插件内保留两条路线的资料，但**当前版本只启用 `mtslg-iocontrol`**；`mw-wpf`（作业 A）暂不进入分流或生成流程，仅在显式重新启用前完成全篇复核：
 
 - `Adapter: mw-wpf`：生成真实 MW WPF 页面、XAML、C# 宿主和项目注册。
 - `Adapter: mtslg-iocontrol`：生成完整 MTSLG IOContorl 项目结构，包括页面 XML、页面 Icon、Layout、mapping/provenance、项目配置以及目标项目要求的宿主壳；它不是 WPF 路线的降级结果，也不是附属中间产物。
 
-两条路线都支持真实目标项目接入、正式输出目录和运行时验证；没有目标项目时，各自生成对应的完整项目脚手架，只跳过编译和运行时加载验证。
+当前启用的 `mtslg-iocontrol` 支持真实目标项目接入、正式输出目录和运行时验证；没有目标项目时生成完整项目脚手架，只跳过编译和运行时加载验证。`mw-wpf` 路线的同等能力需在其重新启用时单独复核。
 
 完整页面转换包含三项强制工具：
 
