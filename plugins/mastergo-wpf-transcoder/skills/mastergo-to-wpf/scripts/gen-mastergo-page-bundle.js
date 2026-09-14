@@ -751,8 +751,16 @@ function validateBundleOutputs(info) {
   const mapping = info.mapping;
   if (Array.isArray(mapping.nodes) && mapping.nodes.length > 0) {
     const sourceByRef = new Map((mapping.sourceNodes || []).map(function (node) { return [node.ref, node]; }));
+    const rootRef = mapping.rootRef || null;
     const coordNodes = mapping.nodes.map(function (node) {
       const source = sourceByRef.get(node.sourceRef || node.ref) || {};
+      // 坐标核对的原点 = 该节点 XML 父容器的页面绝对坐标，与生成器口径一致：
+      //   根级节点（父容器是页面根）→ (0, 192)，顶层公共栏 126 + 示例标题 66 只在根级扣一次；
+      //   嵌套节点 → 父容器的 (pageAbsX, pageAbsY)，生成器按父容器相对发射、不再扣 192。
+      const parentSource = sourceByRef.get(node.sourceParent) || null;
+      const parentIsRoot = !parentSource || (rootRef !== null && parentSource.ref === rootRef);
+      const originX = parentSource ? (Number(parentSource.pageAbsX) || 0) : 0;
+      const originY = parentIsRoot ? 192 : (parentSource ? (Number(parentSource.pageAbsY) || 0) : 192);
       const isTextBlock = (node.controlType || (node.attrs && node.attrs.ControlType)) === "TextBlock";
       return {
         id: node.xmlId || node.id || node.ref,
@@ -766,8 +774,8 @@ function validateBundleOutputs(info) {
         h: node.expectedHeight !== undefined
           ? node.expectedHeight
           : (source.height !== undefined ? source.height : node.h),
-        contentOriginX: mapping.contentOriginX === undefined ? 0 : mapping.contentOriginX,
-        contentOriginY: 192
+        contentOriginX: originX,
+        contentOriginY: originY
       };
     });
     if (coordNodes.every(function (node) {

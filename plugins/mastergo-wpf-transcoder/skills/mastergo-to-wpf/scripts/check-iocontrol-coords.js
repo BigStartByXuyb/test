@@ -9,12 +9,16 @@
  *   [
  *     { "id": "dsl-node-id（与 XML 的 ID 属性一致；XML 无 ID 的节点用 ref）",
  *       "x": 10, "y": 35, "w": 160, "h": 150,          // 控件自身 page-absolute bbox，double
- *       "contentOriginX": 0, "contentOriginY": 192 },     // 固定内容区偏移，只扣除一次
+ *       "contentOriginX": 0, "contentOriginY": 192 },     // 该节点 XML 父容器的页面绝对坐标
  *     ...
  *   ]
  * 对照规则：XML.Left ≈ x - contentOriginX，XML.Top ≈ y - contentOriginY，XML.Width ≈ w，XML.Height ≈ h
  * （容差 --tolerance 默认 0.5）；NaN 只与 NaN/缺失 算匹配，NaN 与具体数值算 MISMATCH。
  * TextBlock 的 Width 固定为 NaN（自适应），节点表按 NaN 传入即可。
+ * contentOriginX/contentOriginY 的取值 = 该节点在 XML 里的父容器页面绝对坐标：
+ *   - 根级节点（父容器是页面根）：X 用 0，Y 用 192（顶层公共栏 126 + 示例标题 66，只在根级扣一次）；
+ *   - 嵌套节点：用父容器的 pageAbsX / pageAbsY（生成器对嵌套节点按父容器相对发射，不再扣 192）。
+ * 与 validate-iocontrol-provenance.js 的 expectedLeft/expectedTop 计算口径一致。
  *
  * 用法：
  *   node check-iocontrol-coords.js --xml <page.xml> --nodes <nodes.json> [--tolerance 0.5]
@@ -94,11 +98,13 @@ for (const xn of xmlNodes) {
   usedNode.add(src);
 
   const xl = num(xn.Left), xt = num(xn.Top), xw = num(xn.Width), xh = num(xn.Height);
-  const originX = src.contentOriginX === undefined ? 0 : Number(src.contentOriginX);
-  const originY = src.contentOriginY === undefined ? 192 : Number(src.contentOriginY);
-  if (originY !== 192) {
+  // 原点 = 该节点 XML 父容器的页面绝对坐标（根级节点为 0 / 192；嵌套节点为父容器的 pageAbs 坐标）。
+  const originX = src.contentOriginX === undefined || src.contentOriginX === null ? 0 : Number(src.contentOriginX);
+  const originY = src.contentOriginY === undefined || src.contentOriginY === null ? 192 : Number(src.contentOriginY);
+  if (!Number.isFinite(originX) || !Number.isFinite(originY)) {
     mismatch++;
-    results.push('MISMATCH id="' + (src.id || src.ref || '?') + '" contentOriginY=' + originY + '，固定值必须为 192');
+    results.push('MISMATCH id="' + (src.id || src.ref || '?') + '" contentOriginX/Y 必须是数值，当前为 ' +
+      JSON.stringify([src.contentOriginX, src.contentOriginY]));
     continue;
   }
   const sl = num(src.x - originX), st = num(src.y - originY), sw = num(src.w), sh = num(src.h);
