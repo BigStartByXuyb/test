@@ -256,14 +256,16 @@ const orderedEntries = visualOrder(
     }, [])
   )
 );
-// 空占位槽位保留在 orderedEntries 里（Index 空档照旧），但不生成 MenuItem。
+// 空占位槽位（命中变体但没有组件属性/文案/图标）照旧生成 MenuItem —— 产物里保留
+// `<MenuItem Name="" Icon="" TopLeftContent="" Index="N" />` 这样的空项对位；
+// 这里只统计它们的数量，供 layoutEvidence 报告使用。
 const placeholderRefs = new Set(
   orderedEntries.filter(function (item) {
     return !item.entry.resident && isEmptyBottomBarPlaceholder(item.node);
   }).map(function (item) { return item.node.id; })
 );
 const candidateEntries = orderedEntries.filter(function (item) {
-  return !item.entry.resident && !placeholderRefs.has(item.node.id);
+  return !item.entry.resident;
 });
 if (process.env.DEBUG_LAYOUT_MANIFEST) {
   orderedEntries.forEach(function (item, i) {
@@ -360,15 +362,16 @@ const manifest = {
   pageLangName: args["page-lang-name"] === undefined ? "" : args["page-lang-name"],
   layoutStatus: menuItems.length + residentGroupItems === 0 ? "none" : "complete",
   layoutEvidence: {
-    // 命中底部栏变体的槽位总数 = 生成 MenuItem 的 + 常驻分组内的 + 空占位槽位
-    matchedBottomBarItems: menuItems.length + residentGroupItems + placeholderRefs.size,
+    // 命中底部栏变体的槽位总数 = 生成 MenuItem 的（含空位占位项）+ 常驻分组内的
+    matchedBottomBarItems: menuItems.length + residentGroupItems,
     unresolvedBottomBarItems: 0,
     residentGroupItems: residentGroupItems,
+    // 其中 Name / Icon / TopLeftContent 全空的占位项数量（是 menuItems 的子集）
     emptyPlaceholderItems: placeholderRefs.size,
     note: "由 gen-mtslg-layout-manifest.js 从 DSL 机械推导：底部栏 " + bar.id +
-      "，菜单项 " + menuItems.length + " 项，右下角常驻分组 " + residentGroupItems +
-      " 项与空占位槽位 " + placeholderRefs.size + " 项不生成 MenuItem（Index 空档保留），" +
-      "文本按设计稿原样写入。",
+      "，菜单项 " + menuItems.length + " 项（其中空位占位项 " + placeholderRefs.size +
+      " 项照发空 MenuItem 对位），右下角常驻分组 " + residentGroupItems +
+      " 项不生成 MenuItem（Index 空档保留），文本按设计稿原样写入。",
   },
   menuItems: menuItems,
 };

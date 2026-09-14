@@ -177,11 +177,11 @@ function validateLayoutManifest(manifest) {
   if (matched < 0 || unresolved < 0) {
     fail("layoutEvidence 中的组件数量不能为负数");
   }
-  // 不生成 MenuItem 的两类底部栏槽位（2026-09 规则）：
-  //   1) 右下角“右侧底部-常驻button”分组内的实例 —— 单独登记 residentGroupItems；
-  //   2) 空占位槽位（命中变体但没有组件属性/文案/图标）—— 单独登记 emptyPlaceholderItems。
-  // 两者都算作"命中的底部栏槽位"，Index 空档都保留，因此换算关系是
-  //   matchedBottomBarItems = menuItems.length + residentGroupItems + emptyPlaceholderItems。
+  // 底部栏槽位的处理（2026-09 规则）：
+  //   1) 右下角“右侧底部-常驻button”分组内的实例 —— 不生成 MenuItem，单独登记 residentGroupItems；
+  //   2) 空占位槽位（命中变体但没有组件属性/文案/图标）—— 照旧生成空 MenuItem 对位，
+  //      数量作为 menuItems 的子集登记在 emptyPlaceholderItems。
+  // 换算关系固定为 matchedBottomBarItems = menuItems.length + residentGroupItems。
   const residentRaw = evidence.residentGroupItems;
   const resident = residentRaw === undefined || residentRaw === null ? 0 : Number(residentRaw);
   if (!Number.isInteger(resident) || resident < 0) {
@@ -197,9 +197,8 @@ function validateLayoutManifest(manifest) {
     fail("Layout 映射仍为 pending，禁止生成 Layout.xml；请先处理未决底部栏组件");
   }
   if (status === "none") {
-    // 只有空占位槽位、没有任何菜单项或常驻项时也算 none：不写 Menu，但空占位数量照旧登记。
-    if (unresolved !== 0 || resident !== 0 || manifest.menuItems.length !== 0 || matched !== placeholders) {
-      fail("layoutStatus=none 时，menuItems、常驻分组与未决项必须为空（只允许空占位槽位计数）");
+    if (matched !== 0 || unresolved !== 0 || resident !== 0 || manifest.menuItems.length !== 0) {
+      fail("layoutStatus=none 时，Layout 证据（含 residentGroupItems）和 menuItems 必须全部为空");
     }
     return;
   }
@@ -210,11 +209,10 @@ function validateLayoutManifest(manifest) {
   if (unresolved !== 0) {
     fail("Layout 仍存在未决底部栏组件，不能标记为 complete");
   }
-  if (manifest.menuItems.length + resident + placeholders !== matched) {
+  if (manifest.menuItems.length + resident !== matched) {
     fail("Layout 映射数量不一致：matchedBottomBarItems=" + matched +
       "，menuItems=" + manifest.menuItems.length + "，residentGroupItems=" + resident +
-      "，emptyPlaceholderItems=" + placeholders +
-      "（常驻分组内的实例与空占位槽位都不生成 MenuItem，Index 空档保留）");
+      "（右下角常驻分组内的实例不生成 MenuItem；空位占位项仍是 menuItems 的子集）");
   }
 }
 

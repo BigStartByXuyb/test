@@ -276,14 +276,16 @@ const placeholderResult = spawnSync(process.execPath, [script,
 ], { encoding: "utf8" });
 assert.strictEqual(placeholderResult.status, 0, placeholderResult.stderr);
 const placeholderManifest = JSON.parse(fs.readFileSync(placeholderOut, "utf8"));
-assert.deepStrictEqual(placeholderManifest.menuItems.map((item) => item.sourceRef), ["42:7/bar/1"],
-  "空占位槽位不得生成 MenuItem");
-// 空占位占视觉第 2 位，因此唯一菜单项的 Index 仍是 1（空档保留）
-assert.deepStrictEqual(placeholderManifest.menuItems.map((item) => item.index), [1]);
+assert.deepStrictEqual(placeholderManifest.menuItems.map((item) => item.sourceRef), ["42:7/bar/1", "42:7/bar/2"],
+  "空位占位项照旧生成 MenuItem，Index 按视觉位置");
+assert.deepStrictEqual(placeholderManifest.menuItems.map((item) => item.index), [1, 2]);
+assert.strictEqual(placeholderManifest.menuItems[1].name, "", "空位占位项的 Name 为空");
+assert.strictEqual(placeholderManifest.menuItems[1].icon, "", "空位占位项的 Icon 为空");
+assert.strictEqual(placeholderManifest.menuItems[1].topLeftContent, "", "空位占位项不写 TopLeftContent");
 assert.strictEqual(placeholderManifest.layoutEvidence.emptyPlaceholderItems, 1,
-  "空占位槽位数量必须登记到 layoutEvidence.emptyPlaceholderItems");
+  "空位占位项数量必须登记到 layoutEvidence.emptyPlaceholderItems（menuItems 的子集）");
 assert.strictEqual(placeholderManifest.layoutEvidence.residentGroupItems, 2);
 assert.strictEqual(placeholderManifest.layoutEvidence.matchedBottomBarItems, 4,
-  "matchedBottomBarItems = menuItems + residentGroupItems + emptyPlaceholderItems");
+  "matchedBottomBarItems = menuItems + residentGroupItems");
 
 console.log("PASS MTSLG Layout manifest derivation regression test");
