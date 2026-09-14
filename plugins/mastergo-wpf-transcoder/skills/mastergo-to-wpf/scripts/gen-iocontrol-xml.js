@@ -115,16 +115,25 @@ const nodes = sortNodesByDesignOrder(mapping.nodes || []);
 //   layoutParent → parent → DSL sourceParent（sourceNodes.parentRef）
 // 与 validate-iocontrol-provenance.js、gen-mastergo-page-bundle.js 的坐标门禁一致；
 // 当前 DSL→mapping 生成器把 parent / layoutParent 写成同一个值，二者不同只来自显式登记的 layoutParent。
+// 唯一约束：输出父节点必须是**已发射的输出节点**（mapping.nodes 的 ref）或页面根；
+// 指向未发射节点时 XML 无法表达该嵌套（按根级发射会与校验器重算的相对坐标相反），因此直接失败，不静默降级。
 const sourceByRef = new Map((mapping.sourceNodes || []).map(function (s) { return [s.ref, s]; }));
 const nodeRefs = new Set((mapping.nodes || []).map(function (n) { return n.ref; }));
 function parentRefOf(node) {
-  if (node.layoutParent !== undefined) return node.layoutParent || null;
-  if (node.parent !== undefined) return node.parent || null;
-  // 未登记 parent/layoutParent 时回落到 DSL 父节点：只有它落在真实输出节点上才嵌套，
-  // 否则按页面根级发射（与 provenance 的 parentIsRoot / !outputParent 口径一致）。
-  const src = sourceByRef.get(node.sourceRef || node.ref);
-  const ref = src ? (src.parentRef || null) : null;
-  if (!ref || ref === mapping.rootRef || !nodeRefs.has(ref)) return null;
+  let ref;
+  let field;
+  if (node.layoutParent !== undefined) { ref = node.layoutParent || null; field = 'layoutParent'; }
+  else if (node.parent !== undefined) { ref = node.parent || null; field = 'parent'; }
+  else {
+    const src = sourceByRef.get(node.sourceRef || node.ref);
+    ref = src ? (src.parentRef || null) : null;
+    field = 'DSL sourceParent';
+  }
+  if (!ref || ref === mapping.rootRef) return null;
+  if (!nodeRefs.has(ref)) {
+    throw new Error('映射门禁失败: ' + node.ref + ' 的输出父节点（' + field + '=' + ref +
+      '）不是已发射的输出节点；请把 layoutParent 登记为已发射节点的 ref，或用 null 表示页面根级');
+  }
   return ref;
 }
 const TOP_PUBLIC_BAR_Y = 126;
@@ -596,7 +605,7 @@ function mergeMode() {
     const p = parentRefOf(n);
     if (p === null) return { x: 0, y: 0 };
     const pn = absOf.get(p);
-    if (!pn) throw new Error(`映射节点 parent 引用不存在: ${p}（来自 ref=${n.ref}）`);
+    if (!pn) throw new Error(`映射节点的输出父节点（layoutParent/parent=${p}）不是已发射的输出节点（来自 ref=${n.ref}）`);
     return { x: pn.absX, y: pn.absY };
   }
 
@@ -764,7 +773,7 @@ function mergeMode() {
 
     // 插入点：父闭合标签（父为根 → 最后一个闭合标签；父是新节点 → 挂在该新块的插入点后）
     let closeIdx = null;
-    const p = n.parent || null;
+    const p = parentRefOf(n);
     if (p === null) {
       for (let i = tokens.length - 1; i >= 0; i--) {
         if (tokens[i].type === 'tag' && tokens[i].isClose) { closeIdx = i; break; }

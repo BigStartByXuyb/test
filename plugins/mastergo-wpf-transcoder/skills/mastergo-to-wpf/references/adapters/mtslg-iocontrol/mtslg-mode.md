@@ -155,7 +155,7 @@
 ### 7.2 路径 A：修改现有页面（当前主路径）
 
 1. 读目标项目实际加载的现有页面 XML；由适配记录确认唯一生效版本，不能按目录名或历史副本猜测。
-2. 建映射：先套用公共栏边界表并归一 bbox，再写 DSL 节点 → 映射 JSON（`ref`/`id`/`controlType`/`parent`/pageAbsX/pageAbsY/w/h/attrs）；公共栏节点保留审计记录但不进入页面映射。
+2. 建映射：先套用公共栏边界表并归一 bbox，再写 DSL 节点 → 映射 JSON（`ref`/`id`/`controlType`/`parent`/`layoutParent`/pageAbsX/pageAbsY/w/h/attrs）；公共栏节点保留审计记录但不进入页面映射。`parent` 与 `layoutParent` 都是**输出父节点**的登记位，取值优先级为 `layoutParent` → `parent` → DSL `sourceParent`，三者由发射器、provenance 校验器与坐标门禁共用：该 ref 必须是已发射的输出节点（`mapping.nodes` 的 ref）或页面根（`null`/`rootRef`）；指向未发射节点时发射器直接失败，不静默按根级发射。
 3. Group 语义用 `classify-mastergo-groups.js` 的 role，再经 `mtslg-iocontrol-map.json` roleMap 定 ControlType；不得用相机/按钮实例在有效相机组件外重复搭建内部控件。
 4. `gen-iocontrol-xml.js --merge <现有XML> <mapping.json> --out <已确认页面输出路径>` → 读 merge 报告，逐条裁决冲突。
 5. `check-iocontrol-coords.js --xml <产出> --nodes <节点表>`：0 MISMATCH / 0 EXTRA。

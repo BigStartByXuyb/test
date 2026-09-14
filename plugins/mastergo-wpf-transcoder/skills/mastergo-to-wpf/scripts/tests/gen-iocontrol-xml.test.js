@@ -428,3 +428,39 @@ assert.match(layoutParentXml,
   /ID="PANEL_1"[\s\S]*?<IOContorl[^>]*ID="ITEM_1"[\s\S]*?Left="10"[\s\S]*?Top="0"/,
   'ITEM_1 必须嵌套在 PANEL_1 内并按输出父节点计算相对坐标（Left=10 / Top=0）');
 console.log('PASS output-parent (layoutParent) regression test');
+
+// merge 路径：新节点的插入点必须与嵌套口径一致（CI BLOCK-001）。
+// ITEM_1 登记 parent:null + layoutParent:"panel"：既要把坐标算成相对 PANEL_1（Left=10/Top=0），
+// 也必须插到 PANEL_1 的闭合标签之前；按裸 parent 插入会落到页面根，成为 PANEL_1 的同级节点。
+const nestedExistingXml = path.join(dir, 'nested-existing-page.xml');
+const nestedMergedXml = path.join(dir, 'nested-merged-page.xml');
+fs.writeFileSync(nestedExistingXml, [
+  '<?xml version="1.0" encoding="utf-8"?>',
+  '<IOContorl',
+  '    ID=""',
+  '    Left="NaN"',
+  '    Top="NaN"',
+  '    Width="NaN"',
+  '    Height="NaN">',
+  '    <IOContorl',
+  '        ID="PANEL_1"',
+  '        ControlType="Border"',
+  '        Left="600"',
+  '        Top="8"',
+  '        Width="200"',
+  '        Height="120">',
+  '    </IOContorl>',
+  '</IOContorl>',
+  ''
+].join('\n'));
+const nestedMergeRun = spawnSync(process.execPath, [path.join(__dirname, '..', 'gen-iocontrol-xml.js'),
+  '--merge', nestedExistingXml, layoutParentMapping, '--out', nestedMergedXml], { encoding: 'utf8' });
+assert.strictEqual(nestedMergeRun.status, 0, 'layoutParent 映射必须能 merge: ' + nestedMergeRun.stderr);
+const nestedMergedText = fs.readFileSync(nestedMergedXml, 'utf8');
+const panelBlock = (nestedMergedText.match(/<IOContorl[^>]*ID="PANEL_1"[\s\S]*?<\/IOContorl>/) || [''])[0];
+assert.ok(panelBlock, 'merge 输出必须包含 PANEL_1 容器');
+assert.match(panelBlock, /ID="ITEM_1"/,
+  'merge 必须把新节点插入到输出父节点（layoutParent=panel）的闭合标签之前，而不是页面根');
+assert.match(panelBlock, /ID="ITEM_1"[\s\S]*?Left="10"[\s\S]*?Top="0"/,
+  'merge 新增的嵌套节点必须按输出父节点计算相对坐标（Left=10 / Top=0）');
+console.log('PASS merge insertion point follows output parent');
