@@ -18,6 +18,10 @@ const DEFAULT_BUTTON_FAMILY_RULES = {
 };
 // 图标字段名：与映射表 buttonFamily.iconSizeAttrs 一致（生成器用同一组名字）。
 const BUTTON_ICON_SIZE_ATTR_NAMES = ['IconWidth', 'IconHeight'];
+// 无模板信息时的内置图标口径：按钮族里只有 IconButton 的模板含图标字段。
+// 适用场景：未传 --map，或传入的表里没有该 ControlType 条目（与 gen-iocontrol-xml.js 的
+// DEFAULT_CONTROL_TYPE_REQUIRED_ATTRS 一致，由 doc-rule-consistency.test.js 守护一致性）。
+const DEFAULT_ICON_TEMPLATE_CONTROL_TYPES = ['IconButton'];
 
 // 每个 ControlType 的固定必写字段集（设计方模板）：真值来源 mtslg-iocontrol-map.json 的
 // controlTypeRequiredAttrs；未传入 --map 或表缺该字段时不做必写字段校验。
@@ -274,13 +278,12 @@ function validate(xmlPath, manifestPath) {
       for (const attr of BUTTON_ALWAYS_ATTRS) {
         if (x[attr] === undefined) errors.push('[' + n.xmlId + '] 按钮族缺少必写属性 ' + attr);
       }
-      // 图标字段判据与生成器保持一致：先看该 ControlType 的模板是否含图标字段。
-      // 未提供 --map 时退回内置口径——按钮族里只有 IconButton 的模板含图标字段
-      // （与 gen-iocontrol-xml.js 的 DEFAULT_CONTROL_TYPE_REQUIRED_ATTRS 一致），
-      // 不能退化成「映射残留 Icon 就当有图标」，否则无 --map 的执行者会与生成器结论相反。
+      // 图标字段判据与生成器保持一致：先看该 ControlType 的模板是否含图标字段；
+      // 模板信息缺失（未传 --map，或表里没有该 ControlType 条目）时退回内置口径，
+      // 不能退化成「映射残留 Icon 就当有图标」，否则会与生成器结论相反。
       const declaresIconAttrs = Array.isArray(requiredAttrs)
         ? (requiredAttrs.includes('Icon') || requiredAttrs.includes(BUTTON_ICON_SIZE_ATTR_NAMES[0]))
-        : controlType === 'IconButton';
+        : DEFAULT_ICON_TEMPLATE_CONTROL_TYPES.includes(controlType);
       if (declaresIconAttrs === false) {
         // 模板不含图标字段（如 Button / StatusButton）：不得发射这三项，映射里的残留 Icon 不参与判定。
         for (const attr of ['Icon'].concat(BUTTON_ICON_SIZE_ATTR_NAMES)) {

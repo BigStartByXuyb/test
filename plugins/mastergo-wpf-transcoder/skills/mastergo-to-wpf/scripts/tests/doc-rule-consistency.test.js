@@ -60,14 +60,24 @@ function objectLiteralOf(source, constName) {
   return match[1];
 }
 
+function splitList(text) {
+  return text.split(",").map((item) => item.trim().replace(/^['"]|['"]$/g, "")).filter(Boolean);
+}
+
 function arrayFields(chunk) {
   const result = {};
   const re = /([A-Za-z_][\w]*)\s*:\s*\[([^\]]*)\]/g;
   let match;
   while ((match = re.exec(chunk))) {
-    result[match[1]] = match[2].split(",").map((item) => item.trim().replace(/^['"]|['"]$/g, "")).filter(Boolean);
+    result[match[1]] = splitList(match[2]);
   }
   return result;
+}
+
+function arrayLiteralOf(source, constName) {
+  const match = source.match(new RegExp("const " + constName + "\\s*=\\s*\\[([^\\]]*)\\]"));
+  assert.ok(match, `源码中必须存在 const ${constName} = [ ... ]`);
+  return splitList(match[1]);
 }
 
 const sameList = (a, b) => JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
@@ -87,6 +97,19 @@ for (const [type, attrs] of Object.entries(arrayFields(objectLiteralOf(generator
   assert.ok(required[type] && sameList(attrs, required[type]),
     `gen-iocontrol-xml.js 的 DEFAULT_CONTROL_TYPE_REQUIRED_ATTRS.${type} 与映射表 controlTypeRequiredAttrs.${type} 漂移`);
 }
+
+// 「哪些 ControlType 的模板含图标字段」在三处必须是同一个集合：映射表、生成器内置默认、
+// 校验器无模板信息时的内置口径。任一处漏改都会让两条门禁对同一映射给出相反结论。
+const iconTemplateTypes = Object.entries(required)
+  .filter(([type, attrs]) => !type.startsWith("_") && Array.isArray(attrs) && attrs.includes("Icon"))
+  .map(([type]) => type).sort();
+const generatorIconTemplateTypes = Object.entries(arrayFields(objectLiteralOf(generator, "DEFAULT_CONTROL_TYPE_REQUIRED_ATTRS")))
+  .filter(([, attrs]) => attrs.includes("Icon")).map(([type]) => type).sort();
+const validatorFallbackTypes = arrayLiteralOf(validator, "DEFAULT_ICON_TEMPLATE_CONTROL_TYPES");
+assert.deepStrictEqual(generatorIconTemplateTypes, iconTemplateTypes,
+  "生成器内置默认中「模板含图标字段」的 ControlType 集合必须与映射表一致");
+assert.deepStrictEqual(validatorFallbackTypes, iconTemplateTypes,
+  "校验器无模板信息时的内置图标口径必须与映射表「模板含图标字段」的集合一致");
 
 // ---------- 3. 文档格式 Skill 与映射表同口径 ----------
 const exceptionLine = skillLines(docFormat).find((line) => line.startsWith("例外：按钮族"));
