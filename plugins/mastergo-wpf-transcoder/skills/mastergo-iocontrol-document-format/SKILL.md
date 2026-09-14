@@ -1,6 +1,6 @@
 ---
 name: mastergo-iocontrol-document-format
-description: 强制规范 MasterGo → MTSLG IOContorl 映射文档的写法。只要用户要求新增、修改、整理或审查 IOContorl 映射规则、组件库映射文档或飞书映射文档，就必须使用本 Skill，严格沿用既有标题层级、固定模板、固定节点和 XML 风格，不得自行改成表格主导或另起格式。
+description: 强制规范 MasterGo → MTSLG IOContorl 映射文档的写法，并约束新增/修改映射后必须整批完成的同步与验证。只要用户要求新增、修改、整理或审查 IOContorl 映射规则、组件库映射文档或飞书映射文档，就必须使用本 Skill，严格沿用既有标题层级、固定模板、固定节点和 XML 风格，不得自行改成表格主导或另起格式。
 ---
 
 # MasterGo → MTSLG IOContorl 映射文档规范
@@ -112,9 +112,35 @@ description: 强制规范 MasterGo → MTSLG IOContorl 映射文档的写法。�
 - 根级示例标题/工件示教标题按 `design-artifact-title` 规则处理，不得混入业务 XML；保留或剥离都要记录原因。
 - Style 或 ControlType 必须有目标框架源码、真实页面或正式映射证据；用户指定但尚未找到运行时键时，明确标记待核对，不得伪造。
 
-## 修改前后检查清单
+## 新增/修改映射的同步清单（必须整批完成）
 
-写入或修改后，逐项检查：
+新增、修改或删除**任意一条映射**时，下列位置必须在同一批改动里保持一致；只改其中一处就等于制造漂移，而漂移不会立刻报错，只会在后续页面生成时才暴露：
+
+1. **机器真值源**：`skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/mtslg-iocontrol-map.json`（以插件根为基准）——模板族结构、`match.property`、`variants` 真实属性值、`controlTypeRequiredAttrs` 必写字段、按钮族 `iconSize` 等。同一个「匹配属性名 + 属性值」只能登记在一个模板族。
+2. **人读口径**：本规范约束的映射文档 `skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/feishu-component-library-mapping.md`——按上面的层级、匹配规则、固定模板和 XML 格式补齐同一条映射。
+3. **新增模板族时的审计登记**：映射表里新出现 `*Templates` 族时，同步登记到 `skills/mastergo-to-wpf/scripts/audit-mtslg-feishu-map.js` 的家族清单，否则该族不进入文档覆盖审计。
+4. **回归用例**：在 `skills/mastergo-to-wpf/scripts/tests/` 下按需补断言（文档覆盖、模板匹配、按钮族图标字段口径、TextBlock 尺寸、坐标等）。
+5. **版本号**：`.claude-plugin/plugin.json` 递增；不要在上一轮 CI 未结束时连续推送。
+6. **在线同步副本**：发版前把映射文档同步到对应的飞书在线文档（按标题检索定位、不写死地址、整篇重建并记录 revision）。
+
+改完后按顺序自检，任何一步非零退出都必须修完再提交：
+
+```text
+node skills/mastergo-to-wpf/scripts/audit-mtslg-feishu-map.js \
+     skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/feishu-component-library-mapping.md \
+     skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/mtslg-iocontrol-map.json
+node --test "skills/mastergo-to-wpf/scripts/tests/*.test.js"
+pwsh -NoProfile -File skills/mastergo-to-wpf/scripts/tests/mastergo-dsl-pipeline.tests.ps1
+```
+
+- 覆盖审计报告里 `missing`（文档声明了但映射表没有）、`undocumented`（映射表登记了但文档没写）、`duplicateMatchKeys`（跨模板族重复匹配键）任一非空，都表示这次改动不完整。
+- 只改映射表或只改映射文档都不算完成；必须文档 + 映射表 + 审计 + 回归同时通过。
+- 新 ControlType 的必写字段只需登记进 `controlTypeRequiredAttrs`，生成器与 provenance 校验会自动读取；若改的是固定字段口径（按钮族、图标字段、TextBlock 尺寸等），还要同步 `doc-rule-consistency.test.js` 覆盖的口径文本。
+- 改动涉及页面产物行为时，另按 `skills/mastergo-to-wpf/SKILL.md` 的交付链路在真实页面上复跑一次，不在本清单内自动执行。
+
+## 修改前后检查清单（格式自检）
+
+写入或修改映射文档后，逐项检查：
 
 - 是否归入正确的 `#`/`##`/`###` 层级；
 - 是否所有组件集都使用同一条“匹配规则 → 固定模板 → 固定节点 → XML → 字段来源”映射链；

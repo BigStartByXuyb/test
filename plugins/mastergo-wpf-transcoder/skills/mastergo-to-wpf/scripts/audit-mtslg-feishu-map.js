@@ -95,10 +95,33 @@ function auditMappingCoverage(markdown, templateMap) {
     documented: documented.families,
     covered,
     missing,
+    undocumented: findUndocumentedVariants(markdown, templateMap),
     unconfirmed,
     ambiguous: documented.ambiguous,
     duplicateMatchKeys: findDuplicateMatchKeys(templateMap)
   };
+}
+
+// 映射表里登记的模板族/变体（机器真值源）。文档侧的家族清单是人工登记的，
+// 单靠「文档 → 映射表」方向看不见「表加了、文档忘了写」，所以需要反向核对。
+function collectMapVariants(templateMap) {
+  const rows = [];
+  for (const [family, spec] of Object.entries(templateMap)) {
+    if (family.startsWith("_") || !family.endsWith("Templates")) continue;
+    if (!spec || typeof spec !== "object") continue;
+    if (!spec.variants || typeof spec.variants !== "object") continue;
+    for (const variant of Object.keys(spec.variants)) {
+      if (variant) rows.push({ family, variant });
+    }
+  }
+  return rows;
+}
+
+// 反向覆盖：映射表里登记、但映射文档正文完全没提到的变体。
+function findUndocumentedVariants(markdown, templateMap) {
+  return collectMapVariants(templateMap)
+    .filter(({ variant }) => !markdown.includes(variant))
+    .map(({ family, variant }) => `${family}/${variant}`);
 }
 
 // 同一个「匹配属性名 + 属性值」不得登记在两个模板族（否则会互相抢模板）。
@@ -130,9 +153,15 @@ function main() {
     JSON.parse(fs.readFileSync(mapPath, "utf8"))
   );
   console.log(JSON.stringify(report, null, 2));
-  if (report.missing.length) process.exitCode = 2;
+  if (report.missing.length || report.undocumented.length) process.exitCode = 2;
 }
 
 if (require.main === module) main();
 
-module.exports = { extractDocumentedRules, auditMappingCoverage, findDuplicateMatchKeys };
+module.exports = {
+  extractDocumentedRules,
+  auditMappingCoverage,
+  findDuplicateMatchKeys,
+  collectMapVariants,
+  findUndocumentedVariants
+};
