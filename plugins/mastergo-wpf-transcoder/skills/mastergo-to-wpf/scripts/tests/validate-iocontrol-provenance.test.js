@@ -246,5 +246,10 @@ const scopedRun = spawnSync(process.execPath, [cliScript, '--xml', scopedXmlPath
   '--mapping', scopedMappingPath, '--map', scopedMapPath], { encoding: 'utf8' });
 assert.strictEqual(scopedRun.status, 0,
   '模板不含图标字段的 Button 不得因映射残留 Icon/iconSize 触发图标尺寸校验: ' + scopedRun.stderr + scopedRun.stdout);
+// 未传 --map 时必须与生成器内置口径一致：Button / StatusButton 仍不按图标字段校验。
+const noMapRun = spawnSync(process.execPath, [cliScript, '--xml', scopedXmlPath,
+  '--mapping', scopedMappingPath], { encoding: 'utf8' });
+assert.strictEqual(noMapRun.status, 0,
+  '未传 --map 时也要与生成器内置口径一致：Button 不得因映射残留 Icon 触发图标尺寸校验: ' + noMapRun.stderr + noMapRun.stdout);
 
 console.log('PASS provenance regression test');

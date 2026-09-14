@@ -275,10 +275,12 @@ function validate(xmlPath, manifestPath) {
         if (x[attr] === undefined) errors.push('[' + n.xmlId + '] 按钮族缺少必写属性 ' + attr);
       }
       // 图标字段判据与生成器保持一致：先看该 ControlType 的模板是否含图标字段。
-      // 未提供 --map（requiredAttrs 缺失）时不做模板收窄，按旧口径校验。
+      // 未提供 --map 时退回内置口径——按钮族里只有 IconButton 的模板含图标字段
+      // （与 gen-iocontrol-xml.js 的 DEFAULT_CONTROL_TYPE_REQUIRED_ATTRS 一致），
+      // 不能退化成「映射残留 Icon 就当有图标」，否则无 --map 的执行者会与生成器结论相反。
       const declaresIconAttrs = Array.isArray(requiredAttrs)
         ? (requiredAttrs.includes('Icon') || requiredAttrs.includes(BUTTON_ICON_SIZE_ATTR_NAMES[0]))
-        : null;
+        : controlType === 'IconButton';
       if (declaresIconAttrs === false) {
         // 模板不含图标字段（如 Button / StatusButton）：不得发射这三项，映射里的残留 Icon 不参与判定。
         for (const attr of ['Icon'].concat(BUTTON_ICON_SIZE_ATTR_NAMES)) {
