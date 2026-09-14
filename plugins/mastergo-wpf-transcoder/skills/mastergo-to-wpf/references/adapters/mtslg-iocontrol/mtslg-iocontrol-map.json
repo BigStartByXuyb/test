@@ -1181,7 +1181,6 @@
     "_note": "底部栏 → Layout MenuItem 的规则。只有布局侧脚本（gen-mtslg-layout-manifest.js / gen-mtslg-layout.js）读取，不参与 IOContorl 模板匹配。",
     "bottomBar": {
       "componentSet": "底部栏",
-      "matchProperty": "属性 1",
       "match": {
         "_note": "底部栏变体的匹配键：properties 列出的公开属性值精确等于 variants 的键，或（layerNameFallback=true 时）图层名精确等于 variants 的键。实测 SSD 隐切项目 file 181586559903927 / layer 42:008605 的 10 个「非首页-长方形」菜单按钮没有「属性 1」（properties 只有 实例/显示icon/显示文案/显示F，或为空），变体名只落在图层名上，因此底部栏保留图层名回退；该回退只用于识别底部栏变体，不参与 ControlType/Style/资源键推断。",
         "properties": ["属性 1"],

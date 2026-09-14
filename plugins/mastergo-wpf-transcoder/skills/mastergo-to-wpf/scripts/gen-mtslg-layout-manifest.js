@@ -219,16 +219,21 @@ const residentGroupItems = residentGroups.reduce(function (sum, group) {
   }).length;
 }, 0);
 
-function isBottomBarVariant(node) {
-  if (node.type !== "INSTANCE") return false;
+// 唯一的底部栏变体解析入口：按登记的顺序取属性值，再按需回退图层名。
+// isBottomBarVariant 与 MenuItem.variant 都走这里，避免"判定用一套、取值用另一套"。
+function resolveBottomBarVariant(node) {
+  if (!node || node.type !== "INSTANCE") return "";
   const props = (node.componentInfo && node.componentInfo.properties) || {};
-  const byProperty = matchProperties.some(function (name) {
+  for (const name of matchProperties) {
     const value = props[name];
-    return typeof value === "string" && variantNames.has(value);
-  });
-  if (byProperty) return true;
-  const byName = typeof node.name === "string" && variantNames.has(node.name);
-  return layerNameFallback && byName;
+    if (typeof value === "string" && variantNames.has(value)) return value;
+  }
+  if (layerNameFallback && typeof node.name === "string" && variantNames.has(node.name)) return node.name;
+  return "";
+}
+
+function isBottomBarVariant(node) {
+  return resolveBottomBarVariant(node) !== "";
 }
 
 const residentRefs = new Set(residentGroups.map(function (node) { return node.id; }));
@@ -312,12 +317,10 @@ const raw = candidateEntries.map(function (item) {
   const fKeyText = texts.find(function (entry) { return fKeyPattern.test(entry.text); });
   const iconEntry = iconEntryOf(node);
   const geometryNode = iconEntry ? nodeById.get(iconEntry.sourceRef || iconEntry.sourceId) : null;
-  const props = (node.componentInfo && node.componentInfo.properties) || {};
   return {
     ref: node.id,
     position: position,
-    variant: Object.keys(props).map(function (key) { return props[key]; })
-      .find(function (value) { return typeof value === "string" && variantNames.has(value); }) || node.name,
+    variant: resolveBottomBarVariant(node),
     name: nameText ? nameText.text : "",
     topLeftContent: fKeyText ? fKeyText.text : "",
     // 红字文案（实测 #F8274B）→ IsNeedRedMark；左上角状态方框 → IsShowStatus。
