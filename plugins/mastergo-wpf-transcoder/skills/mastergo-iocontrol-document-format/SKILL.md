@@ -122,7 +122,7 @@ description: 强制规范 MasterGo → MTSLG IOContorl 映射文档的写法，�
 4. **版本号**：`.claude-plugin/plugin.json` 递增；不要在上一轮 CI 未结束时连续推送。
 5. **在线同步副本**：发版前把映射文档同步到对应的飞书在线文档（按标题检索定位、不写死地址、整篇重建并记录 revision）。同步工具是可选项、不是交付链路的运行依赖：本机没有该工具时，在交付说明里标注"在线文档未同步"即可，不阻塞本次改动。
 
-新增模板族时不必先判断它属于哪类写法：直接跑下面的覆盖审计，报告里的 `missing` / `unregisteredVariants` / `undocumented` 会指出该族还差哪一项（映射表条目、映射文档条目或审计脚本的家族登记），按报告补齐后再重跑，直到全部为空。
+新增模板族时不必先判断它属于哪类写法：直接跑下面的覆盖审计，报告里的 `missing`、`unregisteredFamilies`、`unregisteredVariants`、`undocumented` 会指出该族还差哪一项（映射表条目、映射文档条目，或审计脚本的家族清单登记），按报告补齐后再重跑，直到全部为空。
 
 改完后按顺序自检，任何一步非零退出都必须修完再提交：
 
@@ -134,7 +134,7 @@ node --test "skills/mastergo-to-wpf/scripts/tests/*.test.js"
 pwsh -NoProfile -File skills/mastergo-to-wpf/scripts/tests/mastergo-dsl-pipeline.tests.ps1
 ```
 
-- 覆盖审计报告里 `missing`（文档声明了但映射表没有）、`unregisteredVariants`（`### 固定模板：属性 1=…` 标题里的变体在映射表里没有归属族）、`undocumented`（映射表登记了但文档正文没提）、`duplicateMatchKeys`（跨模板族重复匹配键）任一非空，都表示这次改动不完整；任一非空时脚本以退出码 2 结束。
+- 覆盖审计报告里 `missing`（文档声明了但映射表没有）、`unregisteredFamilies`（映射表里有该模板族、审计脚本的家族清单没登记）、`unregisteredVariants`（`### 固定模板：属性 1=…` 标题里的变体在映射表里没有归属族）、`undocumented`（映射表登记了但文档正文没提）、`duplicateMatchKeys`（跨模板族重复匹配键）任一非空，都表示这次改动不完整；任一非空时脚本以退出码 2 结束。
 - `undocumented` 是关键词级覆盖检查（文档正文里是否提到该变体，HTML 注释不算），不证明模板已经写全；模板是否成体系仍按本 Skill 的层级、匹配规则和固定模板规则人工审查。
 - 只改映射表或只改映射文档都不算完成；必须文档 + 映射表 + 审计 + 回归同时通过。
 - 新 ControlType 的必写字段只需登记进 `controlTypeRequiredAttrs`，生成器与 provenance 校验会自动读取；若改的是固定字段口径（按钮族、图标字段、TextBlock 尺寸等），还要同步 `doc-rule-consistency.test.js` 覆盖的口径文本。

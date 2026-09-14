@@ -81,6 +81,16 @@ function buildVariantOwners(templateMap) {
 function auditMappingCoverage(markdown, templateMap) {
   const documented = extractDocumentedRules(markdown);
   const owners = buildVariantOwners(templateMap);
+  // 映射表里存在、但本文件家族清单没登记的模板族：这类族的文档侧变体没有期望值可比，
+  // `missing` 方向会整族失效，必须显式报出来（新增模板族时最先看到的就是这一项）。
+  const registeredFamilies = new Set(Object.keys(documented.families));
+  const unregisteredFamilies = Object.keys(templateMap).filter((family) => {
+    if (family.startsWith("_") || !family.endsWith("Templates")) return false;
+    const spec = templateMap[family];
+    if (!spec || typeof spec !== "object") return false;
+    if (!spec.variants || typeof spec.variants !== "object") return false;
+    return !registeredFamilies.has(family);
+  });
   const unregisteredVariants = [];
   for (const variant of documented.headingVariants) {
     const owner = owners.get(variant);
@@ -120,6 +130,7 @@ function auditMappingCoverage(markdown, templateMap) {
     covered,
     missing,
     undocumented: findUndocumentedVariants(markdown, templateMap),
+    unregisteredFamilies,
     unregisteredVariants,
     unconfirmed,
     ambiguous: documented.ambiguous,
@@ -189,7 +200,7 @@ function main() {
     JSON.parse(fs.readFileSync(mapPath, "utf8"))
   );
   console.log(JSON.stringify(report, null, 2));
-  if (report.missing.length || report.undocumented.length ||
+  if (report.missing.length || report.undocumented.length || report.unregisteredFamilies.length ||
       report.unregisteredVariants.length || report.duplicateMatchKeys.length) {
     process.exitCode = 2;
   }
