@@ -251,5 +251,21 @@ const noMapRun = spawnSync(process.execPath, [cliScript, '--xml', scopedXmlPath,
   '--mapping', scopedMappingPath], { encoding: 'utf8' });
 assert.strictEqual(noMapRun.status, 0,
   '未传 --map 时也要与生成器内置口径一致：Button 不得因映射残留 Icon 触发图标尺寸校验: ' + noMapRun.stderr + noMapRun.stdout);
+// 传入了表但表里没有该 ControlType 条目：与生成器同样视为「模板不含图标字段」。
+const mapWithoutIconButtonEntry = path.join(dir, 'template-map-without-entry.json');
+fs.writeFileSync(mapWithoutIconButtonEntry, JSON.stringify({
+  buttonFamily: {
+    controlTypes: ['IconButton', 'Button'],
+    alwaysWrittenAttrs: ['PageName', 'IOVisible', 'IOCommand', 'IOEnable'],
+    iconSizeAttrs: ['IconWidth', 'IconHeight']
+  },
+  controlTypeRequiredAttrs: {
+    Button: ['Style', 'Value', 'PageName', 'IOCommand', 'IOEnable', 'IOVisible']
+  }
+}, null, 2));
+const noEntryRun = spawnSync(process.execPath, [cliScript, '--xml', scopedXmlPath,
+  '--mapping', scopedMappingPath, '--map', mapWithoutIconButtonEntry], { encoding: 'utf8' });
+assert.strictEqual(noEntryRun.status, 0,
+  '表里没有该 ControlType 条目时必须与生成器一致（视为不含图标字段），不得按 IconButton 反推: ' + noEntryRun.stderr + noEntryRun.stdout);
 
 console.log('PASS provenance regression test');

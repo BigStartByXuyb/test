@@ -279,11 +279,13 @@ function validate(xmlPath, manifestPath) {
         if (x[attr] === undefined) errors.push('[' + n.xmlId + '] 按钮族缺少必写属性 ' + attr);
       }
       // 图标字段判据与生成器保持一致：先看该 ControlType 的模板是否含图标字段；
-      // 模板信息缺失（未传 --map，或表里没有该 ControlType 条目）时退回内置口径，
+      // 只有「整张表都没有」（未传 --map / 表缺该字段）才退回内置口径——与生成器的回退粒度一致：
+      // 传入了表但表里没有该 ControlType 条目时，生成器视为「模板不含图标字段」，校验器同样处理。
       // 不能退化成「映射残留 Icon 就当有图标」，否则会与生成器结论相反。
+      const hasTemplateMap = Object.keys(REQUIRED_ATTRS_BY_CONTROL_TYPE).length > 0;
       const declaresIconAttrs = Array.isArray(requiredAttrs)
         ? (requiredAttrs.includes('Icon') || requiredAttrs.includes(BUTTON_ICON_SIZE_ATTR_NAMES[0]))
-        : DEFAULT_ICON_TEMPLATE_CONTROL_TYPES.includes(controlType);
+        : (hasTemplateMap ? false : DEFAULT_ICON_TEMPLATE_CONTROL_TYPES.includes(controlType));
       if (declaresIconAttrs === false) {
         // 模板不含图标字段（如 Button / StatusButton）：不得发射这三项，映射里的残留 Icon 不参与判定。
         for (const attr of ['Icon'].concat(BUTTON_ICON_SIZE_ATTR_NAMES)) {
