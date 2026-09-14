@@ -799,7 +799,8 @@ function mergeMode() {
       if (!insertions.has(closeIdx)) insertions.set(closeIdx, []);
       insertions.get(closeIdx).push(block);
     } else {
-      // 父是新节点：挂到最后一个根级闭合标签前（保守回退）
+      // 兜底：输出父节点是既有的、按位置匹配但无 ID 的节点，闭合标签定位不到时挂到最后一个根级闭合标签前。
+      // 输出父节点本身是本次新增节点的情况不会到这里——其子节点随父块递归发射（见 isNewNode）。
       if (!insertions.has('root-pending')) insertions.set('root-pending', []);
       insertions.get('root-pending').push(block);
     }

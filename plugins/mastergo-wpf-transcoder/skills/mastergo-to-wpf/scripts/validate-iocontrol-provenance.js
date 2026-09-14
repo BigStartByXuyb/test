@@ -191,8 +191,9 @@ function validate(xmlPath, manifestPath) {
   const actual = tags.filter(a => a.ID !== '' || a.ControlType);
   const byId = new Map(actual.filter(a => a.ID).map(a => [a.ID, a]));
   const mappedIds = new Set();
-  // 输出父节点必须是「已发射的输出节点」（mapping.nodes 里存在 ref）或页面根，
-  // 与 gen-iocontrol-xml.js 的 parentRefOf()、bundle 坐标门禁同一口径。
+  // 输出父节点必须是「已发射的输出节点」（mapping.nodes 里存在 ref 且 sourceNodes 有同名纪录）或页面根。
+  // 发射器 gen-iocontrol-xml.js 的 parentRefOf() 在发射时按同一优先级强制该条件；本校验器作为独立门禁，
+  // 对任何已存在的 XML+mapping 组合（含未重跑发射器的历史产物）独立重算并复检，不依赖发射器是否跑过。
   const emittedRefs = new Set(entries.map(e => e.ref).filter(r => typeof r === 'string' && r !== ''));
 
   for (const n of entries) {
