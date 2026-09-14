@@ -754,10 +754,15 @@ function validateBundleOutputs(info) {
     const rootRef = mapping.rootRef || null;
     const coordNodes = mapping.nodes.map(function (node) {
       const source = sourceByRef.get(node.sourceRef || node.ref) || {};
-      // 坐标核对的原点 = 该节点 XML 父容器的页面绝对坐标，与生成器口径一致：
+      // 坐标核对的原点 = 该节点「输出父节点」（XML 里的父容器）的页面绝对坐标，与生成器口径一致：
       //   根级节点（父容器是页面根）→ (0, 192)，顶层公共栏 126 + 示例标题 66 只在根级扣一次；
       //   嵌套节点 → 父容器的 (pageAbsX, pageAbsY)，生成器按父容器相对发射、不再扣 192。
-      const parentSource = sourceByRef.get(node.sourceParent) || null;
+      // 注意必须用输出父节点（layoutParent / parent / DSL parentRef 的优先级，与 provenance 校验一致），
+      // 不能用 DSL 父节点：mapping 允许把语义槽位展开为同级节点，两者可能不同。
+      const outputParentRef = node.layoutParent !== undefined
+        ? node.layoutParent
+        : (node.parent !== undefined ? node.parent : (source.parentRef || null));
+      const parentSource = outputParentRef ? (sourceByRef.get(outputParentRef) || null) : null;
       const parentIsRoot = !parentSource || (rootRef !== null && parentSource.ref === rootRef);
       const originX = parentSource ? (Number(parentSource.pageAbsX) || 0) : 0;
       const originY = parentIsRoot ? 192 : (parentSource ? (Number(parentSource.pageAbsY) || 0) : 192);
@@ -778,11 +783,14 @@ function validateBundleOutputs(info) {
         contentOriginY: originY
       };
     });
-    if (coordNodes.every(function (node) {
-      return [node.x, node.y, node.w, node.h].every(function (value) {
-        return typeof value === "number" && Number.isFinite(value);
-      });
-    })) {
+    // TextBlock 的宽度按规则固定为 NaN（自适应），此时 w 传 "NaN" 是合法的：
+    // 只要求 x/y 必须是数值，w/h 允许是数值或 "NaN"（NaN 只与 NaN 匹配，见 check-iocontrol-coords.js）。
+    const coordNodesUsable = coordNodes.every(function (node) {
+      return Number.isFinite(node.x) && Number.isFinite(node.y) &&
+        (node.w === "NaN" || Number.isFinite(node.w)) &&
+        (node.h === "NaN" || Number.isFinite(node.h));
+    });
+    if (coordNodesUsable) {
       const coordsPath = path.join(info.tempRoot, "coords.json");
       fs.writeFileSync(coordsPath, JSON.stringify(coordNodes), "utf8");
       run(COORDS_SCRIPT, ["--xml", info.pageXmlPath, "--nodes", coordsPath]);
