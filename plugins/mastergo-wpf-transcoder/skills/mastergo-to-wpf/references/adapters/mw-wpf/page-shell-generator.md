@@ -8,7 +8,9 @@ scripts/gen-mw-wpf-page.js 用一个页面清单生成独立页面的固定 WPF 
 
 脚本同时将这些文件，以及清单中声明的 Icon Page 和页面 XML Content，补入目标旧式 .csproj。需要一次生成 XML、Icon、Layout、WPF 宿主和审计文件时，使用 scripts/gen-mastergo-page-bundle.js；页面 XML 的控件内容和 Icon Geometry 不在本脚本中猜测，分别由 IOContorl XML 和页面 Icon 生成器从 MasterGo DSL 发射。
 
-**生成的 View 不合并页面 Icon 资源字典**：`<Page>View.xaml` 只由 `UserControl` 头 + `<Grid>` 里的 `uidesign:PageDesign` 组成，**不生成** `<UserControl.Resources><ResourceDictionary Source="/<程序集>;component/Resources/Pages/<页面名>/<页面名>Icons.xaml" /></UserControl.Resources>` 这一段。页面 Icon 文件本身仍照常生成，并按 Icon Page 注册进 `.csproj`；宿主脚本不写页面级资源合并声明。
+**生成的 View 不合并页面 Icon 资源字典（仅描述 `mtslg-iocontrol` 宿主壳）**：`<Page>View.xaml` 只由 `UserControl` 头 + `<Grid>` 里的 `uidesign:PageDesign` 组成，**不生成** `<UserControl.Resources><ResourceDictionary Source="/<程序集>;component/Resources/Pages/<页面名>/<页面名>Icons.xaml" /></UserControl.Resources>` 这一段。页面 Icon 文件本身仍照常生成，并按 Icon Page 注册进 `.csproj`；宿主脚本不写页面级资源合并声明。
+
+该「不合并」结论**只对作业 B（`mtslg-iocontrol`，当前唯一启用）成立**，不得套用到作业 A（`mw-wpf`）：作业 A 页面用 `{StaticResource …Geometry}` 引用图标，`StaticResource` 加载期解析，必须保证本页 Icon 字典存在合并点（页面或宿主），重新启用前必须复核（见主 SKILL.md「页面 Icon 文件」一节）。
 
 ## 清单
 
@@ -83,7 +85,12 @@ public class <Page>ViewModel : IOScreen, IPage
 
     node scripts/gen-mw-wpf-page.js --manifest .\page.json
 
-已有宿主文件不会静默覆盖。明确需要重新生成时：
+已有宿主文件不会静默覆盖。明确需要重新生成时，**必须同时满足两个条件**：清单里 `operation` 为 `modify-existing` 或 `replace-existing`，并显式加 `--overwrite`（只加 `--overwrite` 而清单 `operation` 仍是新建模式时，脚本会直接失败并提示 `operation=replace-existing`）：
+
+    {
+      "operation": "replace-existing",
+      ...其余清单字段...
+    }
 
     node scripts/gen-mw-wpf-page.js --manifest .\page.json --overwrite
 
