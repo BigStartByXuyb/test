@@ -1,6 +1,6 @@
 # mastergo-wpf-transcoder 项目架构
 
-> 本文只讲**架构与关键组成**，不逐文件罗列、也不复制任何规则正文。字段级规则看 `skills/mastergo-to-wpf/references/`，流程与硬规则看 `skills/mastergo-to-wpf/SKILL.md`（唯一流程路由），团队/设计师口径看 4 份飞书在线文档（见 §5 规则与文档分层）。
+> 本文只讲**架构与关键组成**，不逐文件罗列、也不复制任何规则正文。字段级规则看 `skills/mastergo-to-wpf/references/`，流程与硬规则看 `skills/mastergo-to-wpf/SKILL.md`（唯一流程路由）；团队/设计师阅读副本是 4 份飞书在线文档，**仅为同步副本、冲突以本地为准**（见 §5 规则与文档分层）。
 
 ## 1. 插件是什么
 
