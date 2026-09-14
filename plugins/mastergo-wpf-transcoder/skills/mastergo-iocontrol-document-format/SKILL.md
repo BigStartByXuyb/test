@@ -52,6 +52,10 @@ description: 强制规范 MasterGo → MTSLG IOContorl 映射文档的写法，�
 
 组件集 ID、实例 ID、图层 ID 和设计师自定义名称只用于内部来源追踪，不参与唯一匹配。来源追踪信息用于读取证据、审计和回溯，默认不要作为“来源：MasterGo 文件……”等独立正文行写入飞书映射文档；只有全文已有同类来源字段或用户明确要求时才写入。必须保留真实父节点语义；不能只写“左右结构”“上下结构”等缩写。
 
+**一个族一个键**：模板族实际用哪个键，登记在 `mtslg-iocontrol-map.json` 的 `match` 字段里，**一个模板族只登记一个键、解析时也只用一个**——公开属性名（如 `属性 1`、`按钮类型`、`component`、`role`）、`componentSet: true`（按组件集名命中，如右栏独立组件族）、或 `componentName: true`（按被引用组件的名字命中）。映射文档里每个族的“匹配规则”必须写明它用的是哪一种，并与映射表登记一致；不要写成“多个键任选其一”或“先按属性、取不到再按名字”这类多候选兜底。
+
+**底部栏不属于本规范范围**：底部栏（`layoutRules.bottomBar`）是 Layout 层规则，按《页面壳层 Layout 映射标准》的 `layoutRules.bottomBar.match` 匹配（当前登记 `componentName: true`——底部栏实例的属性里没有变体信息，变体值就是被引用组件的名字）。本规范只约束组件库映射文档，不得把底部栏按公开属性“属性 1”登记进组件库映射文档。
+
 ## 每个映射条目的固定格式（所有组件集统一）
 
 每个组件集、父节点分支和具体变体都必须独立写成：
@@ -116,7 +120,7 @@ description: 强制规范 MasterGo → MTSLG IOContorl 映射文档的写法，�
 
 新增、修改或删除**任意一条映射**时，下列位置要在同一批改动里保持一致；只改其中一处就等于制造漂移，而漂移不会立刻报错，只会在后续页面生成时才暴露。第 1~5 项是硬性要求；第 6 项按发版节奏处理，不阻塞本次改动：
 
-1. **机器真值源**：`skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/mtslg-iocontrol-map.json`（以插件根为基准）——模板族结构、`match.property`、`variants` 真实属性值、`controlTypeRequiredAttrs` 必写字段、按钮族 `iconSize` 等。同一个「匹配属性名 + 属性值」只能登记在一个模板族。
+1. **机器真值源**：`skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/mtslg-iocontrol-map.json`（以插件根为基准）——模板族结构、`match`（一族一键：公开属性名 / `componentSet` / `componentName`）、`variants` 真实属性值、`controlTypeRequiredAttrs` 必写字段、按钮族 `iconSize` 等。同一个「匹配属性名 + 属性值」只能登记在一个模板族。
 2. **人读口径**：本规范约束的映射文档 `skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/feishu-component-library-mapping.md`——按上面的层级、匹配规则、固定模板和 XML 格式补齐同一条映射。
 3. **审计脚本的家族登记**：映射表里新出现 `*Templates` 族时，同步登记到 `skills/mastergo-to-wpf/scripts/audit-mtslg-feishu-map.js` 的家族清单；漏登记会被覆盖审计的 `unregisteredFamilies` 报出并以退出码 2 结束（该族的 `missing` 方向会整族失效）。
 4. **回归用例**：在 `skills/mastergo-to-wpf/scripts/tests/` 下按需补断言（文档覆盖、模板匹配、按钮族图标字段口径、TextBlock 尺寸、坐标等）。
