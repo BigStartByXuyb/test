@@ -112,13 +112,13 @@ description: 强制规范 MasterGo → MTSLG IOContorl 映射文档的写法，�
 - 根级示例标题/工件示教标题按 `design-artifact-title` 规则处理，不得混入业务 XML；保留或剥离都要记录原因。
 - Style 或 ControlType 必须有目标框架源码、真实页面或正式映射证据；用户指定但尚未找到运行时键时，明确标记待核对，不得伪造。
 
-## 新增/修改映射的同步清单（必须整批完成）
+## 新增/修改映射的同步清单
 
-新增、修改或删除**任意一条映射**时，下列位置必须在同一批改动里保持一致；只改其中一处就等于制造漂移，而漂移不会立刻报错，只会在后续页面生成时才暴露：
+新增、修改或删除**任意一条映射**时，下列位置要在同一批改动里保持一致；只改其中一处就等于制造漂移，而漂移不会立刻报错，只会在后续页面生成时才暴露。第 1、2、4、5 项是硬性要求；第 3 项在本次新增了模板族时必做；第 6 项按发版节奏处理，不阻塞本次改动：
 
 1. **机器真值源**：`skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/mtslg-iocontrol-map.json`（以插件根为基准）——模板族结构、`match.property`、`variants` 真实属性值、`controlTypeRequiredAttrs` 必写字段、按钮族 `iconSize` 等。同一个「匹配属性名 + 属性值」只能登记在一个模板族。
 2. **人读口径**：本规范约束的映射文档 `skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/feishu-component-library-mapping.md`——按上面的层级、匹配规则、固定模板和 XML 格式补齐同一条映射。
-3. **新增模板族时的审计登记**：映射表里新出现 `*Templates` 族时，同步登记到 `skills/mastergo-to-wpf/scripts/audit-mtslg-feishu-map.js` 的家族清单。反向检查（`undocumented`）已能从映射表反查"表登记了、文档没写"，所以漏登记只会让"文档声明了、表里没有"这个方向对该族失效；为保持双向覆盖，新族仍必须登记。
+3. **新增模板族时的审计登记**：映射表里新出现 `*Templates` 族时，同步登记到 `skills/mastergo-to-wpf/scripts/audit-mtslg-feishu-map.js` 的家族清单。漏登记不会静默通过：按本规范用 `### 固定模板：属性 1=…` 书写的新族变体会被归到 `componentTemplates` 家族参与比对，脚本会报出归属错误的 `missing` 并以退出码 2 结束，需要靠人工判断这不是真的缺映射。反向检查 `undocumented` 覆盖的是"表登记了、文档没写"方向，不能替代这项登记。
 4. **回归用例**：在 `skills/mastergo-to-wpf/scripts/tests/` 下按需补断言（文档覆盖、模板匹配、按钮族图标字段口径、TextBlock 尺寸、坐标等）。
 5. **版本号**：`.claude-plugin/plugin.json` 递增；不要在上一轮 CI 未结束时连续推送。
 6. **在线同步副本**：发版前把映射文档同步到对应的飞书在线文档（按标题检索定位、不写死地址、整篇重建并记录 revision）。同步工具是可选项、不是交付链路的运行依赖：本机没有该工具时，在交付说明里标注"在线文档未同步"即可，不阻塞本次改动。
