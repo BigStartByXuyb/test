@@ -134,7 +134,7 @@ DSL/mapping 文案 ──► 机械派生语言键（标题 / MenuItem / 页面�
 
 | 需求 | 改哪里 |
 |---|---|
-| 新增组件/变体模板 | 按 `skills/mastergo-iocontrol-document-format/SKILL.md` 的「新增/修改映射的同步清单」整批完成：映射表 + 映射文档 + 回归用例，最后跑覆盖审计与全量回归；`### 固定模板：属性 1=…` 族由审计按映射表自动归属，表格/清单形式的族需登记进审计脚本的家族清单 |
+| 新增组件/变体模板 | 按 `skills/mastergo-iocontrol-document-format/SKILL.md` 的「新增/修改映射的同步清单」整批完成：映射表 + 映射文档 + 回归用例，最后跑覆盖审计与全量回归（审计报告会指出该族还缺哪一项） |
 | 新增控件类型的固定字段 | `controlTypeRequiredAttrs`（+ `controlTypeAttrDefaults`）；发射与校验自动跟随 |
 | 新增页面 | 写 bundle 输入清单（`dslPath`/`visibilityPath`/`iconMapPath`/`menuItems`…）→ 跑 `gen-mastergo-page-bundle.js` |
 | 新增语言 | manifest 的 `languages.locales` + 对应译文清单 |
