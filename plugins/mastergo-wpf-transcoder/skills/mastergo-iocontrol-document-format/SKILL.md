@@ -118,10 +118,10 @@ description: 强制规范 MasterGo → MTSLG IOContorl 映射文档的写法，�
 
 1. **机器真值源**：`skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/mtslg-iocontrol-map.json`（以插件根为基准）——模板族结构、`match.property`、`variants` 真实属性值、`controlTypeRequiredAttrs` 必写字段、按钮族 `iconSize` 等。同一个「匹配属性名 + 属性值」只能登记在一个模板族。
 2. **人读口径**：本规范约束的映射文档 `skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/feishu-component-library-mapping.md`——按上面的层级、匹配规则、固定模板和 XML 格式补齐同一条映射。
-3. **新增模板族时的审计登记**：映射表里新出现 `*Templates` 族时，同步登记到 `skills/mastergo-to-wpf/scripts/audit-mtslg-feishu-map.js` 的家族清单，否则该族不进入文档覆盖审计。
+3. **新增模板族时的审计登记**：映射表里新出现 `*Templates` 族时，同步登记到 `skills/mastergo-to-wpf/scripts/audit-mtslg-feishu-map.js` 的家族清单。反向检查（`undocumented`）已能从映射表反查"表登记了、文档没写"，所以漏登记只会让"文档声明了、表里没有"这个方向对该族失效；为保持双向覆盖，新族仍必须登记。
 4. **回归用例**：在 `skills/mastergo-to-wpf/scripts/tests/` 下按需补断言（文档覆盖、模板匹配、按钮族图标字段口径、TextBlock 尺寸、坐标等）。
 5. **版本号**：`.claude-plugin/plugin.json` 递增；不要在上一轮 CI 未结束时连续推送。
-6. **在线同步副本**：发版前把映射文档同步到对应的飞书在线文档（按标题检索定位、不写死地址、整篇重建并记录 revision）。
+6. **在线同步副本**：发版前把映射文档同步到对应的飞书在线文档（按标题检索定位、不写死地址、整篇重建并记录 revision）。同步工具是可选项、不是交付链路的运行依赖：本机没有该工具时，在交付说明里标注"在线文档未同步"即可，不阻塞本次改动。
 
 改完后按顺序自检，任何一步非零退出都必须修完再提交：
 
@@ -133,7 +133,8 @@ node --test "skills/mastergo-to-wpf/scripts/tests/*.test.js"
 pwsh -NoProfile -File skills/mastergo-to-wpf/scripts/tests/mastergo-dsl-pipeline.tests.ps1
 ```
 
-- 覆盖审计报告里 `missing`（文档声明了但映射表没有）、`undocumented`（映射表登记了但文档没写）、`duplicateMatchKeys`（跨模板族重复匹配键）任一非空，都表示这次改动不完整。
+- 覆盖审计报告里 `missing`（文档声明了但映射表没有）、`undocumented`（映射表登记了但文档正文没提）、`duplicateMatchKeys`（跨模板族重复匹配键）任一非空，都表示这次改动不完整；三者非空时脚本以退出码 2 结束。
+- `undocumented` 是关键词级覆盖检查（文档正文里是否提到该变体，HTML 注释不算），不证明模板已经写全；模板是否成体系仍按本 Skill 的层级、匹配规则和固定模板规则人工审查。
 - 只改映射表或只改映射文档都不算完成；必须文档 + 映射表 + 审计 + 回归同时通过。
 - 新 ControlType 的必写字段只需登记进 `controlTypeRequiredAttrs`，生成器与 provenance 校验会自动读取；若改的是固定字段口径（按钮族、图标字段、TextBlock 尺寸等），还要同步 `doc-rule-consistency.test.js` 覆盖的口径文本。
 - 改动涉及页面产物行为时，另按 `skills/mastergo-to-wpf/SKILL.md` 的交付链路在真实页面上复跑一次，不在本清单内自动执行。

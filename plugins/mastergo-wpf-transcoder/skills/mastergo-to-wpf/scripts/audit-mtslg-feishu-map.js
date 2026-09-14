@@ -117,10 +117,21 @@ function collectMapVariants(templateMap) {
   return rows;
 }
 
-// 反向覆盖：映射表里登记、但映射文档正文完全没提到的变体。
+// 反向覆盖：映射表里登记、但映射文档正文没有提到的变体。
+// 只统计正文：HTML 注释里的「属性1=…」示例不算文档内容，否则注释能伪装成已登记。
+// 这是关键词级覆盖检查（证明"文档提到了"），不是结构级校验（不证明模板已写全）；
+// 模板是否成体系仍由人工/agent 按本 Skill 的层级与固定模板规则审查。
+function isVariantDocumented(markdown, variant) {
+  return stripHtmlComments(markdown).includes(variant);
+}
+
+function stripHtmlComments(markdown) {
+  return markdown.replace(/<!--[\s\S]*?-->/g, "");
+}
+
 function findUndocumentedVariants(markdown, templateMap) {
   return collectMapVariants(templateMap)
-    .filter(({ variant }) => !markdown.includes(variant))
+    .filter(({ variant }) => !isVariantDocumented(markdown, variant))
     .map(({ family, variant }) => `${family}/${variant}`);
 }
 
@@ -153,7 +164,9 @@ function main() {
     JSON.parse(fs.readFileSync(mapPath, "utf8"))
   );
   console.log(JSON.stringify(report, null, 2));
-  if (report.missing.length || report.undocumented.length) process.exitCode = 2;
+  if (report.missing.length || report.undocumented.length || report.duplicateMatchKeys.length) {
+    process.exitCode = 2;
+  }
 }
 
 if (require.main === module) main();
@@ -163,5 +176,6 @@ module.exports = {
   auditMappingCoverage,
   findDuplicateMatchKeys,
   collectMapVariants,
-  findUndocumentedVariants
+  findUndocumentedVariants,
+  isVariantDocumented
 };
