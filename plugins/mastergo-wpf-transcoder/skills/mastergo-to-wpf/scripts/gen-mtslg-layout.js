@@ -177,12 +177,19 @@ function validateLayoutManifest(manifest) {
   if (matched < 0 || unresolved < 0) {
     fail("layoutEvidence 中的组件数量不能为负数");
   }
-  // 右下角“右侧底部-常驻button”分组内的实例不计入 Menu（2026-09 规则）：
-  // matchedBottomBarItems 仍统计全部命中变体实例，常驻分组内的数量单独登记。
+  // 不生成 MenuItem 的两类底部栏槽位（2026-09 规则）：
+  //   1) 右下角“右侧底部-常驻button”分组内的实例 —— 单独登记 residentGroupItems；
+  //   2) 空占位槽位（命中变体但没有组件属性/文案/图标）—— 单独登记 emptyPlaceholderItems。
+  // 两者的 Index 空档都保留，因此换算关系始终是 matchedBottomBarItems = menuItems.length + residentGroupItems。
   const residentRaw = evidence.residentGroupItems;
   const resident = residentRaw === undefined || residentRaw === null ? 0 : Number(residentRaw);
   if (!Number.isInteger(resident) || resident < 0) {
     fail("layoutEvidence.residentGroupItems 必须是 0 或正整数（右下角常驻分组内不生成 MenuItem 的实例数）");
+  }
+  const placeholderRaw = evidence.emptyPlaceholderItems;
+  const placeholders = placeholderRaw === undefined || placeholderRaw === null ? 0 : Number(placeholderRaw);
+  if (!Number.isInteger(placeholders) || placeholders < 0) {
+    fail("layoutEvidence.emptyPlaceholderItems 必须是 0 或正整数（空占位槽位不生成 MenuItem，Index 空档保留）");
   }
 
   if (status === "pending") {
@@ -204,7 +211,7 @@ function validateLayoutManifest(manifest) {
   if (manifest.menuItems.length + resident !== matched) {
     fail("Layout 映射数量不一致：matchedBottomBarItems=" + matched +
       "，menuItems=" + manifest.menuItems.length + "，residentGroupItems=" + resident +
-      "（右下角“右侧底部-常驻button”分组内的实例不生成 MenuItem）");
+      "（右下角常驻分组内的实例与空占位槽位都不生成 MenuItem，Index 空档保留）");
   }
 }
 

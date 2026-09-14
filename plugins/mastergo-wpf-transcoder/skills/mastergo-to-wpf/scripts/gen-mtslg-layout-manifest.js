@@ -237,7 +237,15 @@ const orderedEntries = visualOrder(
     }, [])
   )
 );
-const candidateEntries = orderedEntries.filter(function (item) { return !item.entry.resident; });
+// 空占位槽位保留在 orderedEntries 里（Index 空档照旧），但不生成 MenuItem。
+const placeholderRefs = new Set(
+  orderedEntries.filter(function (item) {
+    return !item.entry.resident && isEmptyBottomBarPlaceholder(item.node);
+  }).map(function (item) { return item.node.id; })
+);
+const candidateEntries = orderedEntries.filter(function (item) {
+  return !item.entry.resident && !placeholderRefs.has(item.node.id);
+});
 if (process.env.DEBUG_LAYOUT_MANIFEST) {
   orderedEntries.forEach(function (item, i) {
     console.error('  ' + (i + 1) + ') ' + String(item.node.id).split('/').pop() + ' ' +
@@ -270,6 +278,16 @@ function iconEntryOf(node) {
     if (key) hit = iconByGeometry.get(key) || null;
   }
   return hit;
+}
+
+// 空占位槽位：命中底部栏变体，但整棵子树既没有组件属性、没有文案、也没有图标
+// （设计稿里预留但本页未配置的 F 键位）。不生成 MenuItem，只保留它占的 Index 空档。
+function isEmptyBottomBarPlaceholder(node) {
+  const props = (node.componentInfo && node.componentInfo.properties) || {};
+  if (Object.keys(props).length > 0) return false;
+  if (textNodesOf(node).length > 0) return false;
+  if (iconEntryOf(node)) return false;
+  return true;
 }
 
 const raw = candidateEntries.map(function (item) {
@@ -328,9 +346,11 @@ const manifest = {
     matchedBottomBarItems: menuItems.length + residentGroupItems,
     unresolvedBottomBarItems: 0,
     residentGroupItems: residentGroupItems,
+    emptyPlaceholderItems: placeholderRefs.size,
     note: "由 gen-mtslg-layout-manifest.js 从 DSL 机械推导：底部栏 " + bar.id +
       "，菜单项 " + menuItems.length + " 项，右下角常驻分组 " + residentGroupItems +
-      " 项不生成 MenuItem（Index 空档保留），文本按设计稿原样写入。",
+      " 项与空占位槽位 " + placeholderRefs.size + " 项不生成 MenuItem（Index 空档保留），" +
+      "文本按设计稿原样写入。",
   },
   menuItems: menuItems,
 };
