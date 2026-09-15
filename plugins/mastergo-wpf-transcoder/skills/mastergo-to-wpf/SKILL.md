@@ -87,7 +87,7 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 
 ### MTSLG 页面入口分流（必须先判断）
 
-- **修改现有页面**：读取目标项目实际生效的 XML，使用 `gen-iocontrol-xml.js --merge <existing.xml> <mapping.json> --out <confirmed-output.xml>`；保留工程师已有的 IOName、IOCommand、IOEnable 等业务属性，并处理 merge 报告中的冲突。映射节点 `valueSource=dsl.text` 时 `Value` 属设计文本，merge 会强制按映射覆盖（否则 provenance 校验必然失败），这类覆盖单独列在“设计文本覆盖（dsl.text）”报告里，需逐条确认。不得对现有页面使用 `--fresh`。
+- **修改现有页面**：读取目标项目实际生效的 XML，使用 `gen-iocontrol-xml.js --merge <existing.xml> <mapping.json> --out <confirmed-output.xml>`；保留工程师已有的 IOName、IOCommand、IOEnable 等业务属性，并处理 merge 报告中的冲突。merge 报告输出在 **stderr**（`--- merge 报告 ---`，含冲突/设计文本覆盖/新增属性/几何更新/新增节点/未涉及节点六类清单，逐条点名节点 ref），是「逐条裁决」的唯一输入，不得跳过。映射节点 `valueSource=dsl.text` 时 `Value` 属设计文本，merge 会强制按映射覆盖（否则 provenance 校验必然失败），这类覆盖单独列在“设计文本覆盖（dsl.text）”报告里，需逐条确认。不得对现有页面使用 `--fresh`。
 - **新建页面**：使用 `gen-iocontrol-xml.js --fresh <mapping.json> --out <new-page.xml>`，随后按已确认的 Layout、语言键、Icon 和宿主路径完成注册。不得把不存在的页面伪装成 merge。
 - `gen-mastergo-page-bundle.js` 是页面项目生成的唯一正常入口；它的页面 XML 步骤是 `--fresh`，新建页面目标文件已存在时默认停止并报告冲突。只有用户明确要求替换已有页面、manifest 设置 `operation=replace-existing` 且显式传入 `--overwrite` 时，才允许整套替换并备份。现有页面的业务修改仍必须优先走 `--merge` 主路径；只有 Bundle 被错误或环境阻塞时，才可按阻塞步骤单独调用子脚本。
 - Bundle manifest 必须提供 `svgPath`，并指向 `getDsl` 成功后按需执行 `extractSvg` 保存的 JSON；没有运行时 Icon 时也提供合法的 `{ "svgs": [] }` 文件。

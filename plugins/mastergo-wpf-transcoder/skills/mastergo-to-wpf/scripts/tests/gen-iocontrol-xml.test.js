@@ -276,6 +276,11 @@ const mergedTextTag = (mergedXmlText.match(/<IOContorl[^>]*ID="TXT_1"[\s\S]*?\/>
 assert.match(mergedTextTag, /Width="NaN"/, 'merge 必须把 TextBlock 的 Width 覆写为 NaN');
 assert.match(mergedTextTag, /Height="40"/, 'merge 必须保持 TextBlock 的 Height=40');
 assert.match(mergedTextTag, /Value="速度"/, 'merge 必须按 dsl.text 覆盖旧文本，保证 Value 与设计文本一致');
+// merge 报告必须真的能被调用方读到：文档要求逐条裁决冲突/覆盖/新增/未涉及节点，
+// 因此报告必须出现在进程输出里（stderr，避免污染「不带 --out 时 stdout 就是 XML」的管道用法）。
+assert.match(merge.stderr, /--- merge 报告 ---/, 'merge 必须输出裁决报告');
+assert.match(merge.stderr, /新增节点 \(/, 'merge 报告必须列出新增节点清单');
+assert.match(merge.stderr, /\[status\]/, 'merge 报告必须逐条点名涉及的节点 ref');
 
 // ---- 按钮族规则改为读模板表（--map）：改表即改产物，不再各自维护常量 ----
 const mapPath = path.join(dir, 'template-map.json');
@@ -554,3 +559,49 @@ assert.notStrictEqual(selfClosingRun.status, 0,
 assert.match(selfClosingRun.stderr + selfClosingRun.stdout, /定位不到成对闭合标签/,
   '失败信息必须说明是闭合标签定位失败');
 console.log('PASS self-closing output parent is rejected');
+
+// merge：现有 XML 若没有根级闭合标签（自闭合根 / 空文件），新增节点无处可插时必须失败，
+// 不得「报告说新增、产物里没有、退出码 0」。
+const selfClosedRootXml = path.join(dir, 'self-closed-root-page.xml');
+const selfClosedRootOut = path.join(dir, 'self-closed-root-out.xml');
+fs.writeFileSync(selfClosedRootXml, '<IOContorl ID="" Left="NaN" Top="NaN" Width="NaN" Height="NaN" />\n');
+const selfClosedRootRun = spawnSync(process.execPath, [path.join(__dirname, '..', 'gen-iocontrol-xml.js'),
+  '--merge', selfClosedRootXml, layoutParentMapping, '--out', selfClosedRootOut], { encoding: 'utf8' });
+assert.notStrictEqual(selfClosedRootRun.status, 0,
+  '现有 XML 缺少根级闭合标签时必须失败，不得静默丢弃新增节点');
+assert.match(selfClosedRootRun.stderr + selfClosedRootRun.stdout, /找不到根级 <\/IOContorl> 闭合标签/,
+  '失败信息必须说明缺少根级闭合标签');
+console.log('PASS missing root close tag is rejected');
+
+// merge：无 ID 的既有容器经 ControlType+坐标位置匹配后，必须能直接承接新增子级
+// （插入锚点用匹配到的 token，而不是要求现有 XML 先补 ID）。
+const noIdParentXml = path.join(dir, 'no-id-parent-page.xml');
+const noIdParentOut = path.join(dir, 'no-id-parent-out.xml');
+fs.writeFileSync(noIdParentXml, [
+  '<?xml version="1.0" encoding="utf-8"?>',
+  '<IOContorl',
+  '    ID=""',
+  '    Left="NaN"',
+  '    Top="NaN"',
+  '    Width="NaN"',
+  '    Height="NaN">',
+  '    <IOContorl',
+  '        ControlType="Border"',
+  '        Left="600"',
+  '        Top="8"',
+  '        Width="200"',
+  '        Height="120">',
+  '    </IOContorl>',
+  '</IOContorl>',
+  ''
+].join('\n'));
+const noIdParentRun = spawnSync(process.execPath, [path.join(__dirname, '..', 'gen-iocontrol-xml.js'),
+  '--merge', noIdParentXml, layoutParentMapping, '--out', noIdParentOut], { encoding: 'utf8' });
+assert.strictEqual(noIdParentRun.status, 0,
+  '无 ID 的既有容器经位置匹配后必须能承接新增子级: ' + noIdParentRun.stderr);
+assert.match(noIdParentRun.stderr, /\[panel\]/,
+  'merge 报告必须记录无 ID 父节点被匹配并在其上做的属性变更');
+const noIdParentText = fs.readFileSync(noIdParentOut, 'utf8');
+assert.match(noIdParentText, /Left="600"[\s\S]*ID="ITEM_1"[\s\S]*Left="10"[\s\S]*Top="0"/,
+  '新增子级必须插入到位置匹配命中的父容器闭合标签之前，并按父节点计算相对坐标');
+console.log('PASS position-matched parent accepts new children');

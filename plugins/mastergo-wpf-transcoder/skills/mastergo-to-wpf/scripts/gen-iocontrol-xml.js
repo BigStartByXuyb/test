@@ -788,24 +788,30 @@ function mergeMode() {
       for (let i = tokens.length - 1; i >= 0; i--) {
         if (tokens[i].type === 'tag' && tokens[i].isClose) { closeIdx = i; break; }
       }
+      if (closeIdx === null) {
+        throw new Error('映射门禁失败: 现有 XML 里找不到根级 </IOContorl> 闭合标签，无法插入新增节点 ' + ref +
+          '；自闭合根节点（<IOContorl ... />）或空文件都不能承接新增节点，请先补齐根闭合标签');
+      }
     } else {
       // 输出父节点是既有节点：必须在现有 XML 里定位到它的成对闭合标签才能插入子块。
-      // 定位不到（父节点无 ID / 未被现有 XML 的 ID 索引命中 / 父标签是自闭合形式）时直接失败——
+      // 定位顺序：优先用本次匹配命中的 token（ID 命中或 ControlType+坐标位置命中都算），
+      // 退回 ID 索引；父标签是自闭合形式（openClose 里没有成对闭合标签）时直接失败——
       // 静默挂到页面根会让「按父节点相对的 Left/Top」落到页面根控件上，而属性级门禁察觉不到。
+      const parentRender = rendered.get(p);
       const pn = nodes.find(x => x.ref === p);
-      const openIdx = pn && pn.id && idIndex.has(pn.id) ? idIndex.get(pn.id) : null;
+      const openIdx = parentRender && parentRender.tokenIdx !== null
+        ? parentRender.tokenIdx
+        : (pn && pn.id && idIndex.has(pn.id) ? idIndex.get(pn.id) : null);
       if (openIdx !== null && openClose.has(openIdx)) closeIdx = openClose.get(openIdx);
       else {
         throw new Error('映射门禁失败: 新增节点 ' + ref + ' 的输出父节点 ' + p +
           '（ID=' + ((pn && pn.id) || '(无)') + '）在现有 XML 中定位不到成对闭合标签' +
-          '（父节点无 ID、未被 ID 索引命中，或该标签为自闭合形式）；' +
-          '请把父节点改成容器形式或调整 layoutParent，不要把它静默落到页面根级');
+          '（父标签是自闭合形式）；请把父节点改成容器形式再插入子级，' +
+          '或调整 layoutParent，不要把它静默落到页面根级');
       }
     }
-    if (closeIdx !== null) {
-      if (!insertions.has(closeIdx)) insertions.set(closeIdx, []);
-      insertions.get(closeIdx).push(block);
-    }
+    if (!insertions.has(closeIdx)) insertions.set(closeIdx, []);
+    insertions.get(closeIdx).push(block);
     report.newNodes.push(`[${ref}] ${n.controlType || '(容器)'} 新增`);
   }
 
@@ -820,14 +826,36 @@ function mergeMode() {
 }
 
 // ---------- 主流程 ----------
-let outText, report = null;
+
+// merge 报告：调用方（当前主路径「修改现有页面」）必须靠它逐条裁决冲突/覆盖/新增/未涉及节点，
+// 因此并入主流程必经路径输出。走 stderr，避免污染「不带 --out 时 stdout 就是 XML」的管道用法。
+function mergeReportText(report) {
+  const lines = [];
+  const list = (title, arr) => {
+    if (arr && arr.length) {
+      lines.push(`\n${title} (${arr.length}):`);
+      arr.forEach(x => lines.push(`  - ${x}`));
+    }
+  };
+  lines.push('\n--- merge 报告 ---');
+  list('冲突（保留现有值）', report.conflicts);
+  list('设计文本覆盖（dsl.text）', report.textOverrides);
+  list('新增属性', report.added);
+  list('几何/类型更新', report.updated);
+  list('新增节点', report.newNodes);
+  list('现有但设计稿无（原样保留）', report.unmapped);
+  return lines.join('\n') + '\n';
+}
+
+let outText;
 if (mode === 'fresh') {
   validateFreshMapping();
   outText = renderFresh();
 } else {
   const r = mergeMode();
   outText = r.text;
-  report = r.report;
+  // 报告与产物同步落盘：先写报告，再写文件，调用方在同一进程输出里就能拿到裁决清单。
+  process.stderr.write(mergeReportText(r.report));
 }
 
 if (outPath) {
@@ -835,20 +863,4 @@ if (outPath) {
   console.log(`OK -> ${outPath}`);
 } else {
   process.stdout.write(outText);
-}
-
-if (report) {
-  const list = (title, arr) => {
-    if (arr.length) {
-      console.error(`\n${title} (${arr.length}):`);
-      arr.forEach(x => console.error(`  - ${x}`));
-    }
-  };
-  console.error('\n--- merge 报告 ---');
-  list('冲突（保留现有值）', report.conflicts);
-  list('设计文本覆盖（dsl.text）', report.textOverrides);
-  list('新增属性', report.added);
-  list('几何/类型更新', report.updated);
-  list('新增节点', report.newNodes);
-  list('现有但设计稿无（原样保留）', report.unmapped);
 }

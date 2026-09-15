@@ -116,10 +116,12 @@
 `gen-iocontrol-xml.js --merge <现有XML> <mapping.json>` 的行为：
 
 1. **匹配**：映射节点 ↔ 现有节点，ID 优先；无 ID 时按 ControlType + Left/Top（容差 0.5）位置匹配。
+
+   匹配结果（ID 或位置）**同时**作为新节点的插入锚点：经位置匹配的既有容器可以直接承接新增子级，不需要先给现有 XML 补 ID。
 2. **几何更新**：Left/Top/Width/Height 按映射更新（这就是设计稿改动的落点）。
 3. **ControlType**：按映射更新，变化写冲突报告。
 4. **业务属性保护**：现有 XML 同名的属性一律保留现有值（值不同 → 冲突报告，不覆盖）；映射多出来的属性 → 追加（新增报告）。工程师手写的 IOName/IOCommand/IOState 等永远不会被设计稿冲掉。**例外**：映射节点的 `valueSource=dsl.text` 时，`Value` 是设计文本，merge 强制按映射覆盖并写“设计文本覆盖（dsl.text）”报告——否则 provenance 校验（`Value` 必须等于 `sourceText`）会失败。
-5. **节点增删**：映射里的新节点渲染插入父容器闭合标签前；现有但映射未涉及的节点原样保留（报告列出）。
+5. **节点增删**：映射里的新节点渲染插入父容器闭合标签前。插入锚点取**本次匹配命中的既有父节点**（ID 命中或 ControlType+坐标位置命中都算），因此无 ID 的既有容器也能承接新增子级；**例外**：父节点在现有 XML 里是自闭合标签（`<IOContorl ... />`，没有成对闭合标签）时直接失败——先在现有 XML 里把该节点改成容器形式再 merge，不得把按父节点相对的 `Left/Top` 静默落到页面根级；页面根没有 `</IOContorl>` 闭合标签（自闭合根/空文件）时同样失败。现有但映射未涉及的节点原样保留（报告列出）。
 6. **格式最小扰动**：未触及的节点与注释逐字节保留；被替换节点跟随原样式（单行/多行）。
 
 **为什么禁止整文件重写**：设计稿没有 IO 绑定信息，`--fresh` 重写会丢掉工程师手写的 IOName/IOCommand/IOEnable 等业务属性。改现有页面一律 `--merge`。
@@ -157,7 +159,7 @@
 1. 读目标项目实际加载的现有页面 XML；由适配记录确认唯一生效版本，不能按目录名或历史副本猜测。
 2. 建映射：先套用公共栏边界表并归一 bbox，再写 DSL 节点 → 映射 JSON（`ref`/`id`/`controlType`/`parent`/`layoutParent`/pageAbsX/pageAbsY/w/h/attrs）；公共栏节点保留审计记录但不进入页面映射。`parent` 与 `layoutParent` 都是**输出父节点**的登记位，取值优先级为 `layoutParent` → `parent` → DSL `sourceParent`，发射器与坐标门禁按同一优先级取原点。该 ref 必须是**已发射的输出节点**（同时是 `mapping.nodes` 的 ref 且 `sourceNodes` 里有同名 bbox 记录）或页面根（`null`/`rootRef`）：这条条件由发射器 `gen-iocontrol-xml.js` 在发射时强制（指向未发射节点即直接失败），并由 `validate-iocontrol-provenance.js` 对既有 XML+mapping 独立复检；bundle 坐标门禁不重复实现该条件，只按同一优先级取原点。新增子树只以「子树根」为单位插入页面，输出父节点自身也是本次新增节点时，其子节点随父块递归发射，不再单独插入。
 3. Group 语义用 `classify-mastergo-groups.js` 的 role，再经 `mtslg-iocontrol-map.json` roleMap 定 ControlType；不得用相机/按钮实例在有效相机组件外重复搭建内部控件。
-4. `gen-iocontrol-xml.js --merge <现有XML> <mapping.json> --out <已确认页面输出路径>` → 读 merge 报告，逐条裁决冲突。
+4. `gen-iocontrol-xml.js --merge <现有XML> <mapping.json> --out <已确认页面输出路径>` → 读 merge 报告，逐条裁决冲突。报告固定输出到 **stderr**（`--- merge 报告 ---`，含冲突/设计文本覆盖/新增属性/几何更新/新增节点/未涉及节点六类清单，逐条点名节点 ref）；stdout 只输出产物路径（带 `--out`）或 XML 本体（不带 `--out`，便于管道）。
 5. `check-iocontrol-coords.js --xml <产出> --nodes <节点表>`：0 MISMATCH / 0 EXTRA。
 6. 执行第 6 节键查证门禁，处理全部未核验键。
 7. `sync-to-mt.ps1` 按适配记录同步到唯一已确认的运行配置目录；同步前强制备份。
