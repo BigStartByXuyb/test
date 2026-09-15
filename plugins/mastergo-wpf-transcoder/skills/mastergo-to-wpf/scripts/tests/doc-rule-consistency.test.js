@@ -290,11 +290,14 @@ assert.ok(hostGenerator.includes('const MENU_KEY_PREFIX = "MenuItem"'),
   "方法名派生必须以菜单键前缀 MenuItem 为界（langName 去前缀 = 按钮英文语义名）");
 assert.ok(hostGenerator.includes("PROVISIONAL_MENU_KEY"),
   "临时键 MenuItemIndex<n> 必须显式排除，不得当作按钮英文名");
-// 判定条件只有「是否带 MenuItem 前缀」一条：带前缀去前缀、不带前缀取整键（scope 不参与）。
+// 取名步骤只有「是否带 MenuItem 前缀」一条：带前缀去前缀、不带前缀取整键（scope 不参与）；
+// 临时键检查必须写在去前缀之前（否则 MenuItemIndex3 会派生出 Index3）。
 assert.ok(hostGenerator.includes("=== 0 ? key.slice(MENU_KEY_PREFIX.length) : key"),
   "带 MenuItem 前缀时去前缀，不带前缀时取整键");
 assert.ok(!shellDoc.includes("共享键直接取整键"),
   "文档不得把 scope=shared 写成独立分支（共享键通常也带 MenuItem 前缀）");
+assert.ok(shellDoc.includes("该检查发生在去前缀之前"),
+  "文档必须写明临时键检查发生在去前缀之前");
 for (const item of ["没有 `langName`", "MenuItemIndex<n>", "不是合法 C# 标识符", "命中 C# 关键字"]) {
   assert.ok(shellDoc.includes(item), "退回内联 TODO 的清单必须写明: " + item);
 }

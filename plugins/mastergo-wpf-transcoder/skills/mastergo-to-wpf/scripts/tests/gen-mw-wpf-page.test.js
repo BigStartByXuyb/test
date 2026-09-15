@@ -33,7 +33,7 @@ fs.writeFileSync(manifestPath, JSON.stringify({
     { name: '对焦', index: 10, langName: 'MenuItemFocus' },
     // 菜单项没有独立方法名字段：方法名只从 langName 派生。
     { name: '倍率变更', index: 11, langName: 'MenuItemMagnificationChange' },
-    // 跨页面共享键（scope=shared）可能不带 MenuItem 前缀：直接取整键。
+    // 不带 MenuItem 前缀的键（手工/外部清单可能出现）：按整键取名。
     { name: '共享键按钮', index: 12, langName: 'SharedFocusKey' },
     // 没有 langName 的按钮：退回内联 TODO，并给出对应的 reason。
     { name: '无键按钮', index: 13 }
@@ -97,7 +97,7 @@ assert.ok(!/LangName "SharedFocusKey"/.test(result.stdout), '共享键应能派�
 // 方法名只来自 langName：MenuItemMagnificationChange -> MagnificationChange。
 assert.match(generatedViewModel, /\n {20}case "倍率变更":\n {24}MagnificationChange\(\);\n {24}break;/);
 assert.match(generatedViewModel, /private void MagnificationChange\(\)/);
-// 共享键（不带 MenuItem 前缀）不做前缀拦截：整键即方法名。
+// 不带 MenuItem 前缀的键不做前缀拦截：整键即方法名。
 assert.match(generatedViewModel, /\n {20}case "共享键按钮":\n {24}SharedFocusKey\(\);\n {24}break;/);
 assert.match(generatedViewModel, /private void SharedFocusKey\(\)/);
 // 一个按钮对应一个方法：发射的方法数量必须与审计列出的方法数量一致。
