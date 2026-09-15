@@ -10,6 +10,11 @@
  * must come from an approved mapping; layer names, coordinates and SVG names
  * are never converted into XAML resource keys.
  *
+ * approved 的判定口径：approved = 名称已登记在本页图标台账（icon-map 的 icons[]）中。
+ * 本页自建的语义键、以及页面内唯一临时键（status=provisional）都算 approved，不要求跨页复用，
+ * 也不依赖外部清单；键只要求在本页 Icons.xaml 内唯一并被本页引用。被禁止的只是“由图层 ID/
+ * 坐标/几何外观自动拼名”（例如 MGIcon_<layer-id>），不限制人按语义起名。
+ *
  * Usage:
  *   node discover-mtslg-page-icon-map.js --svg extractSvg.json \
  *     --mapping mapping.json --confirmed icon-map.json --out icon-map.json

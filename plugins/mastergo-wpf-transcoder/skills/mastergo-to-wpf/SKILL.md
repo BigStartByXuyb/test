@@ -120,6 +120,8 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 
 每个页面必须单独维护一个 Icon 文件。转换时先从当前页 MasterGo PATH/SVG 自动发现候选；图标映射输入逐项提供目标项目已确认或页面内生成的英文资源名、中文注释名和 DSL 来源，禁止从图层 ID、坐标或几何外观直接拼出 `MGIcon_<layer-id>` 形式的资源名。资源名必须是英文标识符且在当前页面唯一；重复名称由生成器按稳定数字后缀处理。没有目标项目键时，允许使用页面内唯一的临时 Geometry 键，状态标记为 `provisional` 并保留 sourceId/sourceRef。只有未被任何实际 Icon 槽位引用的 PATH 候选才进入 `candidates/unmapped` 而不进入 XAML。XAML 注释只写中文名称，溯源和 `keyStatus` 写入 mapping/manifest。`mw-wpf`（作业 A，暂不开放）的页面以 `StaticResource` 引用该页 Geometry（作业 A 的 Icon 合并前置条件以本节路线条目为准；作业 A 的整体启用前置条件见「作业 A：MW 框架 WPF」一节）；`mtslg-iocontrol`（作业 B，当前唯一启用）的页面 XML 与 Layout 仅引用该页 Icon 文件中已生成的键。
 
+**「approved 资源名」的判定口径（防止误读为“必须来自外部/历史权威清单”）**：图标是**页面级资源**，approved 指该名称**已登记在本页图标台账（icon-map 的 `icons[]`）**中——本页自建的语义英文键（优先中文语义对应名）与页面内唯一临时键（`status: "provisional"`）同样算 approved，**不要求跨页复用，也不依赖外部键清单**；键只要求在本页 `Icons.xaml` 内唯一并被本页（含 Layout 菜单项）引用。仍然禁止的是“由图层 ID/坐标/几何外观**自动拼名**”（如 `MGIcon_<layer-id>`），该禁令不限制有人按语义为图形起名。未被登记的图形按既有口径留空并进入 `candidates/unmapped` 审计。
+
 ## 页面多语言文件（当前 MTSLG 路线）
 
 每个页面一套语言字典，落在该页自己的目录：`Resources/Pages/{name}/{name}_{LOCALE}.xaml`（默认 `CN`、`EN`，与页面 XML、页面 Icon 同目录）。由 `gen-mtslg-page-lang.js` 发射，Bundle 通过 manifest 的 `languages` 字段驱动；**多语言是默认能力，不是可选项**：manifest 未提供 `languages` 时 Bundle 自动按 `languages.auto=true` + CN/EN 生成字典、派生语言键并强制 `LangName` 引用闭环（审计记 `languagesDefaulted=true`）；只有显式声明 `languages=false` 或 `languages:{disabled:true, reason:"…"}` 才会关闭，关闭原因写入审计 `languageDisabled`/`languageDisabledReason`，不得在未声明原因的情况下生成没有 LangName 的页面。

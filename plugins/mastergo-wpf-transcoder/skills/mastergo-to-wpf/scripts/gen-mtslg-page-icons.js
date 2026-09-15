@@ -20,6 +20,13 @@
  * Duplicate names receive deterministic numeric suffixes (2, 3, ...). This tool
  * never derives a name from a layer ID, location, or geometry.
  *
+ * 「approved」的判定口径（避免误读为“必须来自外部/历史权威清单”）：
+ *   1) approved = 该名称已登记在**本页图标台账**（icon-map 的 icons[]）中；本页自建的
+ *      语义键与页面内唯一临时键（status=provisional）同样算 approved，不需要跨页复用；
+ *   2) 图标是页面级资源：键只要求在本页 Icons.xaml 中唯一、且被本页（含 Layout 菜单）引用；
+ *   3) 仍然禁止把图层 ID/坐标/几何外观当作名字（例如 MGIcon_<layer-id>）——这条禁令针对
+ *      “由机器自动拼名”，不限制人按语义起名（SKILL 口径：优先中文语义对应的英文键）。
+ *
  * 补充来源（extractSvg 去重导致条目缺失时）：
  *   extractSvg 只输出 PATH 自身的 d + transform，几何完全相同的复用实例会被去重
  *   （例如同一图标被旋转/翻转复用），因此某些方向按钮拿不到条目。此时可传入
