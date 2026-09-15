@@ -130,6 +130,12 @@ assert.ok(omitRolesMatch, "必须能在校验器里读到 OMIT_ROLES 定义");
 for (const role of omitRolesMatch[1].split(",").map((item) => item.trim().replace(/^'|'$/g, "")).filter(Boolean)) {
   assert.ok(mainSkill.includes(role), "SKILL.md 的 omit 说明必须列出 OMIT_ROLES 里的角色: " + role);
 }
+// hidden 是第二条 omit 路径（OMIT_REASONS = ['hidden', ...OMIT_ROLES]），SKILL.md 必须同时写清，
+// 不能把 omit 说成只由 OMIT_ROLES 决定。
+assert.ok(/const OMIT_REASONS = \['hidden'\]\.concat\(OMIT_ROLES\)/.test(validator),
+  "校验器必须保持 OMIT_REASONS = ['hidden'].concat(OMIT_ROLES) 的定义");
+assert.ok(mainSkill.includes("OMIT_REASONS") && mainSkill.includes("hidden"),
+  "SKILL.md 的 omit 说明必须写明 hidden 这条路径（omitReason='hidden' 登记在 OMIT_REASONS）");
 
 // ---------- 2. 脚本内置默认 == 映射表（防止三处各写一份后漂移） ----------
 function objectLiteralOf(source, constName) {

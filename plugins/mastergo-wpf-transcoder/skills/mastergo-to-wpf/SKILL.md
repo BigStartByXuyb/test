@@ -292,7 +292,7 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 
 AI 必须同时读取原始 DSL、`visibility.json` 和正式组件映射，按有效可见状态决定每个普通 TEXT、F 文本和 Icon 是否进入 mapping：可见的当前页面文本必须生成，明确 hidden 文本删除；只有页面根级/工件级大标题标记为 `page-title` 时永远删除，组件内部标题、GroupBox Header、表格列标题以及组件库占位文案都按自身可见属性生成。宿主公共栏由结构边界剥离，不作为组件文本删除理由。最终 mapping 必须用 `textAudit` 记录每个 TEXT 的 `sourceRef`、真实文本、可见性、角色、输出决定和 `outputRefs`，再交给 Bundle 生成页面文件。
 
-- `_placeholder=true` 只是 MasterGo 组件库来源提示，不是删除条件。即使正式组件映射把文本标记为 placeholder，只要它属于当前页面或当前组件的可见内容，也必须生成。允许 `decision=omit` 的**唯一真值源是 `validate-iocontrol-provenance.js` 的 `OMIT_ROLES` 集合**（当前为 `page-title`、`host-shell`、`excluded-component`、`unmapped-component`、`camera-viewport-internal`：前四项分别是页面根级大标题、宿主公共栏、被隔离组件内部、未命中模板组件内部；最后一项对应**整体控件内部渲染**——相机视口按映射表 `cameraTemplates.innerTextPolicy` 要求其内部 TEXT 整体 omit）。角色不在该集合内时校验直接拒绝；新增任何一种 omit 角色都必须同时登记进该集合，并在本节同步说明，不得只在文档或映射表里单方面声明。
+- `_placeholder=true` 只是 MasterGo 组件库来源提示，不是删除条件。即使正式组件映射把文本标记为 placeholder，只要它属于当前页面或当前组件的可见内容，也必须生成。`decision=omit` 分两条路径，真值源都在 `validate-iocontrol-provenance.js`：① **明确 hidden 的文本**（`visibility=false`）按可见性 omit，`omitReason='hidden'`，登记在 `OMIT_REASONS`；② **可见文本的角色驱动 omit**，`role` 必须落在 `OMIT_ROLES` 集合（当前为 `page-title`、`host-shell`、`excluded-component`、`unmapped-component`、`camera-viewport-internal`：分别是页面根级大标题、宿主公共栏、被隔离组件内部、未命中模板组件内部、**整体控件内部渲染**——相机视口按映射表 `cameraTemplates.innerTextPolicy` 要求其内部 TEXT 整体 omit）。可见文本的角色不在 `OMIT_ROLES` 内时校验直接拒绝；新增任何一种 omit 角色都必须同时登记进该集合，并在本节同步说明，不得只在文档或映射表里单方面声明。
 
 ### 辅助脚本触发矩阵
 
