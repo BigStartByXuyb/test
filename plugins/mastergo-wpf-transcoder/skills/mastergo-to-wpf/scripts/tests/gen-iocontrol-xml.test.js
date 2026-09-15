@@ -524,3 +524,33 @@ assert.notStrictEqual(badParentRun.status, 0, 'layoutParent 指向未发射节�
 assert.match(badParentRun.stderr + badParentRun.stdout, /输出父节点（layoutParent=/,
   '失败信息必须点名 layoutParent 与实际 ref');
 console.log('PASS output parent must be an emitted node');
+
+// merge：输出父节点在现有 XML 里是自闭合标签（无成对闭合标签）时必须失败，
+// 不得把按父节点相对的 Left/Top 静默挂到页面根级（属性级门禁察觉不到这种错位）。
+const selfClosingExistingXml = path.join(dir, 'self-closing-parent-page.xml');
+const selfClosingOutput = path.join(dir, 'self-closing-parent-out.xml');
+fs.writeFileSync(selfClosingExistingXml, [
+  '<?xml version="1.0" encoding="utf-8"?>',
+  '<IOContorl',
+  '    ID=""',
+  '    Left="NaN"',
+  '    Top="NaN"',
+  '    Width="NaN"',
+  '    Height="NaN">',
+  '    <IOContorl',
+  '        ID="PANEL_1"',
+  '        ControlType="Border"',
+  '        Left="600"',
+  '        Top="8"',
+  '        Width="200"',
+  '        Height="120" />',
+  '</IOContorl>',
+  ''
+].join('\n'));
+const selfClosingRun = spawnSync(process.execPath, [path.join(__dirname, '..', 'gen-iocontrol-xml.js'),
+  '--merge', selfClosingExistingXml, layoutParentMapping, '--out', selfClosingOutput], { encoding: 'utf8' });
+assert.notStrictEqual(selfClosingRun.status, 0,
+  '输出父节点在现有 XML 里自闭合时必须失败，不得静默落到页面根级');
+assert.match(selfClosingRun.stderr + selfClosingRun.stdout, /定位不到成对闭合标签/,
+  '失败信息必须说明是闭合标签定位失败');
+console.log('PASS self-closing output parent is rejected');

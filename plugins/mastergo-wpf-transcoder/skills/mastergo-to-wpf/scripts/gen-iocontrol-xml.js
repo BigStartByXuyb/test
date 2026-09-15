@@ -789,20 +789,22 @@ function mergeMode() {
         if (tokens[i].type === 'tag' && tokens[i].isClose) { closeIdx = i; break; }
       }
     } else {
+      // 输出父节点是既有节点：必须在现有 XML 里定位到它的成对闭合标签才能插入子块。
+      // 定位不到（父节点无 ID / 未被现有 XML 的 ID 索引命中 / 父标签是自闭合形式）时直接失败——
+      // 静默挂到页面根会让「按父节点相对的 Left/Top」落到页面根控件上，而属性级门禁察觉不到。
       const pn = nodes.find(x => x.ref === p);
-      if (pn && pn.id && idIndex.has(pn.id)) {
-        const openIdx = idIndex.get(pn.id);
-        if (openClose.has(openIdx)) closeIdx = openClose.get(openIdx);
+      const openIdx = pn && pn.id && idIndex.has(pn.id) ? idIndex.get(pn.id) : null;
+      if (openIdx !== null && openClose.has(openIdx)) closeIdx = openClose.get(openIdx);
+      else {
+        throw new Error('映射门禁失败: 新增节点 ' + ref + ' 的输出父节点 ' + p +
+          '（ID=' + ((pn && pn.id) || '(无)') + '）在现有 XML 中定位不到成对闭合标签' +
+          '（父节点无 ID、未被 ID 索引命中，或该标签为自闭合形式）；' +
+          '请把父节点改成容器形式或调整 layoutParent，不要把它静默落到页面根级');
       }
     }
     if (closeIdx !== null) {
       if (!insertions.has(closeIdx)) insertions.set(closeIdx, []);
       insertions.get(closeIdx).push(block);
-    } else {
-      // 兜底：输出父节点是既有的、按位置匹配但无 ID 的节点，闭合标签定位不到时挂到最后一个根级闭合标签前。
-      // 输出父节点本身是本次新增节点的情况不会到这里——其子节点随父块递归发射（见 isNewNode）。
-      if (!insertions.has('root-pending')) insertions.set('root-pending', []);
-      insertions.get('root-pending').push(block);
     }
     report.newNodes.push(`[${ref}] ${n.controlType || '(容器)'} 新增`);
   }
@@ -813,11 +815,6 @@ function mergeMode() {
     if (insertions.has(i)) out.push(...insertions.get(i));
     out.push(replacements.has(i) ? replacements.get(i) : t.raw);
   });
-  const pending = insertions.get('root-pending');
-  if (pending && pending.length) {
-    const lastCloseIdx = out.map((x, i) => ({ x, i })).filter(o => typeof o.x === 'string' && /^\s*<\/IOContorl>\s*$/.test(o.x)).pop();
-    if (lastCloseIdx) out.splice(lastCloseIdx.i, 0, ...pending);
-  }
 
   return { text: out.join(''), report };
 }
