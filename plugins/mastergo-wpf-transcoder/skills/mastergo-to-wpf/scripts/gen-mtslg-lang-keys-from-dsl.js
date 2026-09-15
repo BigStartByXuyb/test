@@ -16,9 +16,13 @@
  *   1. 目标项目已登记语言字典里同文案的既有 key（scope=shared，直接复用）
  *   2. 节点 Icon 资源名去掉 Geometry 后缀（IconButton / 菜单项天然带英文语义名）
  *   3. --glossary 术语表（中文 → 英文标识符）
- *   4. 纯 ASCII 文案（AUX. / Diode）归一化成标识符后缀
- *   5. DSL 图层英文名（过滤 Dir / F1 / CH1 之类的结构噪音）
- *   6. 兜底 {页面名}Text{序号}：页面内唯一、稳定，标记 provisional，报告里列出待改名
+ *   4. 该文案的英文译文（--translations / languages.translations）转 PascalCase：
+ *      「工件边缘录入」→ Workpiece Edge Teaching → WorkpieceEdgeTeaching。
+ *      脚本仍不翻译，只把 AI/工程师已给出的译文机械转成标识符；译文是数字/符号或
+ *      首位不是字母时本条不成立，继续往下（菜单项在这一步与页面内容节点同规则）。
+ *   5. 纯 ASCII 文案（AUX. / Diode）归一化成标识符后缀
+ *   6. DSL 图层英文名（过滤 Dir / F1 / CH1 之类的结构噪音）
+ *   7. 兜底 {页面名}Text{序号}：页面内唯一、稳定，标记 provisional，报告里列出待改名
  *
  * 【同页同文案复用】同一页面内文案完全相同的页面内容节点共用一个 LanguageKey：
  * 第一个节点派生键名，其余节点登记进该键的 sourceRefs（运行时同一文案只维护一条翻译），
@@ -146,6 +150,23 @@ function asciiSuffix(value) {
   if (cleaned.length < 2) return "";
   if (!/^[A-Za-z_]/.test(cleaned)) return "";
   return KEY_RE.test(cleaned) ? cleaned : "";
+}
+
+// 译文派生语义名：用该页已产出的英文译文做机械 PascalCase，中文文案 → 英文标识符。
+//   "工件边缘录入" → "Workpiece Edge Teaching" → WorkpieceEdgeTeaching
+//   "光源调整"     → "Light Source Adjust"     → LightSourceAdjust
+// 脚本仍然不翻译：译文是 AI / 工程师产出的 languages.translations，这里只做大小写与分词归一化；
+// 纯数字/符号（+5、9.0%）或首位不是字母的译文会被 KEY_RE 拦下，继续走后面的来源（signNumber / 兜底）。
+function translatedSuffix(cnText, translations) {
+  const en = translations.get(normalizeText(cnText));
+  if (!en) return "";
+  const words = String(en).replace(/[^A-Za-z0-9]+/g, " ").trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return "";
+  const pascal = words.map(function (word) {
+    return word.charAt(0).toUpperCase() + word.slice(1);
+  }).join("");
+  if (pascal.length < 3) return "";
+  return KEY_RE.test(pascal) ? pascal : "";
 }
 
 function decodeXml(value) {
@@ -318,7 +339,7 @@ function deriveLangSpec(options) {
     titleKey: pageName + TITLE_SUFFIX,
     sources: {
       title: 0, menu: 0, catalog: 0, icon: 0, glossary: 0,
-      signNumber: 0, asciiText: 0, dslLayerName: 0, fallback: 0, reusedByText: 0
+      translated: 0, signNumber: 0, asciiText: 0, dslLayerName: 0, fallback: 0, reusedByText: 0
     },
     provisionalKeys: [],
     pendingTranslations: [],
@@ -443,6 +464,11 @@ function deriveLangSpec(options) {
       suffix = String(glossary[name]);
       source = "glossary";
     }
+    // 译文派生：该页已产出英文译文时，用它当语义名（中文文案的英文翻译 → PascalCase 标识符）。
+    if (!suffix) {
+      const translated = translatedSuffix(name, translations);
+      if (translated) { suffix = translated; source = "translated"; }
+    }
     if (!suffix) {
       const signed = signNumberSuffix(name);
       if (signed) { suffix = signed; source = "signNumber"; }
@@ -483,6 +509,7 @@ function deriveLangSpec(options) {
     report.sources.menu += 1;
     if (source === "icon") report.sources.icon += 1;
     if (source === "glossary") report.sources.glossary += 1;
+    if (source === "translated") report.sources.translated += 1;
     if (source === "signNumber") report.sources.signNumber += 1;
     if (source === "asciiText") report.sources.asciiText += 1;
     if (source === "dslLayerName") report.sources.dslLayerName += 1;
@@ -584,6 +611,10 @@ function deriveLangSpec(options) {
     } else if (KEY_RE.test(String(glossary[text] || ""))) {
       suffix = String(glossary[text]);
       source = "glossary";
+    } else if (translatedSuffix(text, translations)) {
+      // 译文派生：该页已产出英文译文时，用它当语义名（中文文案的英文翻译 → PascalCase 标识符）。
+      suffix = translatedSuffix(text, translations);
+      source = "translated";
     } else {
       // 数字/符号类文本已在 isDynamicText 里豁免，这里只可能是需要语义名的真实文案。
       const ascii = asciiSuffix(text);

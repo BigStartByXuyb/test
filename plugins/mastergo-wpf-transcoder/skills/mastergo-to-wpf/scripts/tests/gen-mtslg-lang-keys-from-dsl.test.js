@@ -154,12 +154,17 @@ assert.ok(!languages.keys.some((entry) => entry.menuIndex === 3), "空名称菜�
 // 3) 内容节点：Icon 派生、ASCII 派生、兜底临时键；数字/符号类不产键。
 assert.strictEqual(keyByRef.get("p/btn-auto"), "DemoRecipeAutoOperation");
 assert.strictEqual(keyByRef.get("p/tb-aux"), "DemoRecipeAUX");
-assert.strictEqual(keyByRef.get("p/tb-unknown"), "DemoRecipeText03", "无可用语义源时用稳定的临时键");
+// 「工件边缘录入」没有图标、没有术语表项，但有英文译文 → 用译文转 PascalCase 当语义名。
+assert.strictEqual(keyByRef.get("p/tb-unknown"), "DemoRecipeWorkpieceEdgeTeaching",
+  "无图标无术语表但有译文时，必须用译文派生语义名（而不是 Text03 临时键）");
 assert.ok(!keys.has("p/cam"), "非 dsl.text 节点不产键");
 assert.strictEqual(keys.get("DemoRecipeAutoOperation").text.EN, "Full Auto Operation",
   "内容节点译文来自 translations");
-assert.strictEqual(keys.get("DemoRecipeText03").text.EN, "Workpiece Edge Teaching",
-  "临时键同样必须有真实译文");
+assert.strictEqual(keys.get("DemoRecipeWorkpieceEdgeTeaching").text.EN, "Workpiece Edge Teaching",
+  "译文派生键同样必须有真实译文");
+assert.ok(report.sources.translated >= 1, "报告必须记录译文派生（sources.translated）");
+assert.ok(!report.provisionalKeys.some((item) => item.text === "工件边缘录入"),
+  "有译文时不得再落到临时键");
 
 // 4) 目标项目已登记 key：内容节点复用（scope=shared），MenuItem 命名空间不得被内容节点借用。
 assert.strictEqual(keyByRef.get("p/tb-version"), "PCHeaderSoftwareVersion");

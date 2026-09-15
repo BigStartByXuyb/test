@@ -153,14 +153,15 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 `languages.auto=true` 时，Bundle 在 XML/Layout 生成前调用 `gen-mtslg-lang-keys-from-dsl.js`，从当前页 DSL/mapping/Layout 菜单项**机械派生** LanguageKey，不再要求调用方逐条登记。派生规则固定、可复现：
 
 1. 页面标题 → `{页面名}PageTitle`，文案取值链固定为：`manifest.pageTitleText`（**可选**的显式覆盖）→ `mapping.textAudit` 里 `role=page-title` 的 `sourceText`（**默认来源**，DSL 机械产物）→ DSL 根节点名 → 页面名。Bundle 与单脚本 CLI 走同一条链，不允许两边不一致；本次实际用到的来源写入审计 `languages.titleSource`（`manifest.pageTitleText` / `mapping.textAudit` / `dslRoot`），不得静默回退后无人知晓。
-2. Layout 菜单项 → `MenuItem{名称}`，语义名优先取菜单 `Icon` 资源名去掉 `Geometry` 后缀。
+2. Layout 菜单项 → `MenuItem{名称}`；语义名取值顺序：菜单 `Icon` 资源名去掉 `Geometry` 后缀 → `langGlossary` 术语表 → **该菜单文案的英文译文转 PascalCase**（`工件边缘录入` → `Workpiece Edge Teaching` → `WorkpieceEdgeTeaching`）→ 符号+数字（`+5` → `Plus5`）→ 纯 ASCII 文案 → DSL 图层英文名 → 兜底 `MenuItemIndex{Index}`（provisional，必须列入待改名清单）。
 3. 页面内容节点（`valueSource=dsl.text`）→ `{页面名}{名称}`。**同一页面内文案完全相同的节点共用一个 key**（第一个节点派生键名，其余节点登记进该 key 的 `sourceRefs`），不再产生 `Xxx2` / `XxxText02` 这类重复键——同一页面里重复文案直接复用同一个 LanguageKey；只有“不同文案撞出相同语义名”时才用稳定数字后缀。语义名按以下优先级回退：
    1. （**仅当显式配置 `keyCatalog` 时**）目标项目已登记语言字典里**同文案**的既有 key → 直接复用并记为 `scope=shared`；`MenuItem*` 命名空间的键不给页面内容节点复用。默认不配置，页面 key 全部页面内自产。
    2. 节点 `Icon` 资源名去掉 `Geometry` 后缀（IconButton / 带图标按钮天然带英文语义名）。
    3. `langGlossary` 术语表（`{ "中文文案": "EnglishIdentifier" }`，可内联或给 JSON 文件路径）。
-   4. 纯 ASCII 文案（`AUX.` → `AUX`）。
-   5. DSL 图层英文名（过滤 `Dir`/`F1`/`CH1` 之类的结构噪音）。
-   6. 兜底 `{页面名}Text{NN}`：页面内唯一、稳定，标记 `provisional`，必须列入待改名清单。
+   4. **该文案的英文译文转 PascalCase**（`languages.translations` 里 AI/工程师已给出的译文，如 `光源调整` → `Light Source Adjust` → `LightSourceAdjust`）——脚本仍不翻译，只把已有译文机械转成标识符；译文是数字/符号或首位不是字母时本条不成立，继续往下。
+   5. 纯 ASCII 文案（`AUX.` → `AUX`）。
+   6. DSL 图层英文名（过滤 `Dir`/`F1`/`CH1` 之类的结构噪音）。
+   7. 兜底 `{页面名}Text{NN}`：页面内唯一、稳定，标记 `provisional`，必须列入待改名清单。
 4. 名称冲突由生成器按稳定数字后缀处理（`HomeStart`、`HomeStart2`），不静默覆盖。
 5. **中英文一致的文本不编造语言键**：不含中文且不含英文字母的文本 —— 纯数字、符号、正负步进标签（`+5`/`-1`/`±0.5`）、百分比、版本号、序列号、IP、日期时间、功能键 `F1` —— 在 CN 与 EN 里写法完全相同，一律自动进入 `noLangRefs`，并在审计里逐条给出豁免原因；这类节点只写 `Value`，不挂 `LangName`。例外两条：Layout `MenuItem` 必须挂 `LangName`（菜单名仍会派生 key）；**按钮族（`IconButton`/`Button`/`StatusButton`）带文案的节点一律必须挂 `LangName`，因此 `+5`/`-1` 这类数值按钮也要产键**（CN/EN 文案一致），派生结果记入审计 `buttonFamilyKeys`，不进入 `noLangRefs`。
 
