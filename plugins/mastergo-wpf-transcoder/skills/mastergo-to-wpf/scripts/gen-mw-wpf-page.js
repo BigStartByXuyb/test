@@ -329,9 +329,8 @@ function methodNameFromLangName(langName) {
   return suffix;
 }
 
-// 按钮处理方法解析（机械、可审计，不推断语义）：
-//   取值链 1：menuItems[].methodName（工程师显式登记，优先）
-//   取值链 2：menuItems[].langName 去掉 MenuItem 前缀
+// 按钮处理方法解析（机械、可审计，不推断语义）：**唯一来源是 menuItems[].langName**——
+// 取 LanguageKey 去掉 `MenuItem` 前缀（菜单键命名空间就是 `MenuItem + 英文语义名`）。
 // 一个按钮对应一个 case、一个处理方法；解析不出方法名的按钮退回内联 TODO 并记录原因。
 // 硬约束（fail-closed，不静默改名、也不退回）：算出的方法名与 ViewModel 固定成员/类名同名，
 // 或两个按钮算出同一方法名时，直接失败——这类输入会生成重复的 C# 成员，编译必然失败。
@@ -347,29 +346,24 @@ function resolveButtonHandlers(manifest, buttonNames, viewModelName) {
   const inlineTodoCases = [];
   buttonNames.forEach(function (name) {
     const item = itemByName.get(name) || {};
-    const declared = typeof item.methodName === "string" ? item.methodName.trim() : "";
     let method = "";
     let reason = "";
-    if (declared) {
-      if (isIdentifier(declared) && !CSHARP_KEYWORDS.has(declared)) method = declared;
-      else reason = "menuItems[].methodName 不是可用的 C# 方法名: \"" + declared + "\"";
-    } else {
-      method = methodNameFromLangName(item.langName);
-      if (!method) {
-        reason = item.langName
-          ? "LangName \"" + item.langName + "\" 无法派生方法名（临时键、前缀不符或非法标识符）"
-          : "该菜单项没有 LangName";
-      }
+    method = methodNameFromLangName(item.langName);
+    if (!method) {
+      reason = item.langName
+        ? "LangName \"" + item.langName + "\" 无法派生方法名（临时键、前缀不符或非法标识符）"
+        : "该菜单项没有 LangName";
     }
     if (method) {
       if (RESERVED_VIEWMODEL_MEMBERS.indexOf(method) !== -1 || method === viewModelName) {
         fail("按钮处理方法名与 ViewModel 成员同名，会生成重复成员: " + method +
-          "（按钮 \"" + name + "\"）；请修改该按钮的 menuItems[].methodName 或 LanguageKey，或改名页面");
+          "（按钮 \"" + name + "\"）；请修改该按钮的 menuItems[].langName（即它的 LanguageKey），" +
+          "或改用别的图标/术语派生名；与 ViewModel 类名同名时改页面名");
       }
       const owner = methods.find(function (item) { return item.method === method; });
       if (owner) {
         fail("两个按钮算出同一个处理方法名，会生成重复方法: " + method +
-          "（按钮 \"" + owner.name + "\" 与 \"" + name + "\"）；请用 menuItems[].methodName 区分");
+          "（按钮 \"" + owner.name + "\" 与 \"" + name + "\"）；请让两个按钮的 LanguageKey 不同");
       }
       methods.push({ name: name, method: method });
     } else {

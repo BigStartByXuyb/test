@@ -31,8 +31,8 @@ fs.writeFileSync(manifestPath, JSON.stringify({
     { name: '', index: 2 },
     { name: '工件边缘录入', index: 3, langName: 'MenuItemIndex3' },
     { name: '对焦', index: 10, langName: 'MenuItemFocus' },
-    // 显式登记 methodName：登记了就只认它（一钮一方法）。
-    { name: '显式登记', index: 11, langName: 'MenuItemIgnored', methodName: 'DeclaredHandler' }
+    // 菜单项没有独立方法名字段：方法名只从 langName 派生。
+    { name: '倍率变更', index: 11, langName: 'MenuItemMagnificationChange' }
   ]
 }, null, 2), 'utf8');
 
@@ -86,10 +86,9 @@ assert.match(generatedViewModel, /\n {20}case "工件边缘录入":\n {24}\/\/ T
 assert.ok(!/private void Index3\(\)/.test(generatedViewModel), '临时键不得派生按钮处理方法');
 assert.match(result.stdout, /新建示教 -> NewTeaching/, 'stdout 审计必须列出按钮 -> 方法');
 assert.match(result.stdout, /"name": "工件边缘录入"/, 'stdout 审计必须列出退回内联 TODO 的按钮');
-// 显式登记 methodName：一钮一方法，登记了就只认它。
-assert.match(generatedViewModel, /\n {20}case "显式登记":\n {24}DeclaredHandler\(\);\n {24}break;/);
-assert.match(generatedViewModel, /private void DeclaredHandler\(\)/);
-assert.ok(!/private void Ignored\(\)/.test(generatedViewModel), '登记 methodName 后不得再用 langName 派生');
+// 方法名只来自 langName：MenuItemMagnificationChange -> MagnificationChange。
+assert.match(generatedViewModel, /\n {20}case "倍率变更":\n {24}MagnificationChange\(\);\n {24}break;/);
+assert.match(generatedViewModel, /private void MagnificationChange\(\)/);
 // 一个按钮对应一个方法：发射的方法数量必须与审计列出的方法数量一致。
 const handlerCount = (generatedViewModel.match(/ {8}private void [A-Za-z_][A-Za-z0-9_]*\(\)/g) || []).length;
 const methodListCount = (JSON.parse(result.stdout).viewModel.buttonMethods || []).length;
@@ -179,10 +178,11 @@ assert.notStrictEqual(clash.status, 0, '与固定成员同名必须直接失败'
 assert.match(clash.stderr, /与 ViewModel 成员同名/);
 assert.ok(!fs.existsSync(path.join(clashRoot, 'UI', 'F3', 'ViewModel', 'ClashReservedViewModel.cs')),
   '撞名失败时不得留下 ViewModel');
+// 两个按钮的 LanguageKey 派生出同一方法名（语言键不唯一时）同样直接失败。
 clash = spawnSync(process.execPath, [script, '--manifest',
   writeClashManifest('ClashSame', [
-    { name: '按钮甲', index: 1, methodName: 'SameHandler' },
-    { name: '按钮乙', index: 2, methodName: 'SameHandler' }
+    { name: '按钮甲', index: 1, langName: 'MenuItemFocus' },
+    { name: '按钮乙', index: 2, langName: 'MenuItemFocus' }
   ])], { encoding: 'utf8' });
 assert.notStrictEqual(clash.status, 0, '两个按钮算出同一方法名必须直接失败');
 assert.match(clash.stderr, /同一个处理方法名/);

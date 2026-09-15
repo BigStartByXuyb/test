@@ -278,9 +278,12 @@ const SHELL_DOC = path.join(__dirname, "..", "..", "references", "adapters", "mw
 const shellDoc = fs.readFileSync(SHELL_DOC, "utf8");
 const hostGenerator = fs.readFileSync(path.join(__dirname, "..", "gen-mw-wpf-page.js"), "utf8");
 assert.ok(shellDoc.includes("按钮处理方法（一钮一方法）"), "页面壳文档必须登记「按钮处理方法（一钮一方法）」小节");
-for (const token of ["methodName", "langName", "MenuItem", "MenuItemIndex"]) {
+for (const token of ["langName", "MenuItem", "MenuItemIndex"]) {
   assert.ok(shellDoc.includes(token), "页面壳文档必须写明按钮方法名取值链里的 " + token);
 }
+// 清单里没有独立的方法名字段：方法名只从 langName（LanguageKey）派生。
+assert.ok(!shellDoc.includes("methodName"), "页面壳文档不得再出现清单字段 methodName（方法名只从 langName 派生）");
+assert.ok(!hostGenerator.includes("item.methodName"), "宿主壳生成器不得读取清单的 methodName 字段");
 assert.ok(hostGenerator.includes("methodNameFromLangName") && hostGenerator.includes("resolveButtonHandlers"),
   "宿主壳生成器必须实现按钮方法名解析（methodNameFromLangName / resolveButtonHandlers）");
 assert.ok(hostGenerator.includes('const MENU_KEY_PREFIX = "MenuItem"'),
@@ -291,11 +294,23 @@ assert.ok(hostGenerator.includes('"        private void " + item.method + "()"')
   "宿主壳生成器必须发射 private void <方法名>() 处理方法骨架");
 assert.ok(hostGenerator.includes("inlineTodoCases"),
   "解析不出方法名的按钮必须退回内联 TODO，并登记进审计 inlineTodoCases");
-// 边界同一口径（CI 语义审计曾报两读）：显式 methodName 不可用时不回退 langName；空串/纯空白算未登记。
-assert.ok(shellDoc.includes("不再回退第 2 条"),
-  "文档必须写明显式 methodName 不可用时不再回退 langName");
-assert.ok(shellDoc.includes("纯空白都算未登记"),
-  "文档必须写明空串/纯空白 methodName 视为未登记（与脚本 trim 后走 langName 一致）");
+// 固定成员清单在文档与脚本两侧必须逐项一致（CI 语义审计 REVIEW-001：只查字符串存在不足以防漂移）。
+const reservedFromDoc = (function () {
+  const marker = "与 ViewModel 固定成员同名（";
+  const start = shellDoc.indexOf(marker);
+  assert.ok(start >= 0, "文档必须写明「与 ViewModel 固定成员同名」的撞名口径");
+  const end = shellDoc.indexOf("）", start + marker.length);
+  return shellDoc.slice(start + marker.length, end).split("/")
+    .map(function (item) { return item.trim().replace(/`/g, ""); })
+    .filter(Boolean);
+})();
+const reservedFromScript = arrayLiteralOf(hostGenerator, "RESERVED_VIEWMODEL_MEMBERS");
+assert.ok(sameList(reservedFromDoc, reservedFromScript),
+  "文档列出的 ViewModel 固定成员必须与 RESERVED_VIEWMODEL_MEMBERS 逐项一致: " +
+  JSON.stringify(reservedFromDoc) + " vs " + JSON.stringify(reservedFromScript));
+assert.ok(shellDoc.includes("ViewModel 类名"), "文档必须写明与 ViewModel 类名同名的口径");
+assert.ok(hostGenerator.includes("method === viewModelName"),
+  "宿主壳生成器必须把 ViewModel 类名一并当保留名处理");
 // 一钮一方法的记法必须在文档里写明（避免把 ViewModel 侧又改回静态 TODO 骨架或加多余门禁）。
 assert.ok(shellDoc.includes("一个按钮 = 一个 `case` = 一个处理方法"),
   "文档必须写明「一个按钮 = 一个 case = 一个处理方法」");
