@@ -318,13 +318,14 @@ const PROVISIONAL_MENU_KEY = /^MenuItemIndex\d+$/;
 // ViewModel 固定成员：按钮处理方法与它们同名会生成重复的 C# 成员，直接失败。
 const RESERVED_VIEWMODEL_MEMBERS = ["pageDesign", "OnViewLoaded", "PageDesign_Loaded", "HandleButtonEvent", "OKCmd"];
 
-// 由菜单项 LanguageKey 派生按钮处理方法名：MenuItemFocus -> Focus。
-// 取不到语义名（临时键 / 前缀不符 / 非法标识符 / C# 关键字）返回空串，由调用方退回内联 TODO。
+// 由菜单项 LanguageKey（langName）派生按钮处理方法名：MenuItemFocus -> Focus。
+// 菜单键命名空间是 `MenuItem + 英文语义名`，所以有 `MenuItem` 前缀时去前缀；
+// 跨页面共享键（scope=shared）可能不带该前缀，此时直接取整键。
+// 取不到语义名（临时键 / 结果不是合法标识符 / C# 关键字）返回空串，由调用方退回内联 TODO。
 function methodNameFromLangName(langName) {
   const key = typeof langName === "string" ? langName.trim() : "";
   if (key === "" || PROVISIONAL_MENU_KEY.test(key)) return "";
-  if (key.indexOf(MENU_KEY_PREFIX) !== 0) return "";
-  const suffix = key.slice(MENU_KEY_PREFIX.length);
+  const suffix = key.indexOf(MENU_KEY_PREFIX) === 0 ? key.slice(MENU_KEY_PREFIX.length) : key;
   if (!isIdentifier(suffix) || CSHARP_KEYWORDS.has(suffix)) return "";
   return suffix;
 }
@@ -351,7 +352,7 @@ function resolveButtonHandlers(manifest, buttonNames, viewModelName) {
     method = methodNameFromLangName(item.langName);
     if (!method) {
       reason = item.langName
-        ? "LangName \"" + item.langName + "\" 无法派生方法名（临时键、前缀不符或非法标识符）"
+        ? "LangName \"" + item.langName + "\" 无法派生方法名"
         : "该菜单项没有 LangName";
     }
     if (method) {

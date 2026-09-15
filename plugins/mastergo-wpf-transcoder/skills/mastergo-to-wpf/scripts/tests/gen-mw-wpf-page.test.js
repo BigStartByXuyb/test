@@ -32,7 +32,9 @@ fs.writeFileSync(manifestPath, JSON.stringify({
     { name: '工件边缘录入', index: 3, langName: 'MenuItemIndex3' },
     { name: '对焦', index: 10, langName: 'MenuItemFocus' },
     // 菜单项没有独立方法名字段：方法名只从 langName 派生。
-    { name: '倍率变更', index: 11, langName: 'MenuItemMagnificationChange' }
+    { name: '倍率变更', index: 11, langName: 'MenuItemMagnificationChange' },
+    // 跨页面共享键（scope=shared）可能不带 MenuItem 前缀：直接取整键。
+    { name: '共享键按钮', index: 12, langName: 'SharedFocusKey' }
   ]
 }, null, 2), 'utf8');
 
@@ -89,6 +91,9 @@ assert.match(result.stdout, /"name": "工件边缘录入"/, 'stdout 审计必须
 // 方法名只来自 langName：MenuItemMagnificationChange -> MagnificationChange。
 assert.match(generatedViewModel, /\n {20}case "倍率变更":\n {24}MagnificationChange\(\);\n {24}break;/);
 assert.match(generatedViewModel, /private void MagnificationChange\(\)/);
+// 共享键（不带 MenuItem 前缀）不做前缀拦截：整键即方法名。
+assert.match(generatedViewModel, /\n {20}case "共享键按钮":\n {24}SharedFocusKey\(\);\n {24}break;/);
+assert.match(generatedViewModel, /private void SharedFocusKey\(\)/);
 // 一个按钮对应一个方法：发射的方法数量必须与审计列出的方法数量一致。
 const handlerCount = (generatedViewModel.match(/ {8}private void [A-Za-z_][A-Za-z0-9_]*\(\)/g) || []).length;
 const methodListCount = (JSON.parse(result.stdout).viewModel.buttonMethods || []).length;

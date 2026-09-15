@@ -290,6 +290,14 @@ assert.ok(hostGenerator.includes('const MENU_KEY_PREFIX = "MenuItem"'),
   "方法名派生必须以菜单键前缀 MenuItem 为界（langName 去前缀 = 按钮英文语义名）");
 assert.ok(hostGenerator.includes("PROVISIONAL_MENU_KEY"),
   "临时键 MenuItemIndex<n> 必须显式排除，不得当作按钮英文名");
+// 共享键不带 MenuItem 前缀时直接取整键（不做前缀拦截）；退回清单必须与脚本口径一致。
+assert.ok(hostGenerator.includes("=== 0 ? key.slice(MENU_KEY_PREFIX.length) : key"),
+  "带 MenuItem 前缀时去前缀、共享键直接用整键");
+for (const item of ["没有 `langName`", "MenuItemIndex<n>", "不是合法 C# 标识符", "命中 C# 关键字"]) {
+  assert.ok(shellDoc.includes(item), "退回内联 TODO 的清单必须写明: " + item);
+}
+assert.ok(hostGenerator.includes('" 无法派生方法名"'),
+  "脚本 reason 不得再自列一套与文档不同的退回条件（只报是哪个 langName 派生失败）");
 assert.ok(hostGenerator.includes('"        private void " + item.method + "()"'),
   "宿主壳生成器必须发射 private void <方法名>() 处理方法骨架");
 assert.ok(hostGenerator.includes("inlineTodoCases"),
