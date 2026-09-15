@@ -237,7 +237,8 @@ const unresolvedNodes = barChildren.filter(function (child) {
   return child.type === "INSTANCE" && !decorPattern.test(child.name || "") &&
     !residentRefs.has(child.id) && !isBottomBarVariant(child);
 });
-// 参与定位的按钮 = 底部菜单按钮 + 常驻分组内的按钮（后者只占 Index 位置、不生成 MenuItem）
+// 参与排序的按钮 = 底部菜单按钮 + 常驻分组内的按钮
+// （后者参与视觉排序以便按设计稿顺序排列菜单项，但既不生成 MenuItem、也不占 Index）
 const orderedEntries = visualOrder(
   barChildren.filter(isBottomBarVariant).map(function (node) { return { node: node, resident: false }; }).concat(
     residentGroups.reduce(function (all, group) {
@@ -293,7 +294,10 @@ function iconEntryOf(node) {
 
 const raw = candidateEntries.map(function (item) {
   const node = item.node;
-  const position = orderedEntries.indexOf(item) + 1;
+  // Index = 菜单项自己的连续序号（从 1 起，按底部栏视觉顺序）。
+  // 右下角常驻分组的按钮由框架单独处理，不占 Index，因此这里按"会生成 MenuItem 的按钮"计数，
+  // 而不是按底栏物理槽位计数——底栏槽位含常驻按钮时不会把空档带进 Index。
+  const position = candidateEntries.indexOf(item) + 1;
   const texts = textNodesOf(node);
   const nameText = texts.find(function (entry) { return !fKeyPattern.test(entry.text); });
   const fKeyText = texts.find(function (entry) { return fKeyPattern.test(entry.text); });
@@ -347,7 +351,7 @@ const manifest = {
     residentGroupItems: residentGroupItems,
     note: "由 gen-mtslg-layout-manifest.js 从 DSL 机械推导：底部栏 " + bar.id +
       "，菜单项 " + menuItems.length + " 项，右下角常驻分组 " + residentGroupItems +
-      " 项不生成 MenuItem（Index 空档保留），文本按设计稿原样写入；" +
+      " 项不生成 MenuItem、不占 Index（框架单独处理），Index 按菜单项从 1 连续编号，文本按设计稿原样写入；" +
       "未命中变体的实例 " + unresolvedNodes.length + " 个" +
       (unresolvedNodes.length
         ? "（" + unresolvedNodes.map(function (node) { return node.id + " " + JSON.stringify(node.name); }).join("、") + "）"

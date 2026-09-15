@@ -229,12 +229,21 @@ function renderPage(manifest) {
     }
     const menuIndex = Number(item.index);
     if (menuIndex < 1) {
-      fail("menuItems[" + index + "].index 必须从 1 起（底部栏第几个按钮，含不生成 MenuItem 的按钮）");
+      fail("menuItems[" + index + "].index 必须从 1 起（菜单项连续序号；右下角常驻分组的按钮由框架单独处理，不占 Index）");
     }
     if (seenIndexes.has(menuIndex)) fail("menuItems 存在重复 Index: " + menuIndex);
     seenIndexes.add(menuIndex);
     lines.push(renderMenuItem(item, alwaysAttrs));
   });
+  // Index = 菜单项自己的连续序号（从 1 起）。底栏右下角常驻分组不生成 MenuItem、也不占 Index，
+  // 因此不允许出现空档或跳号：旧版"按底栏物理槽位编号、为常驻按钮留空档"的清单必须重新推导。
+  for (let expected = 1; expected <= manifest.menuItems.length; expected += 1) {
+    if (!seenIndexes.has(expected)) {
+      fail("menuItems 的 Index 必须是 1.." + manifest.menuItems.length + " 的连续编号" +
+        "（右下角常驻分组不占 Index）；缺少 Index=" + expected +
+        "，当前 = [" + [...seenIndexes].join(",") + "]");
+    }
+  }
   lines.push("    </Menu>");
   lines.push("  </Page>");
   return lines.join("\n");

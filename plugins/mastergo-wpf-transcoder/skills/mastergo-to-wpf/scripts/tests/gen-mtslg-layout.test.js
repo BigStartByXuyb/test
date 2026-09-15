@@ -197,6 +197,26 @@ result = spawnSync(process.execPath, [script, "--manifest", duplicateIndexManife
 assert.notStrictEqual(result.status, 0, "重复 Index 必须失败");
 assert.match(result.stderr + result.stdout, /重复 Index/);
 
+// Index 必须是 1..N 连续编号：右下角常驻分组的按钮由框架单独处理、不占 Index，
+// 旧版"按底栏物理槽位编号、为常驻按钮留空档"的清单必须重新推导。
+const gappedIndexManifest = path.join(root, "gapped-index.json");
+fs.writeFileSync(gappedIndexManifest, JSON.stringify({
+  layoutPath: path.join(root, "GappedIndex.xml"),
+  pageTarget: "GappedIndexPage",
+  layoutStatus: "complete",
+  layoutEvidence: { matchedBottomBarItems: 6, unresolvedBottomBarItems: 0, residentGroupItems: 2 },
+  menuItems: [
+    { name: "第一项", index: 1 },
+    { name: "第二项", index: 2 },
+    { name: "第三项", index: 5 },
+    { name: "第四项", index: 6 }
+  ]
+}, null, 2), "utf8");
+result = spawnSync(process.execPath, [script, "--manifest", gappedIndexManifest], { encoding: "utf8" });
+assert.notStrictEqual(result.status, 0, "Index 留空档（按底栏物理槽位编号）必须失败");
+assert.match(result.stderr + result.stdout, /连续编号/);
+assert.match(result.stderr + result.stdout, /Index=3/);
+
 // MenuItem 常驻属性：LangName / PageName / IOCommand / IOVisible / IOEnable 恒写，来源缺失时写空字符串
 // （与页面 XML 按钮族同一策略）；Value 不写（菜单文本只放在 Name）。
 const residentAttrsManifest = path.join(root, "menu-always-attrs.json");

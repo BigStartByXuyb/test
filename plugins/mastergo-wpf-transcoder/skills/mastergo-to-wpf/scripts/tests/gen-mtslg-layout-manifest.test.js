@@ -124,8 +124,8 @@ const result = spawnSync(process.execPath, [script,
 assert.strictEqual(result.status, 0, result.stderr);
 
 const manifest = JSON.parse(fs.readFileSync(out, "utf8"));
-// Index 从 1 起，常驻分组占第 3、4 位，因此留空档
-assert.deepStrictEqual(manifest.menuItems.map(item => item.index), [1, 2, 5, 6]);
+// Index 从 1 起、按菜单项连续编号：常驻分组不生成 MenuItem、也不占 Index（框架单独处理）
+assert.deepStrictEqual(manifest.menuItems.map(item => item.index), [1, 2, 3, 4]);
 // 文本照设计稿原样写入（不做占位符判定）
 assert.strictEqual(manifest.menuItems[0].name, "文案展示");
 assert.strictEqual(manifest.menuItems[0].topLeftContent, "F1");
