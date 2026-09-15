@@ -139,12 +139,14 @@ flowchart LR
 ## 8. 多语言链路
 
 ```text
-DSL/mapping 文案 ──► 机械派生语言键（标题 / MenuItem / 页面内容）
+DSL/mapping 文案 ──► 英文等译文由 AI 产出 translations 清单并落盘（派生前的输入）
+                 ──► 机械派生语言键（标题 / MenuItem / 页面内容；译文同时用作键名语义名与字典 EN 值）
                  ──► 同页同文案共用一个 key
-                 ──► 英文等译文由 AI 产出 translations 清单并落盘
                  ──► 发射 <页面名>_CN.xaml / _EN.xaml（各语言 key 完全一致）
                  ──► LangName 绑定 → 门禁校验引用闭环
 ```
+
+工序顺序以 `skills/mastergo-to-wpf/SKILL.md` 的「语言键自动派生」为准：译文清单先落盘，再派生语言键，随后才发射 XML 与 Layout。
 
 页面字典**自包含**：不复用项目里已登记的跨页键（`keyCatalog` 是可选的显式复用开关，默认关闭）。
 

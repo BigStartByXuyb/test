@@ -205,7 +205,7 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 - 动态值/数量/序列号等**不需要翻译**的文本，必须在 `noLangRefs` 里按 DSL ref 显式豁免，并在交付说明中列出；不得为了让门禁通过而给这类文本编造 key。开启自动派生后这类节点由生成器机械识别并写入 `noLangRefs`，`noLangRefs` 里的显式条目仍会合并保留。
 - **引用闭环硬门禁**：页面 XML、Layout `MenuItem`、`<Page LangName>` 中出现的每个 `LangName` 都必须存在于本页语言字典，否则整套生成失败并回滚。没有目标项目键目录时，禁止用未登记的 key 充当占位。
 - `LangName` 是附加属性：`TextBlock` 必须**同时**发射 `Value` 和 `LangName`（`Value` 仍按设计文本发射，provenance 要求 `Value == sourceText`），运行时以 `LangName` 为准。**按钮族同样必须有 `LangName`**：带文案的 `IconButton` / `Button` / `StatusButton` 一律挂 `LangName`，不得只发 `Value` 或只发 `Icon`。
-- 语言字典里的**英文等非设计语言文案**只能来自设计稿、目标项目已登记字典或 AI/工程师产出的 `languages.translations` 译文清单；生成脚本本身不得做翻译或调用机翻服务，译文必须是可追溯的显式输入。AI 翻译是允许且默认要求的步骤，执行顺序固定为：**先把译文清单落盘 → 再派生 LanguageKey/XMLLayout**（译文同时用于键名语义名与字典 EN 值）；派生报告里的 `pendingTranslations` 只用于核对漏译，补齐后重跑即可，首轮不应交付带临时键/中文占位的产物。
+- 语言字典里的**英文等非设计语言文案**只能来自设计稿、目标项目已登记字典或 AI/工程师产出的 `languages.translations` 译文清单；生成脚本本身不得做翻译或调用机翻服务，译文必须是可追溯的显式输入。AI 翻译是允许且默认要求的步骤（工序顺序与"同一份译文双重用途"已在本节第 3 条与「自动派生结果的交付要求」登记，不在这里重复）。派生报告里的 `pendingTranslations` 只用于核对漏译，补齐后重跑即可；确实无法消除的临时键与中文占位，仍按上面「自动派生结果的交付要求」逐条列入交付说明后交付，不得静默交付。
 
 ## 页面输出目录
 
