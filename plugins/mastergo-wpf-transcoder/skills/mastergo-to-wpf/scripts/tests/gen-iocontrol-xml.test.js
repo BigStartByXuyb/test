@@ -277,6 +277,62 @@ assert.match(mergedTextTag, /Width="NaN"/, 'merge 必须把 TextBlock 的 Width 
 assert.match(mergedTextTag, /Height="40"/, 'merge 必须保持 TextBlock 的 Height=40');
 assert.match(mergedTextTag, /Value="速度"/, 'merge 必须按 dsl.text 覆盖旧文本，保证 Value 与设计文本一致');
 
+// merge 容器类控件：GroupBox 的标题文案由 Header 承载（没有 Value），merge 必须同样按 dsl.text 覆盖，
+// 否则保留旧 Header 会在 provenance 硬门禁处报 "Header != DSL"。文案承载属性与校验器同口径：
+// 有 Value 比 Value，没有 Value 的容器比 Header。
+const containerMapping = path.join(dir, 'container-mapping.json');
+const containerExisting = path.join(dir, 'existing-container-page.xml');
+const containerMerged = path.join(dir, 'merged-container-page.xml');
+fs.writeFileSync(containerMapping, JSON.stringify({
+  rootRef: 'root',
+  sourceNodes: [
+    { ref: 'root', parentRef: null, pageAbsX: 0, pageAbsY: 0, relativeX: 0, relativeY: 0, width: 1280, height: 1024 },
+    { ref: 'grp', parentRef: 'root', pageAbsX: 100, pageAbsY: 292, relativeX: 100, relativeY: 292, width: 252, height: 534 },
+    { ref: 'grp/title', parentRef: 'grp', pageAbsX: 108, pageAbsY: 300, relativeX: 8, relativeY: 8, width: 80, height: 20, type: 'TEXT', text: '周期名称' }
+  ],
+  textAudit: [{ sourceRef: 'grp/title', sourceText: '周期名称', visibility: true, role: 'content', decision: 'emit', outputRefs: ['GRP_1'] }],
+  nodes: [
+    {
+      ref: 'grp', sourceRef: 'grp', sourceParent: 'root', id: 'GRP_1', xmlId: 'GRP_1',
+      controlType: 'GroupBox', absX: 100, absY: 292, w: 252, h: 534,
+      sourceText: '周期名称', valueSource: 'dsl.text',
+      attrs: { Header: '周期名称', IOName: '', MinValue: '', MaxValue: '' }
+    }
+  ]
+}, null, 2));
+fs.writeFileSync(containerExisting, [
+  '<?xml version="1.0" encoding="utf-8"?>',
+  '<IOContorl',
+  '    ID=""',
+  '    Left="NaN"',
+  '    Top="NaN"',
+  '    Width="NaN"',
+  '    Height="NaN">',
+  '    <IOContorl',
+  '        ID="GRP_1"',
+  '        ControlType="GroupBox"',
+  '        Header="旧标题"',
+  '        IOName="EngineerName"',
+  '        Left="100"',
+  '        Top="100"',
+  '        Width="252"',
+  '        Height="534" />',
+  '</IOContorl>',
+  ''
+].join('\n'));
+const containerMerge = spawnSync(process.execPath,
+  [path.join(__dirname, '..', 'gen-iocontrol-xml.js'), '--merge', containerExisting, containerMapping, '--out', containerMerged],
+  { encoding: 'utf8' });
+assert.strictEqual(containerMerge.status, 0, '容器 merge 必须成功: ' + containerMerge.stderr);
+const containerMergedText = fs.readFileSync(containerMerged, 'utf8');
+const mergedGroupTag = (containerMergedText.match(/<IOContorl[^>]*ID="GRP_1"[\s\S]*?\/>/) || [''])[0];
+assert.match(mergedGroupTag, /Header="周期名称"/,
+  'merge 必须按 dsl.text 覆盖 GroupBox 的 Header（文案承载属性，没有 Value）');
+assert.match(mergedGroupTag, /IOName="EngineerName"/,
+  'merge 必须保留工程师手写的 IOName（只覆盖文案承载属性）');
+assert.match(mergedGroupTag, /MinValue=""/, 'merge 必须补齐模板声明的空属性 MinValue');
+assert.match(mergedGroupTag, /MaxValue=""/, 'merge 必须补齐模板声明的空属性 MaxValue');
+
 // ---- 按钮族规则改为读模板表（--map）：改表即改产物，不再各自维护常量 ----
 const mapPath = path.join(dir, 'template-map.json');
 const mapOutput = path.join(dir, 'map-page.xml');

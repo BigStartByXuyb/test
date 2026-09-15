@@ -46,8 +46,9 @@
  *   2. ControlType 按映射更新（变化时写冲突报告）；
  *   3. 业务属性：现有 XML 已有同名的 → 一律保留现有值（值不同写冲突报告，不覆盖）；
  *      现有 XML 没有的 → 按映射新增（写新增报告）；
- *      例外：映射节点的 valueSource=dsl.text 时，Value 是设计文本，merge 必须按 DSL 覆盖，
- *      否则 provenance 校验（Value 必须等于 sourceText）会失败。
+ *      例外：映射节点的 valueSource=dsl.text 时，文案承载属性是设计文本，merge 必须按 DSL 覆盖，
+ *      否则 provenance 校验必然失败。文案承载属性与 validate-iocontrol-provenance.js 同口径：
+ *      有 Value 比 Value；没有 Value 的容器类控件（如 GroupBox）由 Header 承载标题文案，比 Header。
  *   4. 映射中不存在的现有节点 → 原样保留（写"现有但设计稿无"报告）；
  *   5. 全新节点 → 按映射渲染，插入其父节点闭合标签之前。
  *
@@ -652,14 +653,20 @@ function mergeMode() {
       report.conflicts.push(`[${n.ref}] ControlType: 现有 "${finalAttrs.get('ControlType')}" vs 映射 "${attrMap.ControlType}" → 按映射更新`);
       finalAttrs.set('ControlType', attrMap.ControlType);
     }
+    // 文案承载属性（与 validate-iocontrol-provenance.js 同口径）：有 Value 比 Value；容器类控件
+    // （GroupBox 等）没有 Value，标题文案由 Header 承载，此时比 Header。merge 必须覆盖承载属性，
+    // 否则保留旧文案后 provenance 会报「Header/Value != DSL」。
+    const declaresValue = finalAttrs.has('Value') || Object.prototype.hasOwnProperty.call(attrMap, 'Value');
+    const declaresHeader = finalAttrs.has('Header') || Object.prototype.hasOwnProperty.call(attrMap, 'Header');
+    const dslTextCarrier = declaresValue ? 'Value' : (declaresHeader ? 'Header' : null);
     for (const [k, v] of Object.entries(attrMap)) {
       if (geometryKeys.includes(k) || k === 'ControlType' || k === 'ID') continue;
       if (finalAttrs.has(k)) {
-        // dsl.text 来源的 Value 是设计文本，provenance 要求它与 sourceText 一致，必须按映射覆盖。
-        const forcedByDslText = k === 'Value' && n.valueSource === 'dsl.text';
+        // dsl.text 来源的文案承载属性是设计文本，provenance 要求它与 sourceText 一致，必须按映射覆盖。
+        const forcedByDslText = dslTextCarrier !== null && k === dslTextCarrier && n.valueSource === 'dsl.text';
         if (forcedByDslText) {
           if (finalAttrs.get(k) !== v) {
-            report.textOverrides.push(`[${n.ref}] Value: 现有 "${finalAttrs.get(k)}" -> 设计文本 "${v}"（dsl.text 强制一致）`);
+            report.textOverrides.push(`[${n.ref}] ${k}: 现有 "${finalAttrs.get(k)}" -> 设计文本 "${v}"（dsl.text 强制一致）`);
           }
           finalAttrs.set(k, v);
         } else if (n.force && n.force.includes(k)) {

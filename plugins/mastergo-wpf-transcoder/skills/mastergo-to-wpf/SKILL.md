@@ -87,7 +87,7 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 
 ### MTSLG 页面入口分流（必须先判断）
 
-- **修改现有页面**：读取目标项目实际生效的 XML，使用 `gen-iocontrol-xml.js --merge <existing.xml> <mapping.json> --out <confirmed-output.xml>`；保留工程师已有的 IOName、IOCommand、IOEnable 等业务属性，并处理 merge 报告中的冲突。映射节点 `valueSource=dsl.text` 时 `Value` 属设计文本，merge 会强制按映射覆盖（否则 provenance 校验必然失败），这类覆盖单独列在“设计文本覆盖（dsl.text）”报告里，需逐条确认。不得对现有页面使用 `--fresh`。
+- **修改现有页面**：读取目标项目实际生效的 XML，使用 `gen-iocontrol-xml.js --merge <existing.xml> <mapping.json> --out <confirmed-output.xml>`；保留工程师已有的 IOName、IOCommand、IOEnable 等业务属性，并处理 merge 报告中的冲突。映射节点 `valueSource=dsl.text` 时，**文案承载属性**属设计文本，merge 会强制按映射覆盖（否则 provenance 校验必然失败），这类覆盖单独列在“设计文本覆盖（dsl.text）”报告里，需逐条确认。文案承载属性与 provenance 校验同口径：有 `Value` 比 `Value`；容器类控件（如 `GroupBox`）由 `Header` 承载标题文案，此时比 `Header`。不得对现有页面使用 `--fresh`。
 - **新建页面**：使用 `gen-iocontrol-xml.js --fresh <mapping.json> --out <new-page.xml>`，随后按已确认的 Layout、语言键、Icon 和宿主路径完成注册。不得把不存在的页面伪装成 merge。
 - `gen-mastergo-page-bundle.js` 是页面项目生成的唯一正常入口；它的页面 XML 步骤是 `--fresh`，新建页面目标文件已存在时默认停止并报告冲突。只有用户明确要求替换已有页面、manifest 设置 `operation=replace-existing` 且显式传入 `--overwrite` 时，才允许整套替换并备份。现有页面的业务修改仍必须优先走 `--merge` 主路径；只有 Bundle 被错误或环境阻塞时，才可按阻塞步骤单独调用子脚本。
 - Bundle manifest 必须提供 `svgPath`，并指向 `getDsl` 成功后按需执行 `extractSvg` 保存的 JSON；没有运行时 Icon 时也提供合法的 `{ "svgs": [] }` 文件。
@@ -267,7 +267,8 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 
 ### 来源清单与不可交付门禁
 
-- 生成 IOContorl XML 前必须建立逐节点 mapping manifest；manifest 必须同时包含从原始 DSL 机械提取的 sourceNodes。每条 sourceNodes 记录至少包含 ref、parentRef、pageAbsX/pageAbsY、relativeX/relativeY、width/height 和真实 text（文本节点）；每条输出节点记录至少包含 xmlId、唯一 sourceRef、sourceParent、sourceText（文本节点）、输出父节点依据、expectedLeft/expectedTop/expectedWidth/expectedHeight。当前校验器仅支持输出父节点与真实 `sourceParent` 一致；映射若需改变输出父节点，必须先扩展校验器，不得静默发射。
+- 生成 IOContorl XML 前必须建立逐节点 mapping manifest；manifest 必须同时包含从原始 DSL 机械提取的 sourceNodes。每条 sourceNodes 记录至少包含 ref、parentRef、pageAbsX/pageAbsY、relativeX/relativeY、width/height 和真实 text（文本节点）；每条输出节点记录至少包含 xmlId、唯一 sourceRef、sourceParent、sourceText（文本节点）、输出父节点依据、expectedLeft/expectedTop/expectedWidth/expectedHeight。
+- **输出父节点可以不同于 `sourceParent`，但只能在声明过的容器重挂步骤里改**：`sourceParent` 永远保留 DSL 真实父节点作为来源事实，`parent`/`layoutParent` 记录实际输出父节点；`validate-iocontrol-provenance.js` 已支持该形态——它要求 `layoutParent`（否则 `parent`、再否则 `sourceParent`）存在于 `sourceNodes`，并据此独立重算 `expectedLeft/expectedTop`（容器内子节点按父容器归一化原点相对计算，内容区偏移只扣一次），不要求它与 `sourceParent` 相等。目前唯一合法的改写来源是 Bundle 的容器嵌套步骤（`apply-container-containment.js`，见「辅助脚本触发矩阵」与固定调用顺序），它只把命中 `childPolicy=nested-page-templates` 的容器子控件重挂进该容器。任何绕过该步骤、手工把 `parent`/`layoutParent` 改成未登记容器，或让子控件坐标不再等于相对新父容器的机械换算值，都属于静默发射，必须拒绝交付。
 - 文本节点的 Value 必须机械复制 sourceText；valueSource 必须为 dsl.text。禁止用 XML ID、组件属性名、字段名、坐标方向、视觉位置、模板槽位或业务语义生成 Value。RelativePositionXLabel 不得生成 Value="X"。
 - 坐标必须机械计算：MTSLG 根级/展平节点以 `pageAbsX - contentOriginX`、`pageAbsY - 192` 发射；保留父容器的子节点以 `pageAbs - parent.pageAbs` 发射，并且内容区偏移只在根级扣一次；`Width/Height` 必须来自同一 sourceRef 的 bbox。禁止用 ID、相邻节点、截图观感、固定模板或“应该在这里”补坐标。MW WPF 复用同一份已归一化页面来源，但最终布局仍须由目标 WPF 容器确定。
 - 坐标空间必须明确：`sourceNodes` 永远保存 MasterGo 原始页面绝对坐标；输出节点的 `expectedLeft/expectedTop` 记录实际发射坐标，而不是替代来源事实。校验器必须用 `sourceNodes`、真实父子链和根级内容区偏移独立重算。
@@ -306,7 +307,8 @@ AI 必须同时读取原始 DSL、`visibility.json` 和正式组件映射，按�
 - `audit-mtslg-feishu-map.js`：组件映射文档或模板 JSON 修改后运行，用于检查文档覆盖（`missing` / `unregisteredFamilies` / `unregisteredVariants` / `undocumented` / `duplicateMatchKeys` 必须全为空），不是页面生成步骤；新增或修改映射的整批同步清单见 `skills/mastergo-iocontrol-document-format/SKILL.md` 的「新增/修改映射的同步清单」。
 - `cap-window.ps1` / `cap-window2.ps1`：运行时宿主加载成功后做视觉截图验证；不能替代 XML/provenance 校验。
 - `sync-to-mt.ps1`：静态 XML、来源、坐标、键和运行时加载验证完成，并且用户要求部署到运行目录后运行；不能作为生成步骤自动调用。
-主 Bundle 的固定调用顺序是：模板解析 → 语言键派生（`languages.auto`）→ LangName 绑定 → XML 生成 → provenance/坐标校验 → Icon discovery/生成 → Layout → WPF 宿主 → 最终校验。辅助脚本不得被误认为已自动包含在 Bundle 中。
+- `apply-container-containment.js`：**由 Bundle 默认自动调用**（不是手工触发）；在模板解析之后、语言键派生之前，把命中 `childPolicy=nested-page-templates` 的容器（信息分组 / 手动控制弹层）按「坐标完全包含」重挂子控件，改写 `parent`/`layoutParent` 并重算 `expectedLeft/expectedTop`；报告落 `Generated/<页面名>.nesting-report.json`，Bundle 审计写入 `nesting: { enabled, containers, reparented, conflicts }`。可用 `manifest.nesting = { "enabled": false }` 一键关闭，关闭后行为与未引入嵌套完全一致。未登记容器、未命中模板的组件实例不参与重挂。
+主 Bundle 的固定调用顺序是：模板解析 → **容器嵌套重挂（`apply-container-containment.js`，默认开启，可用 `manifest.nesting.enabled=false` 关闭）** → 语言键派生（`languages.auto`）→ LangName 绑定 → XML 生成 → provenance/坐标校验 → Icon discovery/生成 → Layout → WPF 宿主 → 最终校验。辅助脚本不得被误认为已自动包含在 Bundle 中；`apply-container-containment.js` 是唯一例外。
 
 ## 交付和验证
 

@@ -42,7 +42,8 @@ flowchart LR
   F --> G
   H[正式映射表 mtslg-iocontrol-map.json] --> G
   G --> I[模板解析: 槽位与固定字段]
-  I --> J[语言键派生 + LangName 绑定]
+  I --> Q[容器嵌套重挂: 按坐标完全包含重挂容器子控件]
+  Q --> J[语言键派生 + LangName 绑定]
   J --> K[页面 XML 发射]
   K --> L[页面 Icon 生成]
   K --> M[Layout 清单推导 + Layout.xml]
@@ -63,11 +64,12 @@ flowchart LR
 | 事实提取 | `resolve-mastergo-visibility.js` | 机械输出可见性与 TEXT/PATH 索引，不判控件类型 |
 | 图标 | `discover-mtslg-page-icon-map.js`、`gen-mtslg-page-icons.js` | 发现候选、生成页面 Icon（XAML Geometry） |
 | 映射 | `gen-mtslg-mapping-from-dsl.js`、`resolve-mtslg-template-mapping.js` | 从 DSL 建立 mapping、按模板解析槽位与固定字段 |
+| 容器嵌套 | `apply-container-containment.js` | **Bundle 默认自动调用**（在模板解析之后、语言键派生之前）：把命中 `childPolicy=nested-page-templates` 的容器按「坐标完全包含」重挂子控件、改写 `parent`/`layoutParent` 并重算 `expectedLeft/expectedTop`；报告 `Generated/<页面名>.nesting-report.json`；`manifest.nesting.enabled=false` 可关闭 |
 | Layout | `gen-mtslg-layout-manifest.js`、`gen-mtslg-layout.js` | 机械推导 `menuItems` 清单、发射/增量更新 Layout.xml |
 | 页面发射 | `gen-iocontrol-xml.js` | 发射页面 IOContorl XML（fresh / merge） |
 | 多语言 | `gen-mtslg-lang-keys-from-dsl.js`、`gen-mtslg-page-lang.js` | 派生语言键、发射 CN/EN 字典 |
 | 宿主 | `gen-mw-wpf-page.js` | 生成 View / code-behind / ViewModel 与 csproj 登记 |
-| 编排 | **`gen-mastergo-page-bundle.js`（主入口）** | 串起模板解析 → 语言键 → LangName → XML → 校验 → Icon → Layout → 宿主 → 最终校验 |
+| 编排 | **`gen-mastergo-page-bundle.js`（主入口）** | 串起模板解析 → 容器嵌套重挂 → 语言键 → LangName → XML → 校验 → Icon → Layout → 宿主 → 最终校验 |
 | 门禁 | `validate-iocontrol-provenance.js`、`check-iocontrol-coords.js` | 来源闭环、必写字段、坐标 0 MISMATCH / 0 EXTRA |
 | 审计/运维 | `audit-mtslg-feishu-map.js`、`classify-mastergo-groups.js`、`scan-mtslg-keys.ps1`、`sync-to-mt.ps1`、`cap-window*.ps1` | 文档覆盖审计、组件分类、键查证、运行目录同步、视觉截图 |
 
@@ -113,7 +115,8 @@ flowchart LR
 | 坐标 | `check-iocontrol-coords.js` | Left/Top/Width/Height 独立重算，要求 0 MISMATCH / 0 EXTRA |
 | 图标闭合 | `gen-mastergo-page-bundle.js` 内置校验 | Icon 键唯一与引用闭合、页面 Icon 文件结构 |
 | 语言闭环 | Bundle 的语言绑定与字典校验 | `LangName` 引用必须存在于本页字典，各语言 key 一致 |
-| 页面壳层 | `gen-mtslg-layout.js` 校验 | MenuItem 常驻属性、Index、图标尺寸门禁 |
+| 页面壳层 | `gen-mtslg-layout.js` 校验 | MenuItem 常驻属性、Index（菜单项 `1..N` 连续编号，常驻分组不占号）、图标尺寸门禁 |
+| 容器嵌套 | `apply-container-containment.js` + `validate-iocontrol-provenance.js` | 只在命中 `childPolicy=nested-page-templates` 的容器上重挂；输出父节点可与 `sourceParent` 不同，但必须按 `layoutParent` 独立重算坐标；冲突只记报告不猜层级 |
 | 规则与文档一致（仅本地回归，CI 不执行） | 本地回归 `doc-rule-consistency.test.js` + `gen-iocontrol-xml.test.js` | 覆盖边界：`buttonFamily` / `controlTypeRequiredAttrs` ↔ 脚本内置默认 ↔ 两份 Skill ↔ 两份人读参考的常量与表述一致；发射分支由 `gen-iocontrol-xml.test.js` 的「图标字段按 ControlType 模板收窄」用例覆盖，不依赖源码文本 |
 
 任一门禁以非零退出结束即禁止交付；标注「仅本地回归」的行不在 CI 执行，由提交者在本地跑完再推送。规则改动后必须同步更新执行者与回归用例。

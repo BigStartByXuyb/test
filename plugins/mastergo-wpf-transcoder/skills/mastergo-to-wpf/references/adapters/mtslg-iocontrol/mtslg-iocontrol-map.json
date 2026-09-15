@@ -1160,7 +1160,7 @@
     "match": {
       "componentSet": true
     },
-    "componentSetPolicy": "容器类组件（团队组件库中可直接放置的分组框 / 弹层）按组件名命中：组件名取自实例自身的组件名，内部无实例时回退实例名，图层重命名不改变组件名。命中后发射一个 GroupBox 外壳：Header 取实例内第一条可见 TEXT，位置宽高取实例 bbox；壳内子控件由 apply-container-containment.js 按「坐标完全包含」重挂为子节点（childPolicy=nested-page-templates）。",
+    "componentSetPolicy": "容器类组件（团队组件库中可直接放置的分组框 / 弹层）按组件名命中：候选值只有实例**自身**的组件名这一条，命中时必须与该组件集名逐字相等；容器族**不使用「内部实例子节点名」作为候选**——那条候选路径是聚合集合（如右栏）专用的，页面根的第一个实例子节点恰好与外层容器同名时会把整页误判成容器。图层重命名不改变组件名。命中后发射一个 GroupBox 外壳：Header 取实例内第一条可见 TEXT，位置宽高取实例 bbox；壳内子控件由 apply-container-containment.js 按「坐标完全包含」重挂为子节点（childPolicy=nested-page-templates）。",
     "variants": {
       "信息分组-模块化": {
         "componentSet": "信息分组-模块化",

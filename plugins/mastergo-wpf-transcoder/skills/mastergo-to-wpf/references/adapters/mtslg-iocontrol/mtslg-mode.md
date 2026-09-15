@@ -118,7 +118,7 @@
 1. **匹配**：映射节点 ↔ 现有节点，ID 优先；无 ID 时按 ControlType + Left/Top（容差 0.5）位置匹配。
 2. **几何更新**：Left/Top/Width/Height 按映射更新（这就是设计稿改动的落点）。
 3. **ControlType**：按映射更新，变化写冲突报告。
-4. **业务属性保护**：现有 XML 同名的属性一律保留现有值（值不同 → 冲突报告，不覆盖）；映射多出来的属性 → 追加（新增报告）。工程师手写的 IOName/IOCommand/IOState 等永远不会被设计稿冲掉。**例外**：映射节点的 `valueSource=dsl.text` 时，`Value` 是设计文本，merge 强制按映射覆盖并写“设计文本覆盖（dsl.text）”报告——否则 provenance 校验（`Value` 必须等于 `sourceText`）会失败。
+4. **业务属性保护**：现有 XML 同名的属性一律保留现有值（值不同 → 冲突报告，不覆盖）；映射多出来的属性 → 追加（新增报告）。工程师手写的 IOName/IOCommand/IOState 等永远不会被设计稿冲掉。**例外**：映射节点的 `valueSource=dsl.text` 时，**文案承载属性**是设计文本，merge 强制按映射覆盖并写“设计文本覆盖（dsl.text）”报告——否则 provenance 校验会失败。文案承载属性与 `validate-iocontrol-provenance.js` 同口径：有 `Value` 比 `Value`；容器类控件（如 `GroupBox`）没有 `Value`，标题文案由 `Header` 承载，此时比 `Header`。
 5. **节点增删**：映射里的新节点渲染插入父容器闭合标签前；现有但映射未涉及的节点原样保留（报告列出）。
 6. **格式最小扰动**：未触及的节点与注释逐字节保留；被替换节点跟随原样式（单行/多行）。
 
