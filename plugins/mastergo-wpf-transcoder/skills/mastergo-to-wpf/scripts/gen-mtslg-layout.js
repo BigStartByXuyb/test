@@ -6,6 +6,8 @@
 
 const fs = require("fs");
 const path = require("path");
+// 跨脚本共用工具的唯一实现（见 scripts/lib/script-helpers.js；禁止在本脚本再抄一份）。
+const { fail, xmlAttr, backupFile } = require(path.join(__dirname, "lib", "script-helpers.js"));
 
 // MenuItem 属性顺序：与页面 XML 同一约定
 //   Name → Icon → TopLeftContent/Index → LangName → PageName/IO* → UserRightId → IconWidth/IconHeight
@@ -68,8 +70,6 @@ function loadMenuAlwaysAttrs(mapPath) {
   return spec.menuItemAlwaysWrittenAttrs.map(String);
 }
 
-function fail(message) { throw new Error(message); }
-
 function parseArgs(argv) {
   let manifestPath = null;
   let overwrite = false;
@@ -88,11 +88,6 @@ function parseArgs(argv) {
     process.exit(2);
   }
   return { manifestPath, overwrite, mapPath };
-}
-
-function xmlAttr(value) {
-  return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
 function attrEntries(item) {
@@ -318,15 +313,6 @@ function renderNewLayout(manifest, page) {
     "</Layout>",
     ""
   ].join("\n");
-}
-
-function backupFile(filePath) {
-  const stamp = new Date().toISOString().replace(/[-:TZ.]/g, "").slice(0, 14);
-  let backup = filePath + ".bak-" + stamp;
-  let index = 2;
-  while (fs.existsSync(backup)) backup = filePath + ".bak-" + stamp + "-" + index++;
-  fs.copyFileSync(filePath, backup);
-  return backup;
 }
 
 function main() {

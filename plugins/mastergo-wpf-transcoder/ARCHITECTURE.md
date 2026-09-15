@@ -25,6 +25,7 @@ plugins/mastergo-wpf-transcoder/
 │  │  ├─ SKILL.md                  # 唯一流程路由与硬规则总表
 │  │  ├─ references/               # 规则事实源（适配器文档、映射表、框架手册）
 │  │  └─ scripts/                  # 交付链路脚本（运行时）
+│  │     ├─ lib/                    # 跨脚本共享实现（唯一副本，禁止再抄进脚本）
 │  │     └─ tests/                 # 开发期回归测试（CI 不跑，本地跑）
 │  └─ mastergo-iocontrol-document-format/   # 映射文档写作规范 Skill
 ```
@@ -72,6 +73,20 @@ flowchart LR
 | 编排 | **`gen-mastergo-page-bundle.js`（主入口）** | 串起模板解析 → 容器嵌套重挂 → 语言键 → LangName → XML → 校验 → Icon → Layout → 宿主 → 最终校验 |
 | 门禁 | `validate-iocontrol-provenance.js`、`check-iocontrol-coords.js` | 来源闭环、必写字段、坐标 0 MISMATCH / 0 EXTRA |
 | 审计/运维 | `audit-mtslg-feishu-map.js`、`classify-mastergo-groups.js`、`scan-mtslg-keys.ps1`、`sync-to-mt.ps1`、`cap-window*.ps1` | 文档覆盖审计、组件分类、键查证、运行目录同步、视觉截图 |
+| 脚本复用门禁 | `audit-script-duplication.js`（由 `tests/script-duplication.test.js` 调用） | 禁止「同一个功能写两份」：复制体（函数体完全相同）直接失败；同名函数必须在 `lib/script-reuse-registry.json` 登记原因 |
+
+### 4.1 脚本函数复用（`scripts/lib/` 与硬门禁）
+
+脚本各自可独立运行，历史上因此把同一套工具函数抄了多份，抄完就开始漂移（`inferHostPaths` 两处一份用 `startsWith`、一份用 `includes`；`num` 一处 `parseFloat`、一处 `Number`）。现在的口径是**同一个功能只允许一份实现**：
+
+| 共享模块 | 内容 | 使用方 |
+|---|---|---|
+| `lib/script-helpers.js` | `fail` / `failWithPrefix` / `failAndExit`、`xmlAttr`、`xmlDocText`、`normalizeToken`、`numberOrNull`、`readJson`、`backupFile` | 全部脚本 |
+| `lib/project-csproj.js` | `.csproj` Include 解析、宿主路径推断（`inferHostPaths`） | `gen-mastergo-page-bundle.js`、`gen-mw-wpf-page.js` |
+| `lib/iocontrol-map-rules.js` | 模板表 `controlTypeRequiredAttrs` / `buttonFamily` 的读取与解析 | `gen-iocontrol-xml.js`、`validate-iocontrol-provenance.js` |
+| `lib/mastergo-rules.js` | DSL 层共用判定（如宿主壳标记词 `isHostShellName`） | `gen-mtslg-mapping-from-dsl.js`、`apply-container-containment.js` |
+
+规则：**同一个功能要复用，不许反复造轮子**。新脚本需要已存在的工具就 `require` 共享模块；确实职责不同但同名的函数，登记到 `lib/script-reuse-registry.json` 并写清 `reason`（登记是显式决定，不是隐藏白名单）。发版前 `tests/script-duplication.test.js` 必须 PASS。
 
 ## 5. 规则与文档分层（谁是事实源）
 
@@ -158,3 +173,4 @@ DSL/mapping 文案 ──► 机械派生语言键（标题 / MenuItem / 页面�
 - 每次插件发版前，把本地规则文档按"整篇重建"同步到对应的飞书在线文档（按标题检索定位，不写死地址；冲突以本地为准），并记录 revision 便于回滚。
 - 版本号写在 `.claude-plugin/plugin.json`；发版时递增，避免同版本号内容漂移。
 - 不要在上一次 CI run 未结束时连续 push（会被 concurrency 取消，产生空审计报告）。
+- **脚本函数复用**：同一个功能只保留一份实现（放 `scripts/lib/`），各脚本 `require`；复制体与未登记的同名函数由 `scripts/tests/script-duplication.test.js` 拦下。改动脚本后必须跑全量 `scripts/tests/*.test.js`。

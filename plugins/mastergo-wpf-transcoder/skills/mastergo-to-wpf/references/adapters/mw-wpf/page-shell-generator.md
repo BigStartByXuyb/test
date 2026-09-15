@@ -108,8 +108,8 @@ public class <Page>ViewModel : IOScreen, IPage
 - 方法名取值链（机械、可审计，不猜语义）：
   1. `menuItems[].methodName`：工程师在本页清单里显式登记的方法名。**登记了就只认它**——值为非法 C# 标识符或 C# 关键字时直接退回内联 TODO，不再回退第 2 条（显式登记的名字绝不静默改写）；
   2. 未登记 `methodName`（字段缺省、空串、纯空白都算未登记）时，取 `menuItems[].langName` 去掉 `MenuItem` 前缀：菜单键命名空间就是 `MenuItem + 英文语义名`（如 `MenuItemFocus` → `Focus`、`MenuItemZAxisCalibration` → `ZAxisCalibration`、`MenuItemActionParam` → `ActionParam`）。
-- 退回内联 TODO 的情形（**不改名、不猜名、不失败**）按取值链逐条对应，不是一个混合清单：① 第 1 条来源不可用时（登记的 `methodName` 不是合法标识符或命中 C# 关键字）**不再回退第 2 条**；② 第 2 条来源不可用时（没有 `langName`；`langName` 是临时键 `MenuItemIndex<n>`，即语言键派生器拿不到语义名时的占位；去前缀后不是合法标识符；命中 C# 关键字）；③ 算出的方法名已被同页另一个按钮占用；④ 算出的方法名与 ViewModel 固定成员同名（`pageDesign` / `OnViewLoaded` / `PageDesign_Loaded` / `HandleButtonEvent` / `OKCmd`）或与 ViewModel 类名同名。这些 case 保留旧的 `// TODO: <按钮名> 按钮处理` + `break;` 形状。
-- **同一个方法只生成一次**（硬约束）：按钮先按名去重，再逐个解析；方法名撞名只保第一个，后面的按钮退回内联 TODO——不给第二个同名方法加后缀、也不重复发射。发射前还有一道硬门禁：一旦出现重复的方法名，脚本直接失败。因此生成的 ViewModel 里不可能出现两个同名 `private void`，也不会与 `OKCmd` 这类固定成员重名。
+- 退回内联 TODO 的情形（**不改名、不猜名、不失败**）按取值链逐条对应，不是一个混合清单：① 第 1 条来源不可用时（登记的 `methodName` 不是合法标识符或命中 C# 关键字）**不再回退第 2 条**；② 第 2 条来源不可用时（没有 `langName`；`langName` 是临时键 `MenuItemIndex<n>`，即语言键派生器拿不到语义名时的占位；去前缀后不是合法标识符；命中 C# 关键字）。这些 case 保留旧的 `// TODO: <按钮名> 按钮处理` + `break;` 形状。
+- 一句话记法：**一个按钮 = 一个 `case` = 一个处理方法**，脚本不推断按钮语义、也不写业务逻辑。
 - 脚本 stdout 的 `viewModel.buttonMethods`（`<按钮名> -> <方法名>`）与 `viewModel.inlineTodoCases`（按钮名 + 退回原因）是本节的审计口径。
 
 ## 执行

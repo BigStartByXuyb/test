@@ -7,6 +7,10 @@
 // from the current DSL snapshot.
 
 const fs = require("fs");
+const path = require("path");
+// 跨脚本共用工具的唯一实现（见 scripts/lib/script-helpers.js；禁止在本脚本再抄一份）。
+const { readJson, normalizeToken: normalize } = require(path.join(__dirname, "lib", "script-helpers.js"));
+const { isHostShellName } = require(path.join(__dirname, "lib", "mastergo-rules.js"));
 
 function arg(name) {
   const i = process.argv.indexOf(name);
@@ -17,11 +21,6 @@ function required(name) {
   if (!value) throw new Error("missing " + name);
   return value;
 }
-function readJson(file, label) {
-  try { return JSON.parse(fs.readFileSync(file, "utf8")); }
-  catch (e) { throw new Error(label + " read failed: " + e.message); }
-}
-function normalize(value) { return String(value || "").replace(/\s+/g, ""); }
 function textOf(node) { return Array.isArray(node.text) ? node.text.map(x => x.text || "").join("") : undefined; }
 
 const dslSnapshot = readJson(required("--dsl"), "DSL snapshot");
@@ -160,11 +159,11 @@ function ancestorRefs(ref) {
   }
   return result;
 }
-function isHostShell(ref) {
+// 宿主壳判定：规则唯一实现在 lib/mastergo-rules.js；本脚本只负责按自己的祖先链取名字。
+function isInHostShell(ref) {
   return ancestorRefs(ref).some(x => {
     const n = node(x);
-    const name = String(n?.name || "");
-    return name.includes("顶部栏") || name.includes("底部") || name.includes("常驻信息");
+    return isHostShellName(n && n.name);
   });
 }
 function isPageTitle(ref) {
@@ -419,7 +418,7 @@ function addNode(sourceRef, controlType, attrs, options = {}) {
   return xmlId;
 }
 function addText(ref) {
-  if (consumedTexts.has(ref) || !visible(ref) || isHostShell(ref) || isPageTitle(ref)) return outputRefBySource.get(ref) || null;
+  if (consumedTexts.has(ref) || !visible(ref) || isInHostShell(ref) || isPageTitle(ref)) return outputRefBySource.get(ref) || null;
   consumedTexts.add(ref);
   const s = source(ref);
   const attrs = { Value: s.text };
@@ -649,7 +648,7 @@ for (const { item: inst, match } of matched) {
 for (const child of root.children || []) {
   const s = source(child.id);
   if (!["INSTANCE", "FRAME", "COMPONENT"].includes(s.type)) continue;
-  if (matchedRefs.has(s.ref) || isHostShell(s.ref)) continue;
+  if (matchedRefs.has(s.ref) || isInHostShell(s.ref)) continue;
   if (/背景|常驻信息|分割线/.test(s.name)) continue;
   if (!Object.keys(s.properties || {}).length && s.width === source(root.id).width && s.height === source(root.id).height) continue;
   pending.push({ sourceRef: s.ref, reason: "正式组件模板未命中，保留 DSL 来源，未猜测 ControlType" });
@@ -679,8 +678,8 @@ for (const s of sourceNodes) {
     });
     continue;
   }
-  if (visible(s.ref) && !isHostShell(s.ref) && !isPageTitle(s.ref)) addText(s.ref);
-  else textAudit.push({ sourceRef: s.ref, sourceText: s.text, visibility: visible(s.ref), role: isPageTitle(s.ref) ? "page-title" : (isHostShell(s.ref) ? "host-shell" : "hidden"), decision: "omit", omitReason: isPageTitle(s.ref) ? "page-title" : (isHostShell(s.ref) ? "host-shell" : "hidden"), outputRefs: [] });
+  if (visible(s.ref) && !isInHostShell(s.ref) && !isPageTitle(s.ref)) addText(s.ref);
+  else textAudit.push({ sourceRef: s.ref, sourceText: s.text, visibility: visible(s.ref), role: isPageTitle(s.ref) ? "page-title" : (isInHostShell(s.ref) ? "host-shell" : "hidden"), decision: "omit", omitReason: isPageTitle(s.ref) ? "page-title" : (isInHostShell(s.ref) ? "host-shell" : "hidden"), outputRefs: [] });
 }
 
 const mapping = {

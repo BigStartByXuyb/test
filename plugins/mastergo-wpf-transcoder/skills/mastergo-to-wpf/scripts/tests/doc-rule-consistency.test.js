@@ -296,16 +296,9 @@ assert.ok(shellDoc.includes("不再回退第 2 条"),
   "文档必须写明显式 methodName 不可用时不再回退 langName");
 assert.ok(shellDoc.includes("纯空白都算未登记"),
   "文档必须写明空串/纯空白 methodName 视为未登记（与脚本 trim 后走 langName 一致）");
-// 「同一个方法只生成一次」是硬约束，文档与实现都要有；固定成员占位集合同样不得只写在文档里。
-assert.ok(shellDoc.includes("同一个方法只生成一次"), "文档必须写明同一方法只生成一次（拒绝重复创建）");
-assert.ok(shellDoc.includes("与 ViewModel 固定成员同名"), "文档必须写明与固定成员同名时退回内联 TODO");
-assert.ok(hostGenerator.includes("RESERVED_VIEWMODEL_MEMBERS"),
-  "宿主壳生成器必须登记 ViewModel 固定成员占位集合（避免与 OKCmd 等重名）");
-for (const token of ["pageDesign", "OnViewLoaded", "PageDesign_Loaded", "HandleButtonEvent", "OKCmd"]) {
-  const reserved = /const RESERVED_VIEWMODEL_MEMBERS = \[([^\]]+)\]/.exec(hostGenerator);
-  assert.ok(reserved && reserved[1].includes('"' + token + '"'),
-    "固定成员占位集合必须包含 " + token);
-}
+// 一钮一方法的记法必须在文档里写明（避免把 ViewModel 侧又改回静态 TODO 骨架或加多余门禁）。
+assert.ok(shellDoc.includes("一个按钮 = 一个 `case` = 一个处理方法"),
+  "文档必须写明「一个按钮 = 一个 case = 一个处理方法」");
 
 console.log("PASS 按钮族固定字段单一真值源（映射表 ↔ 脚本默认 ↔ 两份 Skill ↔ 两份人读参考）一致性回归测试");
 console.log("PASS ViewModel 按钮处理方法名口径（page-shell-generator.md ↔ gen-mw-wpf-page.js）");

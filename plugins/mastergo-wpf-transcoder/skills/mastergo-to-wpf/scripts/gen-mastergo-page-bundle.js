@@ -43,7 +43,9 @@ function pageLangPaths(pageName, locales) {
   return locales.map(function (locale) { return defaultLangPath(pageName, locale); });
 }
 
-function fail(message) { throw new Error(message); }
+// 跨脚本共用工具的唯一实现（见 scripts/lib/script-helpers.js；禁止在本脚本再抄一份）。
+const { fail, xmlAttr, readJson, backupFile } = require(path.join(SCRIPT_DIR, "lib", "script-helpers.js"));
+const { inferHostPaths } = require(path.join(SCRIPT_DIR, "lib", "project-csproj.js"));
 
 function parseArgs(argv) {
   let manifestPath = null;
@@ -104,11 +106,6 @@ function normalizePageManifest(manifest) {
   return manifest;
 }
 
-function readJson(filePath) {
-  try { return JSON.parse(fs.readFileSync(filePath, "utf8")); }
-  catch (error) { fail("读取 JSON 失败: " + filePath + " - " + error.message); }
-}
-
 function resolvePath(base, value, field) {
   if (typeof value !== "string" || !value.trim()) fail(field + " 必须提供");
   const result = path.resolve(base, value);
@@ -124,11 +121,6 @@ function resolveInput(manifestDir, projectRoot, value, field) {
   const fromManifest = path.resolve(manifestDir, value);
   if (fs.existsSync(fromManifest)) return fromManifest;
   return resolvePath(projectRoot, value, field);
-}
-
-function xmlAttr(value) {
-  return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
 function projectRelative(projectRoot, filePath) {
@@ -222,66 +214,6 @@ function ensureScaffold(manifest) {
   ];
   dirs.forEach(relative => fs.mkdirSync(path.join(projectRoot, ...relative.split("/")), { recursive: true }));
   return { projectRoot, scaffold: true, frameworkConfigPath };
-}
-
-function csprojIncludes(csprojText) {
-  const result = [];
-  const re = /<(?:Page|Compile|Content)\s+Include=["']([^"']+)["']/gi;
-  let match;
-  while ((match = re.exec(csprojText)) !== null) result.push(match[1].replace(/\\/g, "/"));
-  return result;
-}
-
-function inferHostPaths(manifest, projectRoot, csprojText) {
-  const viewName = manifest.viewName || manifest.pageName + "View";
-  const viewModelName = manifest.viewModelName || manifest.pageName + "ViewModel";
-  if ((manifest.viewPath && !manifest.codeBehindPath) || (!manifest.viewPath && manifest.codeBehindPath)) {
-    fail("viewPath 与 codeBehindPath 必须同时提供");
-  }
-  if (manifest.viewPath || manifest.codeBehindPath || manifest.viewModelPath) {
-    return {
-      view: manifest.viewPath || "UI/" + manifest.area + "/View/" + viewName + ".xaml",
-      codeBehind: manifest.codeBehindPath || manifest.viewPath + ".cs",
-      viewModel: manifest.viewModelPath || "UI/" + manifest.area + "/ViewModel/" + viewModelName + ".cs"
-    };
-  }
-  const includes = csprojIncludes(csprojText);
-  const areaPrefix = "UI/" + String(manifest.area).replace(/\\/g, "/") + "/View/";
-  const viewMatch = includes.find(item => item.toLowerCase().startsWith(areaPrefix.toLowerCase()) && /\/View\/[^/]+\.xaml$/i.test(item));
-  const uiViewEvidence = includes.some(item => /^UI\/.+\/View\/[^/]+\.xaml$/i.test(item));
-  const pagesMatch = includes.find(item => /^Pages\/[^/]+\.xaml$/i.test(item) || /\/Pages\/[^/]+\.xaml$/i.test(item));
-  let viewDir;
-  let viewModelDir;
-  if (viewMatch) {
-    viewDir = viewMatch.slice(0, viewMatch.lastIndexOf("/"));
-    const prefix = viewDir.slice(0, viewDir.lastIndexOf("/View"));
-    const vmMatch = includes.find(item => /\/ViewModel\/[^/]+\.cs$/i.test(item) && item.toLowerCase().startsWith(prefix.toLowerCase()));
-    viewModelDir = vmMatch ? vmMatch.slice(0, vmMatch.lastIndexOf("/")) : viewDir.replace(/\/View$/i, "/ViewModel");
-  } else if (pagesMatch) {
-    viewDir = pagesMatch.slice(0, pagesMatch.lastIndexOf("/"));
-    viewModelDir = viewDir;
-  } else if (uiViewEvidence || fs.existsSync(path.join(projectRoot, "UI", manifest.area, "View"))) {
-    viewDir = "UI/" + manifest.area + "/View";
-    viewModelDir = fs.existsSync(path.join(projectRoot, "UI", manifest.area, "ViewModel"))
-      ? "UI/" + manifest.area + "/ViewModel" : viewDir.replace(/\/View$/i, "/ViewModel");
-  } else {
-    viewDir = "Pages";
-    viewModelDir = "Pages";
-  }
-  return {
-    view: viewDir + "/" + viewName + ".xaml",
-    codeBehind: viewDir + "/" + viewName + ".xaml.cs",
-    viewModel: viewModelDir + "/" + viewModelName + ".cs"
-  };
-}
-
-function backupFile(filePath) {
-  const stamp = new Date().toISOString().replace(/[-:TZ.]/g, "").slice(0, 14);
-  let backup = filePath + ".bak-" + stamp;
-  let index = 2;
-  while (fs.existsSync(backup)) backup = filePath + ".bak-" + stamp + "-" + index++;
-  fs.copyFileSync(filePath, backup);
-  return backup;
 }
 
 function copyOutput(source, target, overwrite, created, backups, allowExisting) {
@@ -937,7 +869,13 @@ function main() {
   const csprojPath = resolvePath(projectRoot, manifest.csproj, "csproj");
   if (!fs.existsSync(csprojPath)) fail("csproj 不存在: " + csprojPath);
   const csprojText = fs.readFileSync(csprojPath, "utf8");
-  const hostPaths = inferHostPaths(manifest, projectRoot, csprojText);
+  const hostPaths = inferHostPaths({
+    manifest: manifest,
+    projectRoot: projectRoot,
+    csprojText: csprojText,
+    viewName: manifest.viewName || manifest.pageName + "View",
+    viewModelName: manifest.viewModelName || manifest.pageName + "ViewModel"
+  });
 
   const pageXmlPath = resolvePath(projectRoot, manifest.pageXmlPath, "pageXmlPath");
   const iconPath = resolvePath(projectRoot, manifest.iconPath, "iconPath");

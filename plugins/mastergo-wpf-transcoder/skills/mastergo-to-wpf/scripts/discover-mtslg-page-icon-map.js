@@ -20,6 +20,9 @@
  *     --mapping mapping.json --confirmed icon-map.json --out icon-map.json
  */
 const fs = require("fs");
+const path = require("path");
+// 跨脚本共用工具的唯一实现（见 scripts/lib/script-helpers.js；禁止在本脚本再抄一份）。
+const { readJson } = require(path.join(__dirname, "lib", "script-helpers.js"));
 
 function usage() {
   console.error("Usage: node discover-mtslg-page-icon-map.js --svg <extractSvg.json> --mapping <mapping.json> [--confirmed <icon-map.json>] --out <page-icon-map.json>");
@@ -37,11 +40,6 @@ function args(argv) {
   }
   if (!result.svg || !result.mapping || !result.out) usage();
   return result;
-}
-
-function readJson(file, label) {
-  try { return JSON.parse(fs.readFileSync(file, "utf8")); }
-  catch (error) { throw new Error(`Cannot read ${label}: ${error.message}`); }
 }
 
 function exactExtractEntry(svgs, ref) {

@@ -56,6 +56,9 @@
 
 const fs = require("fs");
 const path = require("path");
+// 跨脚本共用工具的唯一实现（见 scripts/lib/script-helpers.js；禁止在本脚本再抄一份）。
+const { readJson, failWithPrefix } = require(path.join(__dirname, "lib", "script-helpers.js"));
+const fail = failWithPrefix("语言键派生失败");
 
 const KEY_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const TITLE_SUFFIX = "PageTitle";
@@ -71,10 +74,6 @@ const LAYER_NAME_NOISE = new Set([
   "BG", "Bg", "Mask", "Line", "Path", "Union", "Merge", "Slice", "Image", "Container",
   "Layer", "LayerGroup", "Shape", "Ellipse", "Curve", "Arrow", "Backgroud", "Background"
 ]);
-
-function fail(message) {
-  throw new Error("语言键派生失败: " + message);
-}
 
 function toText(value) {
   if (value === undefined || value === null) return "";
@@ -668,14 +667,6 @@ function parseArgs(argv) {
     fail("必须提供 --page、--mapping 和 --out（用法见脚本头部注释）");
   }
   return args;
-}
-
-function readJson(filePath, label) {
-  try {
-    return JSON.parse(fs.readFileSync(filePath, "utf8"));
-  } catch (error) {
-    fail("读取 " + label + " 失败: " + filePath + " - " + error.message);
-  }
 }
 
 function readTextIfExists(filePath) {

@@ -2,10 +2,11 @@
 "use strict";
 
 const fs = require("fs");
-
-function fail(message) {
-  throw new Error("MTSLG 模板映射失败: " + message);
-}
+const path = require("path");
+// 跨脚本共用工具的唯一实现（见 scripts/lib/script-helpers.js；禁止在本脚本再抄一份）。
+const helpers = require(path.join(__dirname, "lib", "script-helpers.js"));
+const fail = helpers.failWithPrefix("MTSLG 模板映射失败");
+const normalizeToken = helpers.normalizeToken;
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -39,9 +40,8 @@ function templatesForName(templateMap, templateName) {
   return templateMap[templateName];
 }
 
-function normalizedPropertyName(value) {
-  return String(value || "").replace(/\s+/g, "");
-}
+// 属性名归一化：唯一实现在 lib/script-helpers.js（normalizeToken），本脚本只做别名。
+const normalizedPropertyName = normalizeToken;
 
 function instanceVariant(instance, matchProperty) {
   const properties = instance.properties || {};

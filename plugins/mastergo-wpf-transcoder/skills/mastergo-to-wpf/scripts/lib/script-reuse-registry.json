@@ -1,0 +1,38 @@
+{
+  "_comment": [
+    "跨脚本同名函数的例外登记表：只登记「名字相同但不是同一功能」的情况，每条必须写 reason。",
+    "同一个功能必须复用 scripts/lib/ 下的实现；复制体（函数体完全一致）一律失败、不允许登记。",
+    "维护方式：audit-script-duplication.js（scripts/tests/script-duplication.test.js 会跑它）会要求",
+    "任何新增的同名函数要么复用共享实现，要么在这里登记原因；已不再同名的条目会提示清理。"
+  ],
+  "entries": [
+    {
+      "name": "main",
+      "reason": "每个 CLI 脚本各有一个入口，编排的步骤与输入输出不同；不是同一功能，无法复用。"
+    },
+    {
+      "name": "parseArgs",
+      "reason": "各脚本的参数集合不同（--dsl/--mapping/--out/--map …），解析与校验规则各自独立。"
+    },
+    {
+      "name": "usage",
+      "reason": "各脚本的用法文本不同，只做「打印自己那条命令 + 退出」。"
+    },
+    {
+      "name": "visit",
+      "reason": "三个脚本遍历的数据结构与回调签名不同（DSL 节点 / mapping 节点 / 可见性索引），共用遍历器反而要加回调抽象。"
+    },
+    {
+      "name": "isInHostShell",
+      "reason": "判定规则唯一实现在 lib/mastergo-rules.js（isHostShellName）；两处只是各自按自己的祖先索引取名字的适配层。"
+    },
+    {
+      "name": "loadControlTypeRequiredAttrs",
+      "reason": "解析唯一实现在 lib/iocontrol-map-rules.js；生成器缺表时回退内置默认，校验器缺表时不校验必写字段，回退策略本来不同。"
+    },
+    {
+      "name": "loadButtonFamilyRules",
+      "reason": "解析唯一实现在 lib/iocontrol-map-rules.js；两处的默认值集合不同（生成器含 iconSizeAttrs，校验器只做固定字段校验）。"
+    }
+  ]
+}

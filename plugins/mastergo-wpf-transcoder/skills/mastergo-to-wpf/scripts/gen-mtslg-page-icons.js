@@ -41,23 +41,13 @@
  * EvenOdd 与 Nonzero 的渲染结果；只有两者确实不同时才补回 F1。详见 planGeometry。
  */
 const fs = require('fs');
+// 跨脚本共用工具的唯一实现（见 scripts/lib/script-helpers.js；禁止在本脚本再抄一份）。
+const { xmlAttr: escapeXml, readJson } = require(require('path').join(__dirname, 'lib', 'script-helpers.js'));
 
 const [, , svgFile, mapFile, outFile, dslFile] = process.argv;
 if (!svgFile || !mapFile || !outFile) {
   console.error('Usage: node gen-mtslg-page-icons.js <extractSvg.json> <page-icon-map.json> <PageIcons.xaml> [dsl.snapshot.json]');
   process.exit(1);
-}
-
-function escapeXml(value) {
-  return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
-
-function readJson(file, label) {
-  try {
-    return JSON.parse(fs.readFileSync(file, 'utf8'));
-  } catch (error) {
-    throw new Error(`Cannot read ${label}: ${error.message}`);
-  }
 }
 
 function parsePaths(svg, sourceId) {

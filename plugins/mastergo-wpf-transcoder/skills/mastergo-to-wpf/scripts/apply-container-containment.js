@@ -28,11 +28,10 @@
 
 const fs = require('fs');
 const path = require('path');
-
-function fail(message) {
-  console.error(message);
-  process.exit(1);
-}
+// 跨脚本共用工具的唯一实现（见 scripts/lib/script-helpers.js；禁止在本脚本再抄一份）。
+const { readJson, failAndExit } = require(path.join(__dirname, 'lib', 'script-helpers.js'));
+const { isHostShellName } = require(path.join(__dirname, 'lib', 'mastergo-rules.js'));
+const fail = failAndExit(1);
 
 function parseArgs(argv) {
   const out = {};
@@ -48,14 +47,6 @@ function parseArgs(argv) {
     fail('用法: node apply-container-containment.js --mapping <mapping.json> --template-map <mtslg-iocontrol-map.json> --out <mapping.out.json> [--report <report.json>]');
   }
   return out;
-}
-
-function readJson(file, label) {
-  try {
-    return JSON.parse(fs.readFileSync(file, 'utf8'));
-  } catch (error) {
-    fail('读取 ' + label + ' 失败: ' + error.message);
-  }
 }
 
 const args = parseArgs(process.argv.slice(2));
@@ -91,11 +82,11 @@ function ancestorsOf(ref) {
   }
   return chain;
 }
-function isHostShell(ref) {
+// 宿主壳判定：规则唯一实现在 lib/mastergo-rules.js；本脚本只负责按自己的祖先链取名字。
+function isInHostShell(ref) {
   return ancestorsOf(ref).some(function (id) {
     const source = sourceByRef.get(id);
-    const name = String((source && source.name) || '');
-    return name.includes('顶部栏') || name.includes('底部') || name.includes('常驻信息');
+    return isHostShellName(source && source.name);
   });
 }
 
@@ -159,7 +150,7 @@ if (containerSpecs.length > 0) {
     const ref = node.sourceRef || node.ref;
     const bbox = bboxOf(ref);
     if (!bbox) { report.skipped.push({ ref: ref, xmlId: node.xmlId || ref, reason: 'missing-bbox' }); continue; }
-    if (isHostShell(ref)) continue;                       // 宿主壳节点直接不参与（背景层 1280×1024 也在此列）
+    if (isInHostShell(ref)) continue;                     // 宿主壳节点直接不参与（背景层 1280×1024 也在此列）
 
     const fully = [];
     const partial = [];

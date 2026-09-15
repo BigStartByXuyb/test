@@ -31,11 +31,8 @@ fs.writeFileSync(manifestPath, JSON.stringify({
     { name: '', index: 2 },
     { name: '工件边缘录入', index: 3, langName: 'MenuItemIndex3' },
     { name: '对焦', index: 10, langName: 'MenuItemFocus' },
-    // 同一方法名不得重复生成：显式登记撞名时，第二个按钮退回内联 TODO。
-    { name: '显式同名A', index: 11, methodName: 'SharedHandler' },
-    { name: '显式同名B', index: 12, methodName: 'SharedHandler' },
-    // 与 ViewModel 固定成员（OKCmd）撞名时同样退回内联 TODO，不得发射第二个同名成员。
-    { name: '确认按钮', index: 13, langName: 'MenuItemOKCmd' }
+    // 显式登记 methodName：登记了就只认它（一钮一方法）。
+    { name: '显式登记', index: 11, langName: 'MenuItemIgnored', methodName: 'DeclaredHandler' }
   ]
 }, null, 2), 'utf8');
 
@@ -89,22 +86,15 @@ assert.match(generatedViewModel, /\n {20}case "工件边缘录入":\n {24}\/\/ T
 assert.ok(!/private void Index3\(\)/.test(generatedViewModel), '临时键不得派生按钮处理方法');
 assert.match(result.stdout, /新建示教 -> NewTeaching/, 'stdout 审计必须列出按钮 -> 方法');
 assert.match(result.stdout, /"name": "工件边缘录入"/, 'stdout 审计必须列出退回内联 TODO 的按钮');
-// 硬约束：同一个方法名只生成一次（重复定义会编译失败）。
-assert.strictEqual((generatedViewModel.match(/private void SharedHandler\(\)/g) || []).length, 1,
-  '两个按钮登记同一方法名时，只能生成一个处理方法');
-assert.match(generatedViewModel, /\n {20}case "显式同名A":\n {24}SharedHandler\(\);\n {24}break;/);
-assert.match(generatedViewModel, /\n {20}case "显式同名B":\n {24}\/\/ TODO: 显式同名B 按钮处理\n {24}break;/,
-  '撞名的第二个按钮必须退回内联 TODO，不得复用/重复方法');
-assert.match(result.stdout, /SharedHandler/, 'stdout 审计必须记录撞名退回');
-// 不得与 ViewModel 固定成员同名（OKCmd 已存在，按钮不能再发一个 private void OKCmd()）。
-assert.ok(!/private void OKCmd\(\)/.test(generatedViewModel),
-  '与固定成员同名的按钮必须退回内联 TODO');
-assert.strictEqual((generatedViewModel.match(/\n {20}case "确认按钮":\n {24}\/\/ TODO: 确认按钮 按钮处理\n {24}break;/) || []).length, 1);
-assert.match(result.stdout, /与 ViewModel 固定成员同名/, 'stdout 审计必须记录保留名退回原因');
+// 显式登记 methodName：一钮一方法，登记了就只认它。
+assert.match(generatedViewModel, /\n {20}case "显式登记":\n {24}DeclaredHandler\(\);\n {24}break;/);
+assert.match(generatedViewModel, /private void DeclaredHandler\(\)/);
+assert.ok(!/private void Ignored\(\)/.test(generatedViewModel), '登记 methodName 后不得再用 langName 派生');
+// 一个按钮对应一个方法：发射的方法数量必须与审计列出的方法数量一致。
 const handlerCount = (generatedViewModel.match(/ {8}private void [A-Za-z_][A-Za-z0-9_]*\(\)/g) || []).length;
 const methodListCount = (JSON.parse(result.stdout).viewModel.buttonMethods || []).length;
 assert.strictEqual(handlerCount, methodListCount,
-  '发射的方法数量必须与审计列出的方法数量一致（不得重复生成）');
+  '一个按钮一个方法：发射的方法数量必须与审计列出的按钮方法一致');
 
 let csproj = fs.readFileSync(csprojPath, 'utf8');
 assert.match(csproj, /<Compile Include="UI\\F2-Teach\\View\\F2NewOperationView\.xaml\.cs"\s*\/>/);

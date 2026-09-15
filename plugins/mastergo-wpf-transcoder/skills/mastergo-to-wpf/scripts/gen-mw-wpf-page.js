@@ -6,8 +6,9 @@
 
 const fs = require("fs");
 const path = require("path");
-
-function fail(message) { throw new Error(message); }
+// 跨脚本共用工具的唯一实现（见 scripts/lib/script-helpers.js；禁止在本脚本再抄一份）。
+const { fail, xmlAttr, xmlDocText, backupFile } = require(path.join(__dirname, "lib", "script-helpers.js"));
+const { inferHostPaths: inferHostPathsShared } = require(path.join(__dirname, "lib", "project-csproj.js"));
 
 function usage() {
   console.error("用法: node gen-mw-wpf-page.js --manifest <page.json> [--overwrite]");
@@ -53,11 +54,6 @@ function projectInclude(relativePath) {
   return safeRelativePath(relativePath, "项目文件路径").replace(/\//g, "\\");
 }
 
-function xmlAttr(value) {
-  return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-}
-
 function namespaceSegment(value) {
   const segment = String(value).replace(/[^A-Za-z0-9_]/g, "_");
   if (!isIdentifier(segment)) fail("area 不能转换为有效 C# 命名空间段: " + value);
@@ -69,70 +65,20 @@ function readRootNamespace(csprojText) {
   return match ? match[1].trim() : null;
 }
 
-function csprojIncludes(csprojText) {
-  const includes = [];
-  const re = /<(?:Page|Compile|Content)\s+Include=["']([^"']+)["']/gi;
-  let match;
-  while ((match = re.exec(csprojText)) !== null) {
-    includes.push(match[1].replace(/\\/g, "/"));
-  }
-  return includes;
-}
-
-function existingDirectory(projectRoot, relativePath) {
-  return fs.existsSync(path.join(projectRoot, ...relativePath.split("/")));
-}
-
+// 宿主路径推断的唯一实现在 lib/project-csproj.js（本脚本只做 safeRelativePath 校验）。
+// 无项目路径证据时才落 Pages/ 兜底，避免给同一页面生成第二套 UI/Pages。
 function inferHostPaths(manifest, projectRoot, csprojText, viewName, viewModelName) {
-  const includes = csprojIncludes(csprojText);
-  const explicitView = manifest.viewPath;
-  const explicitCodeBehind = manifest.codeBehindPath;
-  const explicitViewModel = manifest.viewModelPath;
-  if ((explicitView && !explicitCodeBehind) || (!explicitView && explicitCodeBehind)) {
-    fail("viewPath 与 codeBehindPath 必须同时提供");
-  }
-  if (explicitView || explicitCodeBehind || explicitViewModel) {
-    return {
-      viewRelative: safeRelativePath(explicitView || "UI/" + manifest.area + "/View/" + viewName + ".xaml", "viewPath"),
-      codeBehindRelative: safeRelativePath(explicitCodeBehind || (explicitView + ".cs"), "codeBehindPath"),
-      viewModelRelative: safeRelativePath(explicitViewModel || "UI/" + manifest.area + "/ViewModel/" + viewModelName + ".cs", "viewModelPath")
-    };
-  }
-
-  const areaPrefix = "UI/" + manifest.area.replace(/\\/g, "/") + "/View/";
-  const viewMatch = includes.find(function (item) {
-    return item.toLowerCase().startsWith(areaPrefix.toLowerCase()) && /\/View\/[^/]+\.xaml$/i.test(item);
+  const paths = inferHostPathsShared({
+    manifest: manifest,
+    projectRoot: projectRoot,
+    csprojText: csprojText,
+    viewName: viewName,
+    viewModelName: viewModelName
   });
-  const uiViewEvidence = includes.some(function (item) {
-    return /^UI\/.+\/View\/[^/]+\.xaml$/i.test(item);
-  });
-  const pagesMatch = includes.find(function (item) {
-    return /^Pages\/[^/]+\.xaml$/i.test(item) || /\/Pages\/[^/]+\.xaml$/i.test(item);
-  });
-  let viewDir;
-  let viewModelDir;
-  if (viewMatch) {
-    viewDir = viewMatch.slice(0, viewMatch.lastIndexOf("/"));
-    const vmMatch = includes.find(function (item) {
-      return /\/ViewModel\/[^/]+\.cs$/i.test(item) && item.toLowerCase().includes(viewDir.slice(0, viewDir.lastIndexOf("/view")).toLowerCase());
-    });
-    viewModelDir = vmMatch ? vmMatch.slice(0, vmMatch.lastIndexOf("/")) : viewDir.replace(/\/View$/i, "/ViewModel");
-  } else if (pagesMatch) {
-    viewDir = pagesMatch.slice(0, pagesMatch.lastIndexOf("/"));
-    viewModelDir = viewDir;
-  } else if (uiViewEvidence || existingDirectory(projectRoot, "UI/" + manifest.area + "/View")) {
-    viewDir = "UI/" + manifest.area + "/View";
-    viewModelDir = existingDirectory(projectRoot, "UI/" + manifest.area + "/ViewModel")
-      ? "UI/" + manifest.area + "/ViewModel" : viewDir.replace(/\/View$/i, "/ViewModel");
-  } else {
-    // 无项目路径证据时才使用通用 Pages 兜底，避免给同一页面生成第二套 UI/Pages。
-    viewDir = "Pages";
-    viewModelDir = "Pages";
-  }
   return {
-    viewRelative: viewDir + "/" + viewName + ".xaml",
-    codeBehindRelative: viewDir + "/" + viewName + ".xaml.cs",
-    viewModelRelative: viewModelDir + "/" + viewModelName + ".cs"
+    viewRelative: safeRelativePath(paths.view, "viewPath"),
+    codeBehindRelative: safeRelativePath(paths.codeBehind, "codeBehindPath"),
+    viewModelRelative: safeRelativePath(paths.viewModel, "viewModelPath")
   };
 }
 
@@ -224,7 +170,7 @@ function loadManifest(manifestPath) {
   files.push({ kind: "Content", relative: pageXmlPath });
   // 底部按钮（Layout MenuItem）→ ViewModel 的 case 列表与按钮处理方法名。
   const buttonNames = normalizeButtonNames(manifest);
-  const buttonHandlers = resolveButtonHandlers(manifest, buttonNames, viewModelName);
+  const buttonHandlers = resolveButtonHandlers(manifest, buttonNames);
   return {
     projectRoot, csprojPath, csprojText, rootNamespace, area, namespaceArea,
     operation: manifest.operation || "new",
@@ -364,10 +310,6 @@ const CSHARP_KEYWORDS = new Set([
   "unchecked", "unsafe", "ushort", "using", "virtual", "void", "volatile", "while"
 ]);
 
-// ViewModel 固定成员：按钮处理方法不得与之同名，否则同一个类里会出现重复成员（编译不过）。
-// OKCmd 是唯一与按钮方法同形（无参 void）的固定成员，必须先占位。
-const RESERVED_VIEWMODEL_MEMBERS = ["pageDesign", "OnViewLoaded", "PageDesign_Loaded", "HandleButtonEvent", "OKCmd"];
-
 // 菜单项 LanguageKey 命名空间 = MenuItem + 语义英文名（见 gen-mtslg-lang-keys-from-dsl.js）。
 // MenuItemIndex<n> 是语言键派生器在拿不到语义名时写的临时键，不能当作按钮英文名使用。
 const MENU_KEY_PREFIX = "MenuItem";
@@ -387,9 +329,8 @@ function methodNameFromLangName(langName) {
 // 按钮处理方法解析（机械、可审计，不推断语义）：
 //   取值链 1：menuItems[].methodName（工程师显式登记，优先）
 //   取值链 2：menuItems[].langName 去掉 MenuItem 前缀
-// 硬约束：同一个方法名只允许生成一次——一个按钮名只解析一次；方法名已被别的按钮占用、
-// 或与 ViewModel 固定成员同名时不再复用，退回内联 TODO 并记录原因。
-function resolveButtonHandlers(manifest, buttonNames, viewModelName) {
+// 一个按钮对应一个 case、一个处理方法；解析不出方法名的按钮退回内联 TODO 并记录原因。
+function resolveButtonHandlers(manifest, buttonNames) {
   const itemByName = new Map();
   (Array.isArray(manifest.menuItems) ? manifest.menuItems : []).forEach(function (item) {
     if (!item) return;
@@ -399,7 +340,6 @@ function resolveButtonHandlers(manifest, buttonNames, viewModelName) {
   });
   const methods = [];
   const inlineTodoCases = [];
-  const ownerByMethod = new Map();
   buttonNames.forEach(function (name) {
     const item = itemByName.get(name) || {};
     const declared = typeof item.methodName === "string" ? item.methodName.trim() : "";
@@ -416,40 +356,13 @@ function resolveButtonHandlers(manifest, buttonNames, viewModelName) {
           : "该菜单项没有 LangName";
       }
     }
-    if (method && isReservedViewModelName(method, viewModelName)) {
-      reason = "方法名 " + method + " 与 ViewModel 固定成员同名";
-      method = "";
-    }
-    if (method && ownerByMethod.has(method) && ownerByMethod.get(method) !== name) {
-      reason = "方法名 " + method + " 已被按钮 \"" + ownerByMethod.get(method) + "\" 占用";
-      method = "";
-    }
     if (method) {
-      ownerByMethod.set(method, name);
       methods.push({ name: name, method: method });
     } else {
       inlineTodoCases.push({ name: name, reason: reason });
     }
   });
-  // 兜底硬门禁：同一个方法名绝不允许发射两次（重复定义会直接编译失败）。
-  const emitted = new Set();
-  methods.forEach(function (item) {
-    if (emitted.has(item.method)) {
-      fail("按钮处理方法名重复，同一个方法不得重复生成: " + item.method);
-    }
-    emitted.add(item.method);
-  });
   return { methods: methods, inlineTodoCases: inlineTodoCases };
-}
-
-// 方法名是否与 ViewModel 固定成员（含类名，避免被编译器当成构造函数）撞名。
-function isReservedViewModelName(name, viewModelName) {
-  return RESERVED_VIEWMODEL_MEMBERS.indexOf(name) !== -1 || name === viewModelName;
-}
-
-// C# XML 文档注释里的按钮文案：& < > 必须转义，否则编译器按 XML 解析会告警。
-function xmlDocText(value) {
-  return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 function itemBlock(kind, include) {
@@ -490,15 +403,6 @@ function ensureItemInclude(text, kind, include) {
   const suffix = text.slice(prefix.length, projectClose);
   const block = "\n  <ItemGroup>\n" + itemBlock(kind, include) + "\n  </ItemGroup>\n";
   return prefix + suffix + block + text.slice(projectClose);
-}
-
-function backupFile(filePath) {
-  const stamp = new Date().toISOString().replace(/[-:TZ.]/g, "").slice(0, 14);
-  let backup = filePath + ".bak-" + stamp;
-  let index = 2;
-  while (fs.existsSync(backup)) backup = filePath + ".bak-" + stamp + "-" + index++;
-  fs.copyFileSync(filePath, backup);
-  return backup;
 }
 
 function writeGenerated(filePath, content, overwrite, backups) {

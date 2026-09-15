@@ -9,6 +9,10 @@
 'use strict';
 
 const fs = require('fs');
+// 模板表规则块的解析唯一实现（见 scripts/lib/iocontrol-map-rules.js；禁止在本脚本再抄一份）。
+const MAP_RULES = require('./lib/iocontrol-map-rules');
+// 数值解析的唯一实现（见 scripts/lib/script-helpers.js；本校验器与坐标核对器共用同一口径）。
+const { numberOrNull: num } = require('./lib/script-helpers');
 
 // 按钮族固定参数：真值来源为模板表 mtslg-iocontrol-map.json 的 buttonFamily；
 // 传入 --map 时读取该表，未传入或表缺字段时退回内置默认（与表内容一致）。
@@ -29,32 +33,14 @@ const DEFAULT_ICON_TEMPLATE_CONTROL_TYPES = ['IconButton'];
 // controlTypeRequiredAttrs；未传入 --map 或表缺该字段时不做必写字段校验。
 function loadControlTypeRequiredAttrs(mapPath) {
   if (!mapPath) return {};
-  let templateMap;
-  try { templateMap = JSON.parse(fs.readFileSync(mapPath, 'utf8')); }
-  catch (error) { throw new Error('读取模板表失败: ' + mapPath + ' - ' + error.message); }
-  const spec = templateMap.controlTypeRequiredAttrs;
-  if (!spec || typeof spec !== 'object') return {};
-  const result = {};
-  for (const [type, list] of Object.entries(spec)) {
-    if (type.startsWith('_')) continue;
-    if (Array.isArray(list)) result[type] = list.map(String);
-  }
-  return result;
+  // 未传 --map 或表缺该块时不做必写字段校验（返回空表），这是校验器的口径，与生成器不同。
+  return MAP_RULES.parseControlTypeRequiredAttrs(MAP_RULES.readTemplateMapOrFail(mapPath)) || {};
 }
 
 function loadButtonFamilyRules(mapPath) {
   if (!mapPath) return DEFAULT_BUTTON_FAMILY_RULES;
-  let templateMap;
-  try { templateMap = JSON.parse(fs.readFileSync(mapPath, 'utf8')); }
-  catch (error) { throw new Error('读取模板表失败: ' + mapPath + ' - ' + error.message); }
-  const spec = templateMap.buttonFamily;
-  if (!spec || typeof spec !== 'object') return DEFAULT_BUTTON_FAMILY_RULES;
-  return {
-    controlTypes: Array.isArray(spec.controlTypes) && spec.controlTypes.length
-      ? spec.controlTypes.map(String) : DEFAULT_BUTTON_FAMILY_RULES.controlTypes,
-    alwaysWrittenAttrs: Array.isArray(spec.alwaysWrittenAttrs)
-      ? spec.alwaysWrittenAttrs.map(String) : DEFAULT_BUTTON_FAMILY_RULES.alwaysWrittenAttrs,
-  };
+  return MAP_RULES.parseButtonFamilyRules(MAP_RULES.readTemplateMapOrFail(mapPath), DEFAULT_BUTTON_FAMILY_RULES) ||
+    DEFAULT_BUTTON_FAMILY_RULES;
 }
 
 let BUTTON_FAMILY_RULES = DEFAULT_BUTTON_FAMILY_RULES;
@@ -68,13 +54,6 @@ function attrsFromTag(tag) {
   let m;
   while ((m = re.exec(tag))) attrs[m[1]] = m[2];
   return attrs;
-}
-
-function num(v) {
-  if (v === undefined || v === null || v === '') return null;
-  if (v === 'NaN') return 'NaN';
-  const n = Number(v);
-  return Number.isFinite(n) ? n : null;
 }
 
 function sameNumber(actual, expected, tolerance) {

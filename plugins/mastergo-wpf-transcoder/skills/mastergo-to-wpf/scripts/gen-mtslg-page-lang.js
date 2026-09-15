@@ -34,6 +34,10 @@
 
 const fs = require("fs");
 const path = require("path");
+// 跨脚本共用工具的唯一实现（见 scripts/lib/script-helpers.js；禁止在本脚本再抄一份）。
+const { failWithPrefix, xmlDocText: xmlText } = require(path.join(__dirname, "lib", "script-helpers.js"));
+// 多语言发射的失败口径（模块前缀由共享工厂装配，本脚本不再自建 fail）。
+const fail = failWithPrefix("页面多语言生成失败");
 
 const KEY_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const LOCALE_RE = /^[A-Za-z][A-Za-z0-9_-]*$/;
@@ -51,17 +55,6 @@ const GROUP_ORDER = [GROUP_TITLE, GROUP_MENU, GROUP_CONTENT];
 
 function titleKeyFor(pageName) {
   return pageName + TITLE_SUFFIX;
-}
-
-function fail(message) {
-  throw new Error("页面多语言生成失败: " + message);
-}
-
-function xmlText(value) {
-  return String(value)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
 }
 
 // 语言清单归一化。各语言 key 完全一致是结构保证：keys[] 是唯一真值源，

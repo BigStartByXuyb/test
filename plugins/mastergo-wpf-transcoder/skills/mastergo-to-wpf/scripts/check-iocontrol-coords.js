@@ -26,6 +26,10 @@
  */
 'use strict';
 
+const path = require('path');
+// 数值解析的唯一实现（见 scripts/lib/script-helpers.js；本检查器与 provenance 校验器共用同一口径）。
+const { numberOrNull: num } = require(path.join(__dirname, 'lib', 'script-helpers.js'));
+
 const fs = require('fs');
 
 const args = process.argv.slice(2);
@@ -66,12 +70,6 @@ while ((m = tagRe.exec(xml)) !== null) {
   if (attrs.ID || attrs.ControlType || attrs.Left !== undefined) xmlNodes.push(attrs);
 }
 
-function num(v) {
-  if (v === undefined || v === null || v === '') return null;
-  if (v === 'NaN') return 'NaN';
-  const n = parseFloat(v);
-  return Number.isNaN(n) ? null : n;
-}
 function close(a, b, tol) {
   const aAbsent = a === 'NaN' || a === null;
   const bAbsent = b === 'NaN' || b === null;

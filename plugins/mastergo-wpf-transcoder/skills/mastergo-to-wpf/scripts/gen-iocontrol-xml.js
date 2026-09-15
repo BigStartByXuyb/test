@@ -60,6 +60,8 @@
 
 const fs = require('fs');
 const { validateTextAudit } = require('./validate-iocontrol-provenance');
+// 模板表规则块的解析唯一实现（见 scripts/lib/iocontrol-map-rules.js；禁止在本脚本再抄一份）。
+const MAP_RULES = require('./lib/iocontrol-map-rules');
 
 // ---------- 参数 ----------
 function usage() {
@@ -168,33 +170,14 @@ function loadControlTypeAttrDefaults(mapPath) {
 
 function loadControlTypeRequiredAttrs(mapPath) {
   if (!mapPath) return DEFAULT_CONTROL_TYPE_REQUIRED_ATTRS;
-  let templateMap;
-  try { templateMap = JSON.parse(fs.readFileSync(mapPath, 'utf8')); }
-  catch (error) { throw new Error('读取模板表失败: ' + mapPath + ' - ' + error.message); }
-  const spec = templateMap.controlTypeRequiredAttrs;
-  if (!spec || typeof spec !== 'object') return DEFAULT_CONTROL_TYPE_REQUIRED_ATTRS;
-  const result = {};
-  for (const [type, list] of Object.entries(spec)) {
-    if (type.startsWith('_')) continue;
-    if (Array.isArray(list)) result[type] = list.map(String);
-  }
-  return Object.keys(result).length ? result : DEFAULT_CONTROL_TYPE_REQUIRED_ATTRS;
+  return MAP_RULES.parseControlTypeRequiredAttrs(MAP_RULES.readTemplateMapOrFail(mapPath)) ||
+    DEFAULT_CONTROL_TYPE_REQUIRED_ATTRS;
 }
 
 function loadButtonFamilyRules(mapPath) {
   if (!mapPath) return DEFAULT_BUTTON_FAMILY;
-  let templateMap;
-  try { templateMap = JSON.parse(fs.readFileSync(mapPath, 'utf8')); }
-  catch (error) { throw new Error('读取模板表失败: ' + mapPath + ' - ' + error.message); }
-  const spec = templateMap.buttonFamily;
-  if (!spec || typeof spec !== 'object') return DEFAULT_BUTTON_FAMILY;
-  const controlTypes = Array.isArray(spec.controlTypes) && spec.controlTypes.length
-    ? spec.controlTypes.map(String) : DEFAULT_BUTTON_FAMILY.controlTypes;
-  const alwaysWrittenAttrs = Array.isArray(spec.alwaysWrittenAttrs)
-    ? spec.alwaysWrittenAttrs.map(String) : DEFAULT_BUTTON_FAMILY.alwaysWrittenAttrs;
-  const iconSizeAttrs = Array.isArray(spec.iconSizeAttrs) && spec.iconSizeAttrs.length === 2
-    ? spec.iconSizeAttrs.map(String) : DEFAULT_BUTTON_FAMILY.iconSizeAttrs;
-  return { controlTypes, alwaysWrittenAttrs, iconSizeAttrs };
+  return MAP_RULES.parseButtonFamilyRules(MAP_RULES.readTemplateMapOrFail(mapPath), DEFAULT_BUTTON_FAMILY) ||
+    DEFAULT_BUTTON_FAMILY;
 }
 
 function isButtonFamily(node) {
