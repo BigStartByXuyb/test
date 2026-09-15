@@ -113,7 +113,7 @@ public class <Page>ViewModel : IOScreen, IPage
   通过后即为按钮处理方法名，例如 `MenuItemFocus` → `Focus`、`MenuItemZAxisCalibration` → `ZAxisCalibration`、`MenuItemActionParam` → `ActionParam`。
 - 退回内联 TODO 的**一共四类**，与脚本 `viewModel.inlineTodoCases` 的 reason 一一对应：① 没有 `langName`；② 临时键 `MenuItemIndex<n>`；③ 候选名不是合法 C# 标识符；④ 候选名命中 C# 关键字（**不改名、不猜名、不失败**）。退回的 case 保留旧的 `// TODO: <按钮名> 按钮处理` + `break;` 形状。
 - 一句话记法：**一个按钮 = 一个 `case` = 一个处理方法**，脚本不推断按钮语义、也不写业务逻辑。
-- **撞名是输入错误，直接失败（不退回、不静默改名）**：算出的方法名与 ViewModel 固定成员同名（`pageDesign` / `OnViewLoaded` / `PageDesign_Loaded` / `HandleButtonEvent` / `OKCmd`）或与 ViewModel 类名同名，或两个按钮算出同一个方法名时，脚本立即报错并指出是哪个按钮——这类输入会生成重复的 C# 成员（如 `private void OKCmd()` 与恒发射的 `public void OKCmd()`、或两个同名 `private void`），编译必然失败。处理方式：修改该按钮的 `menuItems[].langName`（即它的 LanguageKey，通常由图标资源名或术语表派生）让它派生出别的名字；与 **ViewModel 类名**（= 页面名 + `ViewModel`）同名时改页面名。
+- **撞名是输入错误，直接失败（不退回、不静默改名）**：算出的方法名与 ViewModel 固定成员同名（`pageDesign` / `OnViewLoaded` / `PageDesign_Loaded` / `HandleButtonEvent` / `OKCmd`）或与 ViewModel 类名同名，或两个按钮算出同一个方法名时，脚本立即报错并指出是哪个按钮——这类输入会生成重复的 C# 成员（如 `private void OKCmd()` 与恒发射的 `public void OKCmd()`、或两个同名 `private void`），编译必然失败。处理方式：修改该按钮的 `menuItems[].langName`（即它的 LanguageKey，通常由图标资源名、术语表或该文案的英文译文派生）让它派生出别的名字；与 **ViewModel 类名**（= 页面名 + `ViewModel`）同名时改页面名。
 - ViewModel 固定成员集合（`pageDesign` / `OnViewLoaded` / `PageDesign_Loaded` / `HandleButtonEvent` / `OKCmd`）在生成器里同一份登记为常量，`doc-rule-consistency.test.js` 会逐项比对本文清单与该常量，任一侧增删都会立刻失败。其中 `OKCmd` 属**恒发射**成员：若某页确认无此按钮，可在生成后删除，但删除后该页不得再出现派生名为 `OKCmd` 的按钮（脚本按"恒发射"口径拦截）。
 - 脚本 stdout 的 `viewModel.buttonMethods`（`<按钮名> -> <方法名>`）与 `viewModel.inlineTodoCases`（按钮名 + 退回原因）是本节的审计口径。
 

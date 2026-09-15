@@ -158,7 +158,7 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
    1. （**仅当显式配置 `keyCatalog` 时**）目标项目已登记语言字典里**同文案**的既有 key → 直接复用并记为 `scope=shared`；`MenuItem*` 命名空间的键不给页面内容节点复用。默认不配置，页面 key 全部页面内自产。
    2. 节点 `Icon` 资源名去掉 `Geometry` 后缀（IconButton / 带图标按钮天然带英文语义名）。
    3. `langGlossary` 术语表（`{ "中文文案": "EnglishIdentifier" }`，可内联或给 JSON 文件路径）。
-   4. **该文案的英文译文转 PascalCase**（`languages.translations` 里 AI/工程师已给出的译文，如 `光源调整` → `Light Source Adjust` → `LightSourceAdjust`）——脚本仍不翻译，只把已有译文机械转成标识符；译文是数字/符号或首位不是字母时本条不成立，继续往下。
+   4. **该文案的英文译文转 PascalCase**（`languages.translations` 里 AI/工程师已给出的译文，如 `光源调整` → `Light Source Adjust` → `LightSourceAdjust`）。算法固定：按非字母数字字符切词 → 每个词首字母大写、其余字符原样保留 → 连接，结果必须匹配 `KEY_RE` 且长度 ≥ 3，否则本条不成立、继续往下。脚本仍不翻译，只把已有译文机械转成标识符。
    5. 纯 ASCII 文案（`AUX.` → `AUX`）。
    6. DSL 图层英文名（过滤 `Dir`/`F1`/`CH1` 之类的结构噪音）。
    7. 兜底 `{页面名}Text{NN}`：页面内唯一、稳定，标记 `provisional`，必须列入待改名清单。
@@ -167,7 +167,8 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 
 自动派生结果的交付要求：
 
-- **英文文案由 AI 翻译产出，并以 `languages.translations` 显式落盘**：AI 读取派生出清单里的中文 CN 文案，逐条给出英文译文，写成 `{ "中文文案": "English Text" }`（内联对象或 JSON 文件路径都可）。脚本不做翻译、也不调用机翻服务，只机械套用这份清单，保证译文可追溯、可复核、可回滚。
+- **英文文案由 AI 翻译产出，并以 `languages.translations` 显式落盘**：AI 逐条给出英文译文，写成 `{ "中文文案": "English Text" }`（内联对象或 JSON 文件路径都可）。脚本不做翻译、也不调用机翻服务，只机械套用这份清单，保证译文可追溯、可复核、可回滚。
+  **流水线顺序（闭环）**：译文清单在派生 LanguageKey 之前就要备好——本页需要翻译的中文文案集合可由 DSL/mapping/菜单项直接枚举，不依赖派生结果（第一轮枚举出来的中文就是 CN 文案）。派生时同一份译文清单同时用于两处：**键名语义名**（第 3 条第 4 级来源，中文翻译 → PascalCase 标识符）和**字典 EN 值**（`translatedFromInput` 计数）。
 - **译文清单与术语表是「页面级生成产物」，不是插件固定资产**：每次生成按当前页面的 DSL/mapping 产出，并由 Bundle 同步落盘到该页审计目录 `Generated/{页面名}.lang-translations.json` 与 `Generated/{页面名}.lang-glossary.json`（未提供对应输入时不生成）。禁止把它们做成跨页面共享的固定文件；不同页面的译文与术语各自独立、可逐页复核与回滚。
 - 英文取值优先级：**目标项目已登记字典同 key 的英文（工程已确认）> `translations` 译文 > 中文占位**。前两者命中数分别记在 `languages.derivation.translatedFromCatalog` 与 `translatedFromInput`。
 - **页面标题文案来源必须逐页核对**：审计 `languages.titleSource` = `mapping.textAudit` 表示标题取自设计稿原文（默认、可信）；= `manifest.pageTitleText` 表示工程师显式覆盖值，交付前必须与 `textAudit` 的 `sourceText` 逐字比对（含空格与标点，不得自行归一化）；= `dslRoot` 表示既没有覆盖值也没有 textAudit 标题，退回的是**设计画板框名**（可能带前缀点、空格差异、版本后缀），交付说明必须单列并要求人工确认。
