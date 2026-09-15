@@ -426,3 +426,32 @@ assert.strictEqual(byText.get('fw:root/normal').attrs.FontSize, '16',
 assert.strictEqual(byText.get('fw:root/bold').attrs.FontSize, '16');
 
 console.log('PASS MTSLG DSL-to-mapping TextBlock FontWeight regression test');
+
+// ---- 相机视口（cameraTemplates）：ControlType=Camera、不写 Style、DesignPanelID/Value 空串占位 ----
+const cameraDsl = {
+  styles: {},
+  nodes: [{
+    type: 'INSTANCE', id: 'cam:root', name: '激光精准对焦',
+    layoutStyle: { width: 1280, height: 1024, relativeX: 0, relativeY: 0 },
+    componentInfo: {},
+    children: [{
+      type: 'INSTANCE', id: 'cam:root/view', name: '集成图像',
+      layoutStyle: { width: 600, height: 600, relativeX: 20, relativeY: 202 },
+      componentId: '197:200415', componentInfo: {},
+      children: [{ type: 'LAYER', id: 'cam:root/view/bg', name: '矩形 2034', layoutStyle: { width: 600, height: 600, relativeX: 0, relativeY: 0 } }],
+    }],
+  }],
+};
+const cameraMapping = runMappingCase('camera-viewport', cameraDsl, []);
+const cameraNode = cameraMapping.nodes.find(node => node.controlType === 'Camera');
+assert.ok(cameraNode, '集成图像 实例必须命中 cameraTemplates 并发 Camera 控件');
+assert.strictEqual(cameraNode.attrs.DesignPanelID, '', 'DesignPanelID 无设计来源时必须空串占位');
+assert.strictEqual(cameraNode.attrs.Value, '', 'Value（相机名）无设计来源时必须空串占位');
+assert.strictEqual(cameraNode.attrs.Style, undefined, 'Camera 不得发射 Style（用运行时默认控件外观）');
+assert.strictEqual(cameraNode.expectedWidth, 600, 'Width 取实例 bbox');
+assert.strictEqual(cameraNode.expectedHeight, 600, 'Height 取实例 bbox');
+assert.strictEqual(cameraNode.expectedTop, 202 - 192, '根级 Top 仍扣 192');
+assert.strictEqual(cameraMapping.pending.filter(item => item.sourceRef === 'cam:root/view').length, 0,
+  '相机实例不得再进入 pending（未映射组件）');
+
+console.log('PASS MTSLG DSL-to-mapping camera viewport regression test');

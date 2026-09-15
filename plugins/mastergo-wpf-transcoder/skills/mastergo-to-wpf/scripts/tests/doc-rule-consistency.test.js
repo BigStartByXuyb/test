@@ -90,6 +90,25 @@ for (const [label, text] of [
     label + " 不得再硬编码已漂移过的 normal 名单枚举，改用 normalStyleNames 指真值源");
 }
 
+// ---------- 相机视口（cameraTemplates）：Camera 不写 Style、字段集固定 ----------
+const cameraFamily = map.cameraTemplates;
+assert.ok(cameraFamily && cameraFamily.variants, "映射表必须登记 cameraTemplates.variants");
+assert.strictEqual(cameraFamily.stylePolicy, "none", "相机族必须声明 stylePolicy=none（不发射 Style）");
+assert.strictEqual(cameraFamily.innerCandidatePolicy, "never",
+  "相机族只认实例自身名，禁止用内部实例子节点名当候选（否则页面根会被误判成 Camera）");
+assert.ok(Object.keys(cameraFamily.variants).length > 0, "相机族至少要登记一个组件集");
+for (const [name, spec] of Object.entries(cameraFamily.variants)) {
+  assert.strictEqual(spec.componentSet, name, "相机变体的 componentSet 必须等于组件集名: " + name);
+  assert.strictEqual(spec.controlType, "Camera", "相机变体必须发射 ControlType=Camera: " + name);
+  assert.strictEqual(spec.style, null, "相机变体不得登记 Style: " + name);
+}
+assert.ok(!(required.Camera || []).includes("Style"), "Camera 的恒写字段集不得包含 Style");
+for (const attr of ["DesignPanelID", "Value"]) {
+  assert.ok((required.Camera || []).includes(attr), "Camera 恒写字段必须包含 " + attr);
+}
+assert.ok((map.controlTypes.Camera.attrs || []).includes("DesignPanelID"), "controlTypes.Camera 必须允许 DesignPanelID");
+assert.ok(feishuMapping.includes("cameraTemplates"), "人读映射文档必须登记相机族（cameraTemplates）");
+
 // ---------- 2. 脚本内置默认 == 映射表（防止三处各写一份后漂移） ----------
 function objectLiteralOf(source, constName) {
   const match = source.match(new RegExp("const " + constName + "\\s*=\\s*\\{([\\s\\S]*?)\\n\\};"));

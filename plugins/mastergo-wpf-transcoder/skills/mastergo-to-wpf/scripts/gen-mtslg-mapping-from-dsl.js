@@ -280,7 +280,13 @@ function formalMatches(n) {
     if (!hits || !hits.length) continue;
     const usable = hits.filter(hit => {
       const variantSpec = templateMap[hit.family]?.variants?.[hit.variant];
-      if (candidate.fromInner && variantSpec?.childPolicy === "nested-page-templates") return false;
+      const familySpec = templateMap[hit.family];
+      // 只认实例自身名的族（如下面的相机视口）：禁止用"内部实例子节点名"当候选，
+      // 否则页面根的第一个实例子节点是相机时，整页会被误判成 Camera。
+      if (candidate.fromInner &&
+          (variantSpec?.childPolicy === "nested-page-templates" || familySpec?.innerCandidatePolicy === "never")) {
+        return false;
+      }
       return true;
     });
     if (!usable.length) continue;
@@ -477,6 +483,19 @@ const matchedRefs = new Set(matched.map(x => x.item.ref));
 for (const { item: inst, match } of matched) {
   const variant = match.variant;
   const spec = match.spec;
+  if (match.family === "cameraTemplates") {
+    // 相机视口：只发 DesignPanelID / Value（空串占位，运行时/工程师绑定）+ Width/Height（实例 bbox），
+    // **不写 Style**——用运行时默认控件外观（stylePolicy=none）。
+    const cameraSpec = templateMap.cameraTemplates || {};
+    const cameraAttrs = Array.isArray(cameraSpec.alwaysWrittenAttrs) && cameraSpec.alwaysWrittenAttrs.length
+      ? cameraSpec.alwaysWrittenAttrs : ["DesignPanelID", "Value"];
+    const attrs = {};
+    for (const attr of cameraAttrs) attrs[attr] = "";
+    if (spec.style && cameraSpec.stylePolicy !== "none") attrs.Style = spec.style;
+    addNode(inst.ref, spec.controlType || cameraSpec.controlType || "Camera", attrs);
+    addInstance(match, inst.ref, []);
+    continue;
+  }
   if (match.family === "rightSidebarTemplates" || match.family === "rightSidebarComponentTemplates" ||
       match.family === "selectBoxTemplates" || match.family === "mainMenuTemplates") {
     const valueText = firstText(inst.ref, s => !/^F\d+$/.test(s.text));

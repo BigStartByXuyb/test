@@ -1213,6 +1213,28 @@
       }
     }
   },
+  "cameraTemplates": {
+    "match": {
+      "componentSet": true
+    },
+    "innerCandidatePolicy": "never",
+    "innerCandidatePolicyNote": "相机族只按实例**自身**的组件集名命中，禁止用「内部实例子节点名」当候选：页面根的第一个实例子节点常常就是相机（集成图像），走内部名会把整页误判成 Camera。",
+    "controlType": "Camera",
+    "stylePolicy": "none",
+    "alwaysWrittenAttrs": ["DesignPanelID", "Value"],
+    "componentSetPolicy": "相机视口组件（团队组件库「集成图像」画廊里的 集成图像 / 晶圆图 组件集）按组件集名（= 实例自身名）命中，命中后发射一个 ControlType=Camera 的视口控件。只发射 DesignPanelID / Value / Width / Height（外加恒写集合里的 IOName 空占位），**不发射 Style**——直接用运行时默认控件外观。DesignPanelID（相机编号）与 Value（相机名称）在设计稿里没有可靠来源（相机实例不带公开属性、也没有承载相机名的文本），按固定模板写空串占位，由工程师或运行时绑定填写；Width/Height 取实例自身 bbox；坐标按页面统一规则计算。",
+    "variants": {
+      "集成图像": { "componentSet": "集成图像", "controlType": "Camera", "style": null, "iconPolicy": "none" },
+      "集成图像-XIS 模式": { "componentSet": "集成图像-XIS 模式", "controlType": "Camera", "style": null, "iconPolicy": "none" },
+      "集成图像-晶圆图 - 线条模式": { "componentSet": "集成图像-晶圆图 - 线条模式", "controlType": "Camera", "style": null, "iconPolicy": "none" },
+      "晶圆图 - 工件模式": { "componentSet": "晶圆图 - 工件模式", "controlType": "Camera", "style": null, "iconPolicy": "none" },
+      "集成图像-低倍率": { "componentSet": "集成图像-低倍率", "controlType": "Camera", "style": null, "iconPolicy": "none" },
+      "集成图像-JOG mode": { "componentSet": "集成图像-JOG mode", "controlType": "Camera", "style": null, "iconPolicy": "none" },
+      "集成图像-结果检查（预对准）": { "componentSet": "集成图像-结果检查（预对准）", "controlType": "Camera", "style": null, "iconPolicy": "none" },
+      "集成图像=结果检查（预对准）展开": { "componentSet": "集成图像=结果检查（预对准）展开", "controlType": "Camera", "style": null, "iconPolicy": "none" },
+      "组件 1065": { "componentSet": "组件 1065", "controlType": "Camera", "style": null, "iconPolicy": "none" }
+    }
+  },
   "layoutRules": {
     "_note": "底部栏 → Layout MenuItem 的规则。只有布局侧脚本（gen-mtslg-layout-manifest.js / gen-mtslg-layout.js）读取，不参与 IOContorl 模板匹配。",
     "bottomBar": {
@@ -1663,7 +1685,7 @@
       ]
     },
     "Camera": {
-      "description": "相机控件；DesignPanelID=相机编号，Value=相机名，默认宽 560 高 450",
+      "description": "相机控件（相机视口）；DesignPanelID=相机编号、Value=相机名（设计稿无来源时空串占位），尺寸取实例 bbox（实测 600×600 / 600×510）。**不发射 Style**（cameraTemplates.stylePolicy=none，用运行时默认控件外观）；恒写字段为 DesignPanelID / Value / IOName。",
       "nested": false,
       "attrs": [
         "DesignPanelID",

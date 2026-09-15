@@ -25,6 +25,13 @@ function extractDocumentedRules(markdown) {
     selectionInfoTemplates: ["单选-选中/未选择", "多选-选中/未选中"],
     selectionTemplates: ["单选-选中", "单选-未选择", "多选-选中", "多选-未选择"],
     infoGroupTemplates: ["信息分组-模块化"],
+    // 相机视口族：团队组件库「集成图像 UI汇总」画廊里的相机组件集（按组件集名命中）。
+    // 注意变体名里带空格/全角括号，必须与映射表 variants 的键逐字一致。
+    cameraTemplates: [
+      "集成图像", "集成图像-XIS 模式", "集成图像-晶圆图 - 线条模式", "晶圆图 - 工件模式",
+      "集成图像-低倍率", "集成图像-JOG mode", "集成图像-结果检查（预对准）",
+      "集成图像=结果检查（预对准）展开", "组件 1065"
+    ],
     // The mapping document names this component set "主菜单button" and
     // "主菜单button-文字".  Do not invent a separate "主菜单" variant.
     mainMenuTemplates: ["主菜单button", "主菜单button-文字"],

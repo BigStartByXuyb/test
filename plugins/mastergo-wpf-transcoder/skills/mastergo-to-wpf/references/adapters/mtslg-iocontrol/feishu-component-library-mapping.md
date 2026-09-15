@@ -178,6 +178,26 @@ MasterGo 组件库已存在真实变体 `密码输入框`，但当前 MT3.0 IOCo
 - 位置、宽高来自根组件；`Style` 按本族登记显式发射（`IOGroupBoxSecondary`）；其余固定模板字段没有可靠来源时输出空字符串值。
 - 组内子控件同样按各自模板生成，嵌套规则、内容区原点换算与信息分组完全一致（`childPolicy = nested-page-templates`，`styleInsets` 共用同一张表）。
 
+# MasterGo 组件集：集成图像 / 晶圆图 → MTSLG 映射关系（相机视口）
+
+### 匹配规则
+
+相机视口组件集按**组件集名**（= 实例自身名）命中（`cameraTemplates.match.componentSet = true`，与右栏独立组件族同一套「按组件名匹配」机制），登记的组件集为团队组件库「集成图像 UI汇总」画廊里的：`集成图像`、`集成图像-XIS 模式`、`集成图像-晶圆图 - 线条模式`、`晶圆图 - 工件模式`、`集成图像-低倍率`、`集成图像-JOG mode`、`集成图像-结果检查（预对准）`、`集成图像=结果检查（预对准）展开`、`组件 1065`。图层重命名不改变组件集名；命中即以组件集名精确匹配，未命中的实例仍按未映射组件处理。`组件 1065` 是组件库里未命名的相机视口（设计侧建议改名，行为上按相机视口登记）。
+
+### 固定模板：组件集=集成图像 / 晶圆图
+
+固定节点：一个 `ControlType="Camera"` 的视口控件；**不发射 `Style`**（`cameraTemplates.stylePolicy = none`，直接用运行时默认控件外观）。相机组件内部的绘制内容（网格、通道文字、拟合结果等）属于视口自身渲染，不再作为页面控件发射。
+
+```
+<IOContorl ID="{id_camera}" ControlType="Camera" DesignPanelID="" IOName="" Value="" Width="{width}" Height="{height}" Left="{left}" Top="{top}" />
+```
+
+- `DesignPanelID`（相机编号）与 `Value`（相机名称）在设计稿里**没有可靠来源**——相机实例既不带公开属性，也没有承载相机名的文本节点（实测各页面相机实例的 `componentInfo.properties` 为空）——按固定模板写**空串占位**，由工程师或运行时绑定填写；不得用组件集名、图层名或内部绘制文字充当相机编号/名称。
+- `IOName`（从内存读取相机名称）同属恒写字段，无来源时写空串。
+- `Width` / `Height` 取**实例自身 bbox**（实测 600×600 或 600×510），不得用组件内部绘制节点尺寸；`Left` / `Top` 按页面统一坐标规则计算。
+- 运行时字段（`IOSetExposure`、`IsImagePix`、`IsExpendPanel`、`IsCrossing*`、`ScalingType` 等）当前模块不发射，保持默认形态。
+- 未命中该组件集的相机类组件不得降级成 `Border`、`Image` 或自绘结构；保持未映射并记入待确认。
+
 # MasterGo 控件类型：IconButton → MTSLG 映射规则
 
 ## 聚合集合=右侧栏：IconButton 按钮族映射关系
