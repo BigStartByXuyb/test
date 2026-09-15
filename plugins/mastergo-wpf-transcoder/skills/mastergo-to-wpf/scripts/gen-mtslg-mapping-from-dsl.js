@@ -47,7 +47,8 @@ const nodeByRef = new Map();
 const fontSizeByRef = new Map();
 const fontWeightByRef = new Map();
 const fontStyleNameByRef = new Map();
-// 映射表登记的 TextBlock FontWeight 规则（命中才写、值照设计稿原样；normal 不写）。
+// 映射表登记的 TextBlock FontWeight 规则：值取设计稿的字体样式名（fontStyle），
+// normal（样式名命中 normalStyleNames，或样式名缺失时 weight 命中 normalValues）不写该属性。
 const fontWeightRule = templateMap.textBlockFontWeight || {};
 const fontWeightAttr = typeof fontWeightRule.attr === "string" && fontWeightRule.attr ? fontWeightRule.attr : "FontWeight";
 const fontWeightControlTypes = new Set(
@@ -68,13 +69,26 @@ const fontStyleNormalNames = new Set(
     return String(value).trim().toLowerCase();
   })
 );
-// "75 SemiBold" / "55 Regular" 这类带字体族档位数字的样式名：去掉前缀数字档位，
-// 保留设计稿自己写的字重名（去掉后 WPF 也认）。
+// 解析设计稿的字体样式名（styles[...].value.style）：
+//   - style 是 `{"fontStyle":"75 SemiBold",...}` 这类 JSON → 取 fontStyle，去掉字体族档位数字前缀；
+//   - style 本身就是裸样式名（如 "Bold"）→ 原样使用；
+//   - 解析不出 fontStyle（非法 JSON / JSON 里没有 fontStyle）→ 返回 null，由调用方回退到 weight 数值。
 function designFontStyleName(rawStyle) {
   if (typeof rawStyle !== "string" || !rawStyle.trim()) return null;
-  let name = rawStyle.trim();
-  const parsed = /^\{[\s\S]*\}$/.test(name) ? JSON.parse(name) : null;
-  if (parsed && typeof parsed.fontStyle === "string") name = parsed.fontStyle.trim();
+  const raw = rawStyle.trim();
+  let name = raw;
+  // 以 { 或 [ 开头一律按 JSON 处理：解析失败或没有 fontStyle 就返回 null（回退 weight），
+  // 绝不把原始 JSON 文本当成字重值。
+  if (/^[{[]/.test(raw)) {
+    let parsed = null;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (error) {
+      return null; // look like JSON but is not parseable → 交给 weight 回退，不猜
+    }
+    if (!parsed || typeof parsed.fontStyle !== "string" || !parsed.fontStyle.trim()) return null;
+    name = parsed.fontStyle.trim();
+  }
   name = name.replace(/^\d+(?:\.\d+)?[\s\-–_]*/, "").trim();
   return name || null;
 }
@@ -122,14 +136,9 @@ function walk(node, parentRef, pageAbsX, pageAbsY) {
     fontWeightByRef.set(node.id, String(fontValue.weight).trim());
   }
   if (fontValue && typeof fontValue.style === "string") {
-    try {
-      const styleName = designFontStyleName(fontValue.style);
-      if (styleName) fontStyleNameByRef.set(node.id, styleName);
-    } catch (error) {
-      // style 不是 JSON（例如直接写 "Bold"）时按原样处理。
-      const styleName = designFontStyleName(String(fontValue.style).replace(/^"|"$/g, ""));
-      if (styleName) fontStyleNameByRef.set(node.id, styleName);
-    }
+    // 解析不出 fontStyle 时返回 null：该节点不写 fontStyleName，由 weight 回退路径决定。
+    const styleName = designFontStyleName(fontValue.style);
+    if (styleName) fontStyleNameByRef.set(node.id, styleName);
   }
   for (const child of node.children || []) walk(child, node.id, x === null ? pageAbsX : x, y === null ? pageAbsY : y);
 }

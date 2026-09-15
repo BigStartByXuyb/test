@@ -24,7 +24,8 @@ function textNode(id, parentRef, value, rx, ry) {
   };
 }
 
-// 带字体样式的 TEXT：font 指向 dsl.styles 里的 font_* 条目（size → FontSize，weight → FontWeight）。
+// 带字体样式的 TEXT：font 指向 dsl.styles 里的 font_* 条目
+// （size → FontSize；style.fontStyle → FontWeight，样式名取不到时才回退 weight 数值）。
 function styledTextNode(id, parentRef, value, rx, ry, fontRef) {
   const node = textNode(id, parentRef, value, rx, ry);
   node.text = [{ text: value, font: fontRef }];
@@ -378,13 +379,17 @@ assert.deepStrictEqual(
 
 console.log('PASS MTSLG DSL-to-mapping container (infoGroupTemplates) regression test');
 
-// ---- TextBlock FontWeight：设计稿 font-weight 非 normal 才发射，值照设计稿原样 ----
+// ---- TextBlock FontWeight：设计稿字重非 normal 才发射，值取设计稿的字体样式名 ----
 const fontWeightDsl = {
   styles: {
     'font_bold': { value: { family: 'DIN Alternate', size: 16, weight: '700', style: '{"fontStyle":"Bold","opsz":"auto"}' } },
     'font_semibold': { value: { family: 'Alibaba PuHuiTi 2.0', size: 18, weight: '600', style: '{"fontStyle":"75 SemiBold","opsz":"auto"}' } },
     'font_normal': { value: { family: 'Alibaba PuHuiTi 2.0', size: 16, weight: '400', style: '{"fontStyle":"55 Regular","opsz":"auto"}' } },
     'font_cn_regular': { value: { family: 'PingFang SC', size: 16, weight: '400', style: '{"fontStyle":"常规体","opsz":"auto"}' } },
+    // style 是合法 JSON 但没有 fontStyle → 不得把整段 JSON 当字重值，必须回退 weight 数值
+    'font_no_fontstyle': { value: { family: 'DIN Alternate', size: 20, weight: '700', style: '{"opsz":"auto"}' } },
+    // style 是坏 JSON → 同样回退 weight 数值（且不得抛错中断整次生成）
+    'font_bad_json': { value: { family: 'DIN Alternate', size: 20, weight: '600', style: '{not-json' } },
   },
   nodes: [{
     type: 'INSTANCE', id: 'fw:root', name: '字体页',
@@ -395,6 +400,8 @@ const fontWeightDsl = {
       styledTextNode('fw:root/semibold', 'fw:root', '半粗标签', 20, 340, 'font_semibold'),
       styledTextNode('fw:root/normal', 'fw:root', '普通正文', 20, 380, 'font_normal'),
       styledTextNode('fw:root/cn-regular', 'fw:root', '中文常规', 20, 420, 'font_cn_regular'),
+      styledTextNode('fw:root/no-fontstyle', 'fw:root', '缺样式名', 20, 460, 'font_no_fontstyle'),
+      styledTextNode('fw:root/bad-json', 'fw:root', '坏JSON', 20, 500, 'font_bad_json'),
     ],
   }],
 };
@@ -410,6 +417,10 @@ assert.strictEqual(byText.get('fw:root/normal').attrs.FontWeight, undefined,
   '"55 Regular" 视为 normal，不得发射 FontWeight');
 assert.strictEqual(byText.get('fw:root/cn-regular').attrs.FontWeight, undefined,
   '中文"常规体"同样视为 normal，不得发射 FontWeight');
+assert.strictEqual(byText.get('fw:root/no-fontstyle').attrs.FontWeight, '700',
+  'style 是合法 JSON 但没有 fontStyle 时必须回退 weight 数值，不能把整段 JSON 当字重值');
+assert.strictEqual(byText.get('fw:root/bad-json').attrs.FontWeight, '600',
+  'style 是坏 JSON 时同样回退 weight 数值，且不得中断生成');
 assert.strictEqual(byText.get('fw:root/normal').attrs.FontSize, '16',
   'FontSize 仍按字体事实恒写（与 FontWeight 规则互不影响）');
 assert.strictEqual(byText.get('fw:root/bold').attrs.FontSize, '16');
