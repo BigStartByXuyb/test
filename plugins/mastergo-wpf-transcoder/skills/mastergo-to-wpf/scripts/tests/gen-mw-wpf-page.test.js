@@ -157,4 +157,34 @@ assert.strictEqual(result.status, 0, result.stderr);
 assert.ok(fs.existsSync(path.join(fallbackRoot, 'Pages', 'FallbackPageView.xaml')));
 assert.ok(fs.existsSync(path.join(fallbackRoot, 'Pages', 'FallbackPageViewModel.cs')));
 
+// 撞名是输入错误：与 ViewModel 固定成员同名、或两个按钮算出同一方法名 → 直接失败（不静默改名）。
+const clashRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'mw-wpf-page-clash-'));
+fs.writeFileSync(path.join(clashRoot, 'Demo.Pages.csproj'),
+  '<Project><PropertyGroup><RootNamespace>Demo.Pages</RootNamespace></PropertyGroup></Project>\n', 'utf8');
+function writeClashManifest(name, menuItems) {
+  const file = path.join(clashRoot, name + '.json');
+  fs.writeFileSync(file, JSON.stringify({
+    projectRoot: clashRoot,
+    csproj: 'Demo.Pages.csproj',
+    area: 'F3',
+    pageName: name,
+    includeIcon: false,
+    menuItems: menuItems
+  }, null, 2), 'utf8');
+  return file;
+}
+let clash = spawnSync(process.execPath, [script, '--manifest',
+  writeClashManifest('ClashReserved', [{ name: '确认按钮', index: 1, langName: 'MenuItemOKCmd' }])], { encoding: 'utf8' });
+assert.notStrictEqual(clash.status, 0, '与固定成员同名必须直接失败');
+assert.match(clash.stderr, /与 ViewModel 成员同名/);
+assert.ok(!fs.existsSync(path.join(clashRoot, 'UI', 'F3', 'ViewModel', 'ClashReservedViewModel.cs')),
+  '撞名失败时不得留下 ViewModel');
+clash = spawnSync(process.execPath, [script, '--manifest',
+  writeClashManifest('ClashSame', [
+    { name: '按钮甲', index: 1, methodName: 'SameHandler' },
+    { name: '按钮乙', index: 2, methodName: 'SameHandler' }
+  ])], { encoding: 'utf8' });
+assert.notStrictEqual(clash.status, 0, '两个按钮算出同一方法名必须直接失败');
+assert.match(clash.stderr, /同一个处理方法名/);
+
 console.log('PASS MW WPF page generator regression test');

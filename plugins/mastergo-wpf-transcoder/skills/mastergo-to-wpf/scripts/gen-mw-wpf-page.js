@@ -170,7 +170,7 @@ function loadManifest(manifestPath) {
   files.push({ kind: "Content", relative: pageXmlPath });
   // 底部按钮（Layout MenuItem）→ ViewModel 的 case 列表与按钮处理方法名。
   const buttonNames = normalizeButtonNames(manifest);
-  const buttonHandlers = resolveButtonHandlers(manifest, buttonNames);
+  const buttonHandlers = resolveButtonHandlers(manifest, buttonNames, viewModelName);
   return {
     projectRoot, csprojPath, csprojText, rootNamespace, area, namespaceArea,
     operation: manifest.operation || "new",
@@ -315,6 +315,9 @@ const CSHARP_KEYWORDS = new Set([
 const MENU_KEY_PREFIX = "MenuItem";
 const PROVISIONAL_MENU_KEY = /^MenuItemIndex\d+$/;
 
+// ViewModel 固定成员：按钮处理方法与它们同名会生成重复的 C# 成员，直接失败。
+const RESERVED_VIEWMODEL_MEMBERS = ["pageDesign", "OnViewLoaded", "PageDesign_Loaded", "HandleButtonEvent", "OKCmd"];
+
 // 由菜单项 LanguageKey 派生按钮处理方法名：MenuItemFocus -> Focus。
 // 取不到语义名（临时键 / 前缀不符 / 非法标识符 / C# 关键字）返回空串，由调用方退回内联 TODO。
 function methodNameFromLangName(langName) {
@@ -330,7 +333,9 @@ function methodNameFromLangName(langName) {
 //   取值链 1：menuItems[].methodName（工程师显式登记，优先）
 //   取值链 2：menuItems[].langName 去掉 MenuItem 前缀
 // 一个按钮对应一个 case、一个处理方法；解析不出方法名的按钮退回内联 TODO 并记录原因。
-function resolveButtonHandlers(manifest, buttonNames) {
+// 硬约束（fail-closed，不静默改名、也不退回）：算出的方法名与 ViewModel 固定成员/类名同名，
+// 或两个按钮算出同一方法名时，直接失败——这类输入会生成重复的 C# 成员，编译必然失败。
+function resolveButtonHandlers(manifest, buttonNames, viewModelName) {
   const itemByName = new Map();
   (Array.isArray(manifest.menuItems) ? manifest.menuItems : []).forEach(function (item) {
     if (!item) return;
@@ -357,6 +362,15 @@ function resolveButtonHandlers(manifest, buttonNames) {
       }
     }
     if (method) {
+      if (RESERVED_VIEWMODEL_MEMBERS.indexOf(method) !== -1 || method === viewModelName) {
+        fail("按钮处理方法名与 ViewModel 成员同名，会生成重复成员: " + method +
+          "（按钮 \"" + name + "\"）；请修改该按钮的 menuItems[].methodName 或 LanguageKey，或改名页面");
+      }
+      const owner = methods.find(function (item) { return item.method === method; });
+      if (owner) {
+        fail("两个按钮算出同一个处理方法名，会生成重复方法: " + method +
+          "（按钮 \"" + owner.name + "\" 与 \"" + name + "\"）；请用 menuItems[].methodName 区分");
+      }
       methods.push({ name: name, method: method });
     } else {
       inlineTodoCases.push({ name: name, reason: reason });

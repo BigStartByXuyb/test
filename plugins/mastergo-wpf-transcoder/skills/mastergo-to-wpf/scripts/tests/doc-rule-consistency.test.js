@@ -299,6 +299,13 @@ assert.ok(shellDoc.includes("纯空白都算未登记"),
 // 一钮一方法的记法必须在文档里写明（避免把 ViewModel 侧又改回静态 TODO 骨架或加多余门禁）。
 assert.ok(shellDoc.includes("一个按钮 = 一个 `case` = 一个处理方法"),
   "文档必须写明「一个按钮 = 一个 case = 一个处理方法」");
+// 撞名口径：文档写「直接失败」，脚本就必须真失败（不能只写文档、也不能静默改名/静默退回）。
+assert.ok(shellDoc.includes("撞名是输入错误，直接失败"),
+  "文档必须写明方法名撞名（固定成员/类名/同页按钮）是输入错误、直接失败");
+assert.ok(hostGenerator.includes("RESERVED_VIEWMODEL_MEMBERS"),
+  "宿主壳生成器必须登记 ViewModel 固定成员集合（撞名直接失败）");
+assert.ok(hostGenerator.includes("与 ViewModel 成员同名") && hostGenerator.includes("两个按钮算出同一个处理方法名"),
+  "宿主壳生成器必须对固定成员撞名与同页按钮撞名两条都直接失败");
 
 console.log("PASS 按钮族固定字段单一真值源（映射表 ↔ 脚本默认 ↔ 两份 Skill ↔ 两份人读参考）一致性回归测试");
 console.log("PASS ViewModel 按钮处理方法名口径（page-shell-generator.md ↔ gen-mw-wpf-page.js）");

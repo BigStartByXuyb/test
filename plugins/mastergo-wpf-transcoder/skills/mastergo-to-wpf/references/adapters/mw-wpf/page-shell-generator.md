@@ -110,6 +110,7 @@ public class <Page>ViewModel : IOScreen, IPage
   2. 未登记 `methodName`（字段缺省、空串、纯空白都算未登记）时，取 `menuItems[].langName` 去掉 `MenuItem` 前缀：菜单键命名空间就是 `MenuItem + 英文语义名`（如 `MenuItemFocus` → `Focus`、`MenuItemZAxisCalibration` → `ZAxisCalibration`、`MenuItemActionParam` → `ActionParam`）。
 - 退回内联 TODO 的情形（**不改名、不猜名、不失败**）按取值链逐条对应，不是一个混合清单：① 第 1 条来源不可用时（登记的 `methodName` 不是合法标识符或命中 C# 关键字）**不再回退第 2 条**；② 第 2 条来源不可用时（没有 `langName`；`langName` 是临时键 `MenuItemIndex<n>`，即语言键派生器拿不到语义名时的占位；去前缀后不是合法标识符；命中 C# 关键字）。这些 case 保留旧的 `// TODO: <按钮名> 按钮处理` + `break;` 形状。
 - 一句话记法：**一个按钮 = 一个 `case` = 一个处理方法**，脚本不推断按钮语义、也不写业务逻辑。
+- **撞名是输入错误，直接失败（不退回、不静默改名）**：算出的方法名与 ViewModel 固定成员同名（`pageDesign` / `OnViewLoaded` / `PageDesign_Loaded` / `HandleButtonEvent` / `OKCmd`）或与 ViewModel 类名同名，或两个按钮算出同一个方法名时，脚本立即报错并指出是哪个按钮——这类输入会生成重复的 C# 成员（如 `private void OKCmd()` 与恒发射的 `public void OKCmd()`、或两个同名 `private void`），编译必然失败。处理方式：修改该按钮的 `menuItems[].methodName` 或它的 `LanguageKey`（页面名不适合时改页面名）。
 - 脚本 stdout 的 `viewModel.buttonMethods`（`<按钮名> -> <方法名>`）与 `viewModel.inlineTodoCases`（按钮名 + 退回原因）是本节的审计口径。
 
 ## 执行
