@@ -245,7 +245,7 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 
 - 每个生成的 XML/XAML 文本控件必须绑定到唯一的 MasterGo `layerId`/DSL `ref`，并记录其真实 `sourceParent`、原始文本、文本槽位和最终输出属性；组件实例的 `ID`、语义名称、坐标方向或业务推测不能作为文本来源。
 - `Value` 只能使用对应 DSL 文本节点的真实文本或已确认的运行时绑定字段。禁止因为 XML `ID` 含有 `X`、`Y`、`Label`、`Value` 等词，或因为控件位于某个视觉位置，就推断、替换或重命名文本；例如 `RelativePositionXLabel` 不得自动生成 `Value="X"`。
-- MTSLG `TextBlock` 的 `Height` 固定为 `40`、`Width` 固定为 `NaN`（宽度自适应，不写文本 bbox 宽度；文本 bbox 宽度只作为 `dslWidth` 记入 mapping 溯源）；`FontSize` 独立取字体事实，不能用文字 bbox、外层组件高度或行高改写这两个固定值。输入框、选择框等非 TextBlock 控件仍按其正式变体模板取自身宽高。
+- MTSLG `TextBlock` 的 `Height` 固定为 `40`、`Width` 固定为 `NaN`（宽度自适应，不写文本 bbox 宽度；文本 bbox 宽度只作为 `dslWidth` 记入 mapping 溯源）；`FontSize` 独立取字体事实，不能用文字 bbox、外层组件高度或行高改写这两个固定值。`FontWeight` **命中才写**：设计稿 font-weight 非 normal（400）时发射、值照设计稿原样（映射表 `textBlockFontWeight` 是真值源），normal 时不写该属性。输入框、选择框等非 TextBlock 控件仍按其正式变体模板取自身宽高。
 - 同一模板的每个实例必须分别读取文本覆盖和父子层级；相同 `componentId`、相同结构、相邻排列或截图文字不能互相借用。设计稿中的 `3:56338 → 镜头倍率` 与兄弟节点 `3:56367 → Y` 必须保持独立。
 - 生成前执行“XML 节点 → 唯一 layerId/ref → 父节点链 → 原始文本 → Value/绑定字段”反向核对；任一项缺失、重复或冲突时，停止生成并标记待确认，不得用语义名称或坐标补齐。
 

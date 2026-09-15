@@ -45,6 +45,20 @@ const iconEntries = Array.isArray(iconMap.icons) ? iconMap.icons : [];
 const sourceNodes = [];
 const nodeByRef = new Map();
 const fontSizeByRef = new Map();
+const fontWeightByRef = new Map();
+// 映射表登记的 TextBlock FontWeight 规则（命中才写、值照设计稿原样；normal 不写）。
+const fontWeightRule = templateMap.textBlockFontWeight || {};
+const fontWeightAttr = typeof fontWeightRule.attr === "string" && fontWeightRule.attr ? fontWeightRule.attr : "FontWeight";
+const fontWeightControlTypes = new Set(
+  Array.isArray(fontWeightRule.controlTypes) && fontWeightRule.controlTypes.length
+    ? fontWeightRule.controlTypes.map(String) : ["TextBlock"]
+);
+const fontWeightNormalValues = new Set(
+  (Array.isArray(fontWeightRule.normalValues) && fontWeightRule.normalValues.length
+    ? fontWeightRule.normalValues : ["", "normal", "400", "regular"]).map(function (value) {
+    return String(value).trim().toLowerCase();
+  })
+);
 const parents = new Map();
 const outputNodes = [];
 const outputRefBySource = new Map();
@@ -83,6 +97,10 @@ function walk(node, parentRef, pageAbsX, pageAbsY) {
   const font = Array.isArray(node.text) && node.text[0] ? node.text[0].font : null;
   const fontValue = font && dsl.styles && dsl.styles[font] ? dsl.styles[font].value : null;
   if (fontValue && typeof fontValue.size === "number") fontSizeByRef.set(node.id, fontValue.size);
+  // font-weight：只有非 normal（400）时才在 TextBlock 上发射 FontWeight（规则见映射表 textBlockFontWeight）。
+  if (fontValue && fontValue.weight !== undefined && fontValue.weight !== null) {
+    fontWeightByRef.set(node.id, String(fontValue.weight).trim());
+  }
   for (const child of node.children || []) walk(child, node.id, x === null ? pageAbsX : x, y === null ? pageAbsY : y);
 }
 walk(root, null, 0, 0);
@@ -362,6 +380,8 @@ function addText(ref) {
   const attrs = { Value: s.text };
   const size = fontSizeByRef.get(ref);
   if (typeof size === "number") attrs.FontSize = String(size);
+  const weight = fontWeightByRef.get(ref);
+  if (weight !== undefined && !fontWeightNormalValues.has(weight.toLowerCase())) attrs[fontWeightAttr] = weight;
   const xmlId = addNode(ref, "TextBlock", attrs, { xmlId: `MGText_${String(textAudit.length + 1).padStart(4, "0")}` });
   textAudit.push({ sourceRef: ref, sourceText: s.text, visibility: true, role: "content", decision: "emit", outputRefs: [xmlId] });
   return xmlId;

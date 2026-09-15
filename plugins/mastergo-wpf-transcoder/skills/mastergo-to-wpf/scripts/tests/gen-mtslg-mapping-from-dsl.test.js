@@ -24,6 +24,13 @@ function textNode(id, parentRef, value, rx, ry) {
   };
 }
 
+// 带字体样式的 TEXT：font 指向 dsl.styles 里的 font_* 条目（size → FontSize，weight → FontWeight）。
+function styledTextNode(id, parentRef, value, rx, ry, fontRef) {
+  const node = textNode(id, parentRef, value, rx, ry);
+  node.text = [{ text: value, font: fontRef }];
+  return node;
+}
+
 function buttonGroup(id, rx, value) {
   return {
     type: 'GROUP',
@@ -370,3 +377,37 @@ assert.deepStrictEqual(
 );
 
 console.log('PASS MTSLG DSL-to-mapping container (infoGroupTemplates) regression test');
+
+// ---- TextBlock FontWeight：设计稿 font-weight 非 normal 才发射，值照设计稿原样 ----
+const fontWeightDsl = {
+  styles: {
+    'font_bold': { value: { family: 'Alibaba PuHuiTi 2.0', size: 16, weight: '700' } },
+    'font_semibold': { value: { family: 'Alibaba PuHuiTi 2.0', size: 18, weight: '600' } },
+    'font_normal': { value: { family: 'Alibaba PuHuiTi 2.0', size: 16, weight: '400' } },
+  },
+  nodes: [{
+    type: 'INSTANCE', id: 'fw:root', name: '字体页',
+    layoutStyle: { width: 1280, height: 1024, relativeX: 0, relativeY: 0 },
+    componentInfo: {},
+    children: [
+      styledTextNode('fw:root/bold', 'fw:root', '加粗标题', 20, 300, 'font_bold'),
+      styledTextNode('fw:root/semibold', 'fw:root', '半粗标签', 20, 340, 'font_semibold'),
+      styledTextNode('fw:root/normal', 'fw:root', '普通正文', 20, 380, 'font_normal'),
+    ],
+  }],
+};
+const fontWeightMapping = runMappingCase('textblock-font-weight', fontWeightDsl, []);
+const byText = new Map(fontWeightMapping.nodes
+  .filter(node => node.controlType === 'TextBlock')
+  .map(node => [node.sourceRef, node]));
+assert.strictEqual(byText.get('fw:root/bold').attrs.FontWeight, '700',
+  'font-weight=700 的 TextBlock 必须发射 FontWeight="700"（值照设计稿原样）');
+assert.strictEqual(byText.get('fw:root/semibold').attrs.FontWeight, '600',
+  'font-weight=600 的 TextBlock 必须发射 FontWeight="600"');
+assert.strictEqual(byText.get('fw:root/normal').attrs.FontWeight, undefined,
+  'font-weight=400（normal）不得发射 FontWeight');
+assert.strictEqual(byText.get('fw:root/normal').attrs.FontSize, '16',
+  'FontSize 仍按字体事实恒写（与 FontWeight 规则互不影响）');
+assert.strictEqual(byText.get('fw:root/bold').attrs.FontSize, '16');
+
+console.log('PASS MTSLG DSL-to-mapping TextBlock FontWeight regression test');

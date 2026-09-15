@@ -393,7 +393,7 @@ const ATTR_ORDER = [
   'UserRightId',
   'IsAutoRead', 'IsAutoWrite', 'IsAutoRefresh', 'IsWriteIO', 'IsSave',
   'IsShowDialog', 'DialogMessage', 'IsShowStatus', 'IsNeedRedMark', 'StatusBrush',
-  'Foreground', 'FontSize', 'Orientation', 'ItemsSourceFile', 'DisplayMemberPath',
+  'Foreground', 'FontSize', 'FontWeight', 'Orientation', 'ItemsSourceFile', 'DisplayMemberPath',
   'SelectedValuePath', 'Filter', 'DefaultValue', 'MinValue', 'MaxValue', 'MinRange',
   'MaxRange', 'DecimalPlaces', 'Keypad', 'MaxLength', 'DisableRow', 'DesignPanelID',
   'ParameterName',
