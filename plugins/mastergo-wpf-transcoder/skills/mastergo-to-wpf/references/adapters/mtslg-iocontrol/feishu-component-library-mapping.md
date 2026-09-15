@@ -171,7 +171,7 @@ MasterGo 组件库已存在真实变体 `密码输入框`，但当前 MT3.0 IOCo
 固定节点：一个固定 GroupBox 外壳；对外只有两个业务参数：标题名称→Header；多语言资源→LangName（由 Header 查资源库）。内部子节点按子组件模板展开。
 
 ```
-<IOContorl ID="{id_group}" ControlType="GroupBox" Style="" Header="{header}" LangName="{lang_name}" IOName="" IOVisible="" IOEnable="" MinValue="" MaxValue="" Width="{width}" Height="{height}" Left="{left}" Top="{top}">{child_io_controls}</IOContorl>
+<IOContorl ID="{id_group}" ControlType="GroupBox" Style="IOGroupBoxSecondary" Header="{header}" LangName="{lang_name}" IOName="" IOVisible="" IOEnable="" MinValue="" MaxValue="" Width="{width}" Height="{height}" Left="{left}" Top="{top}">{child_io_controls}</IOContorl>
 ```
 
 - 根组件内标题 TEXT（例如“单轴控制”）→Header；再由 Header 查询对应 LangName。
