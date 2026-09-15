@@ -34,7 +34,7 @@ fs.writeFileSync(manifestPath, JSON.stringify({
     // 菜单项没有独立方法名字段：方法名只从 langName 派生。
     { name: '倍率变更', index: 11, langName: 'MenuItemMagnificationChange' },
     // 不带 MenuItem 前缀的键（手工/外部清单可能出现）：按整键取名。
-    { name: '无前缀键按钮', index: 12, langName: 'SharedFocusKey' },
+    { name: '无前缀键按钮', index: 12, langName: 'ManualFocusKey' },
     // 没有 langName 的按钮：退回内联 TODO，并给出对应的 reason。
     { name: '无键按钮', index: 13 }
   ]
@@ -93,13 +93,13 @@ assert.match(result.stdout, /"name": "工件边缘录入"/, 'stdout 审计必须
 // 退回原因必须按条件分文案（临时键 / 没有 langName），与文档的四条清单一一对应。
 assert.match(result.stdout, /是临时键 MenuItemIndex<n>/, '临时键必须给出对应 reason');
 assert.match(result.stdout, /该菜单项没有 LangName/, '没有 langName 必须给出对应 reason');
-assert.ok(!/LangName "SharedFocusKey"/.test(result.stdout), '共享键应能派生方法名，不该出现退回 reason');
+assert.ok(!/LangName "ManualFocusKey"/.test(result.stdout), '无前缀键应能派生方法名，不该出现退回 reason');
 // 方法名只来自 langName：MenuItemMagnificationChange -> MagnificationChange。
 assert.match(generatedViewModel, /\n {20}case "倍率变更":\n {24}MagnificationChange\(\);\n {24}break;/);
 assert.match(generatedViewModel, /private void MagnificationChange\(\)/);
 // 不带 MenuItem 前缀的键不做前缀拦截：整键即方法名。
-assert.match(generatedViewModel, /\n {20}case "无前缀键按钮":\n {24}SharedFocusKey\(\);\n {24}break;/);
-assert.match(generatedViewModel, /private void SharedFocusKey\(\)/);
+assert.match(generatedViewModel, /\n {20}case "无前缀键按钮":\n {24}ManualFocusKey\(\);\n {24}break;/);
+assert.match(generatedViewModel, /private void ManualFocusKey\(\)/);
 // 一个按钮对应一个方法：发射的方法数量必须与审计列出的方法数量一致。
 const handlerCount = (generatedViewModel.match(/ {8}private void [A-Za-z_][A-Za-z0-9_]*\(\)/g) || []).length;
 const methodListCount = (JSON.parse(result.stdout).viewModel.buttonMethods || []).length;
