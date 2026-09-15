@@ -46,6 +46,7 @@ const sourceNodes = [];
 const nodeByRef = new Map();
 const fontSizeByRef = new Map();
 const fontWeightByRef = new Map();
+const fontStyleNameByRef = new Map();
 // 映射表登记的 TextBlock FontWeight 规则（命中才写、值照设计稿原样；normal 不写）。
 const fontWeightRule = templateMap.textBlockFontWeight || {};
 const fontWeightAttr = typeof fontWeightRule.attr === "string" && fontWeightRule.attr ? fontWeightRule.attr : "FontWeight";
@@ -59,6 +60,24 @@ const fontWeightNormalValues = new Set(
     return String(value).trim().toLowerCase();
   })
 );
+// 设计稿字体样式名里的"正常体"写法（各字体族不一致：Regular / 55 Regular / 常规体 …）。
+const fontStyleNormalNames = new Set(
+  (Array.isArray(fontWeightRule.normalStyleNames) && fontWeightRule.normalStyleNames.length
+    ? fontWeightRule.normalStyleNames
+    : ["regular", "normal", "book", "标准体", "常规体", "常规"]).map(function (value) {
+    return String(value).trim().toLowerCase();
+  })
+);
+// "75 SemiBold" / "55 Regular" 这类带字体族档位数字的样式名：去掉前缀数字档位，
+// 保留设计稿自己写的字重名（去掉后 WPF 也认）。
+function designFontStyleName(rawStyle) {
+  if (typeof rawStyle !== "string" || !rawStyle.trim()) return null;
+  let name = rawStyle.trim();
+  const parsed = /^\{[\s\S]*\}$/.test(name) ? JSON.parse(name) : null;
+  if (parsed && typeof parsed.fontStyle === "string") name = parsed.fontStyle.trim();
+  name = name.replace(/^\d+(?:\.\d+)?[\s\-–_]*/, "").trim();
+  return name || null;
+}
 const parents = new Map();
 const outputNodes = [];
 const outputRefBySource = new Map();
@@ -97,9 +116,20 @@ function walk(node, parentRef, pageAbsX, pageAbsY) {
   const font = Array.isArray(node.text) && node.text[0] ? node.text[0].font : null;
   const fontValue = font && dsl.styles && dsl.styles[font] ? dsl.styles[font].value : null;
   if (fontValue && typeof fontValue.size === "number") fontSizeByRef.set(node.id, fontValue.size);
-  // font-weight：只有非 normal（400）时才在 TextBlock 上发射 FontWeight（规则见映射表 textBlockFontWeight）。
+  // font-weight：值取设计稿自己的字体样式名（styles[...].value.style → fontStyle，
+  // 如 "Bold" / "75 SemiBold"→"SemiBold" / "55 Regular"→normal），规则见映射表 textBlockFontWeight。
   if (fontValue && fontValue.weight !== undefined && fontValue.weight !== null) {
     fontWeightByRef.set(node.id, String(fontValue.weight).trim());
+  }
+  if (fontValue && typeof fontValue.style === "string") {
+    try {
+      const styleName = designFontStyleName(fontValue.style);
+      if (styleName) fontStyleNameByRef.set(node.id, styleName);
+    } catch (error) {
+      // style 不是 JSON（例如直接写 "Bold"）时按原样处理。
+      const styleName = designFontStyleName(String(fontValue.style).replace(/^"|"$/g, ""));
+      if (styleName) fontStyleNameByRef.set(node.id, styleName);
+    }
   }
   for (const child of node.children || []) walk(child, node.id, x === null ? pageAbsX : x, y === null ? pageAbsY : y);
 }
@@ -380,8 +410,15 @@ function addText(ref) {
   const attrs = { Value: s.text };
   const size = fontSizeByRef.get(ref);
   if (typeof size === "number") attrs.FontSize = String(size);
+  // FontWeight 的值取设计稿的字体样式名（"Bold" / "SemiBold" …）；样式名缺失时才回退到 weight 数值。
+  // 样式名或数值属于 normal（Regular / 常规体 / 400 / normal）时不写该属性。
+  const styleName = fontStyleNameByRef.get(ref);
   const weight = fontWeightByRef.get(ref);
-  if (weight !== undefined && !fontWeightNormalValues.has(weight.toLowerCase())) attrs[fontWeightAttr] = weight;
+  if (styleName !== undefined && !fontStyleNormalNames.has(styleName.toLowerCase())) {
+    attrs[fontWeightAttr] = styleName;
+  } else if (styleName === undefined && weight !== undefined && !fontWeightNormalValues.has(weight.toLowerCase())) {
+    attrs[fontWeightAttr] = weight;
+  }
   const xmlId = addNode(ref, "TextBlock", attrs, { xmlId: `MGText_${String(textAudit.length + 1).padStart(4, "0")}` });
   textAudit.push({ sourceRef: ref, sourceText: s.text, visibility: true, role: "content", decision: "emit", outputRefs: [xmlId] });
   return xmlId;

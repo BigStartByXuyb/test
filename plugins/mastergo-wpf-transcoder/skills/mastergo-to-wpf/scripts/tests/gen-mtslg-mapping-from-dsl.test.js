@@ -381,9 +381,10 @@ console.log('PASS MTSLG DSL-to-mapping container (infoGroupTemplates) regression
 // ---- TextBlock FontWeight：设计稿 font-weight 非 normal 才发射，值照设计稿原样 ----
 const fontWeightDsl = {
   styles: {
-    'font_bold': { value: { family: 'Alibaba PuHuiTi 2.0', size: 16, weight: '700' } },
-    'font_semibold': { value: { family: 'Alibaba PuHuiTi 2.0', size: 18, weight: '600' } },
-    'font_normal': { value: { family: 'Alibaba PuHuiTi 2.0', size: 16, weight: '400' } },
+    'font_bold': { value: { family: 'DIN Alternate', size: 16, weight: '700', style: '{"fontStyle":"Bold","opsz":"auto"}' } },
+    'font_semibold': { value: { family: 'Alibaba PuHuiTi 2.0', size: 18, weight: '600', style: '{"fontStyle":"75 SemiBold","opsz":"auto"}' } },
+    'font_normal': { value: { family: 'Alibaba PuHuiTi 2.0', size: 16, weight: '400', style: '{"fontStyle":"55 Regular","opsz":"auto"}' } },
+    'font_cn_regular': { value: { family: 'PingFang SC', size: 16, weight: '400', style: '{"fontStyle":"常规体","opsz":"auto"}' } },
   },
   nodes: [{
     type: 'INSTANCE', id: 'fw:root', name: '字体页',
@@ -393,6 +394,7 @@ const fontWeightDsl = {
       styledTextNode('fw:root/bold', 'fw:root', '加粗标题', 20, 300, 'font_bold'),
       styledTextNode('fw:root/semibold', 'fw:root', '半粗标签', 20, 340, 'font_semibold'),
       styledTextNode('fw:root/normal', 'fw:root', '普通正文', 20, 380, 'font_normal'),
+      styledTextNode('fw:root/cn-regular', 'fw:root', '中文常规', 20, 420, 'font_cn_regular'),
     ],
   }],
 };
@@ -400,12 +402,14 @@ const fontWeightMapping = runMappingCase('textblock-font-weight', fontWeightDsl,
 const byText = new Map(fontWeightMapping.nodes
   .filter(node => node.controlType === 'TextBlock')
   .map(node => [node.sourceRef, node]));
-assert.strictEqual(byText.get('fw:root/bold').attrs.FontWeight, '700',
-  'font-weight=700 的 TextBlock 必须发射 FontWeight="700"（值照设计稿原样）');
-assert.strictEqual(byText.get('fw:root/semibold').attrs.FontWeight, '600',
-  'font-weight=600 的 TextBlock 必须发射 FontWeight="600"');
+assert.strictEqual(byText.get('fw:root/bold').attrs.FontWeight, 'Bold',
+  '必须写设计稿自己的字体样式名（fontStyle="Bold"），不是数值 700');
+assert.strictEqual(byText.get('fw:root/semibold').attrs.FontWeight, 'SemiBold',
+  '带字体族档位的样式名要去掉前缀数字（"75 SemiBold" → "SemiBold"）');
 assert.strictEqual(byText.get('fw:root/normal').attrs.FontWeight, undefined,
-  'font-weight=400（normal）不得发射 FontWeight');
+  '"55 Regular" 视为 normal，不得发射 FontWeight');
+assert.strictEqual(byText.get('fw:root/cn-regular').attrs.FontWeight, undefined,
+  '中文"常规体"同样视为 normal，不得发射 FontWeight');
 assert.strictEqual(byText.get('fw:root/normal').attrs.FontSize, '16',
   'FontSize 仍按字体事实恒写（与 FontWeight 规则互不影响）');
 assert.strictEqual(byText.get('fw:root/bold').attrs.FontSize, '16');
