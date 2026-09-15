@@ -497,6 +497,9 @@ for (const { item: inst, match } of matched) {
     addInstance(match, inst.ref, []);
     // 内部 TEXT 显式 consume + omit：既不发射成页面 TextBlock，也不让它们漏进通用文本循环。
     const innerPolicy = cameraSpec.innerTextPolicy;
+    if (innerPolicy.decision !== "omit") {
+      throw new Error("cameraTemplates.innerTextPolicy.decision 必须是 omit：相机视口内部文本不发射、不走通用文本循环");
+    }
     for (const ref of descendants(inst.ref)) {
       const s = source(ref);
       if (s.type !== "TEXT" || consumedTexts.has(ref)) continue;
@@ -506,7 +509,7 @@ for (const { item: inst, match } of matched) {
         sourceText: s.text,
         visibility: visible(ref),
         role: innerPolicy.role,
-        decision: "omit",
+        decision: innerPolicy.decision,
         omitReason: innerPolicy.role,
         outputRefs: []
       });

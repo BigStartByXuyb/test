@@ -118,6 +118,18 @@ assert.ok(mainSkill.includes(cameraFamily.innerTextPolicy.role),
   "SKILL.md 的可见性映射边界必须写明相机内部文本的 omit 角色");
 assert.ok(fontGenerator.includes("innerTextPolicy"),
   "映射生成器必须按 innerTextPolicy 消费/omit 相机内部文本");
+// innerTextPolicy 的每个字段都必须被生成器真正消费（禁止"登记了但没人读"）。
+for (const field of ["innerTextPolicy.decision", "innerTextPolicy.role"]) {
+  const token = field.split(".")[1];
+  assert.ok(fontGenerator.includes("innerPolicy." + token),
+    "映射生成器必须读取 " + field + "（登记字段必须是行为真值源）: " + token);
+}
+// SKILL.md 的 omit 说明必须指向 OMIT_ROLES 真值源，并列出集合里的全部角色（避免封闭清单与指针两读）。
+const omitRolesMatch = /const OMIT_ROLES = \[([^\]]+)\]/.exec(validator);
+assert.ok(omitRolesMatch, "必须能在校验器里读到 OMIT_ROLES 定义");
+for (const role of omitRolesMatch[1].split(",").map((item) => item.trim().replace(/^'|'$/g, "")).filter(Boolean)) {
+  assert.ok(mainSkill.includes(role), "SKILL.md 的 omit 说明必须列出 OMIT_ROLES 里的角色: " + role);
+}
 
 // ---------- 2. 脚本内置默认 == 映射表（防止三处各写一份后漂移） ----------
 function objectLiteralOf(source, constName) {
