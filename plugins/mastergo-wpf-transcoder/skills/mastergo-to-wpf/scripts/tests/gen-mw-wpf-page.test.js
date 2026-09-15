@@ -25,10 +25,12 @@ fs.writeFileSync(manifestPath, JSON.stringify({
   iconPath: 'Resources/Pages/F2NewOperation/F2NewOperationIcons.xaml',
   pageXmlPath: 'Resources/Pages/F2NewOperation/F2NewOperationPage.xml',
   // 底部按钮 → ViewModel 里 switch (message.ButtonName) 的 case 骨架（空名称不生成 case）
+  // langName 是按钮处理方法名的来源：MenuItemFocus -> Focus；临时键 MenuItemIndex<n> 不派生方法名。
   menuItems: [
-    { name: '新建示教', index: 1 },
+    { name: '新建示教', index: 1, langName: 'MenuItemNewTeaching' },
     { name: '', index: 2 },
-    { name: '对焦', index: 10 }
+    { name: '工件边缘录入', index: 3, langName: 'MenuItemIndex3' },
+    { name: '对焦', index: 10, langName: 'MenuItemFocus' }
   ]
 }, null, 2), 'utf8');
 
@@ -68,8 +70,20 @@ assert.match(generatedViewModel, /case "新建示教":/);
 assert.match(generatedViewModel, /case "对焦":/);
 assert.ok(!/case "":/.test(generatedViewModel), '空名称菜单项不得生成 case');
 // 缩进：switch 的 { 在 16 空格，case 必须在 20 空格（比 { 再进一层），case 体 24 空格。
-assert.match(generatedViewModel, /\n {16}\{\n {20}case "新建示教":\n {24}\/\/ TODO: 新建示教 按钮处理\n {24}break;/,
-  'case 必须相对 switch 的 { 再缩进一层，case 体再缩进一层');
+// 有 LangName 的按钮：case 只调用按钮处理方法（方法名 = LangName 去 MenuItem 前缀）。
+assert.match(generatedViewModel, /\n {16}\{\n {20}case "新建示教":\n {24}NewTeaching\(\);\n {24}break;/,
+  'case 必须相对 switch 的 { 再缩进一层，命中方法名的按钮 case 体调用该方法');
+// 一钮一方法：<summary> 写设计稿按钮文案，方法体只留 TODO，业务由工程师填。
+assert.match(generatedViewModel,
+  / {8}\/\/\/ <summary>\n {8}\/\/\/ 新建示教\n {8}\/\/\/ <\/summary>\n {8}private void NewTeaching\(\)\n {8}\{\n {12}\/\/ TODO: 新建示教 按钮处理\n {8}\}/,
+  '必须为命中方法名的按钮生成 <summary> + private void 处理方法');
+assert.match(generatedViewModel, /private void Focus\(\)/, '对焦 -> Focus');
+// 临时 LangName（MenuItemIndex<n>）不派生方法名，退回内联 TODO。
+assert.match(generatedViewModel, /\n {20}case "工件边缘录入":\n {24}\/\/ TODO: 工件边缘录入 按钮处理\n {24}break;/,
+  '临时键按钮必须退回内联 TODO，不得生成 Index3() 这样的方法名');
+assert.ok(!/private void Index3\(\)/.test(generatedViewModel), '临时键不得派生按钮处理方法');
+assert.match(result.stdout, /新建示教 -> NewTeaching/, 'stdout 审计必须列出按钮 -> 方法');
+assert.match(result.stdout, /"name": "工件边缘录入"/, 'stdout 审计必须列出退回内联 TODO 的按钮');
 
 let csproj = fs.readFileSync(csprojPath, 'utf8');
 assert.match(csproj, /<Compile Include="UI\\F2-Teach\\View\\F2NewOperationView\.xaml\.cs"\s*\/>/);

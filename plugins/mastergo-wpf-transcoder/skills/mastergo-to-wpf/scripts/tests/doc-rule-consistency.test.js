@@ -270,5 +270,28 @@ for (const rel of MUST_STATE_NO_PARENT_MATCH_KEY) {
     `${rel} 必须有一句同时出现「父节点语义」与「不作为匹配键 / 不是匹配键 / 不参与匹配」`);
 }
 
+// ---------- 7. ViewModel 按钮处理方法名：人读文档口径 ↔ 宿主壳脚本实现必须同步 ----------
+// 规则真值源只有两处：page-shell-generator.md 的「按钮处理方法（一钮一方法）」+ gen-mw-wpf-page.js。
+// 背景：方法名曾在文档里只写「case 骨架」、脚本也只发内联 TODO；新增一钮一方法后若只改一处，
+// 就会出现「文档说调用方法、脚本还在发 TODO」的两读。
+const SHELL_DOC = path.join(__dirname, "..", "..", "references", "adapters", "mw-wpf", "page-shell-generator.md");
+const shellDoc = fs.readFileSync(SHELL_DOC, "utf8");
+const hostGenerator = fs.readFileSync(path.join(__dirname, "..", "gen-mw-wpf-page.js"), "utf8");
+assert.ok(shellDoc.includes("按钮处理方法（一钮一方法）"), "页面壳文档必须登记「按钮处理方法（一钮一方法）」小节");
+for (const token of ["methodName", "langName", "MenuItem", "MenuItemIndex"]) {
+  assert.ok(shellDoc.includes(token), "页面壳文档必须写明按钮方法名取值链里的 " + token);
+}
+assert.ok(hostGenerator.includes("methodNameFromLangName") && hostGenerator.includes("resolveButtonHandlers"),
+  "宿主壳生成器必须实现按钮方法名解析（methodNameFromLangName / resolveButtonHandlers）");
+assert.ok(hostGenerator.includes('const MENU_KEY_PREFIX = "MenuItem"'),
+  "方法名派生必须以菜单键前缀 MenuItem 为界（langName 去前缀 = 按钮英文语义名）");
+assert.ok(hostGenerator.includes("PROVISIONAL_MENU_KEY"),
+  "临时键 MenuItemIndex<n> 必须显式排除，不得当作按钮英文名");
+assert.ok(hostGenerator.includes('"        private void " + item.method + "()"'),
+  "宿主壳生成器必须发射 private void <方法名>() 处理方法骨架");
+assert.ok(hostGenerator.includes("inlineTodoCases"),
+  "解析不出方法名的按钮必须退回内联 TODO，并登记进审计 inlineTodoCases");
+
 console.log("PASS 按钮族固定字段单一真值源（映射表 ↔ 脚本默认 ↔ 两份 Skill ↔ 两份人读参考）一致性回归测试");
+console.log("PASS ViewModel 按钮处理方法名口径（page-shell-generator.md ↔ gen-mw-wpf-page.js）");
 console.log("PASS 已作废表述（父节点语义匹配键 / parentVariants）插件根 .md 扫描");

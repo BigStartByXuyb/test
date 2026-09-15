@@ -222,13 +222,17 @@ function loadManifest(manifestPath) {
   if (iconPath) files.push({ kind: "Page", relative: iconPath });
   langPaths.forEach(function (relative) { files.push({ kind: "Page", relative }); });
   files.push({ kind: "Content", relative: pageXmlPath });
+  // 底部按钮（Layout MenuItem）→ ViewModel 的 case 列表与按钮处理方法名。
+  const buttonNames = normalizeButtonNames(manifest);
+  const buttonHandlers = resolveButtonHandlers(manifest, buttonNames);
   return {
     projectRoot, csprojPath, csprojText, rootNamespace, area, namespaceArea,
     operation: manifest.operation || "new",
     pageName, viewName, viewModelName, xmlPageName, iconPath, pageXmlPath,
     langPaths,
     viewRelative, codeBehindRelative, viewModelRelative,
-    buttonNames: normalizeButtonNames(manifest),
+    buttonNames,
+    buttonHandlers,
     designWidth: manifest.designWidth || 1280, designHeight: manifest.designHeight || 1024,
     files
   };
@@ -273,11 +277,17 @@ function renderViewModel(config) {
   const ns = config.rootNamespace + "." + config.namespaceArea + ".ViewModel";
   // switch (message.ButtonName) 的 case：本页底部（Layout Menu）全部按钮名，
   // 逐个生成 case 骨架供工程师填业务；空名称按钮不生成 case。
+  // 能解析出英文方法名的按钮：case 只负责调用该按钮的处理函数（一钮一方法），
+  // 函数体只留 TODO 注释；方法名解析不出来的按钮退回内联 TODO（不猜名字）。
+  const handlers = (config.buttonHandlers && config.buttonHandlers.methods) || [];
+  const methodByName = new Map(handlers.map(function (item) { return [item.name, item.method]; }));
   const caseLines = [];
   (config.buttonNames || []).forEach(function (name) {
     // case 相对 switch 的 { 再缩进一层（4 空格），case 体再缩进一层。
     caseLines.push("                    case \"" + csString(name) + "\":");
-    caseLines.push("                        // TODO: " + name + " 按钮处理");
+    const method = methodByName.get(name);
+    if (method) caseLines.push("                        " + method + "();");
+    else caseLines.push("                        // TODO: " + name + " 按钮处理");
     caseLines.push("                        break;");
   });
   const head = [
@@ -301,12 +311,27 @@ function renderViewModel(config) {
     "            if (message.IsMouseDown)", "            {",
     "                switch (message.ButtonName)", "                {"
   ];
+  // 按钮处理方法：一钮一方法，方法体只留 TODO，业务由工程师填。
+  // <summary> 写设计稿按钮文案（中文），方法名写英文语义名。
+  const handlerLines = [];
+  handlers.forEach(function (item) {
+    if (handlerLines.length) handlerLines.push("");
+    handlerLines.push("        /// <summary>");
+    handlerLines.push("        /// " + xmlDocText(item.name));
+    handlerLines.push("        /// </summary>");
+    handlerLines.push("        private void " + item.method + "()");
+    handlerLines.push("        {");
+    handlerLines.push("            // TODO: " + item.name + " 按钮处理");
+    handlerLines.push("        }");
+  });
   const tail = [
-    "                }", "            }", "        }", "",
+    "                }", "            }", "        }"
+  ].concat(handlerLines.length ? [""].concat(handlerLines) : []).concat([
+    "",
     "        /// <summary>", "        /// 确认按钮", "        /// </summary>",
     "        public void OKCmd()", "        {",
     "            pageDesign.SaveXml();", "        }", "    }", "}", ""
-  ];
+  ]);
   return head.concat(caseLines).concat(tail).join("\n");
 }
 
@@ -325,6 +350,84 @@ function normalizeButtonNames(manifest) {
   if (Array.isArray(manifest.buttonNames)) manifest.buttonNames.forEach(push);
   if (Array.isArray(manifest.menuItems)) manifest.menuItems.forEach(function (item) { if (item) push(item.name); });
   return list;
+}
+
+// C# 关键字：派生出的按钮方法名命中关键字时不可直接使用，退回内联 TODO（不猜、不改名）。
+const CSHARP_KEYWORDS = new Set([
+  "abstract", "as", "base", "bool", "break", "byte", "case", "catch", "char", "checked", "class",
+  "const", "continue", "decimal", "default", "delegate", "do", "double", "else", "enum", "event",
+  "explicit", "extern", "false", "finally", "fixed", "float", "for", "foreach", "goto", "if",
+  "implicit", "in", "int", "interface", "internal", "is", "lock", "long", "namespace", "new",
+  "null", "object", "operator", "out", "override", "params", "private", "protected", "public",
+  "readonly", "ref", "return", "sbyte", "sealed", "short", "sizeof", "stackalloc", "static",
+  "string", "struct", "switch", "this", "throw", "true", "try", "typeof", "uint", "ulong",
+  "unchecked", "unsafe", "ushort", "using", "virtual", "void", "volatile", "while"
+]);
+
+// 菜单项 LanguageKey 命名空间 = MenuItem + 语义英文名（见 gen-mtslg-lang-keys-from-dsl.js）。
+// MenuItemIndex<n> 是语言键派生器在拿不到语义名时写的临时键，不能当作按钮英文名使用。
+const MENU_KEY_PREFIX = "MenuItem";
+const PROVISIONAL_MENU_KEY = /^MenuItemIndex\d+$/;
+
+// 由菜单项 LanguageKey 派生按钮处理方法名：MenuItemFocus -> Focus。
+// 取不到语义名（临时键 / 前缀不符 / 非法标识符 / C# 关键字）返回空串，由调用方退回内联 TODO。
+function methodNameFromLangName(langName) {
+  const key = typeof langName === "string" ? langName.trim() : "";
+  if (key === "" || PROVISIONAL_MENU_KEY.test(key)) return "";
+  if (key.indexOf(MENU_KEY_PREFIX) !== 0) return "";
+  const suffix = key.slice(MENU_KEY_PREFIX.length);
+  if (!isIdentifier(suffix) || CSHARP_KEYWORDS.has(suffix)) return "";
+  return suffix;
+}
+
+// 按钮处理方法解析（机械、可审计，不推断语义）：
+//   取值链 1：menuItems[].methodName（工程师显式登记，优先）
+//   取值链 2：menuItems[].langName 去掉 MenuItem 前缀
+// 一个按钮名只解析一次；方法名已被别的按钮占用时不复用，退回内联 TODO 并记录原因。
+function resolveButtonHandlers(manifest, buttonNames) {
+  const itemByName = new Map();
+  (Array.isArray(manifest.menuItems) ? manifest.menuItems : []).forEach(function (item) {
+    if (!item) return;
+    const name = String(item.name === undefined || item.name === null ? "" : item.name).trim();
+    if (!name || itemByName.has(name)) return;
+    itemByName.set(name, item);
+  });
+  const methods = [];
+  const inlineTodoCases = [];
+  const ownerByMethod = new Map();
+  buttonNames.forEach(function (name) {
+    const item = itemByName.get(name) || {};
+    const declared = typeof item.methodName === "string" ? item.methodName.trim() : "";
+    let method = "";
+    let reason = "";
+    if (declared) {
+      if (isIdentifier(declared) && !CSHARP_KEYWORDS.has(declared)) method = declared;
+      else reason = "menuItems[].methodName 不是可用的 C# 方法名: \"" + declared + "\"";
+    } else {
+      method = methodNameFromLangName(item.langName);
+      if (!method) {
+        reason = item.langName
+          ? "LangName \"" + item.langName + "\" 无法派生方法名（临时键、前缀不符或非法标识符）"
+          : "该菜单项没有 LangName";
+      }
+    }
+    if (method && ownerByMethod.has(method) && ownerByMethod.get(method) !== name) {
+      reason = "方法名 " + method + " 已被按钮 \"" + ownerByMethod.get(method) + "\" 占用";
+      method = "";
+    }
+    if (method) {
+      ownerByMethod.set(method, name);
+      methods.push({ name: name, method: method });
+    } else {
+      inlineTodoCases.push({ name: name, reason: reason });
+    }
+  });
+  return { methods: methods, inlineTodoCases: inlineTodoCases };
+}
+
+// C# XML 文档注释里的按钮文案：& < > 必须转义，否则编译器按 XML 解析会告警。
+function xmlDocText(value) {
+  return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 function itemBlock(kind, include) {
@@ -422,6 +525,13 @@ function main() {
     projectRoot: config.projectRoot,
     generated: [...contents.keys()],
     registered,
+    // ViewModel 按钮处理审计：命中英文方法名的按钮 vs 退回内联 TODO 的按钮（含原因）。
+    viewModel: {
+      buttonMethods: config.buttonHandlers.methods.map(function (item) {
+        return item.name + " -> " + item.method;
+      }),
+      inlineTodoCases: config.buttonHandlers.inlineTodoCases
+    },
     backups,
     overwrite: args.overwrite
   }, null, 2));

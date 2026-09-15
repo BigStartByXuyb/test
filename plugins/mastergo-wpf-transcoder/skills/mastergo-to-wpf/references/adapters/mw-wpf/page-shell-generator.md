@@ -60,13 +60,29 @@ public class <Page>ViewModel : IOScreen, IPage
                 switch (message.ButtonName)
                 {
                     case "新建示教":                              // 本页底部 Layout Menu 的每个 MenuItem
-                        // TODO: 新建示教 按钮处理
+                        NewTeaching();                            // 方法名 = MenuItem LangName 去 MenuItem 前缀
                         break;
                     case "对焦":
-                        // TODO: 对焦 按钮处理
+                        Focus();
                         break;
             }
         }
+    }
+
+    /// <summary>
+    /// 新建示教                                        // <summary> 写设计稿按钮文案（中文）
+    /// </summary>
+    private void NewTeaching()                        // 一钮一方法：方法名是按钮的英文语义名
+    {
+        // TODO: 新建示教 按钮处理                        // 业务由工程师填
+    }
+
+    /// <summary>
+    /// 对焦
+    /// </summary>
+    private void Focus()
+    {
+        // TODO: 对焦 按钮处理
     }
 
     public void OKCmd() { pageDesign.SaveXml(); }                  // 确认按钮
@@ -77,12 +93,23 @@ public class <Page>ViewModel : IOScreen, IPage
 
 ### switch case 的来源
 
-`switch (message.ButtonName)` 的 `case` **按本页底部按钮逐个生成**（每个 `case` 带一行 `// TODO: <按钮名> 按钮处理` 与 `break;`，业务由工程师填）：
+`switch (message.ButtonName)` 的 `case` **按本页底部按钮逐个生成**（每个 `case` 以 `break;` 收尾，业务由工程师填）：
 
 - 来源：清单里的 `menuItems`（Bundle 传的就是本页 Layout Menu 的 MenuItem 列表），取每项 `name`；也可用 `buttonNames: ["…"]` 直接给出。
 - 规则：按菜单顺序生成；重复名称只生成一次；**空名称的菜单项不生成 case**（Layout 里 `Name=""` 的占位项没有可用按钮名）。
-- 缩进：`case` 相对 `switch` 的 `{` 再缩进一层（4 空格），`case` 体（TODO 注释与 `break;`）再缩进一层。
-- 生成器不推断按钮语义，也不写业务逻辑。
+- 缩进：`case` 相对 `switch` 的 `{` 再缩进一层（4 空格），`case` 体（方法调用或 TODO 注释 + `break;`）再缩进一层。
+- 生成器不推断按钮语义，也不写业务逻辑；按钮的**英文方法名**只从已登记的名字派生，见下节。
+
+### 按钮处理方法（一钮一方法）
+
+解析出英文方法名的按钮：`case` 只负责调用该按钮的处理方法，方法体只留 `// TODO: <按钮名> 按钮处理`，业务由工程师按方法填：
+
+- `private void <方法名>()`：一钮一方法，方法体为空骨架；`/// <summary>` 写**设计稿按钮文案（中文）**，便于工程师对照底部菜单定位。
+- 方法名取值链（机械、可审计，不猜语义）：
+  1. `menuItems[].methodName`：工程师在本页清单里显式登记的方法名（优先，必须是合法 C# 标识符且不是关键字）；
+  2. `menuItems[].langName` 去掉 `MenuItem` 前缀：菜单键命名空间就是 `MenuItem + 英文语义名`（如 `MenuItemFocus` → `Focus`、`MenuItemZAxisCalibration` → `ZAxisCalibration`、`MenuItemActionParam` → `ActionParam`）。
+- 退回内联 TODO 的情形（**不改名、不猜名、不失败**）：没有 `langName`；`langName` 是临时键 `MenuItemIndex<n>`（语言键派生器拿不到语义名时的占位）；去前缀后不是合法标识符；命中 C# 关键字；方法名已被同页另一个按钮占用。这些 case 保留旧的 `// TODO: <按钮名> 按钮处理` + `break;` 形状。
+- 脚本 stdout 的 `viewModel.buttonMethods`（`<按钮名> -> <方法名>`）与 `viewModel.inlineTodoCases`（按钮名 + 退回原因）是本节的审计口径。
 
 ## 执行
 
