@@ -299,3 +299,43 @@ assert.match(missingEntryBadRun.stderr + missingEntryBadRun.stdout, /模板不�
   '失败信息必须来自「模板不含图标字段」分支，而不是按 IconButton 反推出的无图标占位分支');
 
 console.log('PASS provenance regression test');
+
+// ---- 文案承载属性：GroupBox 以 Header 承载文案（valueSource=dsl.text 时比 Header）----
+const headerXmlPath = path.join(dir, 'header-group.xml');
+const headerMappingPath = path.join(dir, 'header-group.json');
+fs.writeFileSync(headerXmlPath, [
+  '<IOContorl ID="" Left="NaN" Top="NaN" Width="NaN" Height="NaN">',
+  '  <IOContorl ID="MG_GROUP" ControlType="GroupBox" Style="" Header="周期名称" LangName="PGroupHeader" IOName="" IOVisible="" IOEnable="" MinValue="" MaxValue="" Width="252" Height="534" Left="790" Top="12" />',
+  '</IOContorl>'
+].join('\n'));
+fs.writeFileSync(headerMappingPath, JSON.stringify({
+  contentOriginY: 192,
+  rootRef: 'root',
+  sourceNodes: [
+    { ref: 'root', parentRef: null, pageAbsX: 0, pageAbsY: 0, relativeX: 0, relativeY: 0, width: 1280, height: 1024 },
+    { ref: 'root/group', parentRef: 'root', pageAbsX: 790, pageAbsY: 204, relativeX: 790, relativeY: 204, width: 252, height: 534 }
+  ],
+  nodes: [{
+    xmlId: 'MG_GROUP', sourceRef: 'root/group', sourceParent: 'root', sourceText: '周期名称', valueSource: 'dsl.text',
+    expectedLeft: 790, expectedTop: 12, expectedWidth: 252, expectedHeight: 534
+  }]
+}, null, 2));
+const headerRun = spawnSync(process.execPath, [cliScript, '--xml', headerXmlPath, '--mapping', headerMappingPath], { encoding: 'utf8' });
+assert.strictEqual(headerRun.status, 0,
+  'GroupBox 以 Header 承载文案时必须通过（不得要求 Value）: ' + headerRun.stderr + headerRun.stdout);
+
+const headerBadXmlPath = path.join(dir, 'header-group-bad.xml');
+fs.writeFileSync(headerBadXmlPath, fs.readFileSync(headerXmlPath, 'utf8').replace('Header="周期名称"', 'Header="别的标题"'));
+const headerBadRun = spawnSync(process.execPath, [cliScript, '--xml', headerBadXmlPath, '--mapping', headerMappingPath], { encoding: 'utf8' });
+assert.notStrictEqual(headerBadRun.status, 0, 'Header 与 DSL 文本不一致必须失败');
+assert.match(headerBadRun.stderr + headerBadRun.stdout, /Header="别的标题" != DSL="周期名称"/,
+  '失败信息必须点名 Header 与 DSL 文本不一致');
+
+const headerMissingXmlPath = path.join(dir, 'header-group-missing.xml');
+fs.writeFileSync(headerMissingXmlPath, fs.readFileSync(headerXmlPath, 'utf8')
+  .replace(' Header="周期名称"', '').replace(' LangName="PGroupHeader"', ''));
+const headerMissingRun = spawnSync(process.execPath, [cliScript, '--xml', headerMissingXmlPath, '--mapping', headerMappingPath], { encoding: 'utf8' });
+assert.notStrictEqual(headerMissingRun.status, 0, '既没有 Value 也没有 Header 必须失败');
+assert.match(headerMissingRun.stderr + headerMissingRun.stdout, /既没有 Value 也没有 Header/);
+
+console.log('PASS provenance Header-carrier regression test');

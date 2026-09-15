@@ -141,21 +141,41 @@ MasterGo 组件库已存在真实变体 `密码输入框`，但当前 MT3.0 IOCo
 
 ### 匹配规则
 
-组件集=信息分组-模块化。
+组件集=信息分组-模块化（`infoGroupTemplates.match.componentSet = true`）。组件集名取自实例**自身**的组件名；图层重命名不改变组件名。容器族不使用"内部实例子节点名"作为候选，避免页面根的第一个实例子节点与外层容器同名时把整页误判成容器。
 
 ### 固定模板：组件集=信息分组-模块化
 
 固定节点：一个固定 GroupBox 外壳；该组件对外只有两个业务参数：标题名称→Header；多语言资源→LangName（由 Header 查资源库）。内部子节点不是 GroupBox 的可变类型参数，按子组件模板展开。
 
 ```
-<IOContorl ID="{id_group}" IOName="" ControlType="GroupBox" IOEnable="{io_enable}" Header="{header}" LangName="{lang_name}" MinValue="" MaxValue="" Left="{left}" Top="{top}" Width="{width}" Height="{height}">{child_io_controls}</IOContorl>
+<IOContorl ID="{id_group}" ControlType="GroupBox" Style="" Header="{header}" LangName="{lang_name}" IOName="" IOVisible="" IOEnable="" MinValue="" MaxValue="" Width="{width}" Height="{height}" Left="{left}" Top="{top}">{child_io_controls}</IOContorl>
 ```
 
 - MasterGo 根组件名称/实例名称→组件身份，不写入 Header。
 - 根组件内标题 TEXT（例如“周期名称”）→Header；再由 Header 查询对应 LangName。
-- GroupBox 的位置、宽高来自根组件；组内子控件按各自模板生成，使用相对坐标。
+- GroupBox 的位置、宽高来自根组件；`Style` / `IOName` / `IOVisible` / `IOEnable` / `MinValue` / `MaxValue` 属于固定模板字段，没有可靠来源时输出空字符串值。
+- 组内子控件按各自模板生成，并使用**相对坐标**（`Left/Top` 相对 GroupBox，不再扣内容区偏移）。设计稿把子控件画在组件里但层级上是平级兄弟时，由 `apply-container-containment.js` 按**坐标完全包含**关系重挂为 GroupBox 的子节点（取面积最小的容器；越界 1px 不算包含；无法唯一判定时保持原状并写入冲突报告，不猜）。
+- 未命中该组件集的容器类实例仍按未映射组件处理（不产控件、内部文本不发射）；只有命中的容器才展开子控件。
 
 信息分组内部的 TabControl/TabItem 只有在 MasterGo DSL 明确给出组件集、真实属性值、父子链和槽位来源后才展开；当前没有独立的正式变体模板，未确认时不生成占位 Tab 节点。
+
+# MasterGo 组件集：信息模块-手动控制弹层 → MTSLG 映射关系
+
+### 匹配规则
+
+组件集=信息模块-手动控制弹层（`infoGroupTemplates.match.componentSet = true`）。与信息分组同族：组件集名取自实例自身的组件名，图层重命名不影响。
+
+### 固定模板：组件集=信息模块-手动控制弹层
+
+固定节点：一个固定 GroupBox 外壳；对外只有两个业务参数：标题名称→Header；多语言资源→LangName（由 Header 查资源库）。内部子节点按子组件模板展开。
+
+```
+<IOContorl ID="{id_group}" ControlType="GroupBox" Style="" Header="{header}" LangName="{lang_name}" IOName="" IOVisible="" IOEnable="" MinValue="" MaxValue="" Width="{width}" Height="{height}" Left="{left}" Top="{top}">{child_io_controls}</IOContorl>
+```
+
+- 根组件内标题 TEXT（例如“单轴控制”）→Header；再由 Header 查询对应 LangName。
+- 位置、宽高来自根组件；固定模板字段没有可靠来源时输出空字符串值。
+- 组内子控件同样按各自模板生成并使用相对坐标，嵌套规则与信息分组一致（`childPolicy = nested-page-templates`）。
 
 # MasterGo 控件类型：IconButton → MTSLG 映射规则
 

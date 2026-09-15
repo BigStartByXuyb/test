@@ -252,7 +252,16 @@ function validate(xmlPath, manifestPath) {
     }
     if (n.valueSource === 'dsl.text') {
       if (typeof n.sourceText !== 'string') errors.push('[' + n.xmlId + '] 缺少 sourceText');
-      else if (x.Value !== n.sourceText) errors.push('[' + n.xmlId + '] Value="' + (x.Value || '') + '" != DSL="' + n.sourceText + '"');
+      else {
+        // 文案承载属性：带 Value 的控件（TextBlock/Button/输入类…）比 Value；
+        // 容器类控件（GroupBox 等）以 Header 承载标题文案，此时比 Header。
+        const carrier = x.Value !== undefined ? 'Value' : (x.Header !== undefined ? 'Header' : null);
+        if (carrier === null) {
+          errors.push('[' + n.xmlId + '] valueSource=dsl.text 但 XML 既没有 Value 也没有 Header');
+        } else if (x[carrier] !== n.sourceText) {
+          errors.push('[' + n.xmlId + '] ' + carrier + '="' + (x[carrier] || '') + '" != DSL="' + n.sourceText + '"');
+        }
+      }
     } else if (x.ControlType === 'TextBlock') {
       errors.push('[' + n.xmlId + '] TextBlock 的 ValueSource 必须为 dsl.text');
     }

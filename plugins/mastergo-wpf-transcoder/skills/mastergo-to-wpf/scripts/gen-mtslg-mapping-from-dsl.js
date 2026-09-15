@@ -211,10 +211,25 @@ function formalMatches(n) {
   let componentSet = "";
   let byComponent = [];
   // 组件名来源：先看变体内部实例（聚合集合的变体），再看实例自身（独立组件直接放置）。
-  const candidateNames = [innerComponentName(n), typeof n.name === "string" ? n.name : ""].filter(Boolean);
+  // 容器族（childPolicy=nested-page-templates）额外要求命中实例**自身名**等于组件集名：
+  // 「先看内部实例名」是给聚合集合（如右栏）用的，页面根的第一个实例子节点恰好与外层容器同名时
+  // 会把整页误判成容器，因此容器族不允许走内部实例名这条候选路径。
+  const candidateNames = [
+    { name: innerComponentName(n), fromInner: true },
+    { name: typeof n.name === "string" ? n.name : "", fromInner: false }
+  ].filter(candidate => candidate.name);
   for (const candidate of candidateNames) {
-    const hits = componentSetIndex.get(candidate);
-    if (hits && hits.length) { componentSet = candidate; byComponent = hits; break; }
+    const hits = componentSetIndex.get(candidate.name);
+    if (!hits || !hits.length) continue;
+    const usable = hits.filter(hit => {
+      const variantSpec = templateMap[hit.family]?.variants?.[hit.variant];
+      if (candidate.fromInner && variantSpec?.childPolicy === "nested-page-templates") return false;
+      return true;
+    });
+    if (!usable.length) continue;
+    componentSet = candidate.name;
+    byComponent = usable;
+    break;
   }
   if (byComponent.length > 0) {
     // 同一组件名可能同时登记在“聚合变体族”和“独立组件族”：
@@ -433,6 +448,22 @@ for (const { item: inst, match } of matched) {
     const attrs = {};
     addNode(inst.ref, spec.controlType, attrs);
     addInstance(match, inst.ref, [slot("choice", inst.ref)]);
+    continue;
+  }
+  if (match.family === "infoGroupTemplates") {
+    // 容器类组件（信息分组 / 弹层）：发射一个 GroupBox 外壳，Header 取实例内第一条可见 TEXT。
+    // 该 TEXT 作为槽位被消费（不再作为独立 TextBlock，也不进入「未映射组件内部文本」隔离）；
+    // 壳内子控件由 apply-container-containment.js 按坐标完全包含关系重挂（childPolicy=nested-page-templates）。
+    const headerText = firstText(inst.ref);
+    const attrs = {};
+    if (spec.style) attrs.Style = spec.style;
+    if (headerText) attrs.Header = headerText.text;
+    addNode(inst.ref, spec.controlType || "GroupBox", attrs,
+      headerText ? { valueSourceRef: headerText.ref } : {});
+    if (headerText) addValueAudit(headerText.ref, inst.ref);
+    // 槽位 sourceRef 必须是**已发射的输出节点**（= GroupBox 自己，实例 ref），
+    // 标题文本作为 valueSourceRef 被消费（与 inputTemplates 的 slot 写法一致）。
+    addInstance(match, inst.ref, [slot("header", inst.ref, headerText ? headerText.ref : undefined)]);
     continue;
   }
   const innerRef = firstInner(inst.ref);

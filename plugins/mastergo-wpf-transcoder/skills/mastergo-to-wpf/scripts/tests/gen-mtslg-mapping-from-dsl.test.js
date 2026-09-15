@@ -287,3 +287,81 @@ assert.ok(axis.nodes.every(node => node.controlType === 'IconButton' && node.att
 
 console.log('PASS MTSLG DSL-to-mapping text-slot regression test');
 console.log('PASS MTSLG DSL-to-mapping button-family regression test');
+
+// ---- 容器类组件（infoGroupTemplates）：组件集命中 → 发射 GroupBox + Header，标题文本被消费 ----
+const infoGroupDsl = {
+  styles: {},
+  nodes: [{
+    type: 'INSTANCE',
+    id: 'page:root',
+    name: '校准参数（3.1.3）',
+    layoutStyle: { width: 1280, height: 1024, relativeX: 0, relativeY: 0 },
+    componentInfo: {},
+    children: [
+      {
+        type: 'INSTANCE',
+        id: 'page:root/group',
+        name: '信息分组-模块化',
+        layoutStyle: { width: 252, height: 534, relativeX: 790, relativeY: 204 },
+        componentId: '1066:429122',
+        componentInfo: {},
+        children: [{
+          type: 'TEXT',
+          id: 'page:root/group/title',
+          name: '固定文本框',
+          layoutStyle: { width: 79, height: 20, relativeX: 24, relativeY: 16 },
+          text: [{ text: '周期名称' }]
+        }]
+      },
+      {
+        type: 'INSTANCE',
+        id: 'page:root/popup',
+        name: '信息模块-手动控制弹层',
+        layoutStyle: { width: 564, height: 105, relativeX: 300, relativeY: 700 },
+        componentId: '236:8757',
+        componentInfo: {},
+        children: [{
+          type: 'TEXT',
+          id: 'page:root/popup/title',
+          name: '固定文本框',
+          layoutStyle: { width: 79, height: 20, relativeX: 12, relativeY: 8 },
+          text: [{ text: '单轴控制' }]
+        }]
+      }
+    ]
+  }]
+};
+const infoGroup = runMappingCase('info-group-containers', infoGroupDsl, []);
+const groupNode = infoGroup.nodes.find(item => item.sourceRef === 'page:root/group');
+const popupNode = infoGroup.nodes.find(item => item.sourceRef === 'page:root/popup');
+assert.ok(groupNode, '信息分组-模块化 必须命中模板并发射控件');
+assert.ok(popupNode, '信息模块-手动控制弹层 必须命中模板并发射控件');
+for (const [label, target] of [['信息分组-模块化', groupNode], ['信息模块-手动控制弹层', popupNode]]) {
+  assert.strictEqual(target.controlType, 'GroupBox', label + ' 应发射 GroupBox');
+  assert.strictEqual(target.attrs.Header !== undefined, true, label + ' 必须挂 Header');
+  assert.strictEqual(target.valueSource, 'dsl.text', label + ' 的 Header 文案必须记为 dsl.text 来源');
+  assert.strictEqual(target.sourceText, label === '信息分组-模块化' ? '周期名称' : '单轴控制');
+  assert.strictEqual(target.expectedWidth, label === '信息分组-模块化' ? 252 : 564, 'Width 取实例 bbox');
+  assert.strictEqual(target.expectedTop, (label === '信息分组-模块化' ? 204 : 700) - 192, '根级 Top 仍扣 192');
+}
+assert.ok(!infoGroup.nodes.some(item => item.sourceRef === 'page:root/group/title'),
+  '组内标题文本不得再作为独立 TextBlock 发射');
+const headerAudit = infoGroup.textAudit.find(item => item.sourceRef === 'page:root/group/title');
+assert.strictEqual(headerAudit.decision, 'emit');
+assert.strictEqual(headerAudit.role, 'component-value');
+assert.deepStrictEqual(
+  infoGroup.componentInstances.map(item => item.template),
+  ['infoGroupTemplates', 'infoGroupTemplates'],
+  '两个容器都必须登记为 infoGroupTemplates 实例'
+);
+assert.deepStrictEqual(
+  infoGroup.componentInstances.map(item => (item.requiredSlots[0] || {}).slot),
+  ['header', 'header']
+);
+assert.deepStrictEqual(
+  infoGroup.pending.map(item => item.sourceRef),
+  [],
+  '容器命中模板后不得再进入 pending'
+);
+
+console.log('PASS MTSLG DSL-to-mapping container (infoGroupTemplates) regression test');

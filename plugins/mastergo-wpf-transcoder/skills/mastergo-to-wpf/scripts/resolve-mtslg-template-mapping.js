@@ -123,8 +123,15 @@ function validateSlot(spec, slot, sourceMap, nodeMap, variant, usedSources) {
   if (valueSourceRef !== undefined) {
     const valueSource = sourceMap.get(valueSourceRef);
     if (!valueSource) fail("固定模板槽位 valueSourceRef 不存在: " + variant + "/" + slot.slot);
-    if (typeof valueSource.text === "string" && attrs.Value !== valueSource.text) {
-      fail("固定模板槽位 Value 不是 DSL 文本: " + variant + "/" + slot.slot);
+    if (typeof valueSource.text === "string") {
+      // 文案承载属性：带 Value 的控件比 Value；容器类（GroupBox）以 Header 承载标题文案，此时比 Header。
+      const carrier = attrs.Value !== undefined ? "Value" : (attrs.Header !== undefined ? "Header" : null);
+      if (carrier === null) {
+        fail("固定模板槽位既没有 Value 也没有 Header 承载 DSL 文本: " + variant + "/" + slot.slot);
+      }
+      if (attrs[carrier] !== valueSource.text) {
+        fail("固定模板槽位 " + carrier + " 不是 DSL 文本: " + variant + "/" + slot.slot);
+      }
     }
     if (nodeMap.get(slot.sourceRef).valueSource !== undefined && nodeMap.get(slot.sourceRef).valueSource !== "dsl.text") {
       fail("固定模板槽位 valueSource 必须是 dsl.text: " + variant + "/" + slot.slot);

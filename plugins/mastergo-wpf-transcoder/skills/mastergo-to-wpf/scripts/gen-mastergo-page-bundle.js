@@ -19,6 +19,7 @@ const COORDS_SCRIPT = path.join(SCRIPT_DIR, "check-iocontrol-coords.js");
 const MAPPING_SCRIPT = path.join(SCRIPT_DIR, "gen-mtslg-mapping-from-dsl.js");
 const TEMPLATE_RESOLVER_SCRIPT = path.join(SCRIPT_DIR, "resolve-mtslg-template-mapping.js");
 const ICON_DISCOVERY_SCRIPT = path.join(SCRIPT_DIR, "discover-mtslg-page-icon-map.js");
+const CONTAINMENT_SCRIPT = path.join(SCRIPT_DIR, "apply-container-containment.js");
 const LANG_SCRIPT = path.join(SCRIPT_DIR, "gen-mtslg-page-lang.js");
 const LANG = require("./gen-mtslg-page-lang");
 const LANG_KEYS_SCRIPT = path.join(SCRIPT_DIR, "gen-mtslg-lang-keys-from-dsl.js");
@@ -845,6 +846,7 @@ function bundleGeneratedPaths(info) {
   if (info.scaffold) files.push(info.frameworkConfigPath);
   if (info.langTranslationAudit) files.push(info.langTranslationAudit);
   if (info.langGlossaryAudit) files.push(info.langGlossaryAudit);
+  if (info.nestingAudit) files.push(info.nestingAudit);
   // 语言文件在清单里本来就是项目相对路径，不能再过 projectRelative（否则按 CWD 解析出错路径）。
   return files.map(function (filePath) {
     return projectRelative(info.projectRoot, filePath);
@@ -979,6 +981,7 @@ function main() {
   const iconMapAudit = path.join(generatedDir, manifest.pageName + ".icon-map.json");
   const bundleAudit = path.join(generatedDir, manifest.pageName + ".bundle.manifest.json");
   const auditTargets = [mappingAudit, iconMapAudit, bundleAudit];
+  const nestingAudit = path.join(generatedDir, manifest.pageName + ".nesting-report.json");
   const langTranslationAudit = Object.keys(langTranslationsInput).length
     ? path.join(generatedDir, manifest.pageName + ".lang-translations.json") : null;
   const langGlossaryAudit = Object.keys(langGlossaryInput).length
@@ -1006,6 +1009,7 @@ function main() {
   let langBindings = [];
   const originalCsproj = fs.readFileSync(csprojPath, "utf8");
   const snapshots = snapshotFiles(outputTargets.concat(langTargets).concat([layoutPath, mappingAudit, iconMapAudit, bundleAudit, csprojPath])
+    .concat([nestingAudit])
     .concat(scaffoldInfo.frameworkConfigPath ? [scaffoldInfo.frameworkConfigPath] : []));
 
   try {
@@ -1014,7 +1018,23 @@ function main() {
       "--map", templateMapPath,
       "--out", tempMapping
     ]);
-    const mapping = readJson(tempMapping);
+    let mapping = readJson(tempMapping);
+    // 容器嵌套（默认开启，manifest.nesting.enabled === false 可关）：
+    // 已登记容器（变体 childPolicy=nested-page-templates）按「坐标完全包含」把平级子控件重挂为子节点，
+    // 后续的语言绑定 / XML 发射 / provenance / 坐标核对都以重挂后的 mapping 为准。
+    const nestingEnabled = !(manifest.nesting && manifest.nesting.enabled === false);
+    let nestingReport = null;
+    const nestingReportPath = path.join(tempRoot, "nesting-report.json");
+    if (nestingEnabled) {
+      run(CONTAINMENT_SCRIPT, [
+        "--mapping", tempMapping,
+        "--template-map", templateMapPath,
+        "--out", tempMapping,
+        "--report", nestingReportPath
+      ]);
+      nestingReport = readJson(nestingReportPath);
+      mapping = readJson(tempMapping);
+    }
     const contentOriginY = mapping.contentOriginY === undefined
       ? 192 : Number(mapping.contentOriginY);
     if (contentOriginY !== 192) {
@@ -1133,6 +1153,10 @@ function main() {
     fs.mkdirSync(generatedDir, { recursive: true });
     copyOutput(tempMapping, mappingAudit, args.overwrite, created, backups);
     copyOutput(tempIconMap, iconMapAudit, args.overwrite, created, backups);
+    // 容器嵌套审计：容器清单 / 重挂明细 / 冲突清单（关闭 nesting 时不产出该文件）。
+    if (nestingReport) {
+      writeAuditOutput(nestingAudit, fs.readFileSync(nestingReportPath, "utf8"), args.overwrite, backups);
+    }
     // 页面级多语言输入产物：本页的译文清单与术语表随生成一起落盘（便于逐页复核/回滚）。
     if (langTranslationAudit) {
       const tempTranslations = path.join(tempRoot, "lang-translations.json");
@@ -1181,7 +1205,8 @@ function main() {
       bundleAudit,
       langPaths,
       langTranslationAudit,
-      langGlossaryAudit
+      langGlossaryAudit,
+      nestingAudit: nestingReport ? nestingAudit : null
     };
     writeAuditOutput(bundleAudit, JSON.stringify({
       adapter: "mtslg-iocontrol",
@@ -1216,6 +1241,14 @@ function main() {
           ? null
           : "manifest 未提供 languages：本次未生成语言字典，页面不会挂 LangName（多语言默认开启，请检查 languages 是否被显式关闭）"),
       excludedInstances: excludeInstances,
+      // 容器嵌套：默认开启；记录容器数/重挂数/冲突数（明细见 Generated/<Page>.nesting-report.json）。
+      nesting: {
+        enabled: nestingEnabled,
+        report: nestingReport ? path.relative(projectRoot, nestingAudit).split(path.sep).join("/") : null,
+        containers: nestingReport ? nestingReport.containers.length : 0,
+        reparented: nestingReport ? nestingReport.reparented.length : 0,
+        conflicts: nestingReport ? nestingReport.conflicts.length : 0
+      },
       layout: {
         status: manifest.layoutStatus,
         evidence: manifest.layoutEvidence,

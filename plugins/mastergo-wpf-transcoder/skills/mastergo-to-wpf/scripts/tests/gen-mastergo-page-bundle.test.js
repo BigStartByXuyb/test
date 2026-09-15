@@ -276,6 +276,51 @@ result = spawnSync(process.execPath, [script, "--manifest", stringMetricManifest
 assert.strictEqual(result.status, 0,
   "数值字符串度量必须照常执行坐标核对并通过: " + result.stderr + result.stdout);
 
+// 容器嵌套：bundle 默认调用 apply-container-containment.js 并产出审计文件；
+// 本 fixture 没有容器实例 → containers=0、无冲突，但审计字段与报告文件必须存在。
+assert.match(scriptText, /apply-container-containment\.js/, "bundle 必须调用 apply-container-containment.js");
+const nestingAudit = JSON.parse(fs.readFileSync(path.join(project, "Generated/F2NewPage.nesting-report.json"), "utf8"));
+assert.strictEqual(nestingAudit.schemaVersion, "mastergo-nesting-report/1");
+assert.strictEqual(nestingAudit.containers.length, 0, "无容器实例时容器清单必须为空");
+assert.strictEqual(nestingAudit.reparented.length, 0);
+assert.deepStrictEqual(nestingAudit.conflicts, []);
+const nestingBundleAudit = JSON.parse(fs.readFileSync(path.join(project, "Generated/F2NewPage.bundle.manifest.json"), "utf8"));
+assert.strictEqual(nestingBundleAudit.nesting.enabled, true, "容器嵌套默认开启");
+assert.strictEqual(nestingBundleAudit.nesting.containers, 0);
+assert.strictEqual(nestingBundleAudit.nesting.report, "Generated/F2NewPage.nesting-report.json");
+
+// manifest.nesting.enabled=false 时：不产出嵌套报告（审计 enabled=false、report=null）。
+const nestingOffMapping = path.join(root, "nesting-off-mapping.json");
+// 复用上一轮产出的 mapping 时必须剥掉已绑定的 LangName（新页面名会与旧键冲突）。
+const nestingOffMappingDoc = JSON.parse(fs.readFileSync(path.join(project, "Generated/F2NewPage.mapping.json"), "utf8"));
+for (const item of nestingOffMappingDoc.nodes || []) {
+  if (item.attrs) delete item.attrs.LangName;
+}
+fs.writeFileSync(nestingOffMapping, JSON.stringify(nestingOffMappingDoc, null, 2), "utf8");
+const nestingOffManifest = JSON.parse(fs.readFileSync(manifest, "utf8"));
+nestingOffManifest.pageName = "NestingOff";
+nestingOffManifest.pageTarget = "NestingOff";
+nestingOffManifest.pageLangName = "NestingOffPageTitle";
+nestingOffManifest.viewPath = "UI/F2-Teach/View/NestingOffView.xaml";
+nestingOffManifest.codeBehindPath = "UI/F2-Teach/View/NestingOffView.xaml.cs";
+nestingOffManifest.viewModelPath = "UI/F2-Teach/ViewModel/NestingOffViewModel.cs";
+nestingOffManifest.pageXmlPath = "Resources/Pages/NestingOff/NestingOffPage.xml";
+nestingOffManifest.iconPath = "Resources/Pages/NestingOff/NestingOffIcons.xaml";
+nestingOffManifest.operation = "modify-existing";
+nestingOffManifest.nesting = { enabled: false };
+delete nestingOffManifest.dslPath;
+delete nestingOffManifest.visibilityPath;
+nestingOffManifest.mappingPath = nestingOffMapping;
+const nestingOffManifestPath = path.join(root, "nesting-off.json");
+fs.writeFileSync(nestingOffManifestPath, JSON.stringify(nestingOffManifest, null, 2), "utf8");
+result = spawnSync(process.execPath, [script, "--manifest", nestingOffManifestPath], { encoding: "utf8" });
+assert.strictEqual(result.status, 0, "关闭 nesting 时必须正常生成: " + result.stderr + result.stdout);
+const nestingOffAudit = JSON.parse(fs.readFileSync(path.join(project, "Generated/NestingOff.bundle.manifest.json"), "utf8"));
+assert.strictEqual(nestingOffAudit.nesting.enabled, false);
+assert.strictEqual(nestingOffAudit.nesting.report, null);
+assert.ok(!fs.existsSync(path.join(project, "Generated/NestingOff.nesting-report.json")),
+  "关闭 nesting 时不得产出嵌套报告文件");
+
 // 空项目脚手架：目标目录可以尚不存在，但必须生成完整文件结构；只做静态校验，不编译或加载 WPF。
 const scaffoldProject = path.join(root, "EmptyScaffold");
 const scaffoldManifest = path.join(root, "scaffold.json");

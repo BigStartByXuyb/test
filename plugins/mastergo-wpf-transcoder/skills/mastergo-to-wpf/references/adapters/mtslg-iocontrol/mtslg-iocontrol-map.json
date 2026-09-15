@@ -41,7 +41,7 @@
   },
   "controlTypeRequiredAttrs": {
     "_note": "每个 ControlType 的固定必写字段集（属性恒写，取不到来源时写空字符串）。ID/ControlType 恒由节点身份发射，Left/Top/Width/Height 恒由 DSL bbox 发射（TextBlock 为 Width=NaN、Height=40），因此不重复登记在这里。LangName 是唯一例外：只在多语言绑定层给出真实 key 时发射，动态值等 noLangRefs 豁免节点不写空占位。真值来源：设计方给定的 IOContorl 字段模板。",
-    "GroupBox": ["Style", "Header", "LangName", "IOEnable", "IOVisible"],
+    "GroupBox": ["Style", "Header", "LangName", "IOName", "IOEnable", "IOVisible", "MinValue", "MaxValue"],
     "Border": ["Style", "Value", "IOEnable", "IOVisible"],
     "TextBlock": ["Style", "Value", "LangName", "IOName", "IOEnable", "IOVisible", "IsAutoRead", "Foreground", "FontSize"],
     "Button": ["Style", "Value", "LangName", "PageName", "IOCommand", "IOEnable", "IOVisible"],
@@ -1158,17 +1158,34 @@
   },
   "infoGroupTemplates": {
     "match": {
-      "property": "component"
+      "componentSet": true
     },
+    "componentSetPolicy": "容器类组件（团队组件库中可直接放置的分组框 / 弹层）按组件名命中：组件名取自实例自身的组件名，内部无实例时回退实例名，图层重命名不改变组件名。命中后发射一个 GroupBox 外壳：Header 取实例内第一条可见 TEXT，位置宽高取实例 bbox；壳内子控件由 apply-container-containment.js 按「坐标完全包含」重挂为子节点（childPolicy=nested-page-templates）。",
     "variants": {
       "信息分组-模块化": {
+        "componentSet": "信息分组-模块化",
         "controlType": "GroupBox",
         "style": null,
         "iconPolicy": "none",
         "childPolicy": "nested-page-templates",
         "slots": [
           {
-            "slot": "group",
+            "slot": "header",
+            "controlType": "GroupBox",
+            "iconPolicy": "none",
+            "valueSource": "dsl.text"
+          }
+        ]
+      },
+      "信息模块-手动控制弹层": {
+        "componentSet": "信息模块-手动控制弹层",
+        "controlType": "GroupBox",
+        "style": null,
+        "iconPolicy": "none",
+        "childPolicy": "nested-page-templates",
+        "slots": [
+          {
+            "slot": "header",
             "controlType": "GroupBox",
             "iconPolicy": "none",
             "valueSource": "dsl.text"

@@ -376,4 +376,41 @@ assert.throws(
   /缺失必经槽位/
 );
 
+// 容器族（infoGroupTemplates）：GroupBox 以 Header 承载标题文案，槽位 valueSourceRef 走 Header 而非 Value。
+function makeInfoGroupMapping(headerTextAttrs) {
+  return {
+    contentOriginY: 192,
+    sourceNodes: [
+      { ref: 'root', parentRef: null, pageAbsX: 0, pageAbsY: 0, relativeX: 0, relativeY: 0, width: 1280, height: 1024 },
+      { ref: 'instance/1', parentRef: 'root', pageAbsX: 790, pageAbsY: 204, relativeX: 790, relativeY: 204, width: 252, height: 534 },
+      { ref: 'instance/1/header', parentRef: 'instance/1', pageAbsX: 814, pageAbsY: 220, relativeX: 24, relativeY: 16, width: 79, height: 20, text: '周期名称' }
+    ],
+    nodes: [{
+      ref: 'instance/1', sourceRef: 'instance/1', sourceParent: 'root', controlType: 'GroupBox',
+      sourceText: '周期名称', valueSource: 'dsl.text', valueSourceRef: 'instance/1/header',
+      absX: 790, absY: 204, w: 252, h: 534,
+      expectedLeft: 790, expectedTop: 12, expectedWidth: 252, expectedHeight: 534,
+      attrs: Object.assign({ ControlType: 'GroupBox' }, headerTextAttrs)
+    }],
+    componentInstances: [{
+      template: 'infoGroupTemplates',
+      componentSet: '信息分组-模块化',
+      instanceRef: 'instance/1',
+      requiredSlots: [{ slot: 'header', sourceRef: 'instance/1', valueSourceRef: 'instance/1/header' }]
+    }]
+  };
+}
+
+const headerResolved = resolveTemplateMapping(makeInfoGroupMapping({ Header: '周期名称' }), templateMap);
+assert.strictEqual(headerResolved.nodes[0].controlType, 'GroupBox');
+assert.strictEqual(headerResolved.nodes[0].attrs.Header, '周期名称', 'Header 文案必须原样保留');
+assert.throws(
+  () => resolveTemplateMapping(makeInfoGroupMapping({ Header: '别的标题' }), templateMap),
+  /Header 不是 DSL 文本/
+);
+assert.throws(
+  () => resolveTemplateMapping(makeInfoGroupMapping({}), templateMap),
+  /既没有 Value 也没有 Header/
+);
+
 console.log("PASS MTSLG template mapping resolver test");

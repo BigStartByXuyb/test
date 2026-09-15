@@ -125,7 +125,7 @@ const DEFAULT_BUTTON_FAMILY = {
 // 每个 ControlType 的固定必写字段集（设计方给定的 IOContorl 字段模板）。
 // 真值来源：模板表 mtslg-iocontrol-map.json 的 controlTypeRequiredAttrs；缺表时退回内置默认。
 const DEFAULT_CONTROL_TYPE_REQUIRED_ATTRS = {
-  GroupBox: ['Style', 'Header', 'LangName', 'IOEnable', 'IOVisible'],
+  GroupBox: ['Style', 'Header', 'LangName', 'IOName', 'IOEnable', 'IOVisible', 'MinValue', 'MaxValue'],
   Border: ['Style', 'Value', 'IOEnable', 'IOVisible'],
   TextBlock: ['Style', 'Value', 'LangName', 'IOName', 'IOEnable', 'IOVisible', 'IsAutoRead', 'Foreground', 'FontSize'],
   Button: ['Style', 'Value', 'LangName', 'PageName', 'IOCommand', 'IOEnable', 'IOVisible'],
