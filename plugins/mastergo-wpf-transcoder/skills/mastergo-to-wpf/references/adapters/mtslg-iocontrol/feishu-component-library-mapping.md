@@ -148,13 +148,14 @@ MasterGo 组件库已存在真实变体 `密码输入框`，但当前 MT3.0 IOCo
 固定节点：一个固定 GroupBox 外壳；该组件对外只有两个业务参数：标题名称→Header；多语言资源→LangName（由 Header 查资源库）。内部子节点不是 GroupBox 的可变类型参数，按子组件模板展开。
 
 ```
-<IOContorl ID="{id_group}" ControlType="GroupBox" Style="" Header="{header}" LangName="{lang_name}" IOName="" IOVisible="" IOEnable="" MinValue="" MaxValue="" Width="{width}" Height="{height}" Left="{left}" Top="{top}">{child_io_controls}</IOContorl>
+<IOContorl ID="{id_group}" ControlType="GroupBox" Style="IOGroupBoxSecondary" Header="{header}" LangName="{lang_name}" IOName="" IOVisible="" IOEnable="" MinValue="" MaxValue="" Width="{width}" Height="{height}" Left="{left}" Top="{top}">{child_io_controls}</IOContorl>
 ```
 
 - MasterGo 根组件名称/实例名称→组件身份，不写入 Header。
 - 根组件内标题 TEXT（例如“周期名称”）→Header；再由 Header 查询对应 LangName。
-- GroupBox 的位置、宽高来自根组件；`Style` / `IOName` / `IOVisible` / `IOEnable` / `MinValue` / `MaxValue` 属于固定模板字段，没有可靠来源时输出空字符串值。
-- 组内子控件按各自模板生成，并使用**相对坐标**（`Left/Top` 相对 GroupBox，不再扣内容区偏移）。设计稿把子控件画在组件里但层级上是平级兄弟时，由 `apply-container-containment.js` 按**坐标完全包含**关系重挂为 GroupBox 的子节点（取面积最小的容器；越界 1px 不算包含；无法唯一判定时保持原状并写入冲突报告，不猜）。
+- GroupBox 的位置、宽高来自根组件；`Style` **必须显式登记**（本族登记 `IOGroupBoxSecondary`），`IOName` / `IOVisible` / `IOEnable` / `MinValue` / `MaxValue` 属于固定模板字段，没有可靠来源时输出空字符串值。
+- **内容区原点（强制）**：GroupBox 的模板是"标题条 + 内容区"两段式，子控件的 `Left/Top` 从**内容区原点**量，不是从容器左上角量。原点登记在 `mtslg-iocontrol-map.json` 的 `infoGroupTemplates.styleInsets`（按 Style 取值，来源是框架模板 `IOGroupBox.xaml` 的内容区边框与标题条高度）：`IOGroupBoxBaseStyle` = `{left:2, top:40}`、`IOGroupBoxSecondary` = `{left:1, top:35}`、`IOGroupBoxThirdly` = `{left:1, top:25}`、`IOGroupBoxFour` = `{left:1, top:35}`。换算：`Left = 子控件绝对X − 容器绝对X − inset.left`，`Top = 子控件绝对Y − 容器绝对Y − inset.top`。**禁止容器变体把 Style 写成空**：不写 Style 时运行时落到隐式 `ContentGroupBoxStyle`（内容区原点是 5px + 标题行高，随字号变化），相对坐标无法机械换算，生成脚本直接失败。
+- 设计稿把子控件画在组件里但层级上是平级兄弟时，由 `apply-container-containment.js` 按**坐标完全包含**关系重挂为 GroupBox 的子节点（取面积最小的容器；越界 1px 不算包含；无法唯一判定时保持原状并写入冲突报告，不猜）；重挂时同时按上面的内容区原点重算 `expectedLeft/expectedTop`。
 - 未命中该组件集的容器类实例仍按未映射组件处理（不产控件、内部文本不发射）；只有命中的容器才展开子控件。
 
 信息分组内部的 TabControl/TabItem 只有在 MasterGo DSL 明确给出组件集、真实属性值、父子链和槽位来源后才展开；当前没有独立的正式变体模板，未确认时不生成占位 Tab 节点。
@@ -174,8 +175,8 @@ MasterGo 组件库已存在真实变体 `密码输入框`，但当前 MT3.0 IOCo
 ```
 
 - 根组件内标题 TEXT（例如“单轴控制”）→Header；再由 Header 查询对应 LangName。
-- 位置、宽高来自根组件；固定模板字段没有可靠来源时输出空字符串值。
-- 组内子控件同样按各自模板生成并使用相对坐标，嵌套规则与信息分组一致（`childPolicy = nested-page-templates`）。
+- 位置、宽高来自根组件；`Style` 按本族登记显式发射（`IOGroupBoxSecondary`）；其余固定模板字段没有可靠来源时输出空字符串值。
+- 组内子控件同样按各自模板生成，嵌套规则、内容区原点换算与信息分组完全一致（`childPolicy = nested-page-templates`，`styleInsets` 共用同一张表）。
 
 # MasterGo 控件类型：IconButton → MTSLG 映射规则
 

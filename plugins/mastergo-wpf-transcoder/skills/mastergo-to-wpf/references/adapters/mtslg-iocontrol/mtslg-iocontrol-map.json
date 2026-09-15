@@ -1160,12 +1160,19 @@
     "match": {
       "componentSet": true
     },
+    "styleInsets": {
+      "IOGroupBoxBaseStyle": { "left": 2, "top": 40 },
+      "IOGroupBoxSecondary": { "left": 1, "top": 35 },
+      "IOGroupBoxThirdly": { "left": 1, "top": 25 },
+      "IOGroupBoxFour": { "left": 1, "top": 35 }
+    },
+    "styleInsetsNote": "容器内容区原点（相对容器左上角）= 内容区边框厚度 + 标题条高度。真值来自框架模板 SDC/Style/IOGroupBox.xaml（内容是 Grid.Row=1、边框 2 0 2 2 / 1 0 1 1）与 SDC/Sizes.xaml（GroupBoxBaseHeader=40、GroupBoxSecondaryHeader=35、GroupBoxThirdlyHeader=25）。重挂进容器的子控件坐标必须按此原点换算：expectedLeft = 子绝对X − 容器绝对X − inset.left，expectedTop = 子绝对Y − 容器绝对Y − inset.top；不换算会让容器内所有子控件整体下移一个标题条高度。容器变体必须显式登记 style（禁止 null）：不写 Style 时运行时落到隐式的 ContentGroupBoxStyle，其内容原点为 5px + 标题行高（随字号变化），不可换算。",
     "componentSetPolicy": "容器类组件（团队组件库中可直接放置的分组框 / 弹层）按组件名命中：候选值只有实例**自身**的组件名这一条，命中时必须与该组件集名逐字相等；容器族**不使用「内部实例子节点名」作为候选**——那条候选路径是聚合集合（如右栏）专用的，页面根的第一个实例子节点恰好与外层容器同名时会把整页误判成容器。图层重命名不改变组件名。命中后发射一个 GroupBox 外壳：Header 取实例内第一条可见 TEXT，位置宽高取实例 bbox；壳内子控件由 apply-container-containment.js 按「坐标完全包含」重挂为子节点（childPolicy=nested-page-templates）。",
     "variants": {
       "信息分组-模块化": {
         "componentSet": "信息分组-模块化",
         "controlType": "GroupBox",
-        "style": null,
+        "style": "IOGroupBoxSecondary",
         "iconPolicy": "none",
         "childPolicy": "nested-page-templates",
         "slots": [
@@ -1180,7 +1187,7 @@
       "信息模块-手动控制弹层": {
         "componentSet": "信息模块-手动控制弹层",
         "controlType": "GroupBox",
-        "style": null,
+        "style": "IOGroupBoxSecondary",
         "iconPolicy": "none",
         "childPolicy": "nested-page-templates",
         "slots": [

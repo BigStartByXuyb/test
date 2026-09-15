@@ -17,8 +17,10 @@
  *   - 部分相交/越界 → 记为冲突、保持原状；
  *   - 宿主壳（顶部栏 / 底部 / 常驻信息）内的节点、容器自身不参与；会形成输出环的容器记为冲突；
  *   - 改写字段：parent 与 layoutParent 同时写为容器 ref，并重算 expectedLeft/expectedTop
- *     （根级父容器扣一次 192；嵌套父容器按相对偏移）；sourceParent / expectedWidth /
- *     expectedHeight / 节点顺序保持不变；脚本幂等。
+ *     （根级父容器扣一次 192；嵌套父容器按"内容区原点"换算：expectedLeft = 子绝对X − 容器绝对X − inset.left，
+ *     expectedTop = 子绝对Y − 容器绝对Y − inset.top，inset 来自容器变体登记的 Style 对应的
+ *     infoGroupTemplates.styleInsets，即内容区边框 + 标题条高度）；sourceParent / expectedWidth /
+ *     expectedHeight / 节点顺序保持不变；脚本幂等（重复运行时若 inset 变化会重算并报告）。
  *
  * 退出码：0 = 正常（冲突只记录不失败）；1 = 参数/文件/映射结构错误。
  */
@@ -112,6 +114,14 @@ for (const instance of mapping.componentInstances || []) {
   if (!node) continue;                                  // 未发射的容器不参与
   const bbox = bboxOf(ref);
   if (!bbox) continue;
+  // 内容区原点：容器子控件的相对坐标必须从"内容区"量（标题条下方 + 边框内），
+  // 不是容器左上角。原点由映射节点携带（映射生成器按样式从 infoGroupTemplates.styleInsets 解析）。
+  const inset = node.contentInset;
+  const insetOk = inset && Number.isFinite(Number(inset.left)) && Number.isFinite(Number(inset.top));
+  if (!insetOk) {
+    fail('容器缺少内容区原点 contentInset: ' + ref +
+      '（映射表必须为该组件集登记显式 Style，并在 infoGroupTemplates.styleInsets 登记 {left, top}）');
+  }
   seenContainers.add(ref);
   containerSpecs.push({
     ref: ref,
@@ -120,6 +130,7 @@ for (const instance of mapping.componentInstances || []) {
     family: instance.template,
     componentSet: variantKey || null,
     bbox: bbox,
+    contentInset: { left: Number(inset.left), top: Number(inset.top) },
     area: bbox.w * bbox.h
   });
 }
@@ -191,18 +202,22 @@ if (containerSpecs.length > 0) {
 
     const target = innermost[0];
     const fromParent = node.layoutParent !== undefined ? node.layoutParent : (node.parent || null);
-    if (fromParent === target.ref && node.parent === target.ref) {
-      report.unchanged += 1;
-      continue;
-    }
-
     const parentIsRoot = !mapping.rootRef || target.ref === mapping.rootRef;
     const originX = parentIsRoot ? 0 : target.bbox.x;
     const originY = parentIsRoot ? 0 : target.bbox.y;
+    const insetLeft = parentIsRoot ? 0 : target.contentInset.left;
+    const insetTop = parentIsRoot ? 0 : target.contentInset.top;
+    const expectedLeft = bbox.x - originX - insetLeft;
+    const expectedTop = bbox.y - originY - insetTop - (parentIsRoot ? report.contentOriginY : 0);
+    if (fromParent === target.ref && node.parent === target.ref &&
+        Number(node.expectedLeft) === expectedLeft && Number(node.expectedTop) === expectedTop) {
+      report.unchanged += 1;
+      continue;
+    }
     node.parent = target.ref;
     node.layoutParent = target.ref;
-    node.expectedLeft = bbox.x - originX;
-    node.expectedTop = bbox.y - originY - (parentIsRoot ? report.contentOriginY : 0);
+    node.expectedLeft = expectedLeft;
+    node.expectedTop = expectedTop;
     report.reparented.push({
       ref: ref,
       xmlId: node.xmlId || ref,

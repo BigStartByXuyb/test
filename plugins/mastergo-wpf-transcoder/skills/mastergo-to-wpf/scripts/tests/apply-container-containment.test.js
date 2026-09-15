@@ -31,13 +31,17 @@ function source(ref, parentRef, name, x, y, w, h) {
   };
 }
 
-function node(ref, xmlId, controlType) {
+function node(ref, xmlId, controlType, contentInset) {
   return {
     ref, xmlId, sourceRef: ref, sourceParent: null, controlType, parent: null, layoutParent: null,
     absX: 0, absY: 0, w: 1, h: 1,
-    expectedLeft: 0, expectedTop: 0, expectedWidth: 1, expectedHeight: 1, attrs: {}
+    expectedLeft: 0, expectedTop: 0, expectedWidth: 1, expectedHeight: 1, attrs: {},
+    ...(contentInset ? { contentInset } : {})
   };
 }
+
+// 容器内容区原点（边框 + 标题条高）：与映射表 infoGroupTemplates.styleInsets 同口径。
+const SECONDARY_INSET = { left: 1, top: 35 };
 
 function runContainment(mappingPath, outPath, reportPath) {
   return spawnSync(process.execPath, [script,
@@ -68,8 +72,8 @@ fs.writeFileSync(mappingA, JSON.stringify({
     source('bg', 'root', '背景常驻信息', 0, 0, 1280, 1024)
   ],
   nodes: [
-    node('popup', 'MG_POPUP', 'GroupBox'),
-    node('group', 'MG_GROUP', 'GroupBox'),
+    node('popup', 'MG_POPUP', 'GroupBox', SECONDARY_INSET),
+    node('group', 'MG_GROUP', 'GroupBox', SECONDARY_INSET),
     node('inside-a', 'MG_A', 'NumberBox'),
     node('inside-b', 'MG_B', 'TextBlock'),
     node('edge', 'MG_EDGE', 'TextBlock'),
@@ -88,11 +92,12 @@ assert.strictEqual(report.containers.length, 2, '只有 childPolicy=nested-page-
 assert.strictEqual(byRef('inside-a').layoutParent, 'group', '多容器包含时挂到面积最小者');
 assert.strictEqual(byRef('inside-b').layoutParent, 'group');
 assert.strictEqual(byRef('inside-a').parent, 'group', 'parent 与 layoutParent 必须同时写');
-assert.strictEqual(byRef('inside-a').expectedLeft, 20, '嵌套坐标按父容器相对');
-assert.strictEqual(byRef('inside-a').expectedTop, 100);
+// 子坐标从"内容区原点"量：abs − 容器左上角 − inset（Info 分组 Style=IOGroupBoxSecondary → {1,35}）
+assert.strictEqual(byRef('inside-a').expectedLeft, 19, '嵌套坐标按父容器内容区原点相对');
+assert.strictEqual(byRef('inside-a').expectedTop, 65);
 assert.strictEqual(byRef('group').layoutParent, 'popup', '内层容器应挂到外层容器');
-assert.strictEqual(byRef('group').expectedLeft, 50);
-assert.strictEqual(byRef('group').expectedTop, 50);
+assert.strictEqual(byRef('group').expectedLeft, 49);
+assert.strictEqual(byRef('group').expectedTop, 15);
 assert.strictEqual(byRef('popup').layoutParent, null, '最外层容器保持根级');
 assert.strictEqual(byRef('popup').expectedTop, 0, '未重挂的节点保持原坐标不变');
 assert.strictEqual(byRef('edge').layoutParent, null, '越界控件不得被重挂');
@@ -131,7 +136,7 @@ fs.writeFileSync(mappingB, JSON.stringify({
     source('c2', 'root', '信息模块-手动控制弹层', 100, 200, 200, 100),
     source('target', 'root', '输入框', 150, 240, 40, 20)
   ],
-  nodes: [node('c1', 'MG_C1', 'GroupBox'), node('c2', 'MG_C2', 'GroupBox'), node('target', 'MG_T', 'NumberBox')]
+  nodes: [node('c1', 'MG_C1', 'GroupBox', SECONDARY_INSET), node('c2', 'MG_C2', 'GroupBox', SECONDARY_INSET), node('target', 'MG_T', 'NumberBox')]
 }, null, 2), 'utf8');
 result = runContainment(mappingB, outB, reportB);
 assert.strictEqual(result.status, 0, result.stderr);
@@ -156,7 +161,7 @@ fs.writeFileSync(mappingC, JSON.stringify({
     source('wrap', 'root', '外壳文本', 100, 200, 200, 150),
     source('wrap/inner', 'wrap', '信息分组-模块化', 100, 200, 200, 150)
   ],
-  nodes: [node('wrap', 'MG_WRAP', 'Border'), node('wrap/inner', 'MG_INNER', 'GroupBox')]
+  nodes: [node('wrap', 'MG_WRAP', 'Border'), node('wrap/inner', 'MG_INNER', 'GroupBox', SECONDARY_INSET)]
 }, null, 2), 'utf8');
 result = runContainment(mappingC, outC, reportC);
 assert.strictEqual(result.status, 0, result.stderr);

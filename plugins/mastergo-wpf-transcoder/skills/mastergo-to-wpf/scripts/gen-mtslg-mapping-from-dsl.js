@@ -347,7 +347,9 @@ function addNode(sourceRef, controlType, attrs, options = {}) {
     id: xmlId,
     xmlId,
     attrs: Object.assign({}, attrs),
-    ...(options.iconSize ? { iconSize: options.iconSize } : {})
+    ...(options.iconSize ? { iconSize: options.iconSize } : {}),
+    // 容器类节点：内容区原点（边框 + 标题条高）。重挂子控件时必须按它换算相对坐标。
+    ...(options.contentInset ? { contentInset: options.contentInset } : {})
   };
   outputNodes.push(out);
   outputRefBySource.set(sourceRef, xmlId);
@@ -455,11 +457,22 @@ for (const { item: inst, match } of matched) {
     // 该 TEXT 作为槽位被消费（不再作为独立 TextBlock，也不进入「未映射组件内部文本」隔离）；
     // 壳内子控件由 apply-container-containment.js 按坐标完全包含关系重挂（childPolicy=nested-page-templates）。
     const headerText = firstText(inst.ref);
+    // 内容区原点必须来自"显式登记的 Style"：不写 Style 会落到隐式 ContentGroupBoxStyle（5px + 标题行高，随字号变化），
+    // 子控件相对坐标无法机械换算。这里 fail-closed，禁止容器变体 style=null 或未登记 styleInsets。
+    const styleInsets = templateMap.infoGroupTemplates?.styleInsets || {};
+    const contentInset = spec.style ? styleInsets[spec.style] : null;
+    if (!contentInset) {
+      throw new Error("容器变体缺少可换算的内容区原点: template=" + match.family +
+        " componentSet=" + (match.componentSet || spec.componentSet || "") +
+        " style=" + JSON.stringify(spec.style ?? null) +
+        "；请在映射表 infoGroupTemplates.styleInsets 登记该 Style（内容区边框 + 标题条高）");
+    }
     const attrs = {};
     if (spec.style) attrs.Style = spec.style;
     if (headerText) attrs.Header = headerText.text;
     addNode(inst.ref, spec.controlType || "GroupBox", attrs,
-      headerText ? { valueSourceRef: headerText.ref } : {});
+      headerText ? { valueSourceRef: headerText.ref, contentInset: contentInset }
+        : { contentInset: contentInset });
     if (headerText) addValueAudit(headerText.ref, inst.ref);
     // 槽位 sourceRef 必须是**已发射的输出节点**（= GroupBox 自己，实例 ref），
     // 标题文本作为 valueSourceRef 被消费（与 inputTemplates 的 slot 写法一致）。

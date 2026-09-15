@@ -456,13 +456,17 @@ function renderFresh() {
   lines.push('    Width="NaN"');
   lines.push('    Height="NaN">');
 
-  const emit = (node, depth, parentAbsX, parentAbsY) => {
+  const emit = (node, depth, parentAbsX, parentAbsY, parentInset) => {
     const indent = '    '.repeat(depth);
     const attrMap = Object.assign({}, node.attrs || {});
     if (node.id) attrMap.ID = node.id;
     if (node.controlType) attrMap.ControlType = node.controlType;
-    attrMap.Left = fmtNum(node.absX - parentAbsX);
-    attrMap.Top = fmtNum(normalizedY(node.absY) - parentAbsY);
+    // 父节点是容器（GroupBox 等）时，子坐标从"内容区原点"量：再扣掉内容区边框 + 标题条高度。
+    // 原点由父节点的 contentInset 携带（映射按容器 Style 登记），与 provenance 校验同口径。
+    const insetLeft = parentInset ? (Number(parentInset.left) || 0) : 0;
+    const insetTop = parentInset ? (Number(parentInset.top) || 0) : 0;
+    attrMap.Left = fmtNum(node.absX - parentAbsX - insetLeft);
+    attrMap.Top = fmtNum(normalizedY(node.absY) - parentAbsY - insetTop);
     if (outputWidth(node) !== undefined && outputWidth(node) !== null) attrMap.Width = fmtNum(outputWidth(node));
     if (outputHeight(node) !== undefined && outputHeight(node) !== null) attrMap.Height = fmtNum(outputHeight(node));
     applyButtonFamilyAttrs(node, attrMap);
@@ -472,13 +476,13 @@ function renderFresh() {
     if (node.comment) lines.push(`${indent}<!-- ${node.comment} -->`);
     if (kids.length > 0) {
       lines.push(renderTag(attrMap, indent, indent + '    ', false, 'multi'));
-      for (const k of kids) emit(k, depth + 1, node.absX, normalizedY(node.absY));
+      for (const k of kids) emit(k, depth + 1, node.absX, normalizedY(node.absY), node.contentInset || null);
       lines.push(`${indent}</IOContorl>`);
     } else {
       lines.push(renderTag(attrMap, indent, indent + '    ', true, 'multi'));
     }
   };
-  for (const n of rootChildren) emit(n, 1, 0, 0);
+  for (const n of rootChildren) emit(n, 1, 0, 0, null);
   lines.push('</IOContorl>');
   return lines.join('\n') + '\n';
 }
@@ -575,13 +579,22 @@ function mergeMode() {
   // 映射节点 → 渲染数据（几何相对坐标在匹配后重算）
   const absOf = new Map();
   nodes.forEach(n => absOf.set(n.ref, { absX: n.absX, absY: normalizedY(n.absY) }));
+  const nodeByRef = new Map(nodes.map(n => [n.ref, n]));
 
   function resolveParentAbs(n) {
     const p = n.parent || null;
-    if (p === null) return { x: 0, y: 0 };
+    if (p === null) return { x: 0, y: 0, insetLeft: 0, insetTop: 0 };
     const pn = absOf.get(p);
     if (!pn) throw new Error(`映射节点 parent 引用不存在: ${p}（来自 ref=${n.ref}）`);
-    return { x: pn.absX, y: pn.absY };
+    // 父节点是容器时，子坐标从内容区原点量（再扣内容区边框 + 标题条高），与 fresh 发射同口径。
+    const parentNode = nodeByRef.get(p);
+    const inset = parentNode && parentNode.contentInset ? parentNode.contentInset : null;
+    return {
+      x: pn.absX,
+      y: pn.absY,
+      insetLeft: inset ? (Number(inset.left) || 0) : 0,
+      insetTop: inset ? (Number(inset.top) || 0) : 0
+    };
   }
 
   const rendered = new Map(); // ref -> {n, attrMap, tokenIdx, matchKind}
@@ -595,8 +608,8 @@ function mergeMode() {
     const attrMap = Object.assign({}, n.attrs || {});
     if (n.id) attrMap.ID = n.id;
     if (n.controlType) attrMap.ControlType = n.controlType;
-    attrMap.Left = fmtNum(n.absX - pa.x);
-    attrMap.Top = fmtNum(normalizedY(n.absY) - pa.y);
+    attrMap.Left = fmtNum(n.absX - pa.x - pa.insetLeft);
+    attrMap.Top = fmtNum(normalizedY(n.absY) - pa.y - pa.insetTop);
     if (outputWidth(n) !== undefined && outputWidth(n) !== null) attrMap.Width = fmtNum(outputWidth(n));
     if (outputHeight(n) !== undefined && outputHeight(n) !== null) attrMap.Height = fmtNum(outputHeight(n));
     applyButtonFamilyAttrs(n, attrMap);
@@ -621,8 +634,8 @@ function mergeMode() {
       const hit = positionCandidates.find(p =>
         !matchedOpenIdx.has(p.i) &&
         p.controlType === n.controlType &&
-        Math.abs(p.left - (n.absX - pa.x)) <= 0.5 &&
-        Math.abs(p.top - (normalizedY(n.absY) - pa.y)) <= 0.5);
+        Math.abs(p.left - (n.absX - pa.x - pa.insetLeft)) <= 0.5 &&
+        Math.abs(p.top - (normalizedY(n.absY) - pa.y - pa.insetTop)) <= 0.5);
       if (hit) { tokenIdx = hit.i; matchKind = 'position'; }
     }
     r.tokenIdx = tokenIdx;

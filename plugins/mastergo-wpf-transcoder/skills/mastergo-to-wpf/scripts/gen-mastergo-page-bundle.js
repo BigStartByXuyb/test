@@ -752,6 +752,8 @@ function validateBundleOutputs(info) {
   const mapping = info.mapping;
   if (Array.isArray(mapping.nodes) && mapping.nodes.length > 0) {
     const sourceByRef = new Map((mapping.sourceNodes || []).map(function (node) { return [node.ref, node]; }));
+    // 输出节点索引：读容器的 contentInset（内容区原点）用。
+    const nodeByRef = new Map((mapping.nodes || []).map(function (node) { return [node.ref, node]; }));
     const rootRef = mapping.rootRef || null;
     const coordNodes = mapping.nodes.map(function (node) {
       const source = sourceByRef.get(node.sourceRef || node.ref) || {};
@@ -765,8 +767,13 @@ function validateBundleOutputs(info) {
         : (node.parent !== undefined ? node.parent : (source.parentRef || null));
       const parentSource = outputParentRef ? (sourceByRef.get(outputParentRef) || null) : null;
       const parentIsRoot = !parentSource || (rootRef !== null && parentSource.ref === rootRef);
-      const originX = parentSource ? (Number(parentSource.pageAbsX) || 0) : 0;
-      const originY = parentIsRoot ? 192 : (parentSource ? (Number(parentSource.pageAbsY) || 0) : 192);
+      // 输出父节点是容器（GroupBox 等）时，子坐标从"内容区原点"量：父容器坐标 + 边框/标题条内边距
+      // （mapping 节点的 contentInset，来自映射表 infoGroupTemplates.styleInsets）。与生成器、校验器同口径。
+      const parentNode = outputParentRef ? nodeByRef.get(outputParentRef) : null;
+      const parentInset = !parentIsRoot && parentNode && parentNode.contentInset ? parentNode.contentInset : null;
+      const originX = (parentSource ? (Number(parentSource.pageAbsX) || 0) : 0) + (parentInset ? (Number(parentInset.left) || 0) : 0);
+      const originY = (parentIsRoot ? 192 : (parentSource ? (Number(parentSource.pageAbsY) || 0) : 192)) +
+        (parentInset ? (Number(parentInset.top) || 0) : 0);
       const isTextBlock = (node.controlType || (node.attrs && node.attrs.ControlType)) === "TextBlock";
       return {
         id: node.xmlId || node.id || node.ref,

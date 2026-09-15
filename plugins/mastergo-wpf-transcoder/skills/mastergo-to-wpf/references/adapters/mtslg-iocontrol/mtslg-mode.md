@@ -70,7 +70,7 @@
 - **设计稿最上方示例标题默认剥离**：位于根节点或展示外壳、仅用于说明组件或工件示教的标题标记为 `design-artifact-title`，不写入页面 XML。业务内容容器内部且运行时需要的标题才保留。
 - **设计稿像素直传（归一后）**：`Left = pageAbsX − parentPageAbsX`，`Top = pageAbsY − parentPageAbsY`，Width/Height 原样；`TextBlock` 例外：`Height` 固定 `40`、`Width` 固定 `NaN`。目标画布尺寸必须与第 1 节适配记录一致；不允许从固定分辨率、截图缩放或其他页面推断。
 - 允许小数与负数；`NaN` 表示自适应（根节点四属性均为 `NaN`；叶子无宽高时省略属性）。具体数值必须来自当前实例的 MasterGo bbox。
-- 子控件坐标相对**父容器左上角**；父容器与子控件的坐标关系必须由唯一 MasterGo 父子链和 bbox 计算。
+- 子控件坐标相对**父容器的内容区原点**；父容器与子控件的坐标关系必须由唯一 MasterGo 父子链和 bbox 计算。普通容器（无内容区内边距）的内容区原点 = 父容器左上角；**容器类控件（`ControlType="GroupBox"`）不是**——框架模板是"标题条 + 内容区"两段式，内容区原点 = 容器左上角 + 内容区边框 + 标题条高度，登记在 `mtslg-iocontrol-map.json` 的 `infoGroupTemplates.styleInsets`（按容器 Style 取值：`IOGroupBoxBaseStyle` = `{left:2, top:40}`、`IOGroupBoxSecondary` = `{left:1, top:35}`、`IOGroupBoxThirdly` = `{left:1, top:25}`、`IOGroupBoxFour` = `{left:1, top:35}`）。换算：`Left = 子控件绝对X − 容器绝对X − inset.left`、`Top = 子控件绝对Y − 容器绝对Y − inset.top`；漏扣会让容器内所有子控件整体下移一个标题条高度。容器变体必须显式登记 Style（禁止空 Style：空 Style 落到隐式 `ContentGroupBoxStyle`，内容区原点随标题字号变化，无法机械换算，生成脚本直接失败）。`gen-mtslg-mapping-from-dsl.js`、`apply-container-containment.js`、`gen-iocontrol-xml.js`、`check-iocontrol-coords.js` 与 `validate-iocontrol-provenance.js` 必须使用同一公式。
 - 当完整 DSL 的根节点或对应容器节点的 `overflow` 属性为 `hidden` 时，必须保留外层布局容器及其 `Width/Height` 裁剪边界，内部子控件继续使用相对父容器坐标。该规则优先于模板中“平级节点”的展开形式。只有 DSL 明确没有裁剪需求时才允许展开为同级节点，且必须保留等价裁剪边界。
 - 无 Viewbox、无缩放、无星号数学、无"三类固定不缩放"——`gen-iocontrol-xml.js` 全自动完成，禁止手工重写坐标。
 - 取数后先核对完整 DSL 根节点 `dsl.nodes[0].layoutStyle.width/height` 与已确认目标画布尺寸一致。不一致或根节点尺寸缺失时先与用户确认页面区域，不能继续生成。

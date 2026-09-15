@@ -333,6 +333,48 @@ assert.match(mergedGroupTag, /IOName="EngineerName"/,
 assert.match(mergedGroupTag, /MinValue=""/, 'merge 必须补齐模板声明的空属性 MinValue');
 assert.match(mergedGroupTag, /MaxValue=""/, 'merge 必须补齐模板声明的空属性 MaxValue');
 
+// 容器内子节点的坐标必须从"内容区原点"量：Left/Top = 设计绝对 − 容器绝对 − contentInset。
+// 漏扣这一项会让容器内所有子控件整体下移一个标题条高度（GroupBox 模板是标题条 + 内容区两段式）。
+const nestedContainerMapping = path.join(dir, 'nested-container-mapping.json');
+const nestedContainerOutput = path.join(dir, 'nested-container-page.xml');
+fs.writeFileSync(nestedContainerMapping, JSON.stringify({
+  rootRef: 'root',
+  contentOriginY: 192,
+  sourceNodes: [
+    { ref: 'root', parentRef: null, pageAbsX: 0, pageAbsY: 0, relativeX: 0, relativeY: 0, width: 1280, height: 1024 },
+    { ref: 'grp', parentRef: 'root', pageAbsX: 658, pageAbsY: 514, relativeX: 658, relativeY: 514, width: 200, height: 160 },
+    { ref: 'input', parentRef: 'root', pageAbsX: 704, pageAbsY: 566, relativeX: 704, relativeY: 566, width: 100, height: 40 },
+    { ref: 'grp/title', parentRef: 'grp', pageAbsX: 682, pageAbsY: 530, relativeX: 24, relativeY: 16, width: 123, height: 20, type: 'TEXT', text: '设定XY轴位置' }
+  ],
+  textAudit: [{ sourceRef: 'grp/title', sourceText: '设定XY轴位置', visibility: true, role: 'component-value', decision: 'emit', outputRefs: ['GRP_9'] }],
+  nodes: [
+    {
+      ref: 'grp', sourceRef: 'grp', sourceParent: 'root', id: 'GRP_9', xmlId: 'GRP_9',
+      controlType: 'GroupBox', absX: 658, absY: 514, w: 200, h: 160,
+      sourceText: '设定XY轴位置', valueSource: 'dsl.text', valueSourceRef: 'grp/title',
+      contentInset: { left: 1, top: 35 },
+      attrs: { Style: 'IOGroupBoxSecondary', Header: '设定XY轴位置', IOName: '', IOVisible: '', IOEnable: '', MinValue: '', MaxValue: '' }
+    },
+    {
+      ref: 'input', sourceRef: 'input', sourceParent: 'root', id: 'NB_9', xmlId: 'NB_9',
+      controlType: 'NumberBox', absX: 704, absY: 566, w: 100, h: 40,
+      parent: 'grp', layoutParent: 'grp', expectedLeft: 45, expectedTop: 17, attrs: {}
+    }
+  ]
+}, null, 2));
+const nestedRun = spawnSync(process.execPath,
+  [path.join(__dirname, '..', 'gen-iocontrol-xml.js'), '--fresh', nestedContainerMapping, '--out', nestedContainerOutput],
+  { encoding: 'utf8' });
+assert.strictEqual(nestedRun.status, 0, '容器嵌套映射必须能正常渲染: ' + nestedRun.stderr);
+const nestedText = fs.readFileSync(nestedContainerOutput, 'utf8');
+const nestedGroupTag = (nestedText.match(/<IOContorl[^>]*ID="GRP_9"[\s\S]*?>/) || [''])[0];
+assert.match(nestedGroupTag, /Style="IOGroupBoxSecondary"/, '容器必须发射已登记的 Style');
+const nestedInputTag = (nestedText.match(/<IOContorl[^>]*ID="NB_9"[\s\S]*?\/>/) || [''])[0];
+assert.match(nestedInputTag, /Left="45"/,
+  '容器内子节点的 Left 必须扣掉内容区左边框（704 − 658 − 1 = 45）');
+assert.match(nestedInputTag, /Top="17"/,
+  '容器内子节点的 Top 必须扣掉标题条高度（566 − 514 − 35 = 17）');
+
 // ---- 按钮族规则改为读模板表（--map）：改表即改产物，不再各自维护常量 ----
 const mapPath = path.join(dir, 'template-map.json');
 const mapOutput = path.join(dir, 'map-page.xml');

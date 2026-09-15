@@ -189,7 +189,9 @@ function validate(xmlPath, manifestPath) {
     (manifest.sourceNodes.find(n => !n.parentRef) || {}).ref;
   const tags = Array.from(xml.matchAll(/<IOContorl\b[^<>]*>/g)).map(m => attrsFromTag(m[0]));
   const actual = tags.filter(a => a.ID !== '' || a.ControlType);
-  const byId = new Map(actual.filter(a => a.ID).map(a => [a.ID, a]));
+    const byId = new Map(actual.filter(a => a.ID).map(a => [a.ID, a]));
+    // 输出节点索引：读容器的 contentInset（内容区原点）用。
+    const nodeByRef = new Map(entries.map(function (node) { return [node.ref, node]; }));
   const mappedIds = new Set();
 
   for (const n of entries) {
@@ -217,11 +219,18 @@ function validate(xmlPath, manifestPath) {
       errors.push('[' + n.xmlId + '] layoutParent 不存在: ' + outputParentRef);
     }
     // Root-level output is content-relative: subtract the public shell/title once.
-    // Nested output is parent-relative: subtract only the output parent's raw page bbox.
+    // Nested output is parent-relative: subtract the output parent's raw page bbox, and — when the
+    // output parent is a container (GroupBox 等) — also its content-area origin (border + title bar),
+    // which the mapping carries as contentInset. 不扣这一项，容器内子控件会整体下移一个标题条高度。
     const parentIsRoot = outputParent && outputParent.ref === rootRef;
-    const expectedSourceLeft = Number(src.pageAbsX) - (outputParent ? Number(outputParent.pageAbsX) : 0);
+    const outputParentNode = outputParentRef ? nodeByRef.get(outputParentRef) : null;
+    const parentInset = !parentIsRoot && outputParentNode && outputParentNode.contentInset
+      ? outputParentNode.contentInset : null;
+    const insetLeft = parentInset ? (Number(parentInset.left) || 0) : 0;
+    const insetTop = parentInset ? (Number(parentInset.top) || 0) : 0;
+    const expectedSourceLeft = Number(src.pageAbsX) - (outputParent ? Number(outputParent.pageAbsX) : 0) - insetLeft;
     const expectedSourceTop = Number(src.pageAbsY) -
-      (outputParent ? Number(outputParent.pageAbsY) : 0) - (parentIsRoot || !outputParent ? originY : 0);
+      (outputParent ? Number(outputParent.pageAbsY) : 0) - (parentIsRoot || !outputParent ? originY : 0) - insetTop;
     if (!sameNumber(n.expectedLeft, expectedSourceLeft) || !sameNumber(n.expectedTop, expectedSourceTop)) {
       errors.push('[' + n.xmlId + '] expectedLeft/Top 不是由 sourceNodes 父子坐标计算得到');
     }
