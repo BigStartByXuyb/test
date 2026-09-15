@@ -484,16 +484,33 @@ for (const { item: inst, match } of matched) {
   const variant = match.variant;
   const spec = match.spec;
   if (match.family === "cameraTemplates") {
-    // 相机视口：只发 DesignPanelID / Value（空串占位，运行时/工程师绑定）+ Width/Height（实例 bbox），
-    // **不写 Style**——用运行时默认控件外观（stylePolicy=none）。
-    const cameraSpec = templateMap.cameraTemplates || {};
-    const cameraAttrs = Array.isArray(cameraSpec.alwaysWrittenAttrs) && cameraSpec.alwaysWrittenAttrs.length
-      ? cameraSpec.alwaysWrittenAttrs : ["DesignPanelID", "Value"];
+    // 相机视口是**一个整体**：内部绘制内容（网格、坐标、通道名、JOG mode 等）完全不管，
+    // 只发射外层的 Camera 控件（DesignPanelID / Value 空串占位 + Width/Height 取实例 bbox），
+    // **不写 Style**——用运行时默认控件外观（映射表 cameraTemplates.stylePolicy 固定为 none）。
+    const cameraSpec = templateMap.cameraTemplates;
+    if (cameraSpec.stylePolicy !== "none") {
+      throw new Error("cameraTemplates.stylePolicy 必须是 none：相机视口用运行时默认控件外观，不发射 Style");
+    }
     const attrs = {};
-    for (const attr of cameraAttrs) attrs[attr] = "";
-    if (spec.style && cameraSpec.stylePolicy !== "none") attrs.Style = spec.style;
-    addNode(inst.ref, spec.controlType || cameraSpec.controlType || "Camera", attrs);
+    for (const attr of cameraSpec.alwaysWrittenAttrs) attrs[attr] = "";
+    addNode(inst.ref, spec.controlType, attrs);
     addInstance(match, inst.ref, []);
+    // 内部 TEXT 显式 consume + omit：既不发射成页面 TextBlock，也不让它们漏进通用文本循环。
+    const innerPolicy = cameraSpec.innerTextPolicy;
+    for (const ref of descendants(inst.ref)) {
+      const s = source(ref);
+      if (s.type !== "TEXT" || consumedTexts.has(ref)) continue;
+      consumedTexts.add(ref);
+      textAudit.push({
+        sourceRef: ref,
+        sourceText: s.text,
+        visibility: visible(ref),
+        role: innerPolicy.role,
+        decision: "omit",
+        omitReason: innerPolicy.role,
+        outputRefs: []
+      });
+    }
     continue;
   }
   if (match.family === "rightSidebarTemplates" || match.family === "rightSidebarComponentTemplates" ||

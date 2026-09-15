@@ -108,6 +108,16 @@ for (const attr of ["DesignPanelID", "Value"]) {
 }
 assert.ok((map.controlTypes.Camera.attrs || []).includes("DesignPanelID"), "controlTypes.Camera 必须允许 DesignPanelID");
 assert.ok(feishuMapping.includes("cameraTemplates"), "人读映射文档必须登记相机族（cameraTemplates）");
+// 相机视口内部文本的处置必须显式登记，且 omit 角色要在校验器里放行（否则内部文本会漏成根级 TextBlock）。
+assert.ok(cameraFamily.innerTextPolicy && cameraFamily.innerTextPolicy.role,
+  "相机族必须登记 innerTextPolicy.role（内部文本整体 omit 的角色）");
+assert.strictEqual(cameraFamily.innerTextPolicy.decision, "omit", "相机内部文本必须 decision=omit");
+assert.ok(validator.includes("'" + cameraFamily.innerTextPolicy.role + "'"),
+  "相机内部文本的 omit 角色必须登记进 validate-iocontrol-provenance.js 的 OMIT_ROLES: " + cameraFamily.innerTextPolicy.role);
+assert.ok(mainSkill.includes(cameraFamily.innerTextPolicy.role),
+  "SKILL.md 的可见性映射边界必须写明相机内部文本的 omit 角色");
+assert.ok(fontGenerator.includes("innerTextPolicy"),
+  "映射生成器必须按 innerTextPolicy 消费/omit 相机内部文本");
 
 // ---------- 2. 脚本内置默认 == 映射表（防止三处各写一份后漂移） ----------
 function objectLiteralOf(source, constName) {

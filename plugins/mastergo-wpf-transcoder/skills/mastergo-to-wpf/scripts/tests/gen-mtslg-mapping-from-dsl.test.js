@@ -438,7 +438,11 @@ const cameraDsl = {
       type: 'INSTANCE', id: 'cam:root/view', name: '集成图像',
       layoutStyle: { width: 600, height: 600, relativeX: 20, relativeY: 202 },
       componentId: '197:200415', componentInfo: {},
-      children: [{ type: 'LAYER', id: 'cam:root/view/bg', name: '矩形 2034', layoutStyle: { width: 600, height: 600, relativeX: 0, relativeY: 0 } }],
+      children: [
+        { type: 'LAYER', id: 'cam:root/view/bg', name: '矩形 2034', layoutStyle: { width: 600, height: 600, relativeX: 0, relativeY: 0 } },
+        // 视口内部绘制文本（真实相机组件里存在：JOG mode / 通道名 / 坐标读数）——整体不处理
+        textNode('cam:root/view/inner-text', 'cam:root/view', 'JOG mode', 12, 12),
+      ],
     }],
   }],
 };
@@ -453,5 +457,11 @@ assert.strictEqual(cameraNode.expectedHeight, 600, 'Height 取实例 bbox');
 assert.strictEqual(cameraNode.expectedTop, 202 - 192, '根级 Top 仍扣 192');
 assert.strictEqual(cameraMapping.pending.filter(item => item.sourceRef === 'cam:root/view').length, 0,
   '相机实例不得再进入 pending（未映射组件）');
+assert.ok(!cameraMapping.nodes.some(node => node.sourceRef === 'cam:root/view/inner-text'),
+  '相机视口内部文本不得被发射成 TextBlock（相机是一个整体）');
+const innerAudit = cameraMapping.textAudit.find(item => item.sourceRef === 'cam:root/view/inner-text');
+assert.ok(innerAudit, '相机视口内部文本必须进入 textAudit（显式登记处置）');
+assert.strictEqual(innerAudit.decision, 'omit', '相机内部文本必须 decision=omit');
+assert.strictEqual(innerAudit.role, 'camera-viewport-internal', '相机内部文本必须用专用 omit 角色');
 
 console.log('PASS MTSLG DSL-to-mapping camera viewport regression test');

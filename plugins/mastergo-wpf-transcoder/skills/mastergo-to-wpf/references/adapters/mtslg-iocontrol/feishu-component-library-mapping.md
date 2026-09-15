@@ -186,7 +186,7 @@ MasterGo 组件库已存在真实变体 `密码输入框`，但当前 MT3.0 IOCo
 
 ### 固定模板：组件集=集成图像 / 晶圆图
 
-固定节点：一个 `ControlType="Camera"` 的视口控件；**不发射 `Style`**（`cameraTemplates.stylePolicy = none`，直接用运行时默认控件外观）。相机组件内部的绘制内容（网格、通道文字、拟合结果等）属于视口自身渲染，不再作为页面控件发射。
+固定节点：一个 `ControlType="Camera"` 的视口控件；**不发射 `Style`**（`cameraTemplates.stylePolicy = none`，直接用运行时默认控件外观）。**相机视口是一个整体**：组件内部的一切绘制内容（网格、通道文字、JOG mode、拟合结果等）都不处理、不发射——内部 TEXT 由映射生成器显式 consume，并按 `cameraTemplates.innerTextPolicy` 以 `camera-viewport-internal` 角色 omit（该角色已登记进 provenance 校验器的 omit 角色集合，校验可通过且不会漏成根级 `TextBlock`）。
 
 ```
 <IOContorl ID="{id_camera}" ControlType="Camera" DesignPanelID="" IOName="" Value="" Width="{width}" Height="{height}" Left="{left}" Top="{top}" />

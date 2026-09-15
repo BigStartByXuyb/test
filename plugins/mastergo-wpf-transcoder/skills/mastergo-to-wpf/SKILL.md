@@ -292,7 +292,7 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 
 AI 必须同时读取原始 DSL、`visibility.json` 和正式组件映射，按有效可见状态决定每个普通 TEXT、F 文本和 Icon 是否进入 mapping：可见的当前页面文本必须生成，明确 hidden 文本删除；只有页面根级/工件级大标题标记为 `page-title` 时永远删除，组件内部标题、GroupBox Header、表格列标题以及组件库占位文案都按自身可见属性生成。宿主公共栏由结构边界剥离，不作为组件文本删除理由。最终 mapping 必须用 `textAudit` 记录每个 TEXT 的 `sourceRef`、真实文本、可见性、角色、输出决定和 `outputRefs`，再交给 Bundle 生成页面文件。
 
-- `_placeholder=true` 只是 MasterGo 组件库来源提示，不是删除条件。即使正式组件映射把文本标记为 placeholder，只要它属于当前页面或当前组件的可见内容，也必须生成。文本只有在明确属于页面根级 `page-title`、明确 hidden，或已被宿主结构边界剥离为 `host-shell` 时才允许 `decision=omit`。
+- `_placeholder=true` 只是 MasterGo 组件库来源提示，不是删除条件。即使正式组件映射把文本标记为 placeholder，只要它属于当前页面或当前组件的可见内容，也必须生成。文本只有在明确属于页面根级 `page-title`、明确 hidden、已被宿主结构边界剥离为 `host-shell`，或属于**整体控件内部渲染**（当前唯一此类是相机视口：映射表 `cameraTemplates.innerTextPolicy` 要求内部 TEXT 整体 omit，角色 `camera-viewport-internal`）时才允许 `decision=omit`；omit 角色必须同时登记在 `validate-iocontrol-provenance.js` 的 `OMIT_ROLES` 里，否则校验会拒绝。
 
 ### 辅助脚本触发矩阵
 

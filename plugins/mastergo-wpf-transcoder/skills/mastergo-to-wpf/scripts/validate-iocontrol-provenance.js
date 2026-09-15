@@ -90,7 +90,8 @@ function isNanValue(value) {
 
 // 允许 decision=omit 的角色/原因：除显式隐藏、页面标题、宿主外壳外，
 // 还包括「未命中正式模板」与「按清单隔离」的组件内部文本（这些文本不进入页面 XML）。
-const OMIT_ROLES = ['page-title', 'host-shell', 'excluded-component', 'unmapped-component'];
+// camera-viewport-internal：相机视口是整体控件，组件内部绘制文本按映射表 cameraTemplates.innerTextPolicy 一律 omit。
+const OMIT_ROLES = ['page-title', 'host-shell', 'excluded-component', 'unmapped-component', 'camera-viewport-internal'];
 const OMIT_REASONS = ['hidden'].concat(OMIT_ROLES);
 
 function validateTextAudit(manifest, entries) {
