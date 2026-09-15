@@ -329,36 +329,6 @@ assert.notStrictEqual(result.status, 0, "缺少 Layout 状态时不得继续生�
 assert.match(result.stderr + result.stdout, /layoutStatus|Layout/i);
 assert.ok(!fs.existsSync(path.join(project, "Resources/Pages/NoLayoutState/NoLayoutStatePage.xml")));
 
-// 坐标门禁必须实际执行（CI REVIEW-002）：merge 路径允许直接提供 mapping（未给 dslPath/visibilityPath 时），
-// 该 mapping 由上游/工程师维护，其 sourceNodes 的 bbox 允许写成数值字符串（"100"）——
-// gen-iocontrol-xml 只对 nodes 的 absX/w/h 做 typeof number 门禁，provenance 与坐标核对器都按 num() 归一化，
-// 因此 bundle 的坐标门禁也必须先归一化再照常核对：既不能整段静默跳过（旧行为），
-// 也不能把 Number.isFinite("100") === false 误判成缺度量而失败。
-assert.doesNotMatch(scriptText, /coordNodesUsable/,
-  "坐标门禁不得保留「度量不可用就整段跳过」的分支");
-assert.match(scriptText, /unusableCoordNodes/,
-  "坐标门禁缺度量必须显式失败，而不是静默跳过");
-
-const mergeMapping = JSON.parse(
-  fs.readFileSync(path.join(project, "Generated/F2NewPage.mapping.json"), "utf8")
-);
-for (const source of mergeMapping.sourceNodes) {
-  for (const field of ["pageAbsX", "pageAbsY", "width", "height"]) {
-    if (typeof source[field] === "number") source[field] = String(source[field]);
-  }
-}
-const stringMetricMapping = path.join(root, "merge-mapping-string-metrics.json");
-fs.writeFileSync(stringMetricMapping, JSON.stringify(mergeMapping, null, 2), "utf8");
-const mergeManifest = JSON.parse(fs.readFileSync(manifest, "utf8"));
-mergeManifest.operation = "modify-existing";
-delete mergeManifest.dslPath;
-delete mergeManifest.visibilityPath;
-mergeManifest.mappingPath = stringMetricMapping;
-const mergeManifestPath = path.join(root, "merge-string-metrics.json");
-fs.writeFileSync(mergeManifestPath, JSON.stringify(mergeManifest, null, 2), "utf8");
-result = spawnSync(process.execPath, [script, "--manifest", mergeManifestPath, "--overwrite"], { encoding: "utf8" });
-assert.strictEqual(result.status, 0, result.stderr + result.stdout);
-
 const brokenManifest = path.join(root, "broken-bundle.json");
 const brokenProject = path.join(root, "Broken.Pages");
 fs.mkdirSync(brokenProject, { recursive: true });

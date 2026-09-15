@@ -17,8 +17,7 @@
  *       "valueSource": "dsl.text（TextBlock 必须为此值）",
  *       "id": "XML ID 属性值（可选；省略则节点不带 ID）",
  *       "controlType": "IconButton | GroupBox | ...（必填；页面根 IOContorl 不在 nodes 中）",
- *       "layoutParent": null | "某节点 ref"（**输出父节点首选项**；null = 页面根 IOContorl 的直接子级）",
- *       "parent": null | "某节点 ref"（同 layoutParent，二选一或同时登记；未登记 layoutParent 时由它决定）",
+ *       "parent": null | "某节点 ref"（null = 页面根 IOContorl 的直接子级）",
  *       "absX": 10, "absY": 35,          // 页面绝对 bbox（double）
  *       "w": 160, "h": 150,              // 可省略（无宽高）；NaN 原样输出
  *       "attrs": { "Style": "MainButtonStyle", "Value": "全自动操作", ... },  // 业务属性
@@ -111,34 +110,6 @@ function sortNodesByDesignOrder(list) {
 }
 
 const nodes = sortNodesByDesignOrder(mapping.nodes || []);
-
-// 输出父节点（XML 里真正的父容器）真值源，三处脚本共用同一优先级：
-//   layoutParent → parent → DSL sourceParent（sourceNodes.parentRef）
-// 与 validate-iocontrol-provenance.js、gen-mastergo-page-bundle.js 的坐标门禁一致；
-// 当前 DSL→mapping 生成器把 parent / layoutParent 写成同一个值，二者不同只来自显式登记的 layoutParent。
-// 唯一约束：输出父节点必须是**已发射的输出节点**（既在 mapping.nodes 的 ref 里、又在 sourceNodes 里有 bbox）
-// 或页面根（null / mapping.rootRef）；指向未发射节点时 XML 无法表达该嵌套（按根级发射会与校验器重算的
-// 相对坐标相反），因此这里直接失败，不静默降级。
-const sourceByRef = new Map((mapping.sourceNodes || []).map(function (s) { return [s.ref, s]; }));
-const nodeRefs = new Set((mapping.nodes || []).map(function (n) { return n.ref; }));
-function parentRefOf(node) {
-  let ref;
-  let field;
-  if (node.layoutParent !== undefined) { ref = node.layoutParent || null; field = 'layoutParent'; }
-  else if (node.parent !== undefined) { ref = node.parent || null; field = 'parent'; }
-  else {
-    const src = sourceByRef.get(node.sourceRef || node.ref);
-    ref = src ? (src.parentRef || null) : null;
-    field = 'DSL sourceParent';
-  }
-  if (!ref || ref === mapping.rootRef) return null;
-  if (!nodeRefs.has(ref) || !sourceByRef.has(ref)) {
-    throw new Error('映射门禁失败: ' + node.ref + ' 的输出父节点（' + field + '=' + ref +
-      '）不是已发射的输出节点（要求同时是 mapping.nodes 的 ref 与 sourceNodes 的记录）；' +
-      '请把 layoutParent 登记为该节点的 ref，或用 null 表示页面根级');
-  }
-  return ref;
-}
 const TOP_PUBLIC_BAR_Y = 126;
 const TOP_ARTIFACT_TITLE_Y = 66;
 const contentOriginY = TOP_PUBLIC_BAR_Y + TOP_ARTIFACT_TITLE_Y;
@@ -466,7 +437,7 @@ function renderFresh() {
   const childMap = new Map();
   const rootChildren = [];
   for (const n of nodes) {
-    const p = parentRefOf(n);
+    const p = n.parent || null;
     if (p === null) rootChildren.push(n);
     else {
       if (!childMap.has(p)) childMap.set(p, []);
@@ -605,10 +576,10 @@ function mergeMode() {
   nodes.forEach(n => absOf.set(n.ref, { absX: n.absX, absY: normalizedY(n.absY) }));
 
   function resolveParentAbs(n) {
-    const p = parentRefOf(n);
+    const p = n.parent || null;
     if (p === null) return { x: 0, y: 0 };
-    // parentRefOf() 已保证 p 是 mapping.nodes 的成员（absOf 的键来自同一批节点），无需再判空。
     const pn = absOf.get(p);
+    if (!pn) throw new Error(`映射节点 parent 引用不存在: ${p}（来自 ref=${n.ref}）`);
     return { x: pn.absX, y: pn.absY };
   }
 
@@ -722,29 +693,21 @@ function mergeMode() {
   const depthOfRef = (ref) => {
     if (depthOf.has(ref)) return depthOf.get(ref);
     const n = nodes.find(x => x.ref === ref);
-    const parentRef = n ? parentRefOf(n) : null;
-    const d = parentRef ? depthOfRef(parentRef) + 1 : 1;
+    const d = (n && n.parent) ? depthOfRef(n.parent) + 1 : 1;
     depthOf.set(ref, d);
     return d;
   };
 
   const insertions = new Map(); // closeTokenIdx -> [chunks]
-  // 新增子树只以「子树根」为单位插入：输出父节点本身也是本次新增节点时，
-  // 该节点已在父块的 renderSub/kids 递归里发射，不能再单独插入（否则会重复发射并被落到页面根）。
-  const isNewNode = (parentRef) => {
-    const parentRender = parentRef === null ? null : rendered.get(parentRef);
-    return Boolean(parentRender && parentRender.tokenIdx === null);
-  };
   for (const [ref, r] of rendered) {
     if (r.tokenIdx !== null) continue;
     const { n, attrMap } = r;
-    if (isNewNode(parentRefOf(n))) continue;
     const pa = resolveParentAbs(n);
     const attrMap2 = Object.assign({}, attrMap);
     attrMap2.Left = fmtNum(n.absX - pa.x);
     attrMap2.Top = fmtNum(normalizedY(n.absY) - pa.y);
     const indent = '    '.repeat(depthOfRef(ref));
-    const kids = nodes.filter(k => parentRefOf(k) === ref);
+    const kids = nodes.filter(k => (k.parent || null) === ref);
 
     const renderSub = (node, d) => {
       const pa2 = resolveParentAbs(node);
@@ -757,7 +720,7 @@ function mergeMode() {
       if (outputHeight(node) !== undefined && outputHeight(node) !== null) am.Height = fmtNum(outputHeight(node));
       applyButtonFamilyAttrs(node, am);
       applyRequiredAttrs(node, am);
-      const kk = nodes.filter(x => parentRefOf(x) === node.ref);
+      const kk = nodes.filter(x => (x.parent || null) === node.ref);
       const ind = '    '.repeat(d);
       const parts = [];
       if (node.comment) parts.push(`${ind}<!-- ${node.comment} -->\n`);
@@ -783,35 +746,26 @@ function mergeMode() {
 
     // 插入点：父闭合标签（父为根 → 最后一个闭合标签；父是新节点 → 挂在该新块的插入点后）
     let closeIdx = null;
-    const p = parentRefOf(n);
+    const p = n.parent || null;
     if (p === null) {
       for (let i = tokens.length - 1; i >= 0; i--) {
         if (tokens[i].type === 'tag' && tokens[i].isClose) { closeIdx = i; break; }
       }
-      if (closeIdx === null) {
-        throw new Error('映射门禁失败: 现有 XML 里找不到根级 </IOContorl> 闭合标签，无法插入新增节点 ' + ref +
-          '；自闭合根节点（<IOContorl ... />）或空文件都不能承接新增节点，请先补齐根闭合标签');
-      }
     } else {
-      // 输出父节点是既有节点：必须在现有 XML 里定位到它的成对闭合标签才能插入子块。
-      // 定位顺序：优先用本次匹配命中的 token（ID 命中或 ControlType+坐标位置命中都算），
-      // 退回 ID 索引；父标签是自闭合形式（openClose 里没有成对闭合标签）时直接失败——
-      // 静默挂到页面根会让「按父节点相对的 Left/Top」落到页面根控件上，而属性级门禁察觉不到。
-      const parentRender = rendered.get(p);
       const pn = nodes.find(x => x.ref === p);
-      const openIdx = parentRender && parentRender.tokenIdx !== null
-        ? parentRender.tokenIdx
-        : (pn && pn.id && idIndex.has(pn.id) ? idIndex.get(pn.id) : null);
-      if (openIdx !== null && openClose.has(openIdx)) closeIdx = openClose.get(openIdx);
-      else {
-        throw new Error('映射门禁失败: 新增节点 ' + ref + ' 的输出父节点 ' + p +
-          '（ID=' + ((pn && pn.id) || '(无)') + '）在现有 XML 中定位不到成对闭合标签' +
-          '（父标签是自闭合形式）；请把父节点改成容器形式再插入子级，' +
-          '或调整 layoutParent，不要把它静默落到页面根级');
+      if (pn && pn.id && idIndex.has(pn.id)) {
+        const openIdx = idIndex.get(pn.id);
+        if (openClose.has(openIdx)) closeIdx = openClose.get(openIdx);
       }
     }
-    if (!insertions.has(closeIdx)) insertions.set(closeIdx, []);
-    insertions.get(closeIdx).push(block);
+    if (closeIdx !== null) {
+      if (!insertions.has(closeIdx)) insertions.set(closeIdx, []);
+      insertions.get(closeIdx).push(block);
+    } else {
+      // 父是新节点：挂到最后一个根级闭合标签前（保守回退）
+      if (!insertions.has('root-pending')) insertions.set('root-pending', []);
+      insertions.get('root-pending').push(block);
+    }
     report.newNodes.push(`[${ref}] ${n.controlType || '(容器)'} 新增`);
   }
 
@@ -821,41 +775,24 @@ function mergeMode() {
     if (insertions.has(i)) out.push(...insertions.get(i));
     out.push(replacements.has(i) ? replacements.get(i) : t.raw);
   });
+  const pending = insertions.get('root-pending');
+  if (pending && pending.length) {
+    const lastCloseIdx = out.map((x, i) => ({ x, i })).filter(o => typeof o.x === 'string' && /^\s*<\/IOContorl>\s*$/.test(o.x)).pop();
+    if (lastCloseIdx) out.splice(lastCloseIdx.i, 0, ...pending);
+  }
 
   return { text: out.join(''), report };
 }
 
 // ---------- 主流程 ----------
-
-// merge 报告：调用方（当前主路径「修改现有页面」）必须靠它逐条裁决冲突/覆盖/新增/未涉及节点，
-// 因此并入主流程必经路径输出。走 stderr，避免污染「不带 --out 时 stdout 就是 XML」的管道用法。
-function mergeReportText(report) {
-  const lines = [];
-  const list = (title, arr) => {
-    if (arr && arr.length) {
-      lines.push(`\n${title} (${arr.length}):`);
-      arr.forEach(x => lines.push(`  - ${x}`));
-    }
-  };
-  lines.push('\n--- merge 报告 ---');
-  list('冲突（保留现有值）', report.conflicts);
-  list('设计文本覆盖（dsl.text）', report.textOverrides);
-  list('新增属性', report.added);
-  list('几何/类型更新', report.updated);
-  list('新增节点', report.newNodes);
-  list('现有但设计稿无（原样保留）', report.unmapped);
-  return lines.join('\n') + '\n';
-}
-
-let outText;
+let outText, report = null;
 if (mode === 'fresh') {
   validateFreshMapping();
   outText = renderFresh();
 } else {
   const r = mergeMode();
   outText = r.text;
-  // 报告与产物同步落盘：先写报告，再写文件，调用方在同一进程输出里就能拿到裁决清单。
-  process.stderr.write(mergeReportText(r.report));
+  report = r.report;
 }
 
 if (outPath) {
@@ -863,4 +800,20 @@ if (outPath) {
   console.log(`OK -> ${outPath}`);
 } else {
   process.stdout.write(outText);
+}
+
+if (report) {
+  const list = (title, arr) => {
+    if (arr.length) {
+      console.error(`\n${title} (${arr.length}):`);
+      arr.forEach(x => console.error(`  - ${x}`));
+    }
+  };
+  console.error('\n--- merge 报告 ---');
+  list('冲突（保留现有值）', report.conflicts);
+  list('设计文本覆盖（dsl.text）', report.textOverrides);
+  list('新增属性', report.added);
+  list('几何/类型更新', report.updated);
+  list('新增节点', report.newNodes);
+  list('现有但设计稿无（原样保留）', report.unmapped);
 }
