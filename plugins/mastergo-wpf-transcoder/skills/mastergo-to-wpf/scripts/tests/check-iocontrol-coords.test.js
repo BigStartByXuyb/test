@@ -47,3 +47,49 @@ if (!/OK id="panel"/.test(nestedResult.stdout) || !/OK id="label2"/.test(nestedR
   throw new Error('expected nested coordinate match for both panel and label2:\n' + nestedResult.stdout);
 }
 console.log('PASS nested (parent-relative) coordinate regression test');
+
+// ---- 度量归一化与缺度量报错：数值字符串算数值；缺度量必须点名 MISMATCH（不允许静默跳过）----
+// 与 provenance / bundle 坐标门禁同口径：Number("292") 视为数值，缺字段必须失败。
+// 独立夹具：TextBlock 的 Width 按规则必须是 NaN，因此不复用上面 Width="63" 的旧夹具。
+const metricXmlPath = path.join(dir, 'metric-page.xml');
+fs.writeFileSync(metricXmlPath, '<IOContorl ID="label" ControlType="TextBlock" Left="658" Top="476" Width="NaN" Height="40" FontSize="16" />');
+const stringMetricNodesPath = path.join(dir, 'string-metric-nodes.json');
+fs.writeFileSync(stringMetricNodesPath, JSON.stringify([
+  { id: 'label', x: '658', y: '668', w: 'NaN', h: '40', contentOriginX: '0', contentOriginY: '192' }
+]));
+const stringMetricResult = spawnSync(process.execPath, [path.join(__dirname, '..', 'check-iocontrol-coords.js'),
+  '--xml', metricXmlPath, '--nodes', stringMetricNodesPath], { encoding: 'utf8' });
+if (stringMetricResult.status !== 0 || !/OK id="label"/.test(stringMetricResult.stdout)) {
+  throw new Error(`数值字符串度量必须按数值核对:\n${stringMetricResult.stdout}`);
+}
+
+const nonNumericNodesPath = path.join(dir, 'non-numeric-nodes.json');
+fs.writeFileSync(nonNumericNodesPath, JSON.stringify([
+  { id: 'label', x: 'abc', y: 668, w: 'NaN', h: 40, contentOriginX: 0, contentOriginY: 192 }
+]));
+const nonNumericResult = spawnSync(process.execPath, [path.join(__dirname, '..', 'check-iocontrol-coords.js'),
+  '--xml', metricXmlPath, '--nodes', nonNumericNodesPath], { encoding: 'utf8' });
+if (nonNumericResult.status === 0 || !/MISMATCH id="label"/.test(nonNumericResult.stdout)) {
+  throw new Error(`非数值度量必须报 MISMATCH:\n${nonNumericResult.stdout}`);
+}
+
+const missingMetricNodesPath = path.join(dir, 'missing-metric-nodes.json');
+fs.writeFileSync(missingMetricNodesPath, JSON.stringify([
+  { id: 'label', w: 'NaN', h: 40, contentOriginX: 0, contentOriginY: 192 }   // 缺 x / y
+]));
+const missingMetricResult = spawnSync(process.execPath, [path.join(__dirname, '..', 'check-iocontrol-coords.js'),
+  '--xml', metricXmlPath, '--nodes', missingMetricNodesPath], { encoding: 'utf8' });
+if (missingMetricResult.status === 0 || !/缺少设计稿度量: x, y/.test(missingMetricResult.stdout)) {
+  throw new Error(`缺少度量必须点名报 MISMATCH:\n${missingMetricResult.stdout}`);
+}
+
+const missingWidthNodesPath = path.join(dir, 'missing-width-nodes.json');
+fs.writeFileSync(missingWidthNodesPath, JSON.stringify([
+  { id: 'label', x: 658, y: 668, h: 40, contentOriginX: 0, contentOriginY: 192 }   // 缺 w
+]));
+const missingWidthResult = spawnSync(process.execPath, [path.join(__dirname, '..', 'check-iocontrol-coords.js'),
+  '--xml', metricXmlPath, '--nodes', missingWidthNodesPath], { encoding: 'utf8' });
+if (missingWidthResult.status === 0 || !/缺少设计稿度量: w/.test(missingWidthResult.stdout)) {
+  throw new Error(`缺宽度必须点名报 MISMATCH:\n${missingWidthResult.stdout}`);
+}
+console.log('PASS coordinate metric normalization + missing-metric reporting');

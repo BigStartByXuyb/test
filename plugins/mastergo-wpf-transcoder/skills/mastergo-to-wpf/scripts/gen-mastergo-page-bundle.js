@@ -783,18 +783,28 @@ function validateBundleOutputs(info) {
         contentOriginY: originY
       };
     });
-    // TextBlock 的宽度按规则固定为 NaN（自适应），此时 w 传 "NaN" 是合法的：
-    // 只要求 x/y 必须是数值，w/h 允许是数值或 "NaN"（NaN 只与 NaN 匹配，见 check-iocontrol-coords.js）。
-    const coordNodesUsable = coordNodes.every(function (node) {
-      return Number.isFinite(node.x) && Number.isFinite(node.y) &&
-        (node.w === "NaN" || Number.isFinite(node.w)) &&
-        (node.h === "NaN" || Number.isFinite(node.h));
+    // 坐标核对是硬门禁：必须每次都执行，禁止因为"度量不是严格数字"而整段跳过
+    // （旧写法 Number.isFinite("292") === false 会让整段核对消失，而审计仍写 static: passed）。
+    // 度量按与 provenance 相同的 Number() 口径归一化：数值字符串（"292"）算数值；
+    // TextBlock 的宽按规则恒为 "NaN"（NaN 只与 NaN 匹配，见 check-iocontrol-coords.js）。
+    // 归一化后仍取不到值的节点不再在这里静默跳过，而是照常交给核对器 —— 由核对器
+    // 在结果里点名 MISMATCH（"缺少设计稿度量"），因此失败路径只有一条。
+    const coordNumber = function (value) {
+      if (value === undefined || value === null || value === "") return null;
+      const numeric = Number(value);
+      return Number.isFinite(numeric) ? numeric : null;
+    };
+    const normalizedCoordNodes = coordNodes.map(function (node) {
+      return Object.assign({}, node, {
+        x: coordNumber(node.x),
+        y: coordNumber(node.y),
+        w: node.w === "NaN" ? "NaN" : coordNumber(node.w),
+        h: node.h === "NaN" ? "NaN" : coordNumber(node.h)
+      });
     });
-    if (coordNodesUsable) {
-      const coordsPath = path.join(info.tempRoot, "coords.json");
-      fs.writeFileSync(coordsPath, JSON.stringify(coordNodes), "utf8");
-      run(COORDS_SCRIPT, ["--xml", info.pageXmlPath, "--nodes", coordsPath]);
-    }
+    const coordsPath = path.join(info.tempRoot, "coords.json");
+    fs.writeFileSync(coordsPath, JSON.stringify(normalizedCoordNodes), "utf8");
+    run(COORDS_SCRIPT, ["--xml", info.pageXmlPath, "--nodes", coordsPath]);
   }
 
   // 多语言：各语言 key 必须完全一致，且 LangName 必须命中本页字典。

@@ -98,6 +98,19 @@ for (const xn of xmlNodes) {
   usedNode.add(src);
 
   const xl = num(xn.Left), xt = num(xn.Top), xw = num(xn.Width), xh = num(xn.Height);
+  // 度量缺失必须先报出来：否则 x/y 为 null 时后续算术会把 null 当 0 参与比较，报出的
+  // "dsl=0" 会误导排查。缺度量一律记 MISMATCH，绝不允许被跳过。
+  const missingFields = [];
+  for (const field of ['x', 'y', 'w', 'h']) {
+    const value = src[field];
+    if (value === undefined || value === null || value === '') missingFields.push(field);
+  }
+  if (missingFields.length > 0) {
+    mismatch++;
+    results.push('MISMATCH id="' + (src.id || src.ref || '?') + '" 缺少设计稿度量: ' +
+      missingFields.join(', ') + '（节点表必须给出该节点自身的 bbox，缺度量不允许跳过核对）');
+    continue;
+  }
   // 原点 = 该节点 XML 父容器的页面绝对坐标（根级节点为 0 / 192；嵌套节点为父容器的 pageAbs 坐标）。
   const originX = src.contentOriginX === undefined || src.contentOriginX === null ? 0 : Number(src.contentOriginX);
   const originY = src.contentOriginY === undefined || src.contentOriginY === null ? 192 : Number(src.contentOriginY);

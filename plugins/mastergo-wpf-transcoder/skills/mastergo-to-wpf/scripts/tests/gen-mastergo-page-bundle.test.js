@@ -246,6 +246,36 @@ assert.notStrictEqual(result.status, 0, "已存在审计文件时不得在没有
 assert.match(result.stderr + result.stdout, /审计文件已存在|未覆盖/);
 assert.ok(!fs.existsSync(path.join(project, "Resources/Pages/AuditCollision/AuditCollisionPage.xml")));
 
+// 坐标门禁必须每次都执行：旧写法在"度量不是严格数字"时整段跳过核对，而审计仍写 static: passed。
+// 现在改成：先按与 provenance 相同的 Number() 口径归一化，再无条件交给坐标核对器；
+// 缺度量由核对器点名 MISMATCH（见 check-iocontrol-coords.js）。
+assert.doesNotMatch(scriptText, /coordNodesUsable/,
+  "坐标门禁不得保留「度量不可用就整段跳过」的分支");
+assert.match(scriptText, /normalizedCoordNodes/,
+  "坐标门禁必须归一化后无条件执行核对");
+
+// 数值字符串度量（手写 / merge mapping 常见：写成 "292" 而不是 292）必须照常核对并通过。
+const stringMetricMapping = JSON.parse(
+  fs.readFileSync(path.join(project, "Generated/F2NewPage.mapping.json"), "utf8")
+);
+for (const source of stringMetricMapping.sourceNodes) {
+  for (const field of ["pageAbsX", "pageAbsY", "width", "height"]) {
+    if (typeof source[field] === "number") source[field] = String(source[field]);
+  }
+}
+const stringMetricMappingPath = path.join(root, "string-metric-mapping.json");
+fs.writeFileSync(stringMetricMappingPath, JSON.stringify(stringMetricMapping, null, 2), "utf8");
+const stringMetricManifest = JSON.parse(fs.readFileSync(manifest, "utf8"));
+stringMetricManifest.operation = "modify-existing";
+delete stringMetricManifest.dslPath;
+delete stringMetricManifest.visibilityPath;
+stringMetricManifest.mappingPath = stringMetricMappingPath;
+const stringMetricManifestPath = path.join(root, "string-metric-manifest.json");
+fs.writeFileSync(stringMetricManifestPath, JSON.stringify(stringMetricManifest, null, 2), "utf8");
+result = spawnSync(process.execPath, [script, "--manifest", stringMetricManifestPath, "--overwrite"], { encoding: "utf8" });
+assert.strictEqual(result.status, 0,
+  "数值字符串度量必须照常执行坐标核对并通过: " + result.stderr + result.stdout);
+
 // 空项目脚手架：目标目录可以尚不存在，但必须生成完整文件结构；只做静态校验，不编译或加载 WPF。
 const scaffoldProject = path.join(root, "EmptyScaffold");
 const scaffoldManifest = path.join(root, "scaffold.json");
