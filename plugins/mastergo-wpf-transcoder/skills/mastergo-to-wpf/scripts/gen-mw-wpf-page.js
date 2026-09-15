@@ -319,15 +319,24 @@ const PROVISIONAL_MENU_KEY = /^MenuItemIndex\d+$/;
 const RESERVED_VIEWMODEL_MEMBERS = ["pageDesign", "OnViewLoaded", "PageDesign_Loaded", "HandleButtonEvent", "OKCmd"];
 
 // 由菜单项 LanguageKey（langName）派生按钮处理方法名：MenuItemFocus -> Focus。
-// 菜单键命名空间是 `MenuItem + 英文语义名`，所以有 `MenuItem` 前缀时去前缀；
-// 跨页面共享键（scope=shared）可能不带该前缀，此时直接取整键。
-// 取不到语义名（临时键 / 结果不是合法标识符 / C# 关键字）返回空串，由调用方退回内联 TODO。
-function methodNameFromLangName(langName) {
+// 判定条件只有一条：**是否带 `MenuItem` 前缀**（带前缀去前缀，不带前缀取整键）——
+// 键的 scope（是否跨页面共享）不参与判定。返回 { method, reason }：
+// 四种退回原因与 page-shell-generator.md 的退回清单逐条对应（没有 langName / 临时键 /
+// 不是合法 C# 标识符 / C# 关键字），method 为空串时由调用方退回内联 TODO。
+function resolveMethodNameFromLangName(langName) {
   const key = typeof langName === "string" ? langName.trim() : "";
-  if (key === "" || PROVISIONAL_MENU_KEY.test(key)) return "";
+  if (key === "") return { method: "", reason: "该菜单项没有 LangName" };
+  if (PROVISIONAL_MENU_KEY.test(key)) {
+    return { method: "", reason: "LangName \"" + key + "\" 是临时键 MenuItemIndex<n>，不派生方法名" };
+  }
   const suffix = key.indexOf(MENU_KEY_PREFIX) === 0 ? key.slice(MENU_KEY_PREFIX.length) : key;
-  if (!isIdentifier(suffix) || CSHARP_KEYWORDS.has(suffix)) return "";
-  return suffix;
+  if (!isIdentifier(suffix)) {
+    return { method: "", reason: "LangName \"" + key + "\" 派生的名字不是合法 C# 标识符: \"" + suffix + "\"" };
+  }
+  if (CSHARP_KEYWORDS.has(suffix)) {
+    return { method: "", reason: "LangName \"" + key + "\" 派生出的是 C# 关键字: " + suffix };
+  }
+  return { method: suffix, reason: "" };
 }
 
 // 按钮处理方法解析（机械、可审计，不推断语义）：**唯一来源是 menuItems[].langName**——
@@ -347,14 +356,9 @@ function resolveButtonHandlers(manifest, buttonNames, viewModelName) {
   const inlineTodoCases = [];
   buttonNames.forEach(function (name) {
     const item = itemByName.get(name) || {};
-    let method = "";
-    let reason = "";
-    method = methodNameFromLangName(item.langName);
-    if (!method) {
-      reason = item.langName
-        ? "LangName \"" + item.langName + "\" 无法派生方法名"
-        : "该菜单项没有 LangName";
-    }
+    const resolved = resolveMethodNameFromLangName(item.langName);
+    const method = resolved.method;
+    const reason = resolved.reason;
     if (method) {
       if (RESERVED_VIEWMODEL_MEMBERS.indexOf(method) !== -1 || method === viewModelName) {
         fail("按钮处理方法名与 ViewModel 成员同名，会生成重复成员: " + method +
