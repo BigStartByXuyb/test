@@ -32,7 +32,7 @@
 </Page>
 ```
 
-新建页面时，Index 取当前页面底部栏中该实例的排列顺序，**从 1 起、连续编号**（第 1 个菜单项 = 1，按底部栏的视觉排列顺序）。右下角常驻分组的按钮不生成 MenuItem、也不占 Index（框架单独处理这四个按钮），因此不出现空档、不跳号。例如底部栏第 1~5 个按钮生成 MenuItem、第 6~7 个是常驻分组不生成、第 8~12 个再生成，则 Index 为 `1,2,3,4,5,6,7,8,9,10`（常驻按钮不参与编号）。不写入 Left、Top、Width、Height。重生成已有页面时同样按上述规则重排 Index；`gen-mtslg-layout.js` 对 Index 做门禁，出现重复、跳号或空档直接失败，要求重新推导清单，不沿用带空档的旧编号。固定模板已经声明的 `PageName`、`IOEnable`、`UserRightId` 等可选属性，目标项目未提供时保留属性并输出空字符串；当前变体没有声明的属性不新增。
+新建页面时，Index 取当前页面底部栏中该实例的排列顺序，**从 1 起、连续编号**（第 1 个菜单项 = 1，按底部栏的视觉排列顺序）。右下角常驻分组的按钮不生成 MenuItem、也不占 Index（框架单独处理这四个按钮），因此不出现空档、不跳号。例如底部栏第 1–5 个按钮生成 MenuItem、第 6–7 个是常驻分组不生成、第 8–12 个再生成，则 Index 为 `1,2,3,4,5,6,7,8,9,10`（常驻按钮不参与编号）。不写入 Left、Top、Width、Height。重生成已有页面时同样按上述规则重排 Index；`gen-mtslg-layout.js` 对 Index 做门禁，出现重复、跳号或空档直接失败，要求重新推导清单，不沿用带空档的旧编号。**多语言键的 `menuIndex` 必须同步重排**：`languages.keys[].menuIndex` 是按「数值等于 MenuItem Index」绑定的，Index 改成连续编号后，历史清单里按旧编号（含空档的底栏槽位号）登记的 `menuIndex` 不得直接复用，必须按重排后的 Index 重新推导，否则旧编号若仍落在 `1..menuItems.length` 内会静默绑到另一个菜单项。固定模板已经声明的 `PageName`、`IOEnable`、`UserRightId` 等可选属性，目标项目未提供时保留属性并输出空字符串；当前变体没有声明的属性不新增。
 
 **MenuItem 常驻属性（恒写）**：`LangName`、`PageName`、`IOCommand`、`IOVisible`、`IOEnable` 与页面 XML 按钮族的 `PageName` / `IOVisible` / `IOCommand` / `IOEnable` 同一策略——无论变体是否声明、来源是否取到，都写出该属性；没有可靠来源时写空字符串占位，不允许因为"没取到"而丢字段。`Value` 不写（菜单文本只放在 `Name`）。常驻集合的真值源是 `mtslg-iocontrol-map.json` 的 `layoutRules.bottomBar.menuItemAlwaysWrittenAttrs`；需要额外追加时用 manifest 的 `menuItemAlwaysAttrs`（例如 `["UserRightId"]`）扩展。
 
@@ -220,7 +220,7 @@ MasterGo 顶部栏组件用于识别宿主插槽和核对显示内容；运行�
 
 ## 键盘提示
 
-MasterGo 底部组件中的 F1、F2、F3、F6、F7、F8、F10 等提示，映射到 MenuItem.TopLeftContent。新建页面的 Index 取当前页面底栏真实排列顺序；已有 Layout 中既有 MenuItem 的 Index 保留原值，不能仅凭 F 标签覆盖。
+MasterGo 底部组件中的 F1、F2、F3、F6、F7、F8、F10 等提示，映射到 MenuItem.TopLeftContent。Index 与 F 标签互不推导：F 标签只写 TopLeftContent，菜单项顺序只按当前页面底栏的视觉排列重排为 `1..menuItems.length`（见上文「固定模板」）。同一 Layout.xml 里**本次没有被重写**的其他页面，其既有 MenuItem 的 Index 原样保留。
 
 ## 页面实例字段来源
 
@@ -234,7 +234,7 @@ Layout 映射只定义字段来源和生成条件，不登记任何具体页面�
 <MenuItem Name="{text}" LangName="{lang_name}" Icon="{icon}" TopLeftContent="{key}" Index="{index}"/>
 ```
 
-Name 取当前组件实例的真实文本槽位；LangName 仅从当前页面的语言文件读取；Icon 仅从当前页面的 Icon 文件读取；TopLeftContent 取当前实例的 F 键提示槽位；新建页面的 Index 取当前页面底部栏中该实例的实际排列顺序，已有 MenuItem 的 Index 保留 Layout.xml 原值。
+Name 取当前组件实例的真实文本槽位；LangName 仅从当前页面的语言文件读取；Icon 仅从当前页面的 Icon 文件读取；TopLeftContent 取当前实例的 F 键提示槽位；Index 取当前页面底部栏中该实例的排列顺序，并重排为 `1..menuItems.length` 连续编号（本次被重写的页面一律重排；只有同一 Layout.xml 里本次未被重写的其他页面，其既有 MenuItem 的 Index 才原样保留）。
 
 当前实例没有对应来源时，如果该字段属于当前固定模板，则保留属性并输出空字符串；如果字段不属于当前固定模板，则不新增属性。`LangName` / `PageName` / `IOCommand` / `IOVisible` / `IOEnable` 按常驻属性恒写（取不到值为空字符串）；`UserRightId` 的值仍只从目标项目或用户明确提供的 Layout 配置读取。
 

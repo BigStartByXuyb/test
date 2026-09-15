@@ -199,7 +199,7 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 - `languages.keys[]` 是 `LangName` 的**唯一真值源**：key 必须是英文标识符且页面内唯一；每个 locale 都必须为每个 key 提供文案，缺一个直接失败；生成后逐文件回读校验，保证**各语言文件的 `x:Key` 集合与顺序完全一致**。
 - **新生成页面必须挂全 `LangName`**（`requireLangName` 默认 `true`）：设计稿里有文案的控件（`valueSource=dsl.text` 的节点）和带 `Name` 的 `MenuItem` 都必须引用到一个已登记的 key，否则整套生成失败并回滚。错误信息会逐条列出缺 key 的节点/菜单项。
 - **按文案自动匹配**（`bindByText` 默认 `true`）：设计稿是中文，LanguageKey 的 `CN` 文案与控件设计文本**逐字相等**时自动绑定并写入 `LangName`，不需要为每个按钮手写 `sourceRef`。同一文案对应多个 key 属于歧义，脚本不猜，直接失败并要求用 `sourceRef` 显式指定。
-- 显式引用优先于自动匹配：`sourceRef` 绑定页面节点、`menuIndex` 绑定 Layout `MenuItem`；页面标题由 `{页面名}PageTitle` 直接决定，不需要在 key 上写 `role`。节点或菜单项已有不同的 `LangName` 时直接失败，不静默覆盖。
+- 显式引用优先于自动匹配：`sourceRef` 绑定页面节点、`menuIndex` 绑定 Layout `MenuItem`；页面标题由 `{页面名}PageTitle` 直接决定，不需要在 key 上写 `role`。节点或菜单项已有不同的 `LangName` 时直接失败，不静默覆盖。`menuIndex` 的绑定判据是「数值等于 MenuItem Index」，因此 **Index 重排（Layout `MenuItem` 一律 1..N 连续编号）后，历史 `menuIndex` 必须同步重排**：按旧编号（含空档的底栏槽位号）登记的条目不得直接复用，否则旧编号若仍落在 `1..menuItems.length` 内会静默绑到另一个菜单项。
 - 动态值/数量/序列号等**不需要翻译**的文本，必须在 `noLangRefs` 里按 DSL ref 显式豁免，并在交付说明中列出；不得为了让门禁通过而给这类文本编造 key。开启自动派生后这类节点由生成器机械识别并写入 `noLangRefs`，`noLangRefs` 里的显式条目仍会合并保留。
 - **引用闭环硬门禁**：页面 XML、Layout `MenuItem`、`<Page LangName>` 中出现的每个 `LangName` 都必须存在于本页语言字典，否则整套生成失败并回滚。没有目标项目键目录时，禁止用未登记的 key 充当占位。
 - `LangName` 是附加属性：`TextBlock` 必须**同时**发射 `Value` 和 `LangName`（`Value` 仍按设计文本发射，provenance 要求 `Value == sourceText`），运行时以 `LangName` 为准。**按钮族同样必须有 `LangName`**：带文案的 `IconButton` / `Button` / `StatusButton` 一律挂 `LangName`，不得只发 `Value` 或只发 `Icon`。
