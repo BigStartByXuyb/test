@@ -106,8 +106,8 @@ public class <Page>ViewModel : IOScreen, IPage
 
 - `private void <方法名>()`：一钮一方法，方法体为空骨架；`/// <summary>` 写**设计稿按钮文案（中文）**，便于工程师对照底部菜单定位。
 - 方法名取值链（机械、可审计，不猜语义）：
-  1. `menuItems[].methodName`：工程师在本页清单里显式登记的方法名（优先，必须是合法 C# 标识符且不是关键字）；
-  2. `menuItems[].langName` 去掉 `MenuItem` 前缀：菜单键命名空间就是 `MenuItem + 英文语义名`（如 `MenuItemFocus` → `Focus`、`MenuItemZAxisCalibration` → `ZAxisCalibration`、`MenuItemActionParam` → `ActionParam`）。
+  1. `menuItems[].methodName`：工程师在本页清单里显式登记的方法名。**登记了就只认它**——值为非法 C# 标识符或 C# 关键字时直接退回内联 TODO，不再回退第 2 条（显式登记的名字绝不静默改写）；
+  2. 未登记 `methodName` 时，取 `menuItems[].langName` 去掉 `MenuItem` 前缀：菜单键命名空间就是 `MenuItem + 英文语义名`（如 `MenuItemFocus` → `Focus`、`MenuItemZAxisCalibration` → `ZAxisCalibration`、`MenuItemActionParam` → `ActionParam`）。
 - 退回内联 TODO 的情形（**不改名、不猜名、不失败**）：没有 `langName`；`langName` 是临时键 `MenuItemIndex<n>`（语言键派生器拿不到语义名时的占位）；去前缀后不是合法标识符；命中 C# 关键字；方法名已被同页另一个按钮占用。这些 case 保留旧的 `// TODO: <按钮名> 按钮处理` + `break;` 形状。
 - 脚本 stdout 的 `viewModel.buttonMethods`（`<按钮名> -> <方法名>`）与 `viewModel.inlineTodoCases`（按钮名 + 退回原因）是本节的审计口径。
 
