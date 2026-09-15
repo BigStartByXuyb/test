@@ -363,7 +363,8 @@ function resolveButtonHandlers(manifest, buttonNames, viewModelName) {
       if (RESERVED_VIEWMODEL_MEMBERS.indexOf(method) !== -1 || method === viewModelName) {
         fail("按钮处理方法名与 ViewModel 成员同名，会生成重复成员: " + method +
           "（按钮 \"" + name + "\"）；请修改该按钮的 menuItems[].langName（即它的 LanguageKey），" +
-          "或改用别的图标/术语派生名；与 ViewModel 类名同名时改页面名");
+          "来源可为图标资源名、术语表 langGlossary 或该文案的英文译文（见 page-shell-generator.md）；" +
+          "与 ViewModel 类名同名时改页面名");
       }
       const owner = methods.find(function (item) { return item.method === method; });
       if (owner) {

@@ -328,6 +328,11 @@ assert.ok(sameList(reservedFromDoc, reservedFromScript),
 assert.ok(shellDoc.includes("ViewModel 类名"), "文档必须写明与 ViewModel 类名同名的口径");
 assert.ok(hostGenerator.includes("method === viewModelName"),
   "宿主壳生成器必须把 ViewModel 类名一并当保留名处理");
+// 撞名提示里的 langName 来源清单必须与文档一致（图标资源名 / 术语表 / 英文译文）。
+for (const source of ["图标资源名", "术语表 langGlossary", "该文案的英文译文"]) {
+  assert.ok(hostGenerator.includes(source), "撞名提示必须列出 langName 来源: " + source);
+  assert.ok(shellDoc.includes(source.replace(" langGlossary", "")), "文档必须写明 langName 来源: " + source);
+}
 // 一钮一方法的记法必须在文档里写明（避免把 ViewModel 侧又改回静态 TODO 骨架或加多余门禁）。
 assert.ok(shellDoc.includes("一个按钮 = 一个 `case` = 一个处理方法"),
   "文档必须写明「一个按钮 = 一个 case = 一个处理方法」");

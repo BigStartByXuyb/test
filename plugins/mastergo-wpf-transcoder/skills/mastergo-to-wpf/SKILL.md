@@ -158,7 +158,7 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
    1. （**仅当显式配置 `keyCatalog` 时**）目标项目已登记语言字典里**同文案**的既有 key → 直接复用并记为 `scope=shared`；`MenuItem*` 命名空间的键不给页面内容节点复用。默认不配置，页面 key 全部页面内自产。
    2. 节点 `Icon` 资源名去掉 `Geometry` 后缀（IconButton / 带图标按钮天然带英文语义名）。
    3. `langGlossary` 术语表（`{ "中文文案": "EnglishIdentifier" }`，可内联或给 JSON 文件路径）。
-   4. **该文案的英文译文转 PascalCase**（`languages.translations` 里 AI/工程师已给出的译文，如 `光源调整` → `Light Source Adjust` → `LightSourceAdjust`）。算法固定：按非字母数字字符切词 → 每个词首字母大写、其余字符原样保留 → 连接，结果必须匹配 `KEY_RE` 且长度 ≥ 3，否则本条不成立、继续往下。脚本仍不翻译，只把已有译文机械转成标识符。
+   4. **该文案的英文译文转 PascalCase**（`languages.translations` 里 AI/工程师已给出的译文，如 `光源调整` → `Light Source Adjust` → `LightSourceAdjust`）。算法固定：按非字母数字字符切词 → 每个词首字母大写、其余字符原样保留 → 连接；结果必须**以字母或下划线开头、其余字符为字母/数字/下划线，且长度 ≥ 3**（即派生器里的标识符规则 `^[A-Za-z_][A-Za-z0-9_]*$`），否则本条不成立、继续往下。脚本仍不翻译，只把已有译文机械转成标识符。
    5. 纯 ASCII 文案（`AUX.` → `AUX`）。
    6. DSL 图层英文名（过滤 `Dir`/`F1`/`CH1` 之类的结构噪音）。
    7. 兜底 `{页面名}Text{NN}`：页面内唯一、稳定，标记 `provisional`，必须列入待改名清单。
@@ -205,7 +205,7 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 - 动态值/数量/序列号等**不需要翻译**的文本，必须在 `noLangRefs` 里按 DSL ref 显式豁免，并在交付说明中列出；不得为了让门禁通过而给这类文本编造 key。开启自动派生后这类节点由生成器机械识别并写入 `noLangRefs`，`noLangRefs` 里的显式条目仍会合并保留。
 - **引用闭环硬门禁**：页面 XML、Layout `MenuItem`、`<Page LangName>` 中出现的每个 `LangName` 都必须存在于本页语言字典，否则整套生成失败并回滚。没有目标项目键目录时，禁止用未登记的 key 充当占位。
 - `LangName` 是附加属性：`TextBlock` 必须**同时**发射 `Value` 和 `LangName`（`Value` 仍按设计文本发射，provenance 要求 `Value == sourceText`），运行时以 `LangName` 为准。**按钮族同样必须有 `LangName`**：带文案的 `IconButton` / `Button` / `StatusButton` 一律挂 `LangName`，不得只发 `Value` 或只发 `Icon`。
-- 语言字典里的**英文等非设计语言文案**只能来自设计稿、目标项目已登记字典或 AI/工程师产出的 `languages.translations` 译文清单；生成脚本本身不得做翻译或调用机翻服务，译文必须是可追溯的显式输入。AI 翻译是允许且默认要求的步骤：派生完成后必须为待翻译清单补齐译文，再重新生成页面。
+- 语言字典里的**英文等非设计语言文案**只能来自设计稿、目标项目已登记字典或 AI/工程师产出的 `languages.translations` 译文清单；生成脚本本身不得做翻译或调用机翻服务，译文必须是可追溯的显式输入。AI 翻译是允许且默认要求的步骤，执行顺序固定为：**先把译文清单落盘 → 再派生 LanguageKey/XMLLayout**（译文同时用于键名语义名与字典 EN 值）；派生报告里的 `pendingTranslations` 只用于核对漏译，补齐后重跑即可，首轮不应交付带临时键/中文占位的产物。
 
 ## 页面输出目录
 
