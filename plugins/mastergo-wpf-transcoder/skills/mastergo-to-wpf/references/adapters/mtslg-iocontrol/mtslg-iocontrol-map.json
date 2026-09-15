@@ -1446,7 +1446,7 @@
       ]
     },
     "TextBlock": {
-      "description": "文本标签；Value=标签文本，IOName=从 IO 读标签名，IOState=状态文本驱动颜色，IsAutoRead 默认 false；Height 固定 40、Width 固定 NaN（宽度自适应，不用文本 bbox 宽度）；FontWeight 是「命中才写」的条件属性（设计稿字重非 normal 时发射，值取 design.fontStyle），不属于 controlTypeRequiredAttrs 恒写集合",
+      "description": "文本标签；Value=标签文本，IOName=从 IO 读标签名，IOState=状态文本驱动颜色，IsAutoRead 默认 false；Height 固定 40、Width 固定 NaN（宽度自适应，不用文本 bbox 宽度）；FontWeight 是「命中才写」的条件属性（设计稿字重非 normal 时发射，值取 `styles[...].value.style` 的 `fontStyle`，见本文件 textBlockFontWeight），不属于 controlTypeRequiredAttrs 恒写集合",
       "nested": false,
       "attrs": [
         "Value",

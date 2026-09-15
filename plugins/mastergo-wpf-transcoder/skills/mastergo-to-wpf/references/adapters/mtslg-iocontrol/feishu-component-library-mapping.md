@@ -494,7 +494,7 @@ Style 与内部组件对照（只对下表列出的真实值成立）：
 
 - **必写字段与按钮族固定参数（IconButton / Button / StatusButton）**：每个 ControlType 的固定必写字段集登记在 `mtslg-iocontrol-map.json` 的 `controlTypeRequiredAttrs`，生成器必须发射这些属性，取不到来源时写**空字符串占位**。按钮族在此基础上恒写 `PageName`、`IOVisible`、`IOCommand`、`IOEnable`；`IconButton` 模板含 `Icon`/`IconWidth`/`IconHeight`：有图标槽位时机械取**图标图形节点自身的 bbox**（不是控件宽高，也不是图标容器尺寸）四舍五入取整，无图标槽位时这三项写空字符串；`Button`/`StatusButton` 模板不含图标字段，不发射 `Icon`/`IconWidth`/`IconHeight`。映射带 `Icon` 却缺少 `iconSize` 时生成器直接失败，禁止猜尺寸。`LangName` 是唯一例外：只在多语言绑定层给出真实 key 时发射，动态值等 `noLangRefs` 豁免节点不写空占位。
 - 固定：ControlType、节点数量、父子关系、槽位顺序。
-- 几何/显示字段：Value、Left、Top、Width、Height、FontSize、字体/颜色/Style；其中 DSL 提供字体样式时 FontSize 必填，Height 与 FontSize 独立取值；MTSLG TextBlock 的 Height 固定为 40、**Width 固定为 `NaN`（自适应，不使用文本 bbox 宽度）**；输入框和选择框外框的 Height 按 MasterGo 的 40/36/32/28 变体处理；Height 与 FontSize 必须分别读取。一般显示型子节点缺少 Value 时控件仍会生成，但文字内容为空；**DataGrid 根节点例外，其 Value 属性必填且最终值必须非空**。列子节点 Value 是否填写取决于 MasterGo 是否提供可靠的字段/标题来源，不属于 DataGrid 加载器的必填契约。Style 只有 MasterGo 明确提供且代码库存在对应资源键时才填写。只有当 MasterGo 层级明确存在父级容器并且该父级有样式选择器时，才由父级为子控件提供样式；不得根据外观或组件名称自行添加父级容器。
+- 几何/显示字段：Value、Left、Top、Width、Height、FontSize、FontWeight、字体/颜色/Style；其中 DSL 提供字体样式时 FontSize 必填，Height 与 FontSize 独立取值；`FontWeight` 是**命中才写**的条件属性（设计稿字重非 normal 时发射，值取设计稿 `styles[...].value.style` 的 `fontStyle`，如 `Bold`；命中映射表 `textBlockFontWeight.normalStyleNames` 里的样式名、或回退用的 `normalValues` 即判为 normal，不写、也不写空串），不参与 `controlTypeRequiredAttrs` 恒写集合，规则见 `mtslg-mode.md` 的 TextBlock 字体规则与映射表 `textBlockFontWeight`；MTSLG TextBlock 的 Height 固定为 40、**Width 固定为 `NaN`（自适应，不使用文本 bbox 宽度）**；输入框和选择框外框的 Height 按 MasterGo 的 40/36/32/28 变体处理；Height 与 FontSize 必须分别读取。一般显示型子节点缺少 Value 时控件仍会生成，但文字内容为空；**DataGrid 根节点例外，其 Value 属性必填且最终值必须非空**。列子节点 Value 是否填写取决于 MasterGo 是否提供可靠的字段/标题来源，不属于 DataGrid 加载器的必填契约。Style 只有 MasterGo 明确提供且代码库存在对应资源键时才填写。只有当 MasterGo 层级明确存在父级容器并且该父级有样式选择器时，才由父级为子控件提供样式；不得根据外观或组件名称自行添加父级容器。
 - 运行时：IOName、IOCommand、PageName、IOEnable、IOState、LangName。
 - ID 按 MX_GUID/Pin 规则生成，不复制 MasterGo layer ID。
 
@@ -508,7 +508,7 @@ Style 与内部组件对照（只对下表列出的真实值成立）：
 
 - 独立文本节点统一映射为 `TextBlock`，不因所在组件或变体改变 ControlType。
 - 如果文本是输入框、选择框等控件内部内容，则保留为所属控件内容，不额外拆分为 TextBlock。
-- 文本的 Value、FontSize 和坐标必须来自对应 MasterGo 节点；所有 MTSLG TextBlock 的 Height 固定为 40、Width 固定为 `NaN`，不能用外层组件高度、文字 bbox、组件语义或文本 bbox 宽度改写这两个值（文本 bbox 宽度只作为 `dslWidth` 来源记录在 mapping 中）。
+- 文本的 Value、FontSize、FontWeight 和坐标必须来自对应 MasterGo 节点；所有 MTSLG TextBlock 的 Height 固定为 40、Width 固定为 `NaN`，不能用外层组件高度、文字 bbox、组件语义或文本 bbox 宽度改写这两个值（文本 bbox 宽度只作为 `dslWidth` 来源记录在 mapping 中）。
 - 独立的标题、单位、说明文字和其他文本节点，统一映射为 `ControlType="TextBlock"`；如果文字是输入框、选择框等控件内部内容，则保留为所属控件内容，不额外拆分。
 - FontSize 只表示字体字号，Height 只表示控件布局边界；两者必须分别读取。所有 MTSLG TextBlock 使用固定 Height=40，禁止把外层组件高度、文字 bbox、字号或行高赋给 Height。
 - 每个输出控件的 Left、Top 必须来自自身 MasterGo bbox，非 TextBlock 控件的 Width/Height 也来自自身 bbox；TextBlock 的 Width/Height 按固定规则发射（`Width="NaN"`、`Height="40"`）；输入框和选择框外框的 Height 按已命中的 40/36/32/28 变体处理；固定模板、相邻控件或父容器不能代替真实尺寸。

@@ -53,6 +53,43 @@ for (const [type, attrs] of Object.entries(required)) {
 assert.ok(!JSON.stringify(map).includes("无图标槽位时不发射"),
   "映射表描述不得保留「无图标槽位时不发射」——与 controlTypeRequiredAttrs 的空字符串占位口径相反");
 
+// ---------- TextBlock FontWeight：映射表是唯一真值源，正文只引用不另立枚举 ----------
+// 背景：该规则曾在「映射表 note + 两份正文（SKILL.md / mtslg-mode.md）+ 生成器内置默认」四处
+// 各写一份 normal 名单，2026-09-15 的 CI 语义审计连续两轮以 REVIEW 报出「正文枚举漏项 / 口径两读」。
+const fontWeightRule = map.textBlockFontWeight;
+assert.ok(fontWeightRule, "映射表必须登记 textBlockFontWeight 规则");
+assert.strictEqual(fontWeightRule.attr, "FontWeight", "textBlockFontWeight.attr 必须是 FontWeight");
+assert.deepStrictEqual(fontWeightRule.controlTypes, ["TextBlock"], "FontWeight 规则只作用于 TextBlock");
+assert.ok(Array.isArray(fontWeightRule.normalStyleNames) && fontWeightRule.normalStyleNames.length > 0,
+  "必须登记 normalStyleNames（设计稿字体样式名里的正常体写法）");
+assert.ok(Array.isArray(fontWeightRule.normalValues) && fontWeightRule.normalValues.length > 0,
+  "必须登记 normalValues（样式名缺失时回退判定用的 weight 值）");
+assert.ok(typeof fontWeightRule.fallbackValueSource === "string" && fontWeightRule.fallbackValueSource,
+  "必须登记 fallbackValueSource（样式名取不到时的回退来源）");
+// 允许集必须放开 FontWeight；但它是「命中才写」，不得进入恒写集合。
+assert.ok((map.controlTypes.TextBlock.attrs || []).includes("FontWeight"),
+  "controlTypes.TextBlock.attrs 必须允许 FontWeight");
+assert.ok(!(required.TextBlock || []).includes("FontWeight"),
+  "FontWeight 是命中才写的条件属性，不得进入 controlTypeRequiredAttrs 恒写集合");
+// 映射生成器必须从映射表读规则并实现「样式名优先 + weight 回退」；
+// 发射器只需把 FontWeight 纳入固定属性顺序（值由 mapping 携带）。
+const fontGenerator = fs.readFileSync(path.join(__dirname, "..", "gen-mtslg-mapping-from-dsl.js"), "utf8");
+assert.ok(fontGenerator.includes("textBlockFontWeight") && fontGenerator.includes("designFontStyleName"),
+  "映射生成器必须消费 textBlockFontWeight 并解析设计稿字体样式名（designFontStyleName）");
+assert.ok(/ATTR_ORDER[\s\S]{0,600}FontWeight/.test(generator),
+  "gen-iocontrol-xml.js 的 ATTR_ORDER 必须包含 FontWeight（属性顺序：FontSize → FontWeight → Width/Height）");
+// 三份人读文档必须写 FontWeight 并指向真值源，不得再抄一份 normal 名单（那是历史漂移点）。
+for (const [label, text] of [
+  ["SKILL.md", mainSkill],
+  ["mtslg-mode.md", modeDoc],
+  ["feishu-component-library-mapping.md", feishuMapping],
+]) {
+  assert.ok(text.includes("FontWeight"), label + " 必须登记 FontWeight 规则");
+  assert.ok(text.includes("normalStyleNames"), label + " 必须指向映射表的 normalStyleNames，不得另立 normal 名单枚举");
+  assert.ok(!text.includes("`Regular`/`Normal`/`Book`/`常规体`/`常规`"),
+    label + " 不得再硬编码已漂移过的 normal 名单枚举，改用 normalStyleNames 指真值源");
+}
+
 // ---------- 2. 脚本内置默认 == 映射表（防止三处各写一份后漂移） ----------
 function objectLiteralOf(source, constName) {
   const match = source.match(new RegExp("const " + constName + "\\s*=\\s*\\{([\\s\\S]*?)\\n\\};"));
