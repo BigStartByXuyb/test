@@ -224,7 +224,7 @@ function loadManifest(manifestPath) {
   files.push({ kind: "Content", relative: pageXmlPath });
   // 底部按钮（Layout MenuItem）→ ViewModel 的 case 列表与按钮处理方法名。
   const buttonNames = normalizeButtonNames(manifest);
-  const buttonHandlers = resolveButtonHandlers(manifest, buttonNames);
+  const buttonHandlers = resolveButtonHandlers(manifest, buttonNames, viewModelName);
   return {
     projectRoot, csprojPath, csprojText, rootNamespace, area, namespaceArea,
     operation: manifest.operation || "new",
@@ -364,6 +364,10 @@ const CSHARP_KEYWORDS = new Set([
   "unchecked", "unsafe", "ushort", "using", "virtual", "void", "volatile", "while"
 ]);
 
+// ViewModel 固定成员：按钮处理方法不得与之同名，否则同一个类里会出现重复成员（编译不过）。
+// OKCmd 是唯一与按钮方法同形（无参 void）的固定成员，必须先占位。
+const RESERVED_VIEWMODEL_MEMBERS = ["pageDesign", "OnViewLoaded", "PageDesign_Loaded", "HandleButtonEvent", "OKCmd"];
+
 // 菜单项 LanguageKey 命名空间 = MenuItem + 语义英文名（见 gen-mtslg-lang-keys-from-dsl.js）。
 // MenuItemIndex<n> 是语言键派生器在拿不到语义名时写的临时键，不能当作按钮英文名使用。
 const MENU_KEY_PREFIX = "MenuItem";
@@ -383,8 +387,9 @@ function methodNameFromLangName(langName) {
 // 按钮处理方法解析（机械、可审计，不推断语义）：
 //   取值链 1：menuItems[].methodName（工程师显式登记，优先）
 //   取值链 2：menuItems[].langName 去掉 MenuItem 前缀
-// 一个按钮名只解析一次；方法名已被别的按钮占用时不复用，退回内联 TODO 并记录原因。
-function resolveButtonHandlers(manifest, buttonNames) {
+// 硬约束：同一个方法名只允许生成一次——一个按钮名只解析一次；方法名已被别的按钮占用、
+// 或与 ViewModel 固定成员同名时不再复用，退回内联 TODO 并记录原因。
+function resolveButtonHandlers(manifest, buttonNames, viewModelName) {
   const itemByName = new Map();
   (Array.isArray(manifest.menuItems) ? manifest.menuItems : []).forEach(function (item) {
     if (!item) return;
@@ -411,6 +416,10 @@ function resolveButtonHandlers(manifest, buttonNames) {
           : "该菜单项没有 LangName";
       }
     }
+    if (method && isReservedViewModelName(method, viewModelName)) {
+      reason = "方法名 " + method + " 与 ViewModel 固定成员同名";
+      method = "";
+    }
     if (method && ownerByMethod.has(method) && ownerByMethod.get(method) !== name) {
       reason = "方法名 " + method + " 已被按钮 \"" + ownerByMethod.get(method) + "\" 占用";
       method = "";
@@ -422,7 +431,20 @@ function resolveButtonHandlers(manifest, buttonNames) {
       inlineTodoCases.push({ name: name, reason: reason });
     }
   });
+  // 兜底硬门禁：同一个方法名绝不允许发射两次（重复定义会直接编译失败）。
+  const emitted = new Set();
+  methods.forEach(function (item) {
+    if (emitted.has(item.method)) {
+      fail("按钮处理方法名重复，同一个方法不得重复生成: " + item.method);
+    }
+    emitted.add(item.method);
+  });
   return { methods: methods, inlineTodoCases: inlineTodoCases };
+}
+
+// 方法名是否与 ViewModel 固定成员（含类名，避免被编译器当成构造函数）撞名。
+function isReservedViewModelName(name, viewModelName) {
+  return RESERVED_VIEWMODEL_MEMBERS.indexOf(name) !== -1 || name === viewModelName;
 }
 
 // C# XML 文档注释里的按钮文案：& < > 必须转义，否则编译器按 XML 解析会告警。
