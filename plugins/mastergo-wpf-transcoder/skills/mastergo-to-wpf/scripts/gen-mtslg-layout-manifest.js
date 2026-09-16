@@ -15,7 +15,7 @@ const path = require("path");
 const SCRIPT_DIR = __dirname;
 const DEFAULT_MAP = path.resolve(SCRIPT_DIR, "..", "references", "adapters", "mtslg-iocontrol", "mtslg-iocontrol-map.json");
 // 跨脚本共用工具的唯一实现（见 scripts/lib/script-helpers.js；禁止在本脚本再抄一份）。
-const { fail } = require(path.join(SCRIPT_DIR, "lib", "script-helpers.js"));
+const { fail, normalizeNewlines } = require(path.join(SCRIPT_DIR, "lib", "script-helpers.js"));
 
 function parseArgs(argv) {
   const out = {};
@@ -270,7 +270,11 @@ function textNodesOf(node) {
   (function walk(node) {
     for (const child of node.children || []) {
       if (Array.isArray(child.text) && child.text.length) {
-        out.push({ node: child, text: child.text.map(function (part) { return part.text || ""; }).join("") });
+        // 文案取值：换行码点归一成 LF（发射时由 xmlAttr 写成 &#x0a;），与页面 XML 同一口径。
+        out.push({
+          node: child,
+          text: normalizeNewlines(child.text.map(function (part) { return part.text || ""; }).join(""))
+        });
       }
       walk(child);
     }

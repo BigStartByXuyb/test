@@ -29,15 +29,47 @@ function failAndExit(code) {
   };
 }
 
+// 设计换行归一：MasterGo DSL 的换行码点（U+2028 行分隔符、U+2029 段分隔符、CR、CRLF）
+// 统一归一成 LF（U+000A）。这是「设计文本 → 发射文本」的唯一换行口径，
+// 真值来源 = 映射表 textNewlinePolicy（脚本、校验器、文档共用同一条）。
+function normalizeNewlines(value) {
+  return String(value === undefined || value === null ? "" : value).replace(/\r\n|[\r\u2028\u2029]/g, "\n");
+}
+
+// XML 字符引用解码：校验器/比对器拿到的是 XML 原始文本（可能是 &#x0a; 这类引用），
+// 与 mapping 文案比较前必须解码（命名实体 + 十进制/十六进制数字引用）。
+function decodeXmlEntities(value) {
+  return String(value === undefined || value === null ? "" : value).replace(
+    /&(?:#x([0-9A-Fa-f]+)|#([0-9]+)|(lt|gt|quot|apos|amp));/g,
+    function (_match, hex, dec, named) {
+      if (hex) return String.fromCodePoint(parseInt(hex, 16));
+      if (dec) return String.fromCodePoint(parseInt(dec, 10));
+      return { lt: "<", gt: ">", quot: '"', apos: "'", amp: "&" }[named];
+    }
+  );
+}
+
+// 文案比对归一：先解码字符引用、再把换行码点归一成 LF。
+// 页面 XML 的原属性值 与 mapping 文案 的比较只走这一条（换行口径变化的唯一兼容点）。
+function normalizeForCompare(value) {
+  return normalizeNewlines(decodeXmlEntities(value));
+}
+
 // XML 属性转义：写 XML 属性的脚本共用（&quot; 必须转）。
+// 属性值里不能出现字面换行——XML 解析器会把它归一成空格——所以 LF 必须写成字符引用 &#x0a;。
 function xmlAttr(value) {
-  return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  return normalizeNewlines(value).replace(/&/g, "&amp;").replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/\n/g, "&#x0a;");
 }
 
 // XML 文本转义：XAML 文本与 C# XML 文档注释共用（文本不转义引号）。
 function xmlDocText(value) {
   return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+// XML 元素内容转义：换行同样写成 &#x0a;（元素内容里字面 LF 也合法，但显式引用避免行结构歧义）。
+function xmlElementText(value) {
+  return xmlDocText(normalizeNewlines(value)).replace(/\n/g, "&#x0a;");
 }
 
 // 匹配键归一化：去空白后比对（组件集名、属性名等）。
@@ -77,8 +109,12 @@ module.exports = {
   fail: fail,
   failWithPrefix: failWithPrefix,
   failAndExit: failAndExit,
+  normalizeNewlines: normalizeNewlines,
+  decodeXmlEntities: decodeXmlEntities,
+  normalizeForCompare: normalizeForCompare,
   xmlAttr: xmlAttr,
   xmlDocText: xmlDocText,
+  xmlElementText: xmlElementText,
   normalizeToken: normalizeToken,
   numberOrNull: numberOrNull,
   readJson: readJson,

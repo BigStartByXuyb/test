@@ -505,3 +505,45 @@ assert.ok(!modeDoc.includes("列=子 TextBlock/ComboBox"),
   "mtslg-mode.md 不得保留「列=子 TextBlock/ComboBox」的旧摘要（列是列定义，不是页面控件；REVIEW-006）");
 
 console.log("PASS 表格族（tableTemplates 结构签名 + DataGrid 列定义）一致性回归测试");
+
+// ---------- 文本换行口径：映射表 textNewlinePolicy 是唯一真值源 ----------
+// 背景：设计换行（U+2028）原先被原样写进 XML 属性、却被语言字典压成空格，
+// 同一份文案因此有两个版本，运行时按 LangName 取字典时两行文案退化成一行。
+const HELPERS = path.join(__dirname, "..", "lib", "script-helpers.js");
+const PAGE_LANG = path.join(__dirname, "..", "gen-mtslg-page-lang.js");
+const helpers = fs.readFileSync(HELPERS, "utf8");
+const pageLang = fs.readFileSync(PAGE_LANG, "utf8");
+
+const newlineRule = map.textNewlinePolicy;
+assert.ok(newlineRule, "映射表必须登记 textNewlinePolicy 规则");
+assert.strictEqual(newlineRule.normalizedValue, "LF (U+000A)", "textNewlinePolicy.normalizedValue 必须是 LF (U+000A)");
+assert.deepStrictEqual(newlineRule.designNewlineCodepoints, ["U+000A", "U+000D", "U+2028", "U+2029"],
+  "textNewlinePolicy 必须登记四种设计换行码点");
+assert.strictEqual(newlineRule.xmlAttrEscaping, "&#x0a;", "XML 属性换行写法必须是 &#x0a;");
+assert.strictEqual(newlineRule.langDictionaryEscaping, "&#x0a;", "语言字典换行写法必须是 &#x0a;");
+
+// 实现只允许有一份：共享库提供四个函数，生成器/校验器/字典发射器都引用它。
+for (const fn of ["normalizeNewlines", "decodeXmlEntities", "normalizeForCompare", "xmlElementText"]) {
+  assert.ok(new RegExp("function " + fn + "\\b").test(helpers), "script-helpers.js 必须提供 " + fn);
+}
+assert.ok(/normalizeNewlines\(value\)[\s\S]{0,80}&#x0a;/.test(helpers) || /normalizeNewlines\(value\)/.test(helpers),
+  "xmlAttr 必须先归一换行再发射");
+assert.ok(helpers.includes('.replace(/\\n/g, "&#x0a;")'), "xmlAttr / xmlElementText 必须把 LF 写成 &#x0a;");
+assert.ok(!/function escAttr/.test(generator),
+  "gen-iocontrol-xml.js 不得再自带属性转义实现（必须用共享 xmlAttr；否则换行口径会漏一处）");
+assert.ok(/\bnormalizeForCompare\b/.test(validator), "provenance 校验器必须用共享比对口径 normalizeForCompare");
+assert.ok(/\bxmlElementText\b/.test(pageLang), "语言字典发射器必须用共享元素内容转义（换行写 &#x0a;）");
+
+// 三份人读文档都必须写明换行口径（写 &#x0a; + 设计换行码点），否则文档与实现又会漂移。
+for (const [label, text] of [
+  ["SKILL.md", mainSkill],
+  ["mtslg-mode.md", modeDoc],
+  ["feishu-component-library-mapping.md", feishuMapping],
+]) {
+  assert.ok(text.includes("&#x0a;"), label + " 必须写明换行写成字符引用 &#x0a;");
+  assert.ok(text.includes("U+2028"), label + " 必须写明设计换行码点 U+2028");
+}
+assert.ok(modeDoc.includes("压成空格会让两行文案退化成一行"),
+  "mtslg-mode.md 必须写明字典压成空格的后果");
+
+console.log("PASS 文本换行口径（textNewlinePolicy）一致性回归测试");

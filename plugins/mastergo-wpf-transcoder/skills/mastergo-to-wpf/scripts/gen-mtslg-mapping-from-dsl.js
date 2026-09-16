@@ -9,7 +9,7 @@
 const fs = require("fs");
 const path = require("path");
 // 跨脚本共用工具的唯一实现（见 scripts/lib/script-helpers.js；禁止在本脚本再抄一份）。
-const { readJson, normalizeToken: normalize } = require(path.join(__dirname, "lib", "script-helpers.js"));
+const { readJson, normalizeToken: normalize, normalizeNewlines } = require(path.join(__dirname, "lib", "script-helpers.js"));
 const { isHostShellName } = require(path.join(__dirname, "lib", "mastergo-rules.js"));
 // 模板表规则块的解析唯一实现（见 scripts/lib/iocontrol-map-rules.js；禁止在本脚本再抄一份）。
 const MAP_RULES = require(path.join(__dirname, "lib", "iocontrol-map-rules.js"));
@@ -23,7 +23,13 @@ function required(name) {
   if (!value) throw new Error("missing " + name);
   return value;
 }
-function textOf(node) { return Array.isArray(node.text) ? node.text.map(x => x.text || "").join("") : undefined; }
+// 文本取值：同一行内的多个 text run（不同字体段）用空串拼接；换行码点统一归一成 LF
+// （设计换行口径见映射表 textNewlinePolicy；发射时由 xmlAttr 写成 &#x0a;）。
+function textOf(node) {
+  return Array.isArray(node.text)
+    ? normalizeNewlines(node.text.map(x => x.text || "").join(""))
+    : undefined;
+}
 
 const dslSnapshot = readJson(required("--dsl"), "DSL snapshot");
 const visibility = readJson(required("--visibility"), "visibility");

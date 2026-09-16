@@ -540,6 +540,21 @@ Style 与内部组件对照（只对下表列出的真实值成立）：
 - 最终坐标统一按内容区绝对坐标计算：`Left = pageAbsX - contentOriginX`，`Top = pageAbsY - 192`。公共外壳偏移只扣除一次；父子关系只用于确认真实结构和裁剪边界。
 - 组件映射文档只登记组件集、变体、ControlType 和固定结构；具体节点来源、尺寸、字体和坐标由 AI 转码规则逐节点核对。
 
+## 文本换行固定口径
+
+```
+设计换行（U+2028 行分隔符 / U+2029 段分隔符 / CR / CRLF）→ 统一归一成 LF（U+000A）
+页面 XML 属性（Value / Header / MenuItem Name / TopLeftContent …）→ 写字符引用 &#x0a;
+页面语言字典值（{页面名}_{LOCALE}.xaml）→ 同样写 &#x0a;
+```
+
+- 设计稿**单个文本 run 内部**的换行以 `U+2028`（行分隔符）编码，必须归一成 LF 后按框架写法发射；**XML 属性里不能出现字面换行**（解析器会把它归一成空格），因此一律写 `&#x0a;`——框架自己的 XAML 也是这个写法（例：`Content="Back&#x0a;Tab"`、`Content="Back&#x0a;Space"`）。
+- **同一行内不同字体的多个 text run 是 `text` 数组的多项，按空串拼接，不是换行**；只有单个 run 内部的换行码点才算换行。
+- 页面语言字典是运行时按 `LangName` 取文案的载体，字典值必须与设计稿换行一致（写 `&#x0a;`）；把换行压成空格会让两行文案在运行时退化成一行，属于缺陷。
+- 键派生、译文查找、术语表匹配仍使用「压平值」（所有空白折叠成单个空格并 trim），与字典值分属两条口径。
+- 发射、校验与 Bundle 共用同一实现（`scripts/lib/script-helpers.js` 的 `normalizeNewlines` / `xmlAttr` / `xmlElementText` / `normalizeForCompare`）：页面 XML 的原始属性值与 mapping 文案比较时先解码字符引用、再归一换行，避免同一文案因写法不同被判成冲突。
+- 本口径的唯一真值来源是映射表 `textNewlinePolicy`；改口径必须同步脚本实现、校验器与本文档。
+
 # 页面生成总规则
 
 1. 识别组件集及实例属性。

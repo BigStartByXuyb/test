@@ -61,7 +61,7 @@
 const fs = require("fs");
 const path = require("path");
 // 跨脚本共用工具的唯一实现（见 scripts/lib/script-helpers.js；禁止在本脚本再抄一份）。
-const { readJson, failWithPrefix } = require(path.join(__dirname, "lib", "script-helpers.js"));
+const { readJson, failWithPrefix, normalizeNewlines } = require(path.join(__dirname, "lib", "script-helpers.js"));
 const fail = failWithPrefix("语言键派生失败");
 
 const KEY_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -87,6 +87,17 @@ function toText(value) {
 
 function normalizeText(value) {
   return toText(value).replace(/\s+/g, " ").trim();
+}
+
+// 语言字典**值**的文案归一：保留换行（统一归一成 LF），只折叠行内空白与行首行尾空白。
+// 键派生、文案匹配、待翻译判定仍用 normalizeText（压平成单行）——两者分工不同：
+//   压平值 → 派生键名 / 查译文 / 查术语表 / 判 pending；
+//   保留换行值 → 写进字典（运行时按 LangName 取它，必须与设计稿的换行一致）。
+function langValueText(value) {
+  return normalizeNewlines(toText(value))
+    .replace(/[^\S\n]+/g, " ")
+    .replace(/ *\n */g, "\n")
+    .trim();
 }
 
 // 不可翻译文本判定。核心原则：中英文一致的文本不需要语言键。
@@ -370,6 +381,8 @@ function deriveLangSpec(options) {
   // 其它语言没有译文时一律用中文占位并标记，脚本不做任何翻译推断。
   const makeText = function (cnText, catalogEn) {
     const cn = normalizeText(cnText);
+    // 字典 CN 值保留设计稿换行（归一成 LF）；中英文一致性的判定仍用压平值 cn。
+    const cnValue = langValueText(cnText) || cn;
     // 只有中文文案才需要翻译；中英文一致的 ASCII 标签（AUX. / Diode）不算待翻译。
     const needTranslation = /[\u4e00-\u9fa5]/.test(cn);
     let english = "";
@@ -387,14 +400,14 @@ function deriveLangSpec(options) {
         usedTranslations.add(cn);
       }
     }
-    const text = { CN: cnText };
+    const text = { CN: cnValue };
     let pending = false;
     for (const locale of locales) {
       if (locale === "CN") continue;
       if (locale === "EN" && english) {
-        text[locale] = english;
+        text[locale] = langValueText(english) || english;
       } else {
-        text[locale] = cnText;
+        text[locale] = cnValue;
         if (needTranslation) pending = true;
       }
     }
@@ -404,12 +417,12 @@ function deriveLangSpec(options) {
   };
 
   // 1) 页面标题：{页面名}PageTitle，由 Layout <Page LangName> 引用。
-  const titleText = normalizeText(opts.titleText)
-    || readDslRootName(opts.dsl)
-    || pageName;
+  // 原值（保留换行）供字典值用；压平值供报告/待翻译判定用。
+  const rawTitleText = normalizeNewlines(toText(opts.titleText)) || readDslRootName(opts.dsl) || pageName;
+  const titleText = normalizeText(rawTitleText) || pageName;
   const titleKey = pageName + TITLE_SUFFIX;
   usedKeys.add(titleKey);
-  const titleMade = makeText(titleText, "");
+  const titleMade = makeText(rawTitleText || titleText, "");
   const titleEntry = { key: titleKey, group: TITLE_GROUP, role: "page-title", text: titleMade.text };
   keys.push(titleEntry);
   report.sources.title = 1;
@@ -423,7 +436,9 @@ function deriveLangSpec(options) {
   // 2) 菜单项：MenuItem{名称}，由 Layout <MenuItem LangName> 引用。
   for (const item of menuItems) {
     if (!item || typeof item !== "object") continue;
-    const name = normalizeText(item.name);
+    // rawName 保留换行（写进字典值）；name 是压平值（派生键名 / 查目标字典 / 报告）。
+    const rawName = normalizeNewlines(toText(item.name));
+    const name = normalizeText(rawName);
     if (!name) continue;
     const index = item.index === undefined || item.index === null ? null : Number(item.index);
     // 目标项目已登记菜单键优先复用：菜单项正是 MenuItem* 命名空间的拥有者。
@@ -432,7 +447,7 @@ function deriveLangSpec(options) {
     });
     if (menuHits.length === 1) {
       const hit = menuHits[0];
-      const made = makeText(name, hit.EN);
+      const made = makeText(rawName || name, hit.EN);
       const entry = {
         key: hit.key,
         group: MENU_GROUP,
@@ -494,7 +509,7 @@ function deriveLangSpec(options) {
     if (key !== base) report.duplicateKeys.push({ base, key, menuIndex: index });
     // 菜单键必须落在 MenuItem 命名空间，因此只借用目标字典的英文文案，不借用它的 key。
     const hits = catalog.get(name) || [];
-    const made = makeText(name, hits.length === 1 ? hits[0].EN : "");
+    const made = makeText(rawName || name, hits.length === 1 ? hits[0].EN : "");
     const entry = { key, group: MENU_GROUP, text: made.text };
     if (index !== null && Number.isFinite(index)) entry.menuIndex = index;
     if (provisional) {
@@ -524,7 +539,9 @@ function deriveLangSpec(options) {
   for (const node of nodes) {
     if (!node || typeof node !== "object") continue;
     if (node.valueSource !== "dsl.text") continue;
-    const text = normalizeText(node.sourceText);
+    // rawText 保留换行（写进字典值）；text 是压平值（派生键名 / 判动态文本 / 报告）。
+    const rawText = normalizeNewlines(toText(node.sourceText));
+    const text = normalizeText(rawText);
     const ref = typeof node.sourceRef === "string" && node.sourceRef
       ? node.sourceRef
       : (typeof node.ref === "string" ? node.ref : "");
@@ -574,7 +591,7 @@ function deriveLangSpec(options) {
         existed.sourceRefs.push(ref);
         continue;
       }
-      const made = makeText(text, hit.EN);
+      const made = makeText(rawText || text, hit.EN);
       const entry = {
         key: hit.key,
         group: CONTENT_GROUP,
@@ -641,7 +658,7 @@ function deriveLangSpec(options) {
     const base = pageName + suffix;
     const key = uniqueKey(base);
     if (key !== base) report.duplicateKeys.push({ base, key, sourceRef: ref });
-    const made = makeText(text, "");
+    const made = makeText(rawText || text, "");
     const entry = { key, group: CONTENT_GROUP, text: made.text, sourceRef: ref };
     if (provisional) {
       entry.comment = "临时键（待工程师改名为语义键）";
@@ -717,7 +734,7 @@ function main() {
   const menuItems = layoutManifest && Array.isArray(layoutManifest.menuItems)
     ? layoutManifest.menuItems
     : (Array.isArray(args.menuItems) ? args.menuItems : []);
-  const titleText = normalizeText(args.titleText) || titleFromMapping(mapping);
+  const titleText = normalizeNewlines(toText(args.titleText)) || titleFromMapping(mapping);
   const derived = deriveLangSpec({
     pageName: args.page,
     mapping,
@@ -755,13 +772,13 @@ function titleFromMapping(mapping) {
   const audit = mapping && Array.isArray(mapping.textAudit) ? mapping.textAudit : [];
   for (const item of audit) {
     if (item && item.role === "page-title" && item.decision !== "omit") {
-      const text = normalizeText(item.sourceText);
+      const text = normalizeNewlines(toText(item.sourceText));
       if (text) return text;
     }
   }
   for (const item of audit) {
     if (item && item.role === "page-title") {
-      const text = normalizeText(item.sourceText);
+      const text = normalizeNewlines(toText(item.sourceText));
       if (text) return text;
     }
   }

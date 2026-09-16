@@ -91,6 +91,16 @@
 
 控件属性允许集与每类控件的固定必写字段集分别在同目录 `mtslg-iocontrol-map.json` 的 `controlTypes` 与 `controlTypeRequiredAttrs`；生成器不得把白名单外属性当作合法字段，也不得漏发必写字段（取不到来源写空字符串）。Style、Icon、LangName 与 PageName 还必须通过第 6 节键查证。资源字典是否共享、资源键来自何处，均由项目适配记录确认。
 
+### 4.0 文本换行口径（所有文案属性与语言字典通用）
+
+设计换行码点（`U+2028` 行分隔符 / `U+2029` 段分隔符 / `CR` / `CRLF`）一律归一成 **LF（U+000A）**，并按框架写法发射为字符引用 **`&#x0a;`**：
+
+- 页面 XML 的所有文案属性（`Value` / `Header` / `MenuItem Name` / `TopLeftContent` …）写 `&#x0a;`——属性里**不能出现字面换行**（XML 解析器会把它归一成空格）。
+- 页面语言字典值（`{页面名}_{LOCALE}.xaml`）同样写 `&#x0a;`：运行时按 `LangName` 取字典值，字典里把换行压成空格会让两行文案退化成一行。
+- 同一行内不同字体的多个 text run 是 `text` 数组多项、按空串拼接，**不是换行**；只有单个 run 内部的换行码点才算换行。
+- 键派生 / 译文查找 / 术语表匹配用「压平值」（空白折叠 + trim），字典值用「保留换行值」，两条口径并存不冲突。
+- 唯一真值来源是映射表 `textNewlinePolicy`；实现集中在 `scripts/lib/script-helpers.js`（`normalizeNewlines` / `xmlAttr` / `xmlElementText` / `normalizeForCompare`），生成器、校验器、Bundle 共用，不允许各写一份。
+
 ### 4.1 DataGrid 的命中口径与 Value 现阶段口径
 
 **命中口径（表格族 `tableTemplates`）**：表格在团队组件库里通常没有组件集（设计稿里只是一个 `GROUP`），因此本族**只登记一条命中路径**（映射表里没有 `match.property` / `componentSet`），按**结构签名**命中——节点类型 `GROUP` + 图层名以「表格」结尾 + 孩子里含名为「表头」的群组 + 至少一个名为 `item` 的行群组 + 表头至少有 `signature.minHeaderTexts` 条可见文本，**五项同时成立**；**部分命中**（后缀或签名之一成立）时登记 `pending`（写明哪一半不成立），两项都不成立的普通 `GROUP` 不属于候选。命中后发射一个 `DataGrid` 根节点 + 由表头可见文本从左到右展开的**列定义子节点**：列节点是列结构不是页面控件，几何按映射表 `tableTemplates.columnTemplate` 固定发射（`Left=0` / `Top=0` / `Height=45`、不写 `Width`），属性只发射 `Value`（列标题）+ `alwaysWrittenAttrs` 空占位，不套 `controlTypeRequiredAttrs`；列数 = 表头可见文本数（没有额外隐藏列），列 `ControlType` 由该列单元格类型严格多数判定（没有多数退化为 `TextBlock`）。表格的**行是 PageData 数据不是控件**：行内文本一律 `omit` + `role=table-data-cell`，行内容按行登记进 `mapping.tableAudits[].rows`，单元格实例不再按 `inputTemplates` 单独发射。表格图层声明尺寸覆盖不了内容范围时记 `tableAudits[].geometry.declaredBoxCoversContent=false`。

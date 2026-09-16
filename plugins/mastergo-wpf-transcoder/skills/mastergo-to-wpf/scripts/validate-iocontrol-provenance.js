@@ -12,7 +12,8 @@ const fs = require('fs');
 // 模板表规则块的解析唯一实现（见 scripts/lib/iocontrol-map-rules.js；禁止在本脚本再抄一份）。
 const MAP_RULES = require('./lib/iocontrol-map-rules');
 // 数值解析的唯一实现（见 scripts/lib/script-helpers.js；本校验器与坐标核对器共用同一口径）。
-const { numberOrNull: num } = require('./lib/script-helpers');
+// 文案比对归一（解码字符引用 + 换行归一成 LF）的唯一实现，见 scripts/lib/script-helpers.js。
+const { numberOrNull: num, normalizeForCompare } = require('./lib/script-helpers');
 
 // 按钮族固定参数：真值来源为模板表 mtslg-iocontrol-map.json 的 buttonFamily；
 // 传入 --map 时读取该表，未传入或表缺字段时退回内置默认（与表内容一致）。
@@ -119,7 +120,7 @@ function validateTextAudit(manifest, entries) {
       errors.push('TEXT 源节点缺少 textAudit: ' + source.ref);
       continue;
     }
-    if (audit.sourceText !== source.text) {
+    if (normalizeForCompare(audit.sourceText) !== normalizeForCompare(source.text)) {
       errors.push('textAudit sourceText 与 DSL 不一致: ' + source.ref);
     }
     if (typeof audit.visibility !== 'boolean') {
@@ -299,7 +300,8 @@ function validate(xmlPath, manifestPath, options) {
         errors.push('[' + n.xmlId + '] expectedHeight 不是同一 sourceRef 或正式模板规则计算得到');
       }
     }
-    if (typeof src.text === 'string' && typeof n.sourceText === 'string' && src.text !== n.sourceText) {
+    if (typeof src.text === 'string' && typeof n.sourceText === 'string' &&
+        normalizeForCompare(src.text) !== normalizeForCompare(n.sourceText)) {
       errors.push('[' + n.xmlId + '] sourceText 与 sourceNodes.text 不一致');
     }
     if (n.valueSource === 'dsl.text') {
@@ -310,7 +312,7 @@ function validate(xmlPath, manifestPath, options) {
         const carrier = x.Value !== undefined ? 'Value' : (x.Header !== undefined ? 'Header' : null);
         if (carrier === null) {
           errors.push('[' + n.xmlId + '] valueSource=dsl.text 但 XML 既没有 Value 也没有 Header');
-        } else if (x[carrier] !== n.sourceText) {
+        } else if (normalizeForCompare(x[carrier]) !== normalizeForCompare(n.sourceText)) {
           errors.push('[' + n.xmlId + '] ' + carrier + '="' + (x[carrier] || '') + '" != DSL="' + n.sourceText + '"');
         }
       }

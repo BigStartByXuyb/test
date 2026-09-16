@@ -62,6 +62,8 @@ const fs = require('fs');
 const { validateTextAudit } = require('./validate-iocontrol-provenance');
 // 模板表规则块的解析唯一实现（见 scripts/lib/iocontrol-map-rules.js；禁止在本脚本再抄一份）。
 const MAP_RULES = require('./lib/iocontrol-map-rules');
+// XML 属性转义（含换行 → &#x0a;）的唯一实现（见 scripts/lib/script-helpers.js；禁止在本脚本再抄一份）。
+const { xmlAttr, normalizeForCompare } = require('./lib/script-helpers');
 
 // ---------- 参数 ----------
 function usage() {
@@ -385,13 +387,8 @@ function fmtNum(n) {
   return String(Number(num.toFixed(4))); // 去浮点噪声、整数值不带小数点
 }
 
-function escAttr(v) {
-  return String(v)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
+// 属性转义：共享实现（xmlAttr）已经处理换行 → &#x0a;，此处只保留本文件的历史名字。
+const escAttr = xmlAttr;
 
 function normalizedY(y) {
   return Number(y) - contentOriginY;
@@ -739,19 +736,22 @@ function mergeMode() {
     for (const [k, v] of Object.entries(attrMap)) {
       if (geometryKeys.includes(k) || k === 'ControlType' || k === 'ID') continue;
       if (finalAttrs.has(k)) {
+        // 值比较走统一文案口径：现有文件里的 &#x0a; 与映射里的 LF 视为同一个值，
+        // 避免换行口径变化把「本来就一致」的文案误报成冲突/覆盖。
+        const sameValue = normalizeForCompare(finalAttrs.get(k)) === normalizeForCompare(v);
         // dsl.text 来源的文案承载属性是设计文本，provenance 要求它与 sourceText 一致，必须按映射覆盖。
         const forcedByDslText = dslTextCarrier !== null && k === dslTextCarrier && n.valueSource === 'dsl.text';
         if (forcedByDslText) {
-          if (finalAttrs.get(k) !== v) {
+          if (!sameValue) {
             report.textOverrides.push(`[${n.ref}] ${k}: 现有 "${finalAttrs.get(k)}" -> 设计文本 "${v}"（dsl.text 强制一致）`);
           }
           finalAttrs.set(k, v);
         } else if (n.force && n.force.includes(k)) {
-          if (finalAttrs.get(k) !== v) {
+          if (!sameValue) {
             report.conflicts.push(`[${n.ref}] ${k}: 现有 "${finalAttrs.get(k)}" -> 映射 "${v}"（force 强制覆盖）`);
           }
           finalAttrs.set(k, v);
-        } else if (finalAttrs.get(k) !== v) {
+        } else if (!sameValue) {
           report.conflicts.push(`[${n.ref}] ${k}: 现有 "${finalAttrs.get(k)}" 保留（映射值 "${v}" 不覆盖）`);
         }
       } else {

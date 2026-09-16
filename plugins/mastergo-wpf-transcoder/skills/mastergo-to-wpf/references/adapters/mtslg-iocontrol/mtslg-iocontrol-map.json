@@ -39,6 +39,21 @@
     ],
       "iconSizeRule": "IconWidth/IconHeight 取图标图形节点 bbox（映射字段 iconSize，四舍五入取整）；模板含图标字段的 IconButton 的 Icon/IconWidth/IconHeight 属于 controlTypeRequiredAttrs 的恒写字段，无图标槽位时写空字符串；Button/StatusButton 的模板不含图标字段，不发射这三项；iconSize 只在模板含图标字段且节点带 Icon 时被消费，带 Icon 却没有 iconSize 视为映射不完整，生成器直接失败"
   },
+  "textNewlinePolicy": {
+    "attrScope": "所有 XML 属性里的文案（页面 XML 的 Value / Header，Layout 的 MenuItem Name / TopLeftContent 等）与页面语言字典的字符串值",
+    "designNewlineCodepoints": [
+      "U+000A",
+      "U+000D",
+      "U+2028",
+      "U+2029"
+    ],
+    "normalizedValue": "LF (U+000A)",
+    "xmlAttrEscaping": "&#x0a;",
+    "langDictionaryEscaping": "&#x0a;",
+    "valueComparison": "normalizeForCompare：先解码字符引用（&#x0a; 等）、再把换行码点归一成 LF，然后逐字比较",
+    "implementation": "scripts/lib/script-helpers.js 的 normalizeNewlines / xmlAttr / xmlElementText / normalizeForCompare（唯一实现；生成器、校验器、Bundle 都从这里取）",
+    "note": "设计稿一个文本 run 内部的换行以 U+2028（行分隔符）/U+2029（段分隔符）编码，必须归一成 LF 后按框架写法发射：**XML 属性里不能出现字面换行**（解析器会把它归一成空格），所以一律写成字符引用 &#x0a;。同一行内不同字体的多个 text run 是 text 数组多项，按空串拼接，**不是**换行。语言字典是运行时按 LangName 取文案的载体，必须与设计稿换行一致（写成 &#x0a;），否则两行文案在运行时退化成一行；键派生 / 译文查找 / 术语表匹配仍使用压平值（normalizeText），与字典值分属两条口径。"
+  },
   "textBlockFontWeight": {
     "attr": "FontWeight",
     "controlTypes": ["TextBlock"],
