@@ -61,7 +61,7 @@ flowchart LR
 
 | 阶段 | 关键脚本 | 职责 |
 |---|---|---|
-| 采集 | `call-mastergo-mcp.js`、`mastergo-dsl-pipeline.ps1` | 调 MCP、落盘快照、校验根/父子链/唯一 ref、产出覆盖报告 |
+| 采集 | `call-mastergo-mcp.js`、`mastergo-dsl-pipeline.ps1` | 调 MCP、落盘快照、校验根/父子链/唯一 ref、产出覆盖报告；顺带落 provenance——响应 sidecar（`sha256`/`bytes`/`egress`/`fetchedAt`，`--egress` 由调用方声明、必填）+ manifest/快照的 `captureSha256`/`captureBytes`/`egress` 回指，并由冻结守卫拒绝把已冻结目录重挂到另一次 capture |
 | 事实提取 | `resolve-mastergo-visibility.js` | 机械输出可见性与 TEXT/PATH 索引，不判控件类型 |
 | 图标 | `discover-mtslg-page-icon-map.js`、`gen-mtslg-page-icons.js` | 发现候选、生成页面 Icon（XAML Geometry） |
 | 映射 | `gen-mtslg-mapping-from-dsl.js`、`resolve-mtslg-template-mapping.js` | 从 DSL 建立 mapping、按模板解析槽位与固定字段 |
@@ -166,7 +166,7 @@ DSL/mapping 文案 ──► 英文等译文由 AI 产出 translations 清单并
 - **PowerShell 脚本一律用 PowerShell 7（`pwsh`）**，不做 Windows PowerShell 5.1 兼容。
 - Node.js 运行全部 JS 脚本；MasterGo MCP 通过 `call-mastergo-mcp.js` 调用（token 不落盘）。
 - **文档同步工具（可选，非交付链路依赖）**：把本地规则文档同步到团队在线文档时，使用本机已授权的飞书文档 CLI（可检索/读写云文档）按标题定位并比对；它不是生成或校验流程的运行依赖，环境没有该工具时跳过同步步骤，并在交付说明里标注"在线文档未同步"，不得因此阻塞页面交付。
-- 本地回归：`node --test "skills/mastergo-to-wpf/scripts/tests/*.test.js"`（20 个，含脚本复用门禁 `script-duplication.test.js`）、`pwsh -NoProfile -File skills/mastergo-to-wpf/scripts/tests/mastergo-dsl-pipeline.tests.ps1`、`node skills/mastergo-to-wpf/scripts/audit-mtslg-feishu-map.js <doc> <map>`。
+- 本地回归：`node --test "skills/mastergo-to-wpf/scripts/tests/*.test.js"`（21 个，含脚本复用门禁 `script-duplication.test.js` 与端到端 provenance 用例 `capture-provenance-e2e.test.js`）、`pwsh -NoProfile -File skills/mastergo-to-wpf/scripts/tests/mastergo-dsl-pipeline.tests.ps1`、`node skills/mastergo-to-wpf/scripts/audit-mtslg-feishu-map.js <doc> <map>`。
 - CI（`BigStartByXuyb/cicd` 复用工作流）只做**确定性校验 + 语义审计**，不跑上述单测；单测由提交者在本地执行。
 
 ## 11. 维护约定

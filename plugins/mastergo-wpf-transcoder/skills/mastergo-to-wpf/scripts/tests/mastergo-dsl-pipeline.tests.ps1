@@ -45,7 +45,8 @@ try {
         '-FileId', 'file-1',
         '-LayerId', 'layer-1',
         '-Ui', 'F2',
-        '-RunId', 'test-run'
+        '-RunId', 'test-run',
+        '-Egress', 'test-direct'
     )
 
     $snapshotPath = Join-Path $runDir 'dsl.snapshot.json'
@@ -56,6 +57,20 @@ try {
     Assert-True (@($snapshot.dsl.nodes).Count -eq 1) '快照必须保留完整 DSL 根节点'
     Assert-True (@($snapshot.rules) -contains 'rule-1') '快照必须保留 MCP rules'
 
+    # provenance：manifest 与快照都要记录原始 capture 的字节哈希/字节数/出网链路，
+    # 且快照必须能回指到本次输入文件——哈希由测试独立复算，不信任脚本写出来的值。
+    $inputSha256 = (Get-FileHash -LiteralPath $inputPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    $inputBytes = (Get-Item -LiteralPath $inputPath).Length
+    $manifestPath = Join-Path $runDir 'manifest.json'
+    $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json -Depth 100
+    Assert-True ($manifest.captureSha256 -eq $inputSha256) "manifest 必须记录原始 capture 的 sha256（小写十六进制），实际 $($manifest.captureSha256)"
+    Assert-True ($manifest.captureBytes -eq $inputBytes) 'manifest 必须记录原始 capture 的字节数'
+    Assert-True ($manifest.egress -eq 'test-direct') 'manifest 必须记录调用方声明的出网链路'
+    Assert-True ($snapshot.captureSha256 -eq $inputSha256) '快照必须回指原始 capture 的 sha256'
+    Assert-True ($snapshot.captureBytes -eq $inputBytes) '快照必须记录原始 capture 的字节数'
+    Assert-True ($snapshot.egress -eq 'test-direct') '快照必须记录调用方声明的出网链路'
+    Assert-True ($manifest.captureSha256 -eq $snapshot.captureSha256) 'manifest 与快照必须指向同一次 capture'
+
     $coverage = Get-Content -LiteralPath (Join-Path $runDir 'coverage-report.json') -Raw | ConvertFrom-Json -Depth 100
     Assert-True ($coverage.status -eq 'complete') '完整 DSL 覆盖校验必须通过'
     Assert-True ($null -eq $coverage.expectedNodeCount -and $coverage.capturedNodeCount -eq 2) '单响应覆盖必须记录实际节点数，不得伪造远端 expectedNodeCount'
@@ -64,6 +79,89 @@ try {
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $runDir 'sections'))) '不得生成 section 目录'
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $runDir 'status'))) '不得生成 section status 目录'
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $runDir 'retry-manifest.json'))) '不得生成 section 重试清单'
+
+    # 冻结守卫（放行侧）：同一份 capture 重跑同一 run 目录必须照常通过（幂等，不是「一把锁死」）。
+    Invoke-Capture @(
+        '-Action', 'Capture',
+        '-InputFile', $inputPath,
+        '-Out', $runDir,
+        '-FileId', 'file-1',
+        '-LayerId', 'layer-1',
+        '-Ui', 'F2',
+        '-RunId', 'test-run-rerun',
+        '-Egress', 'test-direct'
+    )
+    $rerunManifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json -Depth 100
+    Assert-True ($rerunManifest.runId -eq 'test-run-rerun') '同一 capture 重跑必须放行'
+    Assert-True ($rerunManifest.captureSha256 -eq $inputSha256) '重跑后 capture 哈希必须保持不变'
+
+    # 冻结守卫（拒绝侧）：换一份字节不同的 capture 落进已冻结目录，必须拒绝，
+    # 且拒绝发生在任何写入之前——旧 manifest / 旧快照必须逐字节原样不动。
+    $driftedInput = Join-Path $root 'getDsl-drifted.json'
+    [pscustomobject]@{
+        dsl = [pscustomobject]@{
+            styles = [pscustomobject]@{}
+            nodes = @(
+                [pscustomobject]@{
+                    type = 'INSTANCE'
+                    id = 'layer-1'
+                    name = '整页（第二次抓取）'
+                    layoutStyle = [pscustomobject]@{ width = 1280; height = 1024; relativeX = 0; relativeY = 0 }
+                    children = @(
+                        [pscustomobject]@{ type = 'TEXT'; id = 'node-1'; name = '标题'; text = @([pscustomobject]@{ text = '整页' }) }
+                    )
+                }
+            )
+            components = @()
+        }
+        componentDocumentLinks = @()
+        rules = @('rule-1')
+    } | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $driftedInput -Encoding UTF8
+    $frozenManifestBefore = Get-Content -LiteralPath $manifestPath -Raw
+    $frozenSnapshotBefore = Get-Content -LiteralPath $snapshotPath -Raw
+    $refreezeFailed = $false
+    try {
+        Invoke-Capture @(
+            '-Action', 'Capture',
+            '-InputFile', $driftedInput,
+            '-Out', $runDir,
+            '-FileId', 'file-1',
+            '-LayerId', 'layer-1',
+            '-Ui', 'F2',
+            '-RunId', 'test-run-drifted',
+            '-Egress', 'test-direct'
+        )
+    }
+    catch {
+        $refreezeFailed = $true
+    }
+    Assert-True $refreezeFailed 'capture 哈希与已冻结基准不一致时必须拒绝执行'
+    Assert-True ((Get-Content -LiteralPath $manifestPath -Raw) -eq $frozenManifestBefore) '被拒绝时不得改写已冻结的 manifest'
+    Assert-True ((Get-Content -LiteralPath $snapshotPath -Raw) -eq $frozenSnapshotBefore) '被拒绝时不得改写已冻结的快照'
+
+    # 冻结守卫（旧产物侧）：没有 captureSha256 的旧 manifest 无法核对来源，同样必须拒绝。
+    $legacyRun = Join-Path $root 'legacy-run'
+    New-Item -ItemType Directory -Force -Path $legacyRun | Out-Null
+    [pscustomobject]@{ schemaVersion = 'mastergo-dsl-run/1'; runId = 'legacy'; fileId = 'file-1'; layerId = 'layer-1' } |
+        ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $legacyRun 'manifest.json') -Encoding UTF8
+    $legacyFailed = $false
+    try {
+        Invoke-Capture @(
+            '-Action', 'Capture',
+            '-InputFile', $inputPath,
+            '-Out', $legacyRun,
+            '-FileId', 'file-1',
+            '-LayerId', 'layer-1',
+            '-Ui', 'F2',
+            '-RunId', 'test-run-legacy',
+            '-Egress', 'test-direct'
+        )
+    }
+    catch {
+        $legacyFailed = $true
+    }
+    Assert-True $legacyFailed '旧 manifest 缺少 captureSha256 时必须拒绝（无法核对它冻结的是哪次 capture）'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $legacyRun 'dsl.snapshot.json'))) '被拒绝时不得写入新的快照'
 
     $duplicateNode = [pscustomobject]@{
         type = 'GROUP'
@@ -86,7 +184,7 @@ try {
             components = @()
         }
     } | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $duplicateInput -Encoding UTF8
-    Invoke-Capture @('-Action', 'Capture', '-InputFile', $duplicateInput, '-Out', $duplicateRun, '-FileId', 'file-duplicate', '-LayerId', 'duplicate-root', '-Ui', 'F2', '-RunId', 'duplicate-run')
+    Invoke-Capture @('-Action', 'Capture', '-InputFile', $duplicateInput, '-Out', $duplicateRun, '-FileId', 'file-duplicate', '-LayerId', 'duplicate-root', '-Ui', 'F2', '-RunId', 'duplicate-run', '-Egress', 'test-direct')
     $duplicateSnapshot = Get-Content -LiteralPath (Join-Path $duplicateRun 'dsl.snapshot.json') -Raw | ConvertFrom-Json -Depth 100
     $duplicateCoverage = Get-Content -LiteralPath (Join-Path $duplicateRun 'coverage-report.json') -Raw | ConvertFrom-Json -Depth 100
     Assert-True (@($duplicateSnapshot.dsl.nodes[0].children).Count -eq 1) '完全相同的重复节点必须折叠为一个'
@@ -117,7 +215,7 @@ try {
     } | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $conflictInput -Encoding UTF8
     $conflictFailed = $false
     try {
-        Invoke-Capture @('-Action', 'Capture', '-InputFile', $conflictInput, '-Out', $conflictRun, '-FileId', 'file-conflict', '-LayerId', 'conflict-root', '-Ui', 'F2', '-RunId', 'conflict-run')
+        Invoke-Capture @('-Action', 'Capture', '-InputFile', $conflictInput, '-Out', $conflictRun, '-FileId', 'file-conflict', '-LayerId', 'conflict-root', '-Ui', 'F2', '-RunId', 'conflict-run', '-Egress', 'test-direct')
     }
     catch {
         $conflictFailed = $true

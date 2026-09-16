@@ -9,7 +9,7 @@
 const fs = require("fs");
 const path = require("path");
 // 跨脚本共用工具的唯一实现（见 scripts/lib/script-helpers.js；禁止在本脚本再抄一份）。
-const { readJson, normalizeToken: normalize } = require(path.join(__dirname, "lib", "script-helpers.js"));
+const { readJson, sha256File, normalizeToken: normalize } = require(path.join(__dirname, "lib", "script-helpers.js"));
 const { isHostShellName } = require(path.join(__dirname, "lib", "mastergo-rules.js"));
 
 function arg(name) {
@@ -23,7 +23,8 @@ function required(name) {
 }
 function textOf(node) { return Array.isArray(node.text) ? node.text.map(x => x.text || "").join("") : undefined; }
 
-const dslSnapshot = readJson(required("--dsl"), "DSL snapshot");
+const dslPath = required("--dsl");
+const dslSnapshot = readJson(dslPath, "DSL snapshot");
 const visibility = readJson(required("--visibility"), "visibility");
 const templateMap = readJson(required("--template-map"), "template map");
 const iconMap = arg("--icon-map") ? readJson(arg("--icon-map"), "icon map") : { icons: [] };
@@ -690,7 +691,22 @@ const mapping = {
   contentOriginX: 0,
   contentOriginY: 192,
   rootRef: root.id,
-  source: { fileId: dslSnapshot.fileId, layerId: dslSnapshot.layerId, ui: dslSnapshot.ui, pageName: dslSnapshot.pageName },
+  // provenance 必须随页面产物一起流转，所以两份哈希都落在这里：
+  //   sourceSha256/sourceBytes/egress —— 原始 capture（getDsl.json）的事实，由
+  //     mastergo-dsl-pipeline.ps1 在 Capture 时算好写进快照，本脚本只搬运快照里的回指，不重取、不推断；
+  //   snapshotSha256/snapshotBytes —— 本次实际消费的 dsl.snapshot.json 自身字节哈希，本脚本直接对
+  //     读到的文件复算（与快照内部记录的 capture 哈希分属两层，缺任何一层都无法闭环）。
+  source: {
+    fileId: dslSnapshot.fileId,
+    layerId: dslSnapshot.layerId,
+    ui: dslSnapshot.ui,
+    pageName: dslSnapshot.pageName,
+    egress: dslSnapshot.egress || null,
+    sourceSha256: dslSnapshot.captureSha256 || null,
+    sourceBytes: typeof dslSnapshot.captureBytes === "number" ? dslSnapshot.captureBytes : null,
+    snapshotSha256: sha256File(dslPath),
+    snapshotBytes: fs.statSync(dslPath).size
+  },
   sourceNodes,
   textAudit,
   nodes: outputNodes,

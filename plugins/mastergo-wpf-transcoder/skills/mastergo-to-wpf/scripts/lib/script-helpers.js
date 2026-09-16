@@ -8,10 +8,23 @@
 // 与专属规则读取函数保留在脚本内——它们的参数、默认值与失败口径本来就不同。
 
 const fs = require("fs");
+const crypto = require("crypto");
 
 // 通用失败：抛错，由各脚本顶层 catch 转成 stderr + 退出码。
 function fail(message) {
   throw new Error(message);
+}
+
+// provenance 哈希的唯一实现：十六进制小写。
+// 口径固定为「字节的 SHA256」，与 PowerShell `Get-FileHash -Algorithm SHA256` 完全一致
+// （Get-FileHash 的 Hash 是大写，比对前统一转小写）——两侧独立算出同一个值才能互校。
+function sha256Text(value) {
+  return crypto.createHash("sha256").update(String(value), "utf8").digest("hex");
+}
+
+// 文件字节的 SHA256：读原始 Buffer，不做任何编码转换（文件是 UTF-8 文本时与 sha256Text 同值）。
+function sha256File(filePath) {
+  return crypto.createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
 }
 
 // 带模块前缀的失败（如「语言键派生失败: xxx」）：返回一个装配好的 fail，脚本里只绑定一次。
@@ -77,6 +90,8 @@ module.exports = {
   fail: fail,
   failWithPrefix: failWithPrefix,
   failAndExit: failAndExit,
+  sha256Text: sha256Text,
+  sha256File: sha256File,
   xmlAttr: xmlAttr,
   xmlDocText: xmlDocText,
   normalizeToken: normalizeToken,

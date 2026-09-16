@@ -199,7 +199,7 @@
 
 | 脚本 | 用途 | 模式 |
 |---|---|---|
-| `call-mastergo-mcp.js` | 通过 stdio 调用 MasterGo MCP（getDsl / extractSvg / …）并把响应**只落盘**，stdout 仅一行摘要，避免整页 DSL 进入上下文 | 双模式共用 |
+| `call-mastergo-mcp.js` | 通过 stdio 调用 MasterGo MCP（getDsl / extractSvg / …）并把响应**只落盘**，stdout 仅一行摘要，避免整页 DSL 进入上下文；落盘同时写 provenance sidecar（`sha256`/`bytes`/`egress`/`fetchedAt`），`--egress` 必填且只能由调用方声明 | 双模式共用 |
 | `gen-mastergo-page-bundle.js` | 一次编排页面 XML、页面 Icon、Layout、WPF 宿主壳和审计产物 | MTSLG 页面 + MaxWell WPF 宿主 |
 | `gen-mtslg-layout.js` | 创建或增量更新 Layout.xml，只发射已确认字段 | MTSLG |
 | `gen-mw-wpf-page.js` | 生成 View、View.xaml.cs、ViewModel 和 csproj 注册 | MaxWell WPF 宿主 |

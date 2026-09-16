@@ -6,10 +6,10 @@
 //
 // 用法:
 //   node call-mastergo-mcp.js --tool getDsl --fileId <fileId> --layerId <layerId> [--format json] \
-//        --out <runDir>/getDsl.json [--token mg_xxx] [--url https://mastergo.com]
+//        --out <runDir>/getDsl.json --egress <出网链路标签> [--token mg_xxx] [--url https://mastergo.com]
 //
 //   node call-mastergo-mcp.js --tool extractSvg --fileId <fileId> --layerId <layerId> \
-//        --page 0 --pageSize 100 --out <runDir>/extractSvg.json
+//        --page 0 --pageSize 100 --out <runDir>/extractSvg.json --egress <出网链路标签>
 //
 //   node call-mastergo-mcp.js --list-tools          # 只列出服务端可用工具名（不落盘）
 //
@@ -17,10 +17,19 @@
 //   - token 优先取 --token，其次取环境变量 MASTERGO_MCP_TOKEN；绝不写入产物。
 //   - 只用 --out 指定文件承载响应内容；脚本不把响应打到 stdout/stderr。
 //   - 需要比对服务端工具名时，脚本会先 tools/list，匹配 "getDsl" / "mcp__getDsl" 等前缀形式。
+//   - --egress 是**必填**的「出网链路标签」（如 direct / corp-proxy / 内网网关名）：
+//     本次请求实际走哪条链路，在本进程内不可知（环境变量、代理配置都可能被外层改写），
+//     因此只能由调用方声明，**脚本绝不自行探测**。缺省即拒绝落盘，避免把来源不明的
+//     capture 记成有 provenance 的基线。
+//   - 落盘响应后额外写一份 sidecar `<out>.provenance.json`：sha256 + bytes + fileId/layerId
+//     + egress + fetchedAt。哈希口径是「文件字节的 SHA256、十六进制小写」，与
+//     mastergo-dsl-pipeline.ps1 的 Get-FileHash 一致，两侧可独立互校。
+//   - sidecar 只记哈希与元数据，绝不夹带响应内容。
 
 const fs = require("fs");
 const path = require("path");
 const { spawn } = require("child_process");
+const { sha256Text } = require(path.join(__dirname, "lib", "script-helpers.js"));
 
 const TOOL_ARG_KEYS = [
   ["fileId", "fileId"],
@@ -67,6 +76,8 @@ catch (error) { fail(error.message + "\n用法见脚本头部注释"); }
 if (!args.listTools) {
   if (!args.tool) fail("缺少 --tool（例如 getDsl / extractSvg）");
   if (!args.out) fail("缺少 --out（响应落盘路径）");
+  // 出网链路只能由调用方声明：本进程内探测不到，也不允许猜一个默认值充数。
+  if (!args.egress) fail("缺少 --egress（出网链路标签）：本次请求实际走哪条链路在脚本内不可知，必须由调用方声明");
 }
 
 const token = args.token || process.env.MASTERGO_MCP_TOKEN || "";
@@ -211,12 +222,33 @@ function shutdown(exitCode) {
   fs.writeFileSync(absolute, text, "utf8");
 
   const isError = Boolean(response.result && response.result.isError);
+  const bytes = Buffer.byteLength(text, "utf8");
+  const sha256 = sha256Text(text);
+  // provenance sidecar：与响应文件同一份字节算出哈希，随响应一起落盘（每次调用各写一份）。
+  // egress 一律取调用方声明的值（见头部「约定」），脚本不探测、不设默认。
+  const sidecarPath = absolute + ".provenance.json";
+  fs.writeFileSync(sidecarPath, JSON.stringify({
+    schemaVersion: "mastergo-mcp-capture-provenance/1",
+    tool: args.tool,
+    serverTool: serverToolName,
+    fileId: args.fileId || null,
+    layerId: args.layerId || null,
+    out: absolute,
+    sha256: sha256,
+    bytes: bytes,
+    egress: args.egress,
+    fetchedAt: new Date().toISOString(),
+    isError: isError,
+  }, null, 2) + "\n", "utf8");
+
   // 只输出摘要：内容是整页 DSL / SVG，绝不进上下文
   console.log(JSON.stringify({
     tool: args.tool,
     serverTool: serverToolName,
     out: absolute,
-    bytes: Buffer.byteLength(text, "utf8"),
+    bytes: bytes,
+    sha256: sha256,
+    provenance: sidecarPath,
     isError: isError,
   }));
   shutdown(isError ? 5 : 0);

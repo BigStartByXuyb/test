@@ -1,6 +1,7 @@
 'use strict';
 
 const assert = require('assert');
+const crypto = require('crypto');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -78,12 +79,22 @@ const dsl = {
   components: []
 };
 
+// 模拟 mastergo-dsl-pipeline.ps1 的 Capture 产物：快照记录它回指的原始 capture（哈希/字节数/出网链路）。
+// 哈希由测试按字节独立算出，用来验证 mapping 里搬运的是真事实，而不是脚本自报的值。
+const capturePath = path.join(dir, 'getDsl.json');
+fs.writeFileSync(capturePath, JSON.stringify({ dsl, componentDocumentLinks: [], rules: [] }, null, 2), 'utf8');
+const captureSha256 = crypto.createHash('sha256').update(fs.readFileSync(capturePath)).digest('hex');
+const captureBytes = fs.statSync(capturePath).size;
+
 fs.writeFileSync(dslPath, JSON.stringify({
-  schemaVersion: 'mastergo-dsl-capture/1',
+  schemaVersion: 'mastergo-dsl-snapshot/2',
   fileId: 'test-file',
   layerId: rootRef,
   pageName: 'mapping-test',
   ui: 'test',
+  captureSha256,
+  captureBytes,
+  egress: 'test-direct',
   dsl,
   componentDocumentLinks: [],
   rules: []
@@ -103,6 +114,13 @@ const result = spawnSync(process.execPath, [script,
 
 assert.strictEqual(result.status, 0, result.stderr || result.stdout);
 const mapping = JSON.parse(fs.readFileSync(outputPath, 'utf8'));
+// provenance：source 必须同时带「原始 capture」与「本次消费的快照」两层事实——只记一层就断了链。
+assert.strictEqual(mapping.source.sourceSha256, captureSha256, 'source 必须回指原始 capture 的 sha256');
+assert.strictEqual(mapping.source.sourceBytes, captureBytes, 'source 必须记录原始 capture 的字节数');
+assert.strictEqual(mapping.source.egress, 'test-direct', 'source 必须记录出网链路标签');
+assert.strictEqual(mapping.source.snapshotSha256, crypto.createHash('sha256').update(fs.readFileSync(dslPath)).digest('hex'),
+  'source 必须记录本次实际消费的快照自身哈希（脚本直接复算，不取快照里的自报值）');
+assert.strictEqual(mapping.source.snapshotBytes, fs.statSync(dslPath).size, 'source 必须记录快照字节数');
 assert.strictEqual(mapping.mappingTag, '新页面完整DSL映射');
 assert.strictEqual(mapping.componentInstances.length, 1);
 assert.strictEqual(mapping.nodes.filter(node => node.controlType === 'IconButton').length, 4);
@@ -183,7 +201,17 @@ function runMappingCase(name, dsl, icons, extraArgs) {
     '--icon-map', caseIconMap, '--out', caseOutput
   ].concat(extraArgs || []), { encoding: 'utf8' });
   assert.strictEqual(caseResult.status, 0, caseResult.stderr || caseResult.stdout);
-  return JSON.parse(fs.readFileSync(caseOutput, 'utf8'));
+  const parsed = JSON.parse(fs.readFileSync(caseOutput, 'utf8'));
+  // 这些用例的快照是手写的、没有 capture provenance：字段照样要在，但值必须如实记 null，
+  // 不得为了「看起来齐全」编造哈希；快照自身哈希则永远可算（直接复算消费到的字节）。
+  assert.deepStrictEqual(
+    [parsed.source.sourceSha256, parsed.source.sourceBytes, parsed.source.egress],
+    [null, null, null],
+    name + '：快照没有 capture provenance 时必须如实记 null，不得编造'
+  );
+  assert.match(parsed.source.snapshotSha256, /^[0-9a-f]{64}$/, name + ' 必须记录快照自身哈希');
+  assert.strictEqual(parsed.source.snapshotBytes, fs.statSync(caseDsl).size, name + ' 必须记录快照字节数');
+  return parsed;
 }
 
 const aggregate = runMappingCase(
