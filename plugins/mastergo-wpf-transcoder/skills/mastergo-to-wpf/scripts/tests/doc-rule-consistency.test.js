@@ -446,7 +446,7 @@ assert.ok(Array.isArray(tableVariant.slots) && tableVariant.slots.length > 0,
 const tableSlot = tableVariant.slots[0];
 assert.strictEqual(tableSlot.slot, "table", "Table 变体的首个槽位必须是 table");
 assert.ok(!Object.prototype.hasOwnProperty.call(tableSlot, "valueSource"),
-  "Table 变体的 table 槽位不得登记 valueSource（根 Value 指向 PageData 数据文件，来源与占位口径只以 valuePolicy 为准）");
+  "Table 变体的 table 槽位不得登记 valueSource（来源与占位口径只以 tableTemplates.valuePolicy 为准：现阶段固定空串 + valuePending 待绑定提示）");
 
 // 真值源（映射表）本身也不得再出现被退役的绝对表述与旧列口径——上一轮只守住了人读文档。
 const dataGridSpec = map.controlTypes.DataGrid;
