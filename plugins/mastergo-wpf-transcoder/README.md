@@ -18,7 +18,7 @@
 
 完整页面转换包含三项强制工具：
 
-- `skills/mastergo-to-wpf/scripts/mastergo-dsl-pipeline.ps1` — 用 `-Action Capture` 把一次性 `getDsl` 响应固化为唯一的 `dsl.snapshot.json`，并校验根节点、递归节点、唯一 ref 和父子链；只有覆盖报告为 `complete` 才能继续生成。
+- `skills/mastergo-to-wpf/scripts/mastergo-dsl-pipeline.ps1` — 用 `-Action Capture` 把一次性 `getDsl` 响应固化为唯一的 `dsl.snapshot.json`，并校验根节点、递归节点、唯一 ref 和父子链；只有覆盖报告为 `complete` 才能继续生成。固化时把原始 capture 的 `captureSha256`/`captureBytes`/`egress` 写进 `manifest.json` 与快照（快照据此回指原始 capture），并带**冻结守卫**：`-Out` 下已有 `manifest.json` 且其 `captureSha256` 与本次输入不一致（或旧产物没有该字段）时拒绝执行，须显式归档/删除旧 manifest 才能重新冻结。
 - `skills/mastergo-to-wpf/scripts/resolve-mastergo-visibility.js` — 从 DSL 机械提取节点可见属性、祖先继承后的有效可见状态、TEXT/PATH 索引和可见性来源；只生成 visibility audit，不直接生成 mapping。
 - `skills/mastergo-to-wpf/scripts/gen-mastergo-page-bundle.js` — 接收已确认的页面 mapping，统一生成页面 XML、Icon、Layout、WPF 宿主和审计产物。
 
@@ -52,6 +52,6 @@ MasterGo 转换默认优先检查并调用 MasterGo MCP；浏览器、截图和�
 node --test "skills/mastergo-to-wpf/scripts/tests/*.test.js"
 ```
 
-该命令运行全部 20 个回归测试（测试统一放在 `scripts/tests/`，与交付链路脚本 `scripts/` 分开）；需要单跑某一个时直接指定文件名，例如 `node skills/mastergo-to-wpf/scripts/tests/gen-mastergo-page-bundle.test.js`。PowerShell 流水线回归测试同目录：`scripts/tests/mastergo-dsl-pipeline.tests.ps1`。
+该命令运行全部 21 个回归测试（测试统一放在 `scripts/tests/`，与交付链路脚本 `scripts/` 分开）；需要单跑某一个时直接指定文件名，例如 `node skills/mastergo-to-wpf/scripts/tests/gen-mastergo-page-bundle.test.js`。其中 `capture-provenance-e2e.test.js` 会用本地 MCP 桩跑一次真实的 capture + `pwsh` Capture 固化 + mapping 生成，验证 capture → 快照 → mapping 三层同源、且 PowerShell 与 Node 两侧的 SHA256 同口径（本机没有 `pwsh` 时该用例打印 SKIP 并以 0 退出）。PowerShell 流水线回归测试同目录：`scripts/tests/mastergo-dsl-pipeline.tests.ps1`。
 
 Skill 中包含项目专用的 MW/MTSLG 规则。分享给其他团队前，请先检查参考资料，并根据实际项目调整路径和运行时集成方式。

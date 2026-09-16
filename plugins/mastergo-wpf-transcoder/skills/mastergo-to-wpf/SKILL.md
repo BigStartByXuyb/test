@@ -28,7 +28,7 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 4. 如果当前会话没有可调用的 `getDsl`，只检查已配置的官方 MasterGo MCP 服务（包括 `@mastergo/magic-mcp`）是否暴露该接口；仍不可调用时停止本次转换并报告原因。
 5. 如果一次性 `getDsl` 返回错误，停止本次转换并报告原因；不得改用其他设计数据接口、浏览器或截图继续生成。
 6. `extractSvg` 只能作为一次 `getDsl` 成功后的独立图标资源解析步骤，用于生成页面 Icon；它不得读取、替代或补充页面结构。页面生成必须继续走本 Skill 的单响应 DSL capture 和适配器 Bundle 流程。
-7. **调用方式固定（防止整页 DSL 进入上下文）**：必须通过 `scripts/call-mastergo-mcp.js` 调用 `getDsl`、`extractSvg` 及其他 MasterGo MCP 工具，响应**只落盘**（约定 `<runDir>/getDsl.json`、`<runDir>/extractSvg.json`），脚本 stdout 只保留一行摘要（工具名、路径、字节数）。**禁止**把整页 DSL/SVG 原文放进模型上下文、回复正文或日志；引用设计数据时只允许给条数、字节数、哈希等摘要信息。在会话里直接调用 MCP 工具导致整页 DSL 进入上下文，视为违反本门禁。
+7. **调用方式固定（防止整页 DSL 进入上下文）**：必须通过 `scripts/call-mastergo-mcp.js` 调用 `getDsl`、`extractSvg` 及其他 MasterGo MCP 工具，响应**只落盘**（约定 `<runDir>/getDsl.json`、`<runDir>/extractSvg.json`），脚本 stdout 只保留一行摘要（工具名、路径、字节数、响应 sha256）。落盘时**必须**用 `--egress <出网链路标签>` 声明本次请求实际走的链路（直连 / 代理 / 内网网关名）：脚本在进程内探测不到链路，缺这个参数会直接拒绝落盘；每次落盘同时生成 sidecar `<out>.provenance.json`（`sha256` + `bytes` + `fileId`/`layerId` + `egress` + `fetchedAt`），哈希口径是文件字节的 SHA256（十六进制小写）。**禁止**把整页 DSL/SVG 原文放进模型上下文、回复正文或日志；引用设计数据时只允许给条数、字节数、哈希等摘要信息。在会话里直接调用 MCP 工具导致整页 DSL 进入上下文，视为违反本门禁。
 
 先判断交付目标：
 
@@ -273,6 +273,7 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 
 ### 来源清单与不可交付门禁
 
+- mapping 的 `source` 必须带 provenance，且**两份哈希都要有**：`sourceSha256`/`sourceBytes`/`egress` 记录原始 `getDsl` capture 的事实（由快照回指带过来，生成期不重取、不推断），`snapshotSha256`/`snapshotBytes` 记录本次实际消费的 `dsl.snapshot.json` 自身字节哈希（生成器直接对读到的字节复算）。只记一层就断了「capture → 快照 → 页面产物」的来源链；快照里没有 capture provenance 时如实记 `null`，不得编造。
 - 生成 IOContorl XML 前必须建立逐节点 mapping manifest；manifest 必须同时包含从原始 DSL 机械提取的 sourceNodes。每条 sourceNodes 记录至少包含 ref、parentRef、pageAbsX/pageAbsY、relativeX/relativeY、width/height 和真实 text（文本节点）；每条输出节点记录至少包含 xmlId、唯一 sourceRef、sourceParent、sourceText（文本节点）、输出父节点依据、expectedLeft/expectedTop/expectedWidth/expectedHeight。
 - **输出父节点可以不同于 `sourceParent`，但只能在声明过的容器重挂步骤里改**：`sourceParent` 永远保留 DSL 真实父节点作为来源事实，`parent`/`layoutParent` 记录实际输出父节点；`validate-iocontrol-provenance.js` 已支持该形态——它要求 `layoutParent`（否则 `parent`、再否则 `sourceParent`）存在于 `sourceNodes`，并据此独立重算 `expectedLeft/expectedTop`（容器内子节点按父容器归一化原点相对计算，内容区偏移只扣一次），不要求它与 `sourceParent` 相等。目前唯一合法的改写来源是 Bundle 的容器嵌套步骤（`apply-container-containment.js`，见「辅助脚本触发矩阵」与固定调用顺序），它只把命中 `childPolicy=nested-page-templates` 的容器子控件重挂进该容器。任何绕过该步骤、手工把 `parent`/`layoutParent` 改成未登记容器，或让子控件坐标不再等于相对新父容器的机械换算值，都属于静默发射，必须拒绝交付。
 - 文本节点的 Value 必须机械复制 sourceText；valueSource 必须为 dsl.text。禁止用 XML ID、组件属性名、字段名、坐标方向、视觉位置、模板槽位或业务语义生成 Value。RelativePositionXLabel 不得生成 Value="X"。
@@ -286,7 +287,8 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 当任务需要读取完整 MasterGo 页面或容器时，必须先调用一次 `getDsl`，再使用 `scripts/mastergo-dsl-pipeline.ps1` 固化完整响应；禁止把单次响应重新拆成 section，也禁止继续使用分段总览、分段写入、分段合并或失败 section 重试：
 
 1. 从 MasterGo 链接解析 `fileId` 和 `layerId`，调用 `getDsl(fileId, layerId, format=json)` 一次读取完整 DSL，并将 MCP 文本响应保存为一个 JSON 输入文件。
-2. 执行 `mastergo-dsl-pipeline.ps1 -Action Capture -InputFile <getDsl.json> -Out <runDir> -FileId <fileId> -LayerId <layerId> -Ui <ui>`。脚本验证根节点、全部递归节点、唯一 ref 和父子链，并生成唯一的 `dsl.snapshot.json`、`manifest.json`、`coverage-report.json` 和 `timing.json`。
+2. 执行 `mastergo-dsl-pipeline.ps1 -Action Capture -InputFile <getDsl.json> -Out <runDir> -FileId <fileId> -LayerId <layerId> -Ui <ui> -Egress <出网链路标签>`（`-Egress` 与上一步 `call-mastergo-mcp.js --egress` 是同一个值，必填）。脚本验证根节点、全部递归节点、唯一 ref 和父子链，并生成唯一的 `dsl.snapshot.json`、`manifest.json`、`coverage-report.json` 和 `timing.json`；manifest 与快照都会记录本次冻结消费的原始 capture 的 `captureSha256` / `captureBytes` / `egress`，快照据此回指原始 capture。
+   - **冻结守卫**：`-Out` 下已存在 `manifest.json` 时，若其记录的 `captureSha256` 与本次输入不一致（或旧 manifest 没有该字段，无法核对来源），脚本**拒绝执行**，且不写入任何文件——同一 `layerId` 的 `getDsl` 响应逐次不一致，静默重挂会让已冻结的 provenance 基准失效。确实要有意重新冻结时，先归档或删除旧 `manifest.json`（并一并处理同目录的 `dsl.snapshot.json` 等旧产物）再重跑；这是预期行为，不是故障。
 3. 只有 `coverage-report.json.status=complete` 且 `duplicateNodeRefs=[]`、`unknownParentRefs=[]` 时，才允许进入组件映射、Icon 发现和 `gen-mastergo-page-bundle.js`。一次性 `getDsl` 没有独立的远端节点总数，`capturedNodeCount` 只表示本地递归解析到的节点数，不得把它当成远端完整性证明。
    - 完全相同的同 ID、同父节点节点允许在 Capture 阶段折叠为一个，并写入 `collapsedDuplicateRefs` 审计；同 ID 但父节点、类型、内容或几何不同仍写入 `duplicateNodeRefs` 并阻断生成。
 4. 覆盖校验失败时，停止本次转换并报告重复 ref、缺失 id 或断裂父子链；不得改为分段读取或凭不完整数据生成 XML、Icon、Layout 或 WPF 宿主。

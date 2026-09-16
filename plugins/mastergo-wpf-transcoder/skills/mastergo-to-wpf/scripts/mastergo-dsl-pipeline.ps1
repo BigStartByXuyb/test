@@ -17,7 +17,13 @@ param(
 
     [string] $PageName,
     [string] $Ui = 'F2',
-    [string] $RunId
+    [string] $RunId,
+
+    # 出网链路标签：与 call-mastergo-mcp.js 的 --egress 是同一个值（同一次抓取的同一份声明）。
+    # 本次请求实际走哪条链路在脚本内不可知（代理/环境变量都可能被外层改写），因此只能由调用方
+    # 传入；脚本不探测、不设默认值。缺省即拒绝执行，避免落一份来源不明的 provenance 基准。
+    [Parameter(Mandatory = $true)]
+    [string] $Egress
 )
 
 Set-StrictMode -Version Latest
@@ -130,8 +136,46 @@ function Get-NodeRecords {
     }
 }
 
+# 冻结守卫：一个 run 目录一旦冻结到某次 capture，就不允许静默换挂到另一次 capture 上。
+# 同一 layerId 的 getDsl 响应逐次不一致（合并态/展开态两种下发形态），重新固化会让已冻结的
+# provenance 基准失效，因此以 manifest.json 记录的 captureSha256（原始响应文件的字节哈希）判定：
+#   无 manifest.json（首次冻结）        → 放行；
+#   有 manifest.json 且哈希一致（重跑） → 放行；
+#   哈希不一致，或记录里没有 captureSha256（守卫上线前的旧产物，无法核对来源）→ 拒绝执行。
+# 有意重新冻结时，必须显式归档或删除旧 manifest.json 才能继续——这是预期行为，不是故障。
+function Assert-CaptureFreeze {
+    param(
+        [string] $Out,
+        [string] $InputPath,
+        [string] $CaptureSha256
+    )
+
+    if (-not (Test-Path -LiteralPath $Out)) { return }
+    $runDir = (Resolve-Path -LiteralPath $Out).Path
+    $manifestPath = Join-Path $runDir 'manifest.json'
+    if (-not (Test-Path -LiteralPath $manifestPath)) { return }
+
+    $existing = Read-JsonFile -Path $manifestPath -Label '既存 manifest.json'
+    $recorded = if ($existing.PSObject.Properties.Name -contains 'captureSha256' -and $existing.captureSha256) {
+        ([string] $existing.captureSha256).Trim().ToLowerInvariant()
+    }
+    else { '' }
+    if (-not $recorded) {
+        throw "冻结守卫：$runDir 已存在 manifest.json，但没有 captureSha256（冻结守卫上线前的产物），无法核对它冻结的是哪次 capture。拒绝执行，避免把本次 capture 静默挂到旧产物上；确实要重新冻结时，先归档或删除 $manifestPath 再重跑。"
+    }
+    if ($recorded -ne $CaptureSha256) {
+        throw "冻结守卫：$runDir 已冻结到另一次 capture（manifest.json 记录 $recorded，本次输入 $InputPath 为 $CaptureSha256），拒绝把快照重挂到新 capture 上；确实要重新冻结时，先归档或删除 $manifestPath（并一并处理同目录的 dsl.snapshot.json 等旧产物）再重跑。"
+    }
+}
+
 function Capture-Run {
     $inputPath = (Resolve-Path -LiteralPath $InputFile).Path
+    # provenance 基准：原始 capture 的字节哈希 + 字节数。守卫与产物记录共用这一次计算，
+    # 保证「守的」与「记的」是同一份字节（哈希口径：SHA256、十六进制小写，与 Node 侧一致）。
+    $inputHash = (Get-FileHash -LiteralPath $inputPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    $inputBytes = [long] (Get-Item -LiteralPath $inputPath).Length
+    Assert-CaptureFreeze -Out $Out -InputPath $inputPath -CaptureSha256 $inputHash
+
     $payload = Read-JsonFile -Path $inputPath -Label 'MasterGo getDsl 响应'
     if (-not ($payload.PSObject.Properties.Name -contains 'dsl') -or
         $null -eq $payload.dsl -or
@@ -187,6 +231,10 @@ function Capture-Run {
         schemaVersion = 'mastergo-dsl-run/2'
         runId = $runIdValue
         captureMode = 'mcp.getDsl'
+        # provenance：本次冻结消费的原始 capture（getDsl.json）字节哈希/字节数与出网链路标签。
+        captureSha256 = $inputHash
+        captureBytes = $inputBytes
+        egress = $Egress
         fileId = $FileId
         layerId = $LayerId
         pageName = $resolvedPageName
@@ -200,6 +248,11 @@ function Capture-Run {
         schemaVersion = 'mastergo-dsl-snapshot/2'
         runId = $runIdValue
         captureMode = 'mcp.getDsl'
+        # 快照回指原始 capture：生成链路读的是本快照，靠这三个字段才能回答
+        # 「这份快照源自哪一次 getDsl 响应、走了哪条链路」。
+        captureSha256 = $inputHash
+        captureBytes = $inputBytes
+        egress = $Egress
         fileId = $FileId
         layerId = $LayerId
         pageName = $resolvedPageName

@@ -3,6 +3,7 @@
 
 // 契约测试：MasterGo MCP 调用必须"只落盘"，响应内容不得出现在 stdout/stderr。
 const assert = require("assert");
+const crypto = require("crypto");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
@@ -61,6 +62,7 @@ const run = spawnSync(process.execPath, [script,
   "--layerId", "1508:271307",
   "--format", "json",
   "--out", outPath,
+  "--egress", "test-direct",
   "--token", "fake-token",
   "--mcp", process.execPath,
   "--mcp-arg", stubPath,
@@ -79,12 +81,35 @@ assert.ok(run.stdout.indexOf(PAYLOAD_MARKER) < 0, "响应内容不得出现在 s
 assert.ok(run.stderr.indexOf(PAYLOAD_MARKER) < 0, "响应内容不得出现在 stderr");
 assert.ok(JSON.stringify(summary).indexOf(PAYLOAD_MARKER) < 0, "摘要里不得夹带响应内容");
 
-// 缺 --out / 缺 token 必须拒绝
+// provenance sidecar：落盘响应后必须记录「这份 capture 是什么、走了哪条链路」。
+// 哈希口径 = 响应文件字节的 SHA256（小写十六进制），与 pipeline 的 Get-FileHash 可互校。
+const sidecarPath = outPath + ".provenance.json";
+assert.ok(fs.existsSync(sidecarPath), "落盘响应后必须额外写一份 provenance sidecar");
+const payloadSha256 = crypto.createHash("sha256").update(fs.readFileSync(outPath)).digest("hex");
+const sidecar = JSON.parse(fs.readFileSync(sidecarPath, "utf8"));
+assert.strictEqual(sidecar.sha256, payloadSha256, "sidecar 的 sha256 必须等于响应文件的字节哈希");
+assert.strictEqual(sidecar.bytes, Buffer.byteLength(payload, "utf8"), "sidecar 必须记录响应字节数");
+assert.strictEqual(sidecar.fileId, "181586559903927");
+assert.strictEqual(sidecar.layerId, "1508:271307");
+assert.strictEqual(sidecar.egress, "test-direct", "sidecar 必须原样记录调用方声明的出网链路");
+assert.ok(!Number.isNaN(Date.parse(sidecar.fetchedAt)), "sidecar 必须记录可解析的 fetchedAt");
+assert.ok(JSON.stringify(sidecar).indexOf(PAYLOAD_MARKER) < 0, "sidecar 不得夹带响应内容");
+assert.strictEqual(summary.sha256, payloadSha256, "摘要必须给出响应哈希，供调用方记录 provenance");
+assert.strictEqual(summary.provenance, sidecarPath);
+
+// 缺 --out / 缺 --egress / 缺 token 必须拒绝
 const noOut = spawnSync(process.execPath, [script, "--tool", "getDsl", "--fileId", "f", "--layerId", "l", "--token", "t"], { encoding: "utf8" });
 assert.notStrictEqual(noOut.status, 0, "缺少 --out 必须失败");
 assert.match(noOut.stderr, /--out/);
 
-const noToken = spawnSync(process.execPath, [script, "--tool", "getDsl", "--out", path.join(root, "x.json"), "--mcp", process.execPath, "--mcp-arg", stubPath], {
+// 出网链路在进程内不可知：不给就只能拒绝，绝不允许脚本自己猜一个默认值充数。
+const noEgress = spawnSync(process.execPath, [script, "--tool", "getDsl", "--fileId", "f", "--layerId", "l", "--out", path.join(root, "no-egress.json"), "--token", "t", "--mcp", process.execPath, "--mcp-arg", stubPath], { encoding: "utf8" });
+assert.notStrictEqual(noEgress.status, 0, "缺少 --egress 必须失败");
+assert.match(noEgress.stderr, /--egress/);
+assert.ok(!fs.existsSync(path.join(root, "no-egress.json")), "缺少 --egress 时不得落盘响应");
+assert.ok(!fs.existsSync(path.join(root, "no-egress.json.provenance.json")), "缺少 --egress 时不得落盘 sidecar");
+
+const noToken = spawnSync(process.execPath, [script, "--tool", "getDsl", "--out", path.join(root, "x.json"), "--egress", "test-direct", "--mcp", process.execPath, "--mcp-arg", stubPath], {
   encoding: "utf8",
   env: Object.assign({}, process.env, { MASTERGO_MCP_TOKEN: "" }),
 });
