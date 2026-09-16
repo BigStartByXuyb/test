@@ -11,6 +11,8 @@ const path = require("path");
 // 跨脚本共用工具的唯一实现（见 scripts/lib/script-helpers.js；禁止在本脚本再抄一份）。
 const { readJson, normalizeToken: normalize } = require(path.join(__dirname, "lib", "script-helpers.js"));
 const { isHostShellName } = require(path.join(__dirname, "lib", "mastergo-rules.js"));
+// 模板表规则块的解析唯一实现（见 scripts/lib/iocontrol-map-rules.js；禁止在本脚本再抄一份）。
+const MAP_RULES = require(path.join(__dirname, "lib", "iocontrol-map-rules.js"));
 
 function arg(name) {
   const i = process.argv.indexOf(name);
@@ -49,6 +51,8 @@ const fontStyleNameByRef = new Map();
 // 映射表登记的 TextBlock FontWeight 规则：值取设计稿的字体样式名（fontStyle），
 // normal（样式名命中 normalStyleNames，或样式名缺失时 weight 命中 normalValues）不写该属性。
 const fontWeightRule = templateMap.textBlockFontWeight || {};
+// 表格族规则块（结构签名命中 + 列定义模板 + 行内容处置），真值来源是映射表 tableTemplates。
+const tableTemplate = MAP_RULES.parseTableTemplate(templateMap);
 const fontWeightAttr = typeof fontWeightRule.attr === "string" && fontWeightRule.attr ? fontWeightRule.attr : "FontWeight";
 const fontWeightControlTypes = new Set(
   Array.isArray(fontWeightRule.controlTypes) && fontWeightRule.controlTypes.length
@@ -99,6 +103,8 @@ const consumedTexts = new Set();
 const componentInstances = [];
 const deferredValueAudits = [];
 const pending = [];
+// 表格（结构签名命中）的逐表审计：列定义来源、每列单元格分布、行数据登记、Value 待绑定标记。
+const tableAudits = [];
 let textIndex = 0;
 
 function walk(node, parentRef, pageAbsX, pageAbsY) {
@@ -326,6 +332,90 @@ function formalMatches(n) {
   }
   return byProperty;
 }
+// ---------- 表格族：结构签名命中 ----------
+// 表格在团队组件库里没有组件集，设计稿里只是一个 GROUP，因此按「结构签名 + 图层名后缀」命中：
+// 节点类型 ∈ nodeTypes + 图层名以 nameSuffix 结尾 + 孩子里含表头群组 + ≥minRows 个行群组
+// + 表头至少有 minHeaderTexts 条可见文本。签名与名字必须同时成立——只成立一半时登记 pending，
+// 既不静默套模板，也不静默按平铺发射。
+function tableStructuralStatus(n) {
+  const structural = tableTemplate && tableTemplate.structural;
+  if (!structural || !n) return null;
+  if (!structural.nodeTypes.includes(String(n.type || ""))) return null;
+  const children = Array.isArray(n.children) ? n.children : [];
+  const header = children.find(c => c && structural.headerGroupNames.includes(String(c.name || "")));
+  const rows = children.filter(c => c && structural.rowGroupNames.includes(String(c.name || "")));
+  const headerTextCount = header ? textDescendants(header.id).filter(visible).length : 0;
+  const nameOk = !structural.nameSuffix || String(n.name || "").endsWith(structural.nameSuffix);
+  const signatureOk = Boolean(header) && rows.length >= structural.minRows &&
+    headerTextCount >= structural.minHeaderTexts;
+  if (!nameOk && !signatureOk) return null; // 与表格无关的普通 GROUP，不参与本族判定
+  return {
+    nameOk,
+    signatureOk,
+    headerRef: header ? header.id : null,
+    rowRefs: rows.map(row => row.id)
+  };
+}
+
+function structuralTableMatches(n) {
+  const status = tableStructuralStatus(n);
+  if (!status) return [];
+  if (!status.nameOk || !status.signatureOk) {
+    pending.push({
+      sourceRef: n.id,
+      reason: "表格结构签名与图层名没有同时成立，未按 Table 模板发射（保留 DSL 来源待确认）: " +
+        "图层名" + (status.nameOk ? "以「" + tableTemplate.structural.nameSuffix + "」结尾" : "不以「" +
+          tableTemplate.structural.nameSuffix + "」结尾") +
+        "，结构签名" + (status.signatureOk ? "成立" : "不成立（缺表头群组或行群组）")
+    });
+    return [];
+  }
+  const spec = tableTemplate.variants[tableTemplate.structural.variant];
+  return [{
+    family: "tableTemplates",
+    variant: tableTemplate.structural.variant,
+    spec,
+    properties: {},
+    matchKind: "structural",
+    signature: { headerRef: status.headerRef, rowRefs: status.rowRefs }
+  }];
+}
+
+// 值块里的「最上层叶子」：遇到 INSTANCE / TEXT 就收下且不再下钻（输入框内部的固定文本属于该单元格，
+// 不能当成第二个单元格）；LAYER / PATH 等绘制节点直接跳过；只有容器类才继续下钻。
+function cellLeaves(ref) {
+  const result = [];
+  for (const child of node(ref)?.children || []) {
+    const s = source(child.id);
+    if (s.type === "INSTANCE" || s.type === "TEXT") {
+      if (visible(child.id)) result.push(s);
+      continue;
+    }
+    if (s.type === "GROUP" || s.type === "FRAME" || s.type === "COMPONENT") {
+      result.push(...cellLeaves(child.id));
+    }
+  }
+  return result;
+}
+
+// 单元格归类：输入框实例取它命中的正式模板 ControlType；纯文本取 TextBlock；其余记 null（不参与多数判定）。
+function cellControlType(s) {
+  if (s.type === "TEXT") return "TextBlock";
+  if (s.type !== "INSTANCE" && s.type !== "COMPONENT") return null;
+  const matches = formalMatches(node(s.ref));
+  return matches.length ? (matches[0].spec.controlType || null) : null;
+}
+
+function nearestColumnIndex(centres, x) {
+  let best = -1;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (let i = 0; i < centres.length; i++) {
+    const distance = Math.abs(centres[i] - x);
+    if (distance < bestDistance) { bestDistance = distance; best = i; }
+  }
+  return best;
+}
+
 function outerGroups(ref, minWidth = 55, minHeight = 40) {
   const candidates = descendants(ref).filter(id => {
     const s = source(id);
@@ -383,6 +473,13 @@ function addNode(sourceRef, controlType, attrs, options = {}) {
   const xmlId = options.xmlId || `MG_${String(outputNodes.length + 1).padStart(4, "0")}`;
   const parentRef = options.layoutParent || null;
   const parentSource = parentRef ? source(parentRef) : null;
+  // 几何覆盖：登记在映射表模板里的固定几何（目前只有 DataGrid 的列定义节点走这条路）。
+  // 覆盖值必须来自映射表（tableTemplates.columnTemplate），节点的真实 DSL bbox 仍按 dsl* 字段保留溯源。
+  const geometry = options.geometryOverride || null;
+  const expectedLeft = geometry ? Number(geometry.left)
+    : s.pageAbsX - (parentSource ? parentSource.pageAbsX : 0);
+  const expectedTop = geometry ? Number(geometry.top)
+    : s.pageAbsY - (parentSource ? parentSource.pageAbsY : 0) - (parentSource ? 0 : 192);
   const out = {
     ref: sourceRef,
     sourceRef,
@@ -399,13 +496,24 @@ function addNode(sourceRef, controlType, attrs, options = {}) {
     absY: s.pageAbsY,
     w: s.width,
     h: s.height,
-    expectedLeft: s.pageAbsX - (parentSource ? parentSource.pageAbsX : 0),
-    expectedTop: s.pageAbsY - (parentSource ? parentSource.pageAbsY : 0) - (parentSource ? 0 : 192),
-    expectedWidth: controlType === "TextBlock" ? "NaN" : s.width,
-    expectedHeight: controlType === "TextBlock" ? 40 : s.height,
-    widthSource: controlType === "TextBlock" ? "mtslg.textblock.fixed-nan" : "dsl.bbox",
-    heightSource: controlType === "TextBlock" ? "mtslg.textblock.fixed-40" : "dsl.bbox",
+    expectedLeft,
+    expectedTop,
+    expectedWidth: geometry ? "NaN" : (controlType === "TextBlock" ? "NaN" : s.width),
+    expectedHeight: geometry ? Number(geometry.height) : (controlType === "TextBlock" ? 40 : s.height),
+    widthSource: geometry ? "table.column-template"
+      : (controlType === "TextBlock" ? "mtslg.textblock.fixed-nan" : "dsl.bbox"),
+    heightSource: geometry ? "table.column-template"
+      : (controlType === "TextBlock" ? "mtslg.textblock.fixed-40" : "dsl.bbox"),
     ...(controlType === "TextBlock" ? { dslWidth: s.width } : {}),
+    ...(geometry ? {
+      nodeKind: options.nodeKind || "table-column",
+      geometrySource: "table.column-template",
+      omitWidth: geometry.omitWidth !== false,
+      dslLeft: s.pageAbsX - (parentSource ? parentSource.pageAbsX : 0),
+      dslTop: s.pageAbsY - (parentSource ? parentSource.pageAbsY : 0) - (parentSource ? 0 : 192),
+      dslWidth: s.width,
+      dslHeight: s.height
+    } : {}),
     id: xmlId,
     xmlId,
     attrs: Object.assign({}, attrs),
@@ -458,9 +566,180 @@ function addInstance(match, instanceRef, requiredSlots, omittedSlots = []) {
   });
 }
 
+// ---------- 表格（结构签名命中的 GROUP）→ DataGrid + 表头派生的列定义 ----------
+// 设计口径（真值来源：映射表 tableTemplates）：
+//   列定义 = 表头群组里的可见文本，从左到右；列节点几何与属性按 columnTemplate 固定发射；
+//   行是数据不是控件：行内文本一律消费 + 以 innerTextPolicy.role 记 omit，行内容写进 tableAudits；
+//   根节点 Value 指向 PageData 数据文件，设计稿没有来源 → 空串占位 + valuePending 标记。
+function emitTable(inst, spec, match, columnTemplate) {
+  const tableRef = inst.ref;
+  const headerTexts = textDescendants(match.signature.headerRef)
+    .filter(visible)
+    .map(ref => source(ref))
+    .sort((a, b) => (a.pageAbsX - b.pageAbsX) || (a.pageAbsY - b.pageAbsY));
+  if (!headerTexts.length) throw new Error("表格结构签名命中但表头没有可见文本，列定义无处取值: " + tableRef);
+  for (const text of headerTexts) {
+    if (typeof text.text !== "string") throw new Error("表格列标题缺少 DSL 文本: " + text.ref);
+  }
+  const centres = headerTexts.map(t => t.pageAbsX + (Number(t.width) || 0) / 2);
+  const bandLeft = Math.min(...headerTexts.map(t => t.pageAbsX));
+  const bandRight = Math.max(...headerTexts.map(t => t.pageAbsX + (Number(t.width) || 0)));
+  const cellKindsByColumn = headerTexts.map(() => []);
+
+  // 每行：值块 = 与表头列带在 x 上重叠的直接子群组；单元格 = 值块里的最上层叶子。
+  // 行内的直接文本（左标题 / 单位）按 x 从左到右登记为 left / right，不做语义猜测。
+  const rows = [];
+  for (const rowRef of match.signature.rowRefs) {
+    const labels = [];
+    const cells = [];
+    for (const child of node(rowRef)?.children || []) {
+      const s = source(child.id);
+      if (s.type === "TEXT") {
+        if (visible(child.id)) {
+          labels.push({ ref: s.ref, name: s.name, text: s.text, pageAbsX: s.pageAbsX, pageAbsY: s.pageAbsY });
+        }
+        continue;
+      }
+      if (s.type !== "GROUP" && s.type !== "FRAME") continue;
+      const right = s.pageAbsX + (Number(s.width) || 0);
+      if (!(s.pageAbsX < bandRight && right > bandLeft)) continue;
+      for (const leaf of cellLeaves(child.id)) {
+        const controlType = cellControlType(leaf);
+        const column = nearestColumnIndex(centres, leaf.pageAbsX + (Number(leaf.width) || 0) / 2);
+        if (column >= 0 && controlType) cellKindsByColumn[column].push(controlType);
+        cells.push({
+          ref: leaf.ref,
+          name: leaf.name,
+          type: leaf.type,
+          column,
+          controlType,
+          ...(typeof leaf.text === "string" ? { text: leaf.text } : {}),
+          pageAbsX: leaf.pageAbsX,
+          pageAbsY: leaf.pageAbsY
+        });
+      }
+    }
+    labels.sort((a, b) => (a.pageAbsX - b.pageAbsX) || (a.pageAbsY - b.pageAbsY));
+    rows.push({
+      ref: rowRef,
+      name: source(rowRef).name,
+      labels: labels.map((label, index) => Object.assign({}, label, {
+        position: labels.length > 1 ? (index === 0 ? "left" : "right") : "only"
+      })),
+      cells
+    });
+  }
+
+  // 列 ControlType：严格多数（> 50%）胜出，没有严格多数退化为 TextBlock（口径同映射表 columnControlTypePolicy）。
+  const columnControlTypes = cellKindsByColumn.map(kinds => {
+    const counts = new Map();
+    for (const kind of kinds) counts.set(kind, (counts.get(kind) || 0) + 1);
+    let best = null;
+    let bestCount = 0;
+    let tie = false;
+    for (const [kind, count] of counts) {
+      if (count > bestCount) { best = kind; bestCount = count; tie = false; }
+      else if (count === bestCount) tie = true;
+    }
+    return best && !tie && bestCount * 2 > kinds.length ? best : "TextBlock";
+  });
+
+  const valuePolicy = tableTemplate.valuePolicy || {};
+  const tableAttrs = {};
+  if (typeof valuePolicy.attr === "string" && valuePolicy.attr) tableAttrs[valuePolicy.attr] = "";
+  const tableXmlId = addNode(tableRef, spec.controlType, tableAttrs);
+
+  const columns = headerTexts.map((text, index) => {
+    const columnAttrs = { Value: text.text };
+    for (const attr of columnTemplate.alwaysWrittenAttrs) columnAttrs[attr] = "";
+    const xmlId = addNode(text.ref, columnControlTypes[index], columnAttrs, {
+      layoutParent: tableRef,
+      xmlId: `MGCol_${String(index + 1).padStart(4, "0")}`,
+      valueSourceRef: text.ref,
+      nodeKind: "table-column",
+      geometryOverride: {
+        left: columnTemplate.left,
+        top: columnTemplate.top,
+        height: columnTemplate.height,
+        omitWidth: columnTemplate.omitWidth
+      }
+    });
+    addValueAudit(text.ref, text.ref);
+    return {
+      ref: text.ref,
+      xmlId,
+      text: text.text,
+      controlType: columnControlTypes[index],
+      pageAbsX: text.pageAbsX,
+      cellKinds: cellKindsByColumn[index]
+    };
+  });
+
+  // 表格内其余文本：行标题 / 单位 / 单元格文本（含输入框实例内部的固定文本）一律 consume + omit。
+  const innerPolicy = tableTemplate.innerTextPolicy || {};
+  if (innerPolicy.decision !== "omit") {
+    throw new Error("tableTemplates.innerTextPolicy.decision 必须是 omit：表格内的行数据文本不发射成控件");
+  }
+  for (const ref of descendants(tableRef)) {
+    const s = source(ref);
+    if (s.type !== "TEXT" || consumedTexts.has(ref)) continue;
+    consumedTexts.add(ref);
+    textAudit.push({
+      sourceRef: ref,
+      sourceText: s.text,
+      visibility: visible(ref),
+      role: innerPolicy.role,
+      decision: "omit",
+      omitReason: innerPolicy.role,
+      outputRefs: []
+    });
+  }
+
+  // 表格 bbox 与自身内容的实际范围：GROUP 的声明尺寸在设计稿里可能没跟上行数（内容溢出），
+  // 这里把两个数都登记下来——节点几何仍按设计稿 bbox 直传，缺陷交由设计侧修正。
+  const contentRefs = descendants(tableRef).map(ref => source(ref))
+    .filter(s => Number.isFinite(s.pageAbsX) && Number.isFinite(s.pageAbsY));
+  const declared = source(tableRef);
+  const contentBox = contentRefs.length ? {
+    left: Math.min(...contentRefs.map(s => s.pageAbsX)),
+    top: Math.min(...contentRefs.map(s => s.pageAbsY)),
+    right: Math.max(...contentRefs.map(s => s.pageAbsX + (Number(s.width) || 0))),
+    bottom: Math.max(...contentRefs.map(s => s.pageAbsY + (Number(s.height) || 0)))
+  } : null;
+  const declaredBox = {
+    left: declared.pageAbsX,
+    top: declared.pageAbsY,
+    right: declared.pageAbsX + (Number(declared.width) || 0),
+    bottom: declared.pageAbsY + (Number(declared.height) || 0)
+  };
+  const boxCoversContent = Boolean(contentBox) &&
+    contentBox.left >= declaredBox.left - 0.5 && contentBox.top >= declaredBox.top - 0.5 &&
+    contentBox.right <= declaredBox.right + 0.5 && contentBox.bottom <= declaredBox.bottom + 0.5;
+
+  tableAudits.push({
+    ref: tableRef,
+    name: declared.name,
+    xmlId: tableXmlId,
+    controlType: spec.controlType,
+    valueAttr: valuePolicy.attr || "Value",
+    valueDecision: valuePolicy.decision || null,
+    valuePending: true,
+    columnControlTypePolicy: tableTemplate.columnControlTypePolicy || null,
+    columns,
+    rows,
+    geometry: { declared: declaredBox, content: contentBox, declaredBoxCoversContent: boxCoversContent }
+  });
+  if (!boxCoversContent) {
+    console.error("表格 bbox 提醒: [" + tableRef + "] 图层声明尺寸 " +
+      (declaredBox.right - declaredBox.left) + "×" + (declaredBox.bottom - declaredBox.top) +
+      " 覆盖不了自身内容范围（实际到 y=" + (contentBox ? contentBox.bottom : "?") +
+      "）；节点几何仍按设计稿 bbox 发射，请在设计稿里修正表格尺寸。");
+  }
+}
+
 const matched = [];
 for (const item of sourceNodes) {
-  const matches = formalMatches(node(item.ref));
+  const matches = formalMatches(node(item.ref)).concat(structuralTableMatches(node(item.ref)));
   if (!matches.length) continue;
   if (excludeInstances.has(item.ref)) {
     pending.push({
@@ -482,6 +761,24 @@ const matchedRefs = new Set(matched.map(x => x.item.ref));
 for (const { item: inst, match } of matched) {
   const variant = match.variant;
   const spec = match.spec;
+  if (match.family === "tableTemplates") {
+    // 表格（结构签名命中的 GROUP）→ DataGrid + 表头派生的列定义；行按数据登记，不发射控件。
+    const columnTemplate = tableTemplate && tableTemplate.columnTemplate;
+    if (!columnTemplate || !match.signature) {
+      throw new Error("表格族命中缺少 columnTemplate 或结构签名: " + inst.ref +
+        "；请在映射表 tableTemplates 里登记 columnTemplate 与 match.structural.signature");
+    }
+    emitTable(inst, spec, match, columnTemplate);
+    // 变体值来自结构签名（顶点是 GROUP，没有公开属性），resolver 按 instance.variant 解析。
+    componentInstances.push({
+      template: "tableTemplates",
+      variant,
+      instanceRef: inst.ref,
+      properties: {},
+      requiredSlots: [slot("table", inst.ref)]
+    });
+    continue;
+  }
   if (match.family === "cameraTemplates") {
     // 相机视口是**一个整体**：内部绘制内容（网格、坐标、通道名、JOG mode 等）完全不管，
     // 只发射外层的 Camera 控件（DesignPanelID / Value 空串占位 + Width/Height 取实例 bbox），
@@ -695,6 +992,8 @@ const mapping = {
   textAudit,
   nodes: outputNodes,
   componentInstances,
+  // 表格逐表审计：列定义来源、每列单元格分布、行数据登记、Value 待绑定标记、bbox 与内容范围。
+  ...(tableAudits.length ? { tableAudits } : {}),
   // 同一组件可能同时被隔离与“未命中”记录，按 sourceRef 去重后再写入清单。
   pending: pending.filter((item, index) => pending.findIndex(x => x.sourceRef === item.sourceRef) === index),
   unmappedComponents: [...new Set(pending.map(x => x.sourceRef))],
@@ -702,7 +1001,27 @@ const mapping = {
   ...(templateConflicts.length ? { templateConflicts } : {})
 };
 fs.writeFileSync(outPath, JSON.stringify(mapping, null, 2) + "\n", "utf8");
-console.log(JSON.stringify({ sourceNodes: sourceNodes.length, nodes: outputNodes.length, textAudit: textAudit.length, componentInstances: componentInstances.length, templateConflicts: templateConflicts.length, out: outPath }, null, 2));
+console.log(JSON.stringify({
+  sourceNodes: sourceNodes.length,
+  nodes: outputNodes.length,
+  textAudit: textAudit.length,
+  componentInstances: componentInstances.length,
+  templateConflicts: templateConflicts.length,
+  tables: tableAudits.map(item => ({
+    ref: item.ref, name: item.name, xmlId: item.xmlId,
+    columns: item.columns.length, rows: item.rows.length,
+    valuePending: item.valuePending,
+    declaredBoxCoversContent: item.geometry.declaredBoxCoversContent
+  })),
+  out: outPath
+}, null, 2));
+for (const table of tableAudits) {
+  console.error("表格已发射: [" + table.ref + "] " + (table.name || "") +
+    " → DataGrid " + table.xmlId + "，" + table.columns.length + " 列（" +
+    table.columns.map(column => column.controlType).join("/") + "），" +
+    table.rows.length + " 行按数据登记（未发射控件）；Value 待业务确认。" +
+    (table.geometry.declaredBoxCoversContent ? "" : " 注意：图层声明尺寸覆盖不了内容范围，见 tableAudits.geometry。"));
+}
 if (templateConflicts.length) {
   console.error("模板匹配冲突（已按内部组件名执行）:");
   for (const conflict of templateConflicts) {

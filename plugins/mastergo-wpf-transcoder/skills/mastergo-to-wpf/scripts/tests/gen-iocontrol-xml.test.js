@@ -575,3 +575,62 @@ console.log('PASS IconButton fixed-attribute regression test');
 console.log('PASS button-family rules are read from the template map');
 console.log('PASS icon attributes follow the ControlType template scope');
 console.log('PASS merge new siblings follow visual-row order');
+
+// ---- 表格列定义（nodeKind=table-column）：几何按 columnTemplate 固定发射、不写 Width ----
+const tableMap = path.join(__dirname, '..', '..', 'references', 'adapters', 'mtslg-iocontrol', 'mtslg-iocontrol-map.json');
+const tableMapping = path.join(dir, 'table-mapping.json');
+const tableOutput = path.join(dir, 'table-page.xml');
+fs.writeFileSync(tableMapping, JSON.stringify({
+  rootRef: 'root',
+  contentOriginY: 192,
+  sourceNodes: [
+    { ref: 'root', parentRef: null, pageAbsX: 0, pageAbsY: 0, relativeX: 0, relativeY: 0, width: 1280, height: 1024 },
+    { ref: 'root/table', parentRef: 'root', pageAbsX: 50, pageAbsY: 507, relativeX: 50, relativeY: 507, width: 646, height: 189 },
+    { ref: 'root/table/header', parentRef: 'root/table', pageAbsX: 175, pageAbsY: 507, relativeX: 125, relativeY: 0, width: 504, height: 32 },
+    { ref: 'root/table/header/macro', parentRef: 'root/table/header', pageAbsX: 203, pageAbsY: 515, relativeX: 28, relativeY: 8, width: 47, height: 16, type: 'TEXT', text: 'Macro' },
+    { ref: 'root/table/item/title', parentRef: 'root/table', pageAbsX: 64, pageAbsY: 551, relativeX: 14, relativeY: 44, width: 95, height: 16, type: 'TEXT', text: '图像识别阈值' }
+  ],
+  textAudit: [
+    { sourceRef: 'root/table/header/macro', sourceText: 'Macro', visibility: true, role: 'component-value', decision: 'emit', outputRefs: ['MGCol_0001'] },
+    { sourceRef: 'root/table/item/title', sourceText: '图像识别阈值', visibility: true, role: 'table-data-cell', decision: 'omit', omitReason: 'table-data-cell', outputRefs: [] }
+  ],
+  nodes: [
+    {
+      ref: 'root/table', sourceRef: 'root/table', sourceParent: 'root', id: 'MG_GRID', xmlId: 'MG_GRID',
+      controlType: 'DataGrid', parent: null, layoutParent: null, absX: 50, absY: 507, w: 646, h: 189,
+      expectedLeft: 50, expectedTop: 315, expectedWidth: 646, expectedHeight: 189,
+      widthSource: 'dsl.bbox', heightSource: 'dsl.bbox', attrs: { Value: '' }
+    },
+    {
+      ref: 'root/table/header/macro', sourceRef: 'root/table/header/macro', sourceParent: 'root/table/header',
+      id: 'MGCol_0001', xmlId: 'MGCol_0001', controlType: 'TextBlock',
+      parent: 'root/table', layoutParent: 'root/table', absX: 203, absY: 515, w: 47, h: 16,
+      sourceText: 'Macro', valueSource: 'dsl.text',
+      expectedLeft: 0, expectedTop: 0, expectedWidth: 'NaN', expectedHeight: 45,
+      widthSource: 'table.column-template', heightSource: 'table.column-template',
+      omitWidth: true, nodeKind: 'table-column', dslLeft: 153, dslTop: 8, dslWidth: 47, dslHeight: 16,
+      attrs: { Value: 'Macro', IOName: '' }
+    }
+  ]
+}, null, 2));
+const tableFresh = spawnSync(process.execPath, [path.join(__dirname, '..', 'gen-iocontrol-xml.js'),
+  '--fresh', tableMapping, '--out', tableOutput, '--map', tableMap], { encoding: 'utf8' });
+assert.strictEqual(tableFresh.status, 0, '表格映射必须能正常渲染: ' + tableFresh.stderr);
+const tableXml = fs.readFileSync(tableOutput, 'utf8');
+const gridTag = (tableXml.match(/<IOContorl[^>]*ID="MG_GRID"[\s\S]*?>/) || [''])[0];
+assert.ok(gridTag, 'fresh 输出必须包含 DataGrid 根节点');
+assert.match(gridTag, /ControlType="DataGrid"/);
+assert.match(gridTag, /Value=""/, 'DataGrid 的 Value 无来源时必须空串占位');
+assert.match(gridTag, /Left="50"/);
+assert.match(gridTag, /Top="315"/);
+const columnTag = (tableXml.match(/<IOContorl[^>]*ID="MGCol_0001"[\s\S]*?\/>/) || [''])[0];
+assert.ok(columnTag, 'fresh 输出必须包含列定义子节点');
+assert.match(columnTag, /Left="0"/, '列定义几何固定 Left=0');
+assert.match(columnTag, /Top="0"/, '列定义几何固定 Top=0');
+assert.match(columnTag, /Height="45"/, '列定义几何固定 Height=45');
+assert.doesNotMatch(columnTag, /Width=""/, '列定义不写 Width');
+assert.ok(!columnTag.includes('Width='), '列定义不得发射 Width');
+assert.match(columnTag, /IOName=""/, '列定义必须恒写 IOName 空占位');
+assert.ok(!columnTag.includes('FontSize='), '列定义不套页面控件的必写字段集');
+
+console.log('PASS table column definition (DataGrid columns) regression test');

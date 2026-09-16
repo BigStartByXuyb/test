@@ -707,6 +707,19 @@ function validateBundleOutputs(info) {
       const originY = (parentIsRoot ? 192 : (parentSource ? (Number(parentSource.pageAbsY) || 0) : 192)) +
         (parentInset ? (Number(parentInset.top) || 0) : 0);
       const isTextBlock = (node.controlType || (node.attrs && node.attrs.ControlType)) === "TextBlock";
+      // 表格列定义（nodeKind=table-column）按映射表 columnTemplate 固定几何发射：Left=0 / Top=0 /
+      // Height=45、不写 Width。核对输入的 x/y 因此取「父容器原点」本身，w 传 "NaN"（与 XML 无 Width 对应）。
+      if (node.nodeKind === "table-column") {
+        return {
+          id: node.xmlId || node.id || node.ref,
+          x: originX,
+          y: originY,
+          w: "NaN",
+          h: node.expectedHeight,
+          contentOriginX: originX,
+          contentOriginY: originY
+        };
+      }
       return {
         id: node.xmlId || node.id || node.ref,
         x: source.pageAbsX !== undefined ? source.pageAbsX : node.absX,
@@ -1194,6 +1207,21 @@ function main() {
         reparented: nestingReport ? nestingReport.reparented.length : 0,
         conflicts: nestingReport ? nestingReport.conflicts.length : 0
       },
+      // 表格：结构签名命中后发射的 DataGrid（列定义来自表头，行按数据登记不发射控件）。
+      // valuePending=true 表示根节点 Value（PageData 数据文件名）在设计稿里没有来源、待人确认。
+      tables: (Array.isArray(mapping.tableAudits) ? mapping.tableAudits : []).map(function (table) {
+        return {
+          ref: table.ref,
+          name: table.name,
+          xmlId: table.xmlId,
+          columns: Array.isArray(table.columns) ? table.columns.length : 0,
+          columnControlTypes: (Array.isArray(table.columns) ? table.columns : []).map(function (column) { return column.controlType; }),
+          rows: Array.isArray(table.rows) ? table.rows.length : 0,
+          valueAttr: table.valueAttr,
+          valuePending: table.valuePending === true,
+          declaredBoxCoversContent: table.geometry ? table.geometry.declaredBoxCoversContent : null
+        };
+      }),
       layout: {
         status: manifest.layoutStatus,
         evidence: manifest.layoutEvidence,

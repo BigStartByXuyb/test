@@ -409,6 +409,48 @@ function outputWidth(node) {
   return node.w;
 }
 
+// ---------- 表格列定义节点（nodeKind=table-column） ----------
+// DataGrid 的列子节点是列定义，不是页面控件：几何按映射表 tableTemplates.columnTemplate 固定发射
+// （Left=0 / Top=0 / Height=45，不写 Width），属性用映射已带的字段集，不套 controlTypeRequiredAttrs。
+// 映射生成器已把模板值写进 expectedLeft/expectedTop/expectedHeight/omitWidth，这里只做发射；
+// 校验器（provenance / coords）按同一组字段与映射表复核，三方同口径。
+function isTableColumnNode(node) {
+  return Boolean(node && node.nodeKind === 'table-column');
+}
+
+function tableColumnGeometryOf(node) {
+  return {
+    left: node.expectedLeft,
+    top: node.expectedTop,
+    height: node.expectedHeight,
+    omitWidth: node.omitWidth !== false
+  };
+}
+
+// 就地发射节点几何：表格列定义走模板固定几何，其余节点按 DSL bbox 相对父容器计算。
+function applyNodeGeometry(node, attrMap, parentAbsX, parentAbsY, insetLeft, insetTop) {
+  if (isTableColumnNode(node)) {
+    const geometry = tableColumnGeometryOf(node);
+    attrMap.Left = fmtNum(geometry.left);
+    attrMap.Top = fmtNum(geometry.top);
+    attrMap.Height = fmtNum(geometry.height);
+    if (geometry.omitWidth) delete attrMap.Width;
+    else if (node.expectedWidth !== undefined && node.expectedWidth !== null) attrMap.Width = fmtNum(node.expectedWidth);
+    return;
+  }
+  attrMap.Left = fmtNum(node.absX - parentAbsX - insetLeft);
+  attrMap.Top = fmtNum(normalizedY(node.absY) - parentAbsY - insetTop);
+  if (outputWidth(node) !== undefined && outputWidth(node) !== null) attrMap.Width = fmtNum(outputWidth(node));
+  if (outputHeight(node) !== undefined && outputHeight(node) !== null) attrMap.Height = fmtNum(outputHeight(node));
+}
+
+// 就地补齐模板属性：表格列定义按 columnTemplate 发射（字段已在映射里），其余节点按固定必写字段集。
+function applyTemplateAttrs(node, attrMap) {
+  if (isTableColumnNode(node)) return;
+  applyButtonFamilyAttrs(node, attrMap);
+  applyRequiredAttrs(node, attrMap);
+}
+
 // 属性渲染顺序（目标项目页面既有惯例）：
 //   身份/类型/样式 → Icon → 文本(TopLeftContent/Value/Header) → LangName →
 //   运行时字段(PageName/IO*) → 控件尺寸(Width/Height) → 图标尺寸(IconWidth/IconHeight) → 位置(Left/Top)
@@ -490,12 +532,8 @@ function renderFresh() {
     // 原点由父节点的 contentInset 携带（映射按容器 Style 登记），与 provenance 校验同口径。
     const insetLeft = parentInset ? (Number(parentInset.left) || 0) : 0;
     const insetTop = parentInset ? (Number(parentInset.top) || 0) : 0;
-    attrMap.Left = fmtNum(node.absX - parentAbsX - insetLeft);
-    attrMap.Top = fmtNum(normalizedY(node.absY) - parentAbsY - insetTop);
-    if (outputWidth(node) !== undefined && outputWidth(node) !== null) attrMap.Width = fmtNum(outputWidth(node));
-    if (outputHeight(node) !== undefined && outputHeight(node) !== null) attrMap.Height = fmtNum(outputHeight(node));
-    applyButtonFamilyAttrs(node, attrMap);
-    applyRequiredAttrs(node, attrMap);
+    applyNodeGeometry(node, attrMap, parentAbsX, parentAbsY, insetLeft, insetTop);
+    applyTemplateAttrs(node, attrMap);
 
     const kids = orderChildrenByVisualRows(childMap.get(node.ref) || []);
     if (node.comment) lines.push(`${indent}<!-- ${node.comment} -->`);
@@ -634,12 +672,8 @@ function mergeMode() {
     const attrMap = Object.assign({}, n.attrs || {});
     if (n.id) attrMap.ID = n.id;
     if (n.controlType) attrMap.ControlType = n.controlType;
-    attrMap.Left = fmtNum(n.absX - pa.x - pa.insetLeft);
-    attrMap.Top = fmtNum(normalizedY(n.absY) - pa.y - pa.insetTop);
-    if (outputWidth(n) !== undefined && outputWidth(n) !== null) attrMap.Width = fmtNum(outputWidth(n));
-    if (outputHeight(n) !== undefined && outputHeight(n) !== null) attrMap.Height = fmtNum(outputHeight(n));
-    applyButtonFamilyAttrs(n, attrMap);
-    applyRequiredAttrs(n, attrMap);
+    applyNodeGeometry(n, attrMap, pa.x, pa.y, pa.insetLeft, pa.insetTop);
+    applyTemplateAttrs(n, attrMap);
     rendered.set(n.ref, { n, attrMap, tokenIdx: null, matchKind: null });
   }
 
@@ -657,11 +691,15 @@ function mergeMode() {
     if (n.id && idIndex.has(n.id)) { tokenIdx = idIndex.get(n.id); matchKind = 'id'; }
     if (tokenIdx === null && n.controlType) {
       const pa = resolveParentAbs(n);
+      // 表格列定义按模板固定几何匹配（Left=0/Top=0），不能再用 DSL bbox 反推。
+      const expected = isTableColumnNode(n)
+        ? { left: Number(n.expectedLeft), top: Number(n.expectedTop) }
+        : { left: n.absX - pa.x - pa.insetLeft, top: normalizedY(n.absY) - pa.y - pa.insetTop };
       const hit = positionCandidates.find(p =>
         !matchedOpenIdx.has(p.i) &&
         p.controlType === n.controlType &&
-        Math.abs(p.left - (n.absX - pa.x - pa.insetLeft)) <= 0.5 &&
-        Math.abs(p.top - (normalizedY(n.absY) - pa.y - pa.insetTop)) <= 0.5);
+        Math.abs(p.left - expected.left) <= 0.5 &&
+        Math.abs(p.top - expected.top) <= 0.5);
       if (hit) { tokenIdx = hit.i; matchKind = 'position'; }
     }
     r.tokenIdx = tokenIdx;
@@ -777,8 +815,13 @@ function mergeMode() {
     const { n, attrMap } = r;
     const pa = resolveParentAbs(n);
     const attrMap2 = Object.assign({}, attrMap);
-    attrMap2.Left = fmtNum(n.absX - pa.x);
-    attrMap2.Top = fmtNum(normalizedY(n.absY) - pa.y);
+    if (isTableColumnNode(n)) {
+      applyNodeGeometry(n, attrMap2, pa.x, pa.y, 0, 0);
+      applyTemplateAttrs(n, attrMap2);
+    } else {
+      attrMap2.Left = fmtNum(n.absX - pa.x);
+      attrMap2.Top = fmtNum(normalizedY(n.absY) - pa.y);
+    }
     const indent = '    '.repeat(depthOfRef(ref));
     const kids = orderChildrenByVisualRows(nodes.filter(k => (k.parent || null) === ref));
 
@@ -787,12 +830,17 @@ function mergeMode() {
       const am = Object.assign({}, node.attrs || {});
       if (node.id) am.ID = node.id;
       if (node.controlType) am.ControlType = node.controlType;
-      am.Left = fmtNum(node.absX - pa2.x);
-      am.Top = fmtNum(normalizedY(node.absY) - pa2.y);
-      if (outputWidth(node) !== undefined && outputWidth(node) !== null) am.Width = fmtNum(outputWidth(node));
-      if (outputHeight(node) !== undefined && outputHeight(node) !== null) am.Height = fmtNum(outputHeight(node));
-      applyButtonFamilyAttrs(node, am);
-      applyRequiredAttrs(node, am);
+      if (isTableColumnNode(node)) {
+        applyNodeGeometry(node, am, pa2.x, pa2.y, 0, 0);
+        applyTemplateAttrs(node, am);
+      } else {
+        am.Left = fmtNum(node.absX - pa2.x);
+        am.Top = fmtNum(normalizedY(node.absY) - pa2.y);
+        if (outputWidth(node) !== undefined && outputWidth(node) !== null) am.Width = fmtNum(outputWidth(node));
+        if (outputHeight(node) !== undefined && outputHeight(node) !== null) am.Height = fmtNum(outputHeight(node));
+        applyButtonFamilyAttrs(node, am);
+        applyRequiredAttrs(node, am);
+      }
       const kk = orderChildrenByVisualRows(nodes.filter(x => (x.parent || null) === node.ref));
       const ind = '    '.repeat(d);
       const parts = [];

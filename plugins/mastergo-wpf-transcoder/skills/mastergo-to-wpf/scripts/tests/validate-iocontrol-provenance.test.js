@@ -339,3 +339,80 @@ assert.notStrictEqual(headerMissingRun.status, 0, '既没有 Value 也没有 Hea
 assert.match(headerMissingRun.stderr + headerMissingRun.stdout, /既没有 Value 也没有 Header/);
 
 console.log('PASS provenance Header-carrier regression test');
+
+// ---- 表格列定义（nodeKind=table-column）：按映射表 columnTemplate 校验，不套控件规则 ----
+const tableMapPath = path.join(__dirname, '..', '..', 'references', 'adapters', 'mtslg-iocontrol', 'mtslg-iocontrol-map.json');
+const tableSourceNodes = [
+  { ref: 'root', parentRef: null, pageAbsX: 0, pageAbsY: 0, relativeX: 0, relativeY: 0, width: 1280, height: 1024 },
+  { ref: 'root/table', parentRef: 'root', pageAbsX: 50, pageAbsY: 507, relativeX: 50, relativeY: 507, width: 646, height: 189 },
+  { ref: 'root/table/header', parentRef: 'root/table', pageAbsX: 175, pageAbsY: 507, relativeX: 125, relativeY: 0, width: 504, height: 32 },
+  { ref: 'root/table/header/macro', parentRef: 'root/table/header', pageAbsX: 203, pageAbsY: 515, relativeX: 28, relativeY: 8, width: 47, height: 16, text: 'Macro' },
+  { ref: 'root/table/item/title', parentRef: 'root/table', pageAbsX: 64, pageAbsY: 551, relativeX: 14, relativeY: 44, width: 95, height: 16, text: '图像识别阈值' }
+];
+function tableCase(gridAttrs, columnAttrs, nodeExtra) {
+  const xml = [
+    '<IOContorl ID="" Left="NaN" Top="NaN" Width="NaN" Height="NaN">',
+    '  <IOContorl ' + gridAttrs + '>',
+    '    <IOContorl ' + columnAttrs + ' />',
+    '  </IOContorl>',
+    '</IOContorl>'
+  ].join('\n');
+  const manifest = {
+    contentOriginY: 192,
+    rootRef: 'root',
+    sourceNodes: tableSourceNodes,
+    nodes: [
+      {
+        xmlId: 'MG_GRID', sourceRef: 'root/table', sourceParent: 'root', controlType: 'DataGrid',
+        parent: null, layoutParent: null, absX: 50, absY: 507, w: 646, h: 189,
+        expectedLeft: 50, expectedTop: 315, expectedWidth: 646, expectedHeight: 189,
+        widthSource: 'dsl.bbox', heightSource: 'dsl.bbox', attrs: { Value: '' }
+      },
+      Object.assign({
+        xmlId: 'MGCol_0001', sourceRef: 'root/table/header/macro', sourceParent: 'root/table/header',
+        controlType: 'TextBlock', nodeKind: 'table-column', parent: 'root/table', layoutParent: 'root/table',
+        absX: 203, absY: 515, w: 47, h: 16, sourceText: 'Macro', valueSource: 'dsl.text',
+        expectedLeft: 0, expectedTop: 0, expectedWidth: 'NaN', expectedHeight: 45,
+        widthSource: 'table.column-template', heightSource: 'table.column-template',
+        omitWidth: true, dslLeft: 153, dslTop: 8, dslWidth: 47, dslHeight: 16,
+        attrs: { Value: 'Macro', IOName: '' }
+      }, nodeExtra || {})
+    ],
+    textAudit: [
+      { sourceRef: 'root/table/header/macro', sourceText: 'Macro', visibility: true, role: 'component-value', decision: 'emit', outputRefs: ['MGCol_0001'] },
+      { sourceRef: 'root/table/item/title', sourceText: '图像识别阈值', visibility: true, role: 'table-data-cell', decision: 'omit', omitReason: 'table-data-cell', outputRefs: [] }
+    ]
+  };
+  const xmlFile = path.join(dir, 'table-case.xml');
+  const manifestFile = path.join(dir, 'table-case.json');
+  fs.writeFileSync(xmlFile, xml);
+  fs.writeFileSync(manifestFile, JSON.stringify(manifest));
+  return validate(xmlFile, manifestFile, { templateMapPath: tableMapPath });
+}
+
+const gridAttrs = 'ID="MG_GRID" ControlType="DataGrid" Value="" IOName="" IOVisible="" IOEnable="" Width="646" Height="189" Left="50" Top="315"';
+const goodColumn = 'ID="MGCol_0001" ControlType="TextBlock" Value="Macro" IOName="" Height="45" Left="0" Top="0"';
+const tableOk = tableCase(gridAttrs, goodColumn);
+assert.ok(tableOk.ok, '合法的表格列定义必须通过 provenance：' + tableOk.errors.join('; '));
+
+const tableWidth = tableCase(gridAttrs, goodColumn + ' Width="NaN"');
+assert.ok(!tableWidth.ok && tableWidth.errors.some(x => /不得发射 Width/.test(x)),
+  '列定义发射 Width 必须失败');
+
+const tableGeometry = tableCase(gridAttrs, 'ID="MGCol_0001" ControlType="TextBlock" Value="Macro" IOName="" Height="45" Left="0" Top="8"');
+assert.ok(!tableGeometry.ok && tableGeometry.errors.some(x => /Top=8 != expected=0/.test(x)),
+  '列定义几何偏离 columnTemplate 必须失败');
+
+const tableNoIoname = tableCase(gridAttrs, 'ID="MGCol_0001" ControlType="TextBlock" Value="Macro" Height="45" Left="0" Top="0"');
+assert.ok(!tableNoIoname.ok && tableNoIoname.errors.some(x => /缺少恒写属性 IOName/.test(x)),
+  '列定义缺少恒写 IOName 必须失败');
+
+const tableBadDsl = tableCase(gridAttrs, goodColumn, { dslWidth: 99 });
+assert.ok(!tableBadDsl.ok && tableBadDsl.errors.some(x => /dslLeft\/dslTop\/dslWidth\/dslHeight/.test(x)),
+  '列定义的 dsl* 溯源与 sourceNodes 不一致必须失败');
+
+// 表格列定义不套 controlTypeRequiredAttrs：TextBlock 列缺少 Style/FontSize 等页面控件字段仍然通过。
+assert.ok(!tableOk.errors.some(x => /缺少必写属性 Style/.test(x)),
+  '列定义是列结构，不得按页面控件的必写字段集校验');
+
+console.log('PASS provenance table-column regression test');

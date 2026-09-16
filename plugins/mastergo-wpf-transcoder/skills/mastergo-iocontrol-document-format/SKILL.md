@@ -81,6 +81,8 @@ description: 强制规范 MasterGo → MTSLG IOContorl 映射文档的写法，�
 
 如果多个真实属性值的输出结构完全相同，可以在一个固定模板中明确列出这些真实值；如果结构、Style、节点数量或槽位有任何差异，必须拆成独立固定模板。Table、信息分组、输入框等组件集与 IconButton 使用完全相同的文档结构，不得另起“表格专用”或“组件说明”格式。
 
+例外：表格族（`tableTemplates`）的命中与列定义另有固定口径，文档仍按 `### 固定模板：组件集=Table` 命名。**匹配**用结构签名（节点类型 `GROUP` + 图层名以「表格」结尾 + 孩子里含「表头」群组 + 至少一个 `item` 行群组，四项同时成立），因为表格在组件库里通常没有组件集；**列子节点是列结构不是页面控件**：几何按 `tableTemplates.columnTemplate` 固定发射（`Left=0` / `Top=0` / `Height=45`、不写 `Width`），属性只发射 `Value`（列标题 = 表头文本，`valueSource=dsl.text`）加 `alwaysWrittenAttrs` 空占位，**不套** `controlTypeRequiredAttrs`；列 `ControlType` 由该列单元格类型严格多数判定（没有多数退化为 `TextBlock`）。表格的**行是数据不是控件**：行内文本一律 `omit` 且 `role=table-data-cell`，行内容按行登记进映射的 `tableAudits[].rows`；根节点 `Value` 指向 PageData 数据文件，设计稿没有来源时写空串占位并标「待业务确认」。
+
 ### 固定模板标题命名
 
 - 只有一个明确组件集模板时，标题写成 `### 固定模板：组件集=Table`、`### 固定模板：组件集=主菜单button` 等，必须指出模板的匹配对象。
@@ -108,6 +110,7 @@ description: 强制规范 MasterGo → MTSLG IOContorl 映射文档的写法，�
 
 - 图标字段随 `ControlType` 的固定模板决定：模板含图标字段的 `IconButton` 恒写 `Icon`、`IconWidth`、`IconHeight`，无图标槽位时写空字符串值；有图标槽位时 `IconWidth`/`IconHeight` 取值是图标图形节点自身的 bbox（不是控件宽高、也不是图标容器尺寸），`Icon` 取已登记的资源键。模板不含图标字段的 `Button`、`StatusButton` 以及其余无图标控件不得出现 `Icon`、`IconWidth`、`IconHeight`。
 - `FontSize`、`Height`、`Width` 始终分开表达；`TextBlock` 的 `Height` 固定 `40`、`Width` 固定 `NaN`，不得用字号、行高、文本 bbox 高度或文本 bbox 宽度替代；非 TextBlock 控件的宽高必须来自对应 MasterGo bbox。
+- 表格（`tableTemplates`）：命中后发射一个 `DataGrid` 根节点 + 由表头可见文本从左到右派生的列定义子节点；根节点几何取表格图层 bbox（原样直传，图层声明尺寸覆盖不了内容范围时记入审计交设计侧修正），列节点几何取 `columnTemplate` 固定值。行数据只登记不发射控件；表头文本承载列 `Value`（`valueSource=dsl.text`），其余行内文本走 `omit` 角色 `table-data-cell`。
 - 坐标必须来自对应 MasterGo bbox，并按项目统一内容区坐标规则计算；模板不能决定实例坐标。
 - 根级示例标题/工件示教标题按 `design-artifact-title` 规则处理，不得混入业务 XML；保留或剥离都要记录原因。
 - Style 或 ControlType 必须有目标框架源码、真实页面或正式映射证据；用户指定但尚未找到运行时键时，明确标记待核对，不得伪造。

@@ -489,26 +489,31 @@ Style 与内部组件对照（只对下表列出的真实值成立）：
 
 ### 匹配规则
 
+- 本族真值源：映射表 `tableTemplates`（`match.structural` 结构签名、`columnTemplate` 列定义模板、`columnControlTypePolicy` 列类型判定、`rowPolicy`/`innerTextPolicy` 行内容处置、`valuePolicy` 数据源策略）。
 - 独立识别 MasterGo 组件集 Table；组件集 ID 和实例 ID 只作来源追踪，不参与唯一匹配。
+- **表格在团队组件库里通常没有组件集**（设计稿里只是一个 `GROUP`），因此本族额外登记一条**结构签名**命中路径：节点类型 `GROUP` + 图层名以「表格」结尾 + 孩子里含名为「表头」的群组 + 至少一个名为 `item` 的行群组 + 表头至少有 1 条可见文本，**五项同时成立**才算命中。结构签名是主判据、图层名后缀是交叉核对项：只成立一半时登记 `pending` 并写明是哪一半不成立（既不静默套模板，也不假装已识别）。这是本插件对「图层名称只用于核对、不参与匹配」登记的第二个例外（另一个是底部栏按组件名匹配）。
 - 父节点、子节点关系和表格列顺序按 MasterGo 实际结构读取；若父节点明确是 TabControl，则外层按 TabControl/TabItem 规则处理，Table 子节点仍只映射为 DataGrid。
-- 根节点数据源必须映射到非空 Value；无法确认数据源时标记待业务确认，不得省略或编造。
+- 根节点数据源必须映射到非空 Value；无法确认数据源时写空字符串占位并标记「待业务确认」（映射 `tableAudits[].valuePending=true`），不得省略、不得编造。
+- **列 = 表头可见文本**（从左到右），行 = PageData 数据：行不发射控件，只按行登记进 `tableAudits[].rows`（行标题 / 单位 / 每格原文与类型都留档）。
+- **列子节点是列结构，不是页面控件**：几何按下方 `columnTemplate` 固定发射（`Left=0` / `Top=0` / `Height=45`、不写 `Width`），属性只发射 `Value` + 恒写 `IOName` 空占位，**不套** `controlTypeRequiredAttrs`（那是页面控件的字段集）。列 `ControlType` 由该列各行单元格类型**严格多数**（> 50%）判定，没有严格多数时退化为 `TextBlock`；每列的类型分布记进 `tableAudits[].columns` 供复核。
+- 表格内文本的处置：表头文本承载列 `Value`（`valueSource=dsl.text`，`decision=emit`）；行内文本（行标题 / 单位 / 单元格文本，含输入框实例内部的固定文本）一律 `decision=omit` + `role=table-data-cell`，避免泄漏成根级 TextBlock。
+- 表格图层声明尺寸覆盖不了自身内容范围（GROUP 常见：加行后没跟着改尺寸）时，节点几何仍按设计稿 bbox 直传，同时把 `tableAudits[].geometry.declaredBoxCoversContent=false` 与两个 bbox 一起报出来，交设计侧修正。
 
 ### 固定模板：组件集=Table
 
-固定节点：一个 DataGrid IOContorl，可包含按 MasterGo 列结构展开的列定义子节点；根节点 ControlType 固定为 DataGrid，节点父子关系和列顺序固定。
+固定节点：一个 DataGrid IOContorl 作为根节点，下面挂按表头展开的列定义子节点；根节点 ControlType 固定为 DataGrid，父子关系和列顺序固定（列顺序 = 表头文本从左到右）。
 
 ```xml
-<IOContorl ID="{id_table}" ControlType="DataGrid" IOName="{io_name}" IOCommand="{io_command}" Value="{data_source}" IOEnable="{io_enable}" IsAutoRefresh="{is_auto_refresh}" Style="{style_data_grid}" Left="{left}" Top="{top}" Width="{width}" Height="{height}">
-<IOContorl ID="" ControlType="TextBlock" IOVisible="false" Value="{hidden_id_field}" Left="0" Top="0" />
-<IOContorl ID="" IOName="{column_1_name}" ControlType="{column_1_control_type}" Value="{column_1_field}" MinValue="{column_1_min}" MaxValue="{column_1_max}" Left="{column_1_left}" Top="{column_1_top}" Width="{column_1_width}" Height="{column_1_height}" />
-<IOContorl ID="" IOName="{column_2_name}" ControlType="{column_2_control_type}" Value="{column_2_field}" Left="{column_2_left}" Top="{column_2_top}" Width="{column_2_width}" Height="{column_2_height}" />
-<!-- 按 MasterGo 表格列继续展开固定子节点 -->
+<IOContorl ID="{id_table}" ControlType="DataGrid" IOName="" IOVisible="" IOEnable="" Value="{data_source}" Left="{table_left}" Top="{table_top}" Width="{table_width}" Height="{table_height}">
+<IOContorl ID="{id_column_1}" ControlType="{column_1_control_type}" Value="{column_1_header}" IOName="" Left="0" Top="0" Height="45" />
+<IOContorl ID="{id_column_2}" ControlType="{column_2_control_type}" Value="{column_2_header}" IOName="" Left="0" Top="0" Height="45" />
+<!-- 按表头文本从左到右继续展开列定义子节点 -->
 </IOContorl>
 ```
 
-字段来源：数据源→根节点 Value；业务字段/表标识→IOName；加载、刷新或选中动作→IOCommand；可用条件→IOEnable；自动刷新→IsAutoRefresh；位置和尺寸→Left/Top/Width/Height。Style 只填 MasterGo 节点实际提供且代码库已登记的样式。
+字段来源：数据源→根节点 Value（设计稿没有来源时写空串占位并标待业务确认）；业务字段/表标识→IOName；加载、刷新或选中动作→IOCommand；可用条件→IOEnable；自动刷新→IsAutoRefresh；根节点位置和尺寸→表格图层 bbox；列节点位置尺寸→映射表 `columnTemplate` 固定值。Style 只填 MasterGo 节点实际提供且代码库已登记的样式。
 
-列节点按 MasterGo 列结构展开：列字段/标题→子节点 Value，列业务字段→子节点 IOName，列控件类型固定为已登记的 TextBlock、NumberBox、IntNumberBox 等；隐藏主键列使用 IOVisible="false"。列子节点 Value 不是加载器必填项，但 MasterGo 明确提供字段或标题时应填写；没有可靠来源时标记待业务确认，不得编造。
+列节点按表头展开：列标题→子节点 Value（必须回溯到该表头文本的 layerId/ref），列业务字段→子节点 IOName（设计无来源写空串），列控件类型按该列单元格类型严格多数判定（`TextBlock` / `NumberBox` / `IntNumberBox` / `TextBox` 等已登记类型；没有多数退化为 `TextBlock`）。隐藏主键列使用 `IOVisible="false"`。列控件类型不是加载器必填契约，但必须由单元格机械判定并把分布写进 `tableAudits[].columns`，不得凭外观猜。
 
 # 固定字段与可选字段规则
 

@@ -52,9 +52,81 @@ function parseButtonFamilyRules(templateMap, defaults) {
   };
 }
 
+// tableTemplates：表格族的「结构签名命中」+ 列定义模板 + 行列内容处置。
+// 表里没有该块时返回 null（调用方按「表未登记表格族」处理）。
+// 声明了 match.structural 就要求签名字段齐全（fail-closed）：命中路径、列模板、文本处置
+// 必须是映射表里的真值，禁止在脚本里另立一份默认值——那正是本仓库反复踩过的漂移点。
+function parseTableTemplate(templateMap) {
+  const spec = templateMap && templateMap.tableTemplates;
+  if (!spec || typeof spec !== "object") return null;
+  const result = {
+    match: spec.match && typeof spec.match === "object" ? spec.match : {},
+    structural: null,
+    variants: spec.variants && typeof spec.variants === "object" ? spec.variants : {},
+    columnTemplate: null,
+    columnControlTypePolicy: spec.columnControlTypePolicy || null,
+    rowPolicy: spec.rowPolicy || null,
+    innerTextPolicy: spec.innerTextPolicy || null,
+    valuePolicy: spec.valuePolicy || null
+  };
+  const structural = spec.match && spec.match.structural;
+  if (structural && typeof structural === "object") {
+    const signature = structural.signature;
+    if (!signature || typeof signature !== "object") {
+      throw new Error("映射表 tableTemplates.match.structural 缺少 signature（结构签名字段）");
+    }
+    const headerNames = Array.isArray(signature.headerGroupNames) ? signature.headerGroupNames.map(String).filter(Boolean) : [];
+    const rowNames = Array.isArray(signature.rowGroupNames) ? signature.rowGroupNames.map(String).filter(Boolean) : [];
+    if (!headerNames.length || !rowNames.length) {
+      throw new Error("映射表 tableTemplates.match.structural.signature 必须登记 headerGroupNames 与 rowGroupNames");
+    }
+    if (typeof structural.variant !== "string" || !structural.variant) {
+      throw new Error("映射表 tableTemplates.match.structural 必须登记 variant（命中的变体名）");
+    }
+    if (!result.variants[structural.variant]) {
+      throw new Error("映射表 tableTemplates.match.structural.variant 未在 variants 里登记: " + structural.variant);
+    }
+    result.structural = {
+      nodeTypes: Array.isArray(structural.nodeTypes) && structural.nodeTypes.length
+        ? structural.nodeTypes.map(String) : ["GROUP"],
+      nameSuffix: typeof structural.nameSuffix === "string" ? structural.nameSuffix : "",
+      variant: structural.variant,
+      headerGroupNames: headerNames,
+      rowGroupNames: rowNames,
+      minRows: Number.isFinite(Number(signature.minRows)) ? Number(signature.minRows) : 1,
+      minHeaderTexts: Number.isFinite(Number(signature.minHeaderTexts)) ? Number(signature.minHeaderTexts) : 1
+    };
+  }
+  const column = spec.columnTemplate;
+  if (column && typeof column === "object") {
+    const geometry = column.geometry;
+    if (!geometry || typeof geometry !== "object") {
+      throw new Error("映射表 tableTemplates.columnTemplate 缺少 geometry（列定义几何）");
+    }
+    const pickNumber = function (key) {
+      const value = Number(geometry[key]);
+      if (!Number.isFinite(value)) throw new Error("映射表 tableTemplates.columnTemplate.geometry." + key + " 必须是数值");
+      return value;
+    };
+    result.columnTemplate = {
+      left: pickNumber("left"),
+      top: pickNumber("top"),
+      height: pickNumber("height"),
+      omitWidth: column.omitWidth !== false,
+      alwaysWrittenAttrs: Array.isArray(column.alwaysWrittenAttrs) ? column.alwaysWrittenAttrs.map(String) : [],
+      requiredAttrsPolicy: column.requiredAttrsPolicy || "column-template"
+    };
+  }
+  if (result.structural && !result.columnTemplate) {
+    throw new Error("映射表登记了 tableTemplates.match.structural 却没有 columnTemplate：表格列定义的几何/属性无处取值");
+  }
+  return result;
+}
+
 module.exports = {
   readTemplateMap: readTemplateMap,
   readTemplateMapOrFail: readTemplateMapOrFail,
   parseControlTypeRequiredAttrs: parseControlTypeRequiredAttrs,
-  parseButtonFamilyRules: parseButtonFamilyRules
+  parseButtonFamilyRules: parseButtonFamilyRules,
+  parseTableTemplate: parseTableTemplate
 };

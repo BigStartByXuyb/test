@@ -347,3 +347,86 @@ assert.ok(hostGenerator.includes("与 ViewModel 成员同名") && hostGenerator.
 console.log("PASS 按钮族固定字段单一真值源（映射表 ↔ 脚本默认 ↔ 两份 Skill ↔ 两份人读参考）一致性回归测试");
 console.log("PASS ViewModel 按钮处理方法名口径（page-shell-generator.md ↔ gen-mw-wpf-page.js）");
 console.log("PASS 已作废表述（父节点语义匹配键 / parentVariants）插件根 .md 扫描");
+
+// ---------- 8. 表格族（tableTemplates）：结构签名命中 + 列定义模板 + 行数据 omit ----------
+// 单一真值源是映射表 tableTemplates；生成器 / 发射器 / 校验器 / 编排器 / 四份文档必须同口径。
+// 背景：表格在组件库里没有组件集（设计稿里只是 GROUP），命中口径、列几何与行数据处置
+// 一处分叉就会出现「文档说发射控件、脚本说行是数据」这类两读，因此在这里逐项钉死。
+const mappingGenerator = fs.readFileSync(path.join(__dirname, "..", "gen-mtslg-mapping-from-dsl.js"), "utf8");
+const bundleGenerator = fs.readFileSync(path.join(__dirname, "..", "gen-mastergo-page-bundle.js"), "utf8");
+const mapRules = fs.readFileSync(path.join(__dirname, "..", "lib", "iocontrol-map-rules.js"), "utf8");
+
+const tableFamily = map.tableTemplates;
+assert.ok(tableFamily, "映射表必须登记 tableTemplates");
+const tableStructural = tableFamily.match && tableFamily.match.structural;
+assert.ok(tableStructural, "映射表必须登记 tableTemplates.match.structural（表格没有组件集，按结构签名命中）");
+assert.deepStrictEqual(tableStructural.nodeTypes, ["GROUP"],
+  "表格结构签名只作用于 GROUP（表格在设计稿里就是一个组）");
+assert.strictEqual(tableStructural.nameSuffix, "表格", "结构签名必须登记图层名后缀");
+assert.strictEqual(tableStructural.variant, "Table", "结构签名必须指向已登记的变体名");
+assert.ok(tableFamily.variants[tableStructural.variant], "结构签名指向的变体必须在 variants 里登记");
+assert.strictEqual(tableFamily.variants[tableStructural.variant].controlType, "DataGrid", "表格族必须发射 DataGrid");
+assert.ok(Array.isArray(tableStructural.signature.headerGroupNames) && tableStructural.signature.headerGroupNames.length,
+  "结构签名必须登记表头群组名");
+assert.ok(Array.isArray(tableStructural.signature.rowGroupNames) && tableStructural.signature.rowGroupNames.length,
+  "结构签名必须登记行群组名");
+assert.ok(Number(tableStructural.signature.minRows) >= 1, "结构签名必须登记最小行数");
+assert.ok(typeof tableFamily.structuralPolicy === "string" && tableFamily.structuralPolicy,
+  "必须登记 structuralPolicy（为什么表格可以按图层名交叉核对）");
+
+const columnTemplate = tableFamily.columnTemplate;
+assert.ok(columnTemplate && columnTemplate.geometry, "必须登记 columnTemplate.geometry（列定义固定几何）");
+assert.strictEqual(columnTemplate.geometry.left, 0);
+assert.strictEqual(columnTemplate.geometry.top, 0);
+assert.strictEqual(columnTemplate.geometry.height, 45);
+assert.strictEqual(columnTemplate.omitWidth, true, "DataGrid 列定义不写 Width");
+assert.ok((columnTemplate.alwaysWrittenAttrs || []).includes("IOName"), "列定义必须恒写 IOName 空占位");
+assert.strictEqual(columnTemplate.requiredAttrsPolicy, "column-template",
+  "列定义必须明确「不套 controlTypeRequiredAttrs」");
+assert.strictEqual(tableFamily.columnControlTypePolicy, "strict-majority-else-TextBlock",
+  "列 ControlType 判定口径必须是严格多数、否则退化 TextBlock");
+assert.ok(typeof tableFamily.columnControlTypePolicyNote === "string" && tableFamily.columnControlTypePolicyNote,
+  "列 ControlType 判定必须写明依据");
+assert.strictEqual(tableFamily.rowPolicy, "row-data-not-emitted", "行是数据、不发射控件");
+assert.ok(typeof tableFamily.rowPolicyNote === "string" && tableFamily.rowPolicyNote, "行处置必须写明原因");
+assert.ok(tableFamily.innerTextPolicy && tableFamily.innerTextPolicy.role, "必须登记表格内文本的 omit 角色");
+assert.strictEqual(tableFamily.innerTextPolicy.decision, "omit", "表格行内文本必须 decision=omit");
+assert.ok(tableFamily.valuePolicy && tableFamily.valuePolicy.attr === "Value", "必须登记 DataGrid 根节点的 Value 策略");
+assert.strictEqual(tableFamily.valuePolicy.allowEmpty, true, "数据源未确认时允许空串占位并标待业务确认");
+
+// 规则块必须由共享解析器读取（禁止各脚本再抄一份默认值）。
+assert.ok(mapRules.includes("parseTableTemplate"), "lib/iocontrol-map-rules.js 必须提供 parseTableTemplate 共享解析");
+assert.ok(mappingGenerator.includes("parseTableTemplate") && mappingGenerator.includes("structuralTableMatches"),
+  "映射生成器必须按映射表结构签名命中表格");
+for (const token of ["columnTemplate", "innerTextPolicy", "tableAudits", "nearestColumnIndex"]) {
+  assert.ok(mappingGenerator.includes(token), "映射生成器必须消费 " + token);
+}
+assert.ok(mappingGenerator.includes("tableStructuralStatus"),
+  "结构签名只成立一半时必须登记 pending（tableStructuralStatus）");
+assert.ok(generator.includes("table-column") && generator.includes("isTableColumnNode") &&
+  generator.includes("applyNodeGeometry") && generator.includes("applyTemplateAttrs"),
+  "发射器必须按 nodeKind=table-column 走列定义模板几何与字段集");
+assert.ok(validator.includes("'" + tableFamily.innerTextPolicy.role + "'"),
+  "表格行数据的 omit 角色必须登记进校验器 OMIT_ROLES: " + tableFamily.innerTextPolicy.role);
+assert.ok(validator.includes("table-column") && validator.includes("columnTemplate"),
+  "校验器必须按 columnTemplate 单独校验列定义");
+assert.ok(bundleGenerator.includes("table-column"), "编排器必须为列定义提供坐标核对输入");
+assert.ok(bundleGenerator.includes("tableAudits"), "编排器审计必须输出表格摘要");
+
+// 四份人读文档必须写明同一条口径。
+for (const [label, text] of [
+  ["SKILL.md", mainSkill],
+  ["mastergo-iocontrol-document-format/SKILL.md", docFormat],
+  ["mtslg-mode.md", modeDoc],
+  ["feishu-component-library-mapping.md", feishuMapping],
+]) {
+  assert.ok(text.includes("tableTemplates"), label + " 必须登记表格族（tableTemplates）");
+  assert.ok(text.includes("结构签名"), label + " 必须写明表格按结构签名命中");
+  assert.ok(text.includes("DataGrid"), label + " 必须写明表格发射 DataGrid");
+  assert.ok(text.includes("columnTemplate"), label + " 必须写明列定义几何来自 columnTemplate");
+  assert.ok(text.includes("table-data-cell"), label + " 必须写明行数据文本的 omit 角色");
+}
+assert.ok(feishuMapping.includes("组件集=Table"),
+  "人读映射文档必须保留「组件集=Table」的固定模板标题（文档格式约定）");
+
+console.log("PASS 表格族（tableTemplates 结构签名 + DataGrid 列定义）一致性回归测试");

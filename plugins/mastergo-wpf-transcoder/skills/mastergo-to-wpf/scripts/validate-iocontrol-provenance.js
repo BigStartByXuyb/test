@@ -43,10 +43,18 @@ function loadButtonFamilyRules(mapPath) {
     DEFAULT_BUTTON_FAMILY_RULES;
 }
 
+// 表格族规则块（列定义模板 + 行内容处置），真值来源是映射表 tableTemplates；
+// 未传入 --map 时不做表格列的模板校验（与必写字段校验同一粒度）。
+function loadTableTemplate(mapPath) {
+  if (!mapPath) return null;
+  return MAP_RULES.parseTableTemplate(MAP_RULES.readTemplateMapOrFail(mapPath));
+}
+
 let BUTTON_FAMILY_RULES = DEFAULT_BUTTON_FAMILY_RULES;
 let BUTTON_FAMILY_CONTROL_TYPES = BUTTON_FAMILY_RULES.controlTypes;
 let BUTTON_ALWAYS_ATTRS = BUTTON_FAMILY_RULES.alwaysWrittenAttrs;
 let REQUIRED_ATTRS_BY_CONTROL_TYPE = {};
+let TABLE_TEMPLATE = null;
 
 function attrsFromTag(tag) {
   const attrs = {};
@@ -70,7 +78,8 @@ function isNanValue(value) {
 // 允许 decision=omit 的角色/原因：除显式隐藏、页面标题、宿主外壳外，
 // 还包括「未命中正式模板」与「按清单隔离」的组件内部文本（这些文本不进入页面 XML）。
 // camera-viewport-internal：相机视口是整体控件，组件内部绘制文本按映射表 cameraTemplates.innerTextPolicy 一律 omit。
-const OMIT_ROLES = ['page-title', 'host-shell', 'excluded-component', 'unmapped-component', 'camera-viewport-internal'];
+// table-data-cell：表格的行是数据不是控件，表格内的行数据文本按映射表 tableTemplates.innerTextPolicy 一律 omit。
+const OMIT_ROLES = ['page-title', 'host-shell', 'excluded-component', 'unmapped-component', 'camera-viewport-internal', 'table-data-cell'];
 const OMIT_REASONS = ['hidden'].concat(OMIT_ROLES);
 
 function validateTextAudit(manifest, entries) {
@@ -142,7 +151,17 @@ function validateTextAudit(manifest, entries) {
   return errors;
 }
 
-function validate(xmlPath, manifestPath) {
+// options.templateMapPath：显式给定时按该表重载规则块（按钮族 / 必写字段 / 表格列模板）。
+// CLI 用 --map 走同一条路径；单测可以直接传路径，避免再写一份规则。
+function validate(xmlPath, manifestPath, options) {
+  if (options && options.templateMapPath) {
+    const loaded = MAP_RULES.readTemplateMapOrFail(options.templateMapPath);
+    BUTTON_FAMILY_RULES = MAP_RULES.parseButtonFamilyRules(loaded, DEFAULT_BUTTON_FAMILY_RULES) || DEFAULT_BUTTON_FAMILY_RULES;
+    BUTTON_FAMILY_CONTROL_TYPES = BUTTON_FAMILY_RULES.controlTypes;
+    BUTTON_ALWAYS_ATTRS = BUTTON_FAMILY_RULES.alwaysWrittenAttrs;
+    REQUIRED_ATTRS_BY_CONTROL_TYPE = MAP_RULES.parseControlTypeRequiredAttrs(loaded) || {};
+    TABLE_TEMPLATE = MAP_RULES.parseTableTemplate(loaded);
+  }
   const errors = [];
   let xml;
   let manifest;
@@ -203,38 +222,82 @@ function validate(xmlPath, manifestPath) {
     // output parent is a container (GroupBox 等) — also its content-area origin (border + title bar),
     // which the mapping carries as contentInset. 不扣这一项，容器内子控件会整体下移一个标题条高度。
     const parentIsRoot = outputParent && outputParent.ref === rootRef;
+    // 表格列定义（nodeKind=table-column）是 DataGrid 的**列结构**，不是页面控件：
+    // 几何按映射表 tableTemplates.columnTemplate 固定发射（Left=0 / Top=0 / Height=45、不写 Width），
+    // 真实 DSL bbox 只作为 dslLeft/dslTop/dslWidth/dslHeight 溯源。这里与生成器同口径地单独校验，
+    // 不套用「控件坐标 = DSL bbox」与 controlTypeRequiredAttrs 两条规则。
+    const isTableColumn = n.nodeKind === 'table-column';
+    if (isTableColumn) {
+      const columnTemplate = TABLE_TEMPLATE && TABLE_TEMPLATE.columnTemplate;
+      if (!columnTemplate) {
+        errors.push('[' + n.xmlId + '] 表格列定义节点需要映射表 tableTemplates.columnTemplate（请带 --map）');
+      } else {
+        if (!sameNumber(n.expectedLeft, columnTemplate.left) ||
+            !sameNumber(n.expectedTop, columnTemplate.top) ||
+            !sameNumber(n.expectedHeight, columnTemplate.height)) {
+          errors.push('[' + n.xmlId + '] 表格列定义几何与 columnTemplate（left/top/height）不一致');
+        }
+        if (columnTemplate.omitWidth && n.expectedWidth !== 'NaN' && !isNanValue(n.expectedWidth)) {
+          errors.push('[' + n.xmlId + '] 表格列定义不写 Width，expectedWidth 必须是 NaN');
+        }
+        for (const attr of columnTemplate.alwaysWrittenAttrs) {
+          if (x[attr] === undefined) {
+            errors.push('[' + n.xmlId + '] 表格列定义缺少恒写属性 ' + attr + '（取不到来源时必须写空值占位）');
+          }
+        }
+        if (columnTemplate.omitWidth) {
+          if (x.Width !== undefined) errors.push('[' + n.xmlId + '] 表格列定义不得发射 Width');
+        } else if (!sameNumber(x.Width, n.expectedWidth)) {
+          errors.push('[' + n.xmlId + '] Width=' + (x.Width || '') + ' != expected=' + n.expectedWidth);
+        }
+        const dslLeft = outputParent ? Number(src.pageAbsX) - Number(outputParent.pageAbsX) : Number(src.pageAbsX);
+        const dslTop = outputParent ? Number(src.pageAbsY) - Number(outputParent.pageAbsY) : Number(src.pageAbsY) - originY;
+        if (!sameNumber(n.dslLeft, dslLeft) || !sameNumber(n.dslTop, dslTop) ||
+            !sameNumber(n.dslWidth, src.width) || !sameNumber(n.dslHeight, src.height)) {
+          errors.push('[' + n.xmlId + '] 表格列定义的 dslLeft/dslTop/dslWidth/dslHeight 不是同一 sourceRef 的 bbox');
+        }
+        for (const pair of [['expectedLeft', 'Left'], ['expectedTop', 'Top'], ['expectedHeight', 'Height']]) {
+          if (n[pair[0]] === undefined) { errors.push('[' + n.xmlId + '] 缺少 ' + pair[0]); continue; }
+          if (!sameNumber(x[pair[1]], n[pair[0]])) {
+            errors.push('[' + n.xmlId + '] ' + pair[1] + '=' + (x[pair[1]] || '') + ' != expected=' + n[pair[0]]);
+          }
+        }
+      }
+    }
     const outputParentNode = outputParentRef ? nodeByRef.get(outputParentRef) : null;
     const parentInset = !parentIsRoot && outputParentNode && outputParentNode.contentInset
       ? outputParentNode.contentInset : null;
     const insetLeft = parentInset ? (Number(parentInset.left) || 0) : 0;
     const insetTop = parentInset ? (Number(parentInset.top) || 0) : 0;
-    const expectedSourceLeft = Number(src.pageAbsX) - (outputParent ? Number(outputParent.pageAbsX) : 0) - insetLeft;
-    const expectedSourceTop = Number(src.pageAbsY) -
-      (outputParent ? Number(outputParent.pageAbsY) : 0) - (parentIsRoot || !outputParent ? originY : 0) - insetTop;
-    if (!sameNumber(n.expectedLeft, expectedSourceLeft) || !sameNumber(n.expectedTop, expectedSourceTop)) {
-      errors.push('[' + n.xmlId + '] expectedLeft/Top 不是由 sourceNodes 父子坐标计算得到');
-    }
-    const fixedTextBlockHeight = x.ControlType === 'TextBlock' || n.heightSource === 'mtslg.textblock.fixed-40';
-    const expectedHeightSource = fixedTextBlockHeight ? 40 : src.height;
-    if (fixedTextBlockHeight && x.ControlType !== 'TextBlock') {
-      errors.push('[' + n.xmlId + '] fixed-40 高度规则只能用于 TextBlock');
-    }
-    // TextBlock：Width 固定 NaN（自适应），bbox 宽度只作为 dslWidth 来源保留。
-    if (x.ControlType === 'TextBlock') {
-      if (!isNanValue(n.expectedWidth)) {
-        errors.push('[' + n.xmlId + '] TextBlock 的 expectedWidth 必须固定为 NaN');
+    if (!isTableColumn) {
+      const expectedSourceLeft = Number(src.pageAbsX) - (outputParent ? Number(outputParent.pageAbsX) : 0) - insetLeft;
+      const expectedSourceTop = Number(src.pageAbsY) -
+        (outputParent ? Number(outputParent.pageAbsY) : 0) - (parentIsRoot || !outputParent ? originY : 0) - insetTop;
+      if (!sameNumber(n.expectedLeft, expectedSourceLeft) || !sameNumber(n.expectedTop, expectedSourceTop)) {
+        errors.push('[' + n.xmlId + '] expectedLeft/Top 不是由 sourceNodes 父子坐标计算得到');
       }
-      if (n.widthSource !== undefined && n.widthSource !== 'mtslg.textblock.fixed-nan') {
-        errors.push('[' + n.xmlId + '] TextBlock 的 widthSource 必须是 mtslg.textblock.fixed-nan');
+      const fixedTextBlockHeight = x.ControlType === 'TextBlock' || n.heightSource === 'mtslg.textblock.fixed-40';
+      const expectedHeightSource = fixedTextBlockHeight ? 40 : src.height;
+      if (fixedTextBlockHeight && x.ControlType !== 'TextBlock') {
+        errors.push('[' + n.xmlId + '] fixed-40 高度规则只能用于 TextBlock');
       }
-      if (n.dslWidth !== undefined && !sameNumber(n.dslWidth, src.width)) {
-        errors.push('[' + n.xmlId + '] TextBlock 的 dslWidth 与 sourceNodes bbox 不一致');
+      // TextBlock：Width 固定 NaN（自适应），bbox 宽度只作为 dslWidth 来源保留。
+      if (x.ControlType === 'TextBlock') {
+        if (!isNanValue(n.expectedWidth)) {
+          errors.push('[' + n.xmlId + '] TextBlock 的 expectedWidth 必须固定为 NaN');
+        }
+        if (n.widthSource !== undefined && n.widthSource !== 'mtslg.textblock.fixed-nan') {
+          errors.push('[' + n.xmlId + '] TextBlock 的 widthSource 必须是 mtslg.textblock.fixed-nan');
+        }
+        if (n.dslWidth !== undefined && !sameNumber(n.dslWidth, src.width)) {
+          errors.push('[' + n.xmlId + '] TextBlock 的 dslWidth 与 sourceNodes bbox 不一致');
+        }
+      } else if (!sameNumber(n.expectedWidth, src.width)) {
+        errors.push('[' + n.xmlId + '] expectedWidth 不是同一 sourceRef 的 bbox');
       }
-    } else if (!sameNumber(n.expectedWidth, src.width)) {
-      errors.push('[' + n.xmlId + '] expectedWidth 不是同一 sourceRef 的 bbox');
-    }
-    if (!sameNumber(n.expectedHeight, expectedHeightSource)) {
-      errors.push('[' + n.xmlId + '] expectedHeight 不是同一 sourceRef 或正式模板规则计算得到');
+      if (!sameNumber(n.expectedHeight, expectedHeightSource)) {
+        errors.push('[' + n.xmlId + '] expectedHeight 不是同一 sourceRef 或正式模板规则计算得到');
+      }
     }
     if (typeof src.text === 'string' && typeof n.sourceText === 'string' && src.text !== n.sourceText) {
       errors.push('[' + n.xmlId + '] sourceText 与 sourceNodes.text 不一致');
@@ -257,6 +320,8 @@ function validate(xmlPath, manifestPath) {
     for (const pair of [['expectedLeft', 'Left'], ['expectedTop', 'Top'], ['expectedWidth', 'Width'], ['expectedHeight', 'Height']]) {
       const field = pair[0], attr = pair[1];
       if (n[field] === undefined) { errors.push('[' + n.xmlId + '] 缺少 ' + field); continue; }
+      // 表格列定义已在上面按 columnTemplate 校验过几何（含「不写 Width」），这里不重复判。
+      if (isTableColumn) continue;
       if (attr === 'Width' && x.ControlType === 'TextBlock') {
         if (!isNanValue(x[attr])) errors.push('[' + n.xmlId + '] TextBlock 的 Width 必须固定为 NaN');
         continue;
@@ -265,7 +330,8 @@ function validate(xmlPath, manifestPath) {
     }
     const controlType = x.ControlType || n.controlType || (n.attrs && n.attrs.ControlType);
     const requiredAttrs = REQUIRED_ATTRS_BY_CONTROL_TYPE[controlType];
-    if (Array.isArray(requiredAttrs)) {
+    // 表格列定义的字段集来自映射表 columnTemplate（列结构，不是页面控件），不套 controlTypeRequiredAttrs。
+    if (!isTableColumn && Array.isArray(requiredAttrs)) {
       for (const attr of requiredAttrs) {
         // LangName 例外：动态值等 noLangRefs 豁免节点不挂 LangName，也不写空占位。
         if (attr === 'LangName') continue;
@@ -342,10 +408,11 @@ if (require.main === module) {
   if (!xml || !manifest) { console.error('用法: node validate-iocontrol-provenance.js --xml <page.xml> --mapping <mapping.json> [--map mtslg-iocontrol-map.json]'); process.exit(2); }
   const mapPath = get('--map');
   if (mapPath) {
-BUTTON_FAMILY_RULES = loadButtonFamilyRules(mapPath);
-BUTTON_FAMILY_CONTROL_TYPES = BUTTON_FAMILY_RULES.controlTypes;
-BUTTON_ALWAYS_ATTRS = BUTTON_FAMILY_RULES.alwaysWrittenAttrs;
-REQUIRED_ATTRS_BY_CONTROL_TYPE = loadControlTypeRequiredAttrs(mapPath);
+    BUTTON_FAMILY_RULES = loadButtonFamilyRules(mapPath);
+    BUTTON_FAMILY_CONTROL_TYPES = BUTTON_FAMILY_RULES.controlTypes;
+    BUTTON_ALWAYS_ATTRS = BUTTON_FAMILY_RULES.alwaysWrittenAttrs;
+    REQUIRED_ATTRS_BY_CONTROL_TYPE = loadControlTypeRequiredAttrs(mapPath);
+    TABLE_TEMPLATE = loadTableTemplate(mapPath);
   }
   const result = validate(xml, manifest);
   if (!result.ok) { console.error(result.errors.join('\n')); process.exit(1); }

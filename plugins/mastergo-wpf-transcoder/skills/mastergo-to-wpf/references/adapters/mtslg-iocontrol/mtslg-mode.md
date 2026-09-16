@@ -86,12 +86,14 @@
 
 按钮族（IconButton / Button / StatusButton）另有固定参数：`PageName`/`IOVisible`/`IOCommand`/`IOEnable` 恒写（取不到写空字符串值）；`IconButton` 的 `Icon`/`IconWidth`/`IconHeight` 同样恒写——有图标槽位时按图标图形节点 bbox 四舍五入发射，无图标槽位时写空字符串，`Button`/`StatusButton` 不含图标字段、不发射这三项；详见飞书组件库映射规范的“固定字段与可选字段规则”。
 | 选择 | ComboBox（选项=子 TextBlock；ItemsSourceFile/DisplayMemberPath/SelectedValuePath） |
-| 数据 | DataGrid（Value=数据文件名；列=子 TextBlock/ComboBox）、ProgressBar、RangeProgressBar、PowerControl（实时功率曲线） |
+| 数据 | DataGrid（Value=数据文件名；列=子 TextBlock/ComboBox；命中口径见 4.1）、ProgressBar、RangeProgressBar、PowerControl（实时功率曲线） |
 | 视觉/设备 | Image（Value=绝对路径）、Camera（DesignPanelID）、AutoCutCamera、HighAngleCamera、LowAngleCamera、EMTCamera |
 
 控件属性允许集与每类控件的固定必写字段集分别在同目录 `mtslg-iocontrol-map.json` 的 `controlTypes` 与 `controlTypeRequiredAttrs`；生成器不得把白名单外属性当作合法字段，也不得漏发必写字段（取不到来源写空字符串）。Style、Icon、LangName 与 PageName 还必须通过第 6 节键查证。资源字典是否共享、资源键来自何处，均由项目适配记录确认。
 
-### 4.1 DataGrid 的 Value 数据源门禁
+### 4.1 DataGrid 的命中口径与 Value 数据源门禁
+
+**命中口径（表格族 `tableTemplates`）**：表格在团队组件库里通常没有组件集（设计稿里只是一个 `GROUP`），因此本族按**结构签名**命中——节点类型 `GROUP` + 图层名以「表格」结尾 + 孩子里含名为「表头」的群组 + 至少一个名为 `item` 的行群组 + 表头至少 1 条可见文本，五项同时成立；只成立一半时登记 `pending`（写明哪一半不成立），既不平铺假装没看见、也不静默套模板。命中后发射一个 `DataGrid` 根节点 + 由表头可见文本从左到右展开的**列定义子节点**：列节点是列结构不是页面控件，几何按映射表 `tableTemplates.columnTemplate` 固定发射（`Left=0` / `Top=0` / `Height=45`、不写 `Width`），属性只发射 `Value`（列标题）+ `alwaysWrittenAttrs` 空占位，不套 `controlTypeRequiredAttrs`；列 `ControlType` 由该列单元格类型严格多数判定（没有多数退化为 `TextBlock`）。表格的**行是 PageData 数据不是控件**：行内文本一律 `omit` + `role=table-data-cell`，行内容按行登记进 `mapping.tableAudits[].rows`，单元格实例不再按 `inputTemplates` 单独发射。表格图层声明尺寸覆盖不了内容范围时记 `tableAudits[].geometry.declaredBoxCoversContent=false`。
 
 - `ControlType="DataGrid"` 必须声明 `Value`；该值用于定位 PageData 数据文件。
 - 最终页面中的 `Value` 必须是非空、可由当前运行配置解析的数据文件名。若真实数据源尚未确认，应将该控件标记为“待绑定/未完成”并向用户确认，不能把空值当作最终配置。

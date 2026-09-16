@@ -465,3 +465,157 @@ assert.strictEqual(innerAudit.decision, 'omit', '相机内部文本必须 decisi
 assert.strictEqual(innerAudit.role, 'camera-viewport-internal', '相机内部文本必须用专用 omit 角色');
 
 console.log('PASS MTSLG DSL-to-mapping camera viewport regression test');
+
+// ---- 表格（tableTemplates 结构签名命中）：GROUP → DataGrid + 表头派生的列定义 ----
+// 表格在组件库里没有组件集（设计稿里只是 GROUP），命中口径是「结构签名 + 图层名后缀」；
+// 列 = 表头可见文本；行 = 数据（不发射控件，只登记进 tableAudits）。
+function tableFixture(rootName) {
+  const tableRef = 'tbl:root/table';
+  const headerRef = tableRef + '/header';
+  const cell = (id, props, rx) => ({
+    type: 'INSTANCE', id, name: '输入框',
+    layoutStyle: { width: 80, height: 32, relativeX: rx, relativeY: 4 },
+    componentInfo: { properties: props }, children: []
+  });
+  const rowOne = {
+    type: 'GROUP', id: tableRef + '/item1', name: 'item',
+    layoutStyle: { width: 609, height: 40, relativeX: 14, relativeY: 32 },
+    children: [
+      {
+        type: 'GROUP', id: tableRef + '/item1/content', name: '表格内容',
+        layoutStyle: { width: 480, height: 40, relativeX: 111, relativeY: 0 },
+        children: [
+          cell(tableRef + '/item1/content/c1', { '属性 1': '输入框-整数-32' }, 16),
+          cell(tableRef + '/item1/content/c2', { '属性 1': '输入框-整数-32' }, 108)
+        ]
+      },
+      textNode(tableRef + '/item1/unit', tableRef + '/item1', '%', 595, 12),
+      textNode(tableRef + '/item1/title', tableRef + '/item1', '图像识别阈值', 0, 12)
+    ]
+  };
+  const rowTwo = {
+    type: 'GROUP', id: tableRef + '/item2', name: 'item',
+    layoutStyle: { width: 609, height: 40, relativeX: 14, relativeY: 71 },
+    children: [
+      {
+        type: 'GROUP', id: tableRef + '/item2/content', name: '表格内容',
+        layoutStyle: { width: 480, height: 40, relativeX: 111, relativeY: 0 },
+        children: [
+          cell(tableRef + '/item2/content/c1', { '属性 1': '输入框-整数-32' }, 16),
+          textNode(tableRef + '/item2/content/c2', tableRef + '/item2/content', '64', 108, 11)
+        ]
+      },
+      textNode(tableRef + '/item2/unit', tableRef + '/item2', 'pixel', 609, 12),
+      textNode(tableRef + '/item2/title', tableRef + '/item2', 'X 方向窗口大小', 0, 12)
+    ]
+  };
+  return {
+    styles: {},
+    nodes: [{
+      type: 'INSTANCE', id: 'tbl:root', name: '校准参数（3.1.3）',
+      layoutStyle: { width: 1280, height: 1024, relativeX: 0, relativeY: 0 },
+      componentInfo: {}, children: [{
+        type: 'GROUP', id: tableRef, name: rootName,
+        layoutStyle: { width: 646, height: 189, relativeX: 50, relativeY: 507 },
+        children: [
+          {
+            type: 'GROUP', id: headerRef, name: '表头',
+            layoutStyle: { width: 504, height: 32, relativeX: 125, relativeY: 0 },
+            children: [
+              textNode(headerRef + '/macro', headerRef, 'Macro', 28, 8),
+              textNode(headerRef + '/ch1', headerRef, 'CH1', 120, 8),
+              textNode(headerRef + '/ch2', headerRef, 'CH2', 212, 8)
+            ]
+          },
+          rowOne,
+          rowTwo
+        ]
+      }]
+    }]
+  };
+}
+
+const tableMapping = runMappingCase('table-structural', tableFixture('校准参数（3.1.3）表格'), []);
+const dataGrid = tableMapping.nodes.find(node => node.controlType === 'DataGrid');
+assert.ok(dataGrid, '结构签名命中的表格必须发射 DataGrid 根节点');
+assert.strictEqual(dataGrid.sourceRef, 'tbl:root/table', 'DataGrid 的来源必须是表格那个 GROUP 自己');
+assert.strictEqual(dataGrid.attrs.Value, '', 'Value（PageData 数据文件名）无设计来源时必须空串占位');
+assert.strictEqual(dataGrid.expectedLeft, 50, 'DataGrid 的 Left 取表格图层 bbox');
+assert.strictEqual(dataGrid.expectedTop, 507 - 192, '根级 DataGrid 的 Top 仍扣 192');
+assert.strictEqual(dataGrid.expectedWidth, 646);
+assert.strictEqual(dataGrid.expectedHeight, 189);
+
+const columns = tableMapping.nodes.filter(node => node.nodeKind === 'table-column');
+assert.deepStrictEqual(columns.map(column => column.attrs.Value), ['Macro', 'CH1', 'CH2'],
+  '列定义必须按表头文本从左到右展开');
+for (const column of columns) {
+  assert.strictEqual(column.parent, dataGrid.ref, '列定义必须挂在 DataGrid 下');
+  assert.strictEqual(column.expectedLeft, 0, '列定义几何固定 Left=0（映射表 columnTemplate）');
+  assert.strictEqual(column.expectedTop, 0, '列定义几何固定 Top=0');
+  assert.strictEqual(column.expectedHeight, 45, '列定义几何固定 Height=45');
+  assert.strictEqual(column.expectedWidth, 'NaN', '列定义不写 Width');
+  assert.strictEqual(column.omitWidth, true);
+  assert.strictEqual(column.attrs.IOName, '', '列定义恒写 IOName 空占位');
+  assert.strictEqual(column.valueSource, 'dsl.text', '列标题必须回溯到表头文本');
+  const source = tableMapping.sourceNodes.find(item => item.ref === column.sourceRef);
+  assert.ok(source, '列定义的 sourceRef 必须存在');
+  assert.strictEqual(column.dslLeft, source.pageAbsX - 50, '真实表头 bbox 必须留在 dslLeft 溯源');
+  assert.strictEqual(column.dslWidth, source.width);
+}
+// 列 ControlType：严格多数胜出，没有多数退化为 TextBlock。
+// 夹具：Macro 列两行都是整数框 → IntNumberBox；CH1 列一行整数框一行纯文本 → 平票 → TextBlock；
+// CH2 列没有单元格 → TextBlock。
+assert.deepStrictEqual(columns.map(column => column.controlType), ['IntNumberBox', 'TextBlock', 'TextBlock'],
+  '列 ControlType 按该列单元格的严格多数判定，没有多数时退化为 TextBlock');
+
+// 行是数据不是控件：行内文本一律 omit，且不得泄漏成 TextBlock。
+for (const ref of ['tbl:root/table/item1/title', 'tbl:root/table/item1/unit',
+  'tbl:root/table/item2/title', 'tbl:root/table/item2/unit',
+  'tbl:root/table/item2/content/c2']) {
+  const audit = tableMapping.textAudit.find(item => item.sourceRef === ref);
+  assert.ok(audit, '表格内文本必须进入 textAudit: ' + ref);
+  assert.strictEqual(audit.decision, 'omit', '表格内行数据文本必须 omit: ' + ref);
+  assert.strictEqual(audit.omitReason, 'table-data-cell', '表格内文本必须用专用 omit 角色: ' + ref);
+  assert.ok(!tableMapping.nodes.some(node => node.sourceRef === ref), '表格内文本不得发射成控件: ' + ref);
+}
+// 表格里的输入框实例属于行数据，不得再按 inputTemplates 发射成控件。
+assert.ok(!tableMapping.nodes.some(node => node.sourceRef.startsWith('tbl:root/table/item1/content/c') ||
+  node.sourceRef.startsWith('tbl:root/table/item2/content/c')),
+  '表格单元格实例不得单独发射成控件');
+assert.strictEqual(tableMapping.tableAudits.length, 1, '必须登记一条表格审计');
+const tableAudit = tableMapping.tableAudits[0];
+assert.strictEqual(tableAudit.xmlId, dataGrid.xmlId);
+assert.strictEqual(tableAudit.valuePending, true, 'Value 待业务确认必须显式登记');
+assert.strictEqual(tableAudit.columns.length, 3);
+assert.deepStrictEqual(tableAudit.columns.map(column => column.cellKinds),
+  [['IntNumberBox', 'IntNumberBox'], ['IntNumberBox', 'TextBlock'], []],
+  '每列的单元格类型分布必须留档，便于复核列类型判定');
+assert.strictEqual(tableAudit.rows.length, 2);
+assert.deepStrictEqual(tableAudit.rows[0].labels.map(label => label.position),
+  ['left', 'right'], '行内直接文本按 x 登记 left/right（左标题 / 单位）');
+assert.strictEqual(tableAudit.rows[0].labels[0].text, '图像识别阈值');
+assert.strictEqual(tableAudit.rows[0].cells.length, 2, '行只登记值块里的单元格');
+assert.strictEqual(tableAudit.rows[0].cells[0].controlType, 'IntNumberBox');
+assert.strictEqual(tableAudit.geometry.declaredBoxCoversContent, false,
+  '图层声明尺寸覆盖不了内容范围时必须在审计里报出来（设计侧待修正）');
+assert.strictEqual(tableMapping.pending.filter(item => item.sourceRef === 'tbl:root/table').length, 0,
+  '命中的表格不得再进入 pending');
+// 实例登记：表格（GROUP）也要登记进 componentInstances，供 resolver 校验 DataGrid 节点。
+const tableInstance = tableMapping.componentInstances.find(item => item.template === 'tableTemplates');
+assert.ok(tableInstance, '表格必须登记进 componentInstances');
+assert.strictEqual(tableInstance.variant, 'Table');
+assert.strictEqual(tableInstance.requiredSlots[0].sourceRef, 'tbl:root/table');
+
+// 结构签名成立但图层名不带「表格」后缀 → 不命中、登记 pending（不静默套模板，也不假装已识别）。
+const tableNameMismatch = runMappingCase(
+  'table-name-mismatch',
+  tableFixture('校准参数（3.1.3）'),
+  []
+);
+assert.strictEqual(tableNameMismatch.nodes.filter(node => node.controlType === 'DataGrid').length, 0,
+  '图层名后缀不符时不得发射 DataGrid');
+assert.ok(tableNameMismatch.pending.some(item => item.sourceRef === 'tbl:root/table' &&
+  /表格结构签名与图层名没有同时成立/.test(item.reason)),
+  '图层名后缀不符的候选表格必须登记 pending 说明原因');
+
+console.log('PASS MTSLG DSL-to-mapping table (tableTemplates structural) regression test');

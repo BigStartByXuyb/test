@@ -1367,7 +1367,45 @@
   },
   "tableTemplates": {
     "match": {
-      "property": "component"
+      "property": "component",
+      "structural": {
+        "nodeTypes": ["GROUP"],
+        "nameSuffix": "表格",
+        "variant": "Table",
+        "signature": {
+          "headerGroupNames": ["表头"],
+          "rowGroupNames": ["item"],
+          "minRows": 1,
+          "minHeaderTexts": 1
+        }
+      }
+    },
+    "structuralPolicy": "表格在团队组件库里没有组件集，设计稿里只是一个 GROUP，因此本族额外登记一条**结构签名**命中路径：节点类型 GROUP + 图层名以「表格」结尾 + 孩子里含名为「表头」的群组 + 至少一个名为「item」的行群组，四项同时成立才算命中。结构签名是主判据，图层名后缀是交叉核对项：只要有一项不成立就不命中，按「未命中」登记 pending（既不静默套模板，也不假装已识别），由人工确认后再补登记。这是本插件对「图层名称只用于核对、不参与匹配」登记的第二个例外（另一个是底部栏按组件名匹配）。",
+    "columnTemplate": {
+      "geometry": {
+        "left": 0,
+        "top": 0,
+        "height": 45
+      },
+      "omitWidth": true,
+      "alwaysWrittenAttrs": ["IOName"],
+      "requiredAttrsPolicy": "column-template",
+      "note": "DataGrid 的列子节点是**列定义**，不是页面控件：按设计器模板发射固定几何（Left=0 / Top=0 / Height=45，不写 Width），属性只发射 Value（列标题，来自表头文本）加恒写 IOName 空占位，不套用 controlTypeRequiredAttrs（那是页面控件的字段集）。列顺序 = 表头文本从左到右。"
+    },
+    "columnControlTypePolicy": "strict-majority-else-TextBlock",
+    "columnControlTypePolicyNote": "列 ControlType 由该列各行的单元格机械判定：每个单元格按类型归类（输入框实例取它命中的 ControlType，纯文本取 TextBlock），严格多数（> 50%）胜出；没有严格多数时退化为 TextBlock。判定依据与每列分布写进 mapping.tableAudits[].columns，便于复核与后续调整。",
+    "rowPolicy": "row-data-not-emitted",
+    "rowPolicyNote": "表格的行是数据（PageData 文件里的记录），不是页面控件：item 行里的左标题 / 单位 / 各列值一律不发射成 IOContorl，按行登记进 mapping.tableAudits[].rows（含单元格的 DSL ref、原文与类型），供工程师据此建数据文件。行数据不得编造，只登记设计稿里真实存在的内容。",
+    "innerTextPolicy": {
+      "decision": "omit",
+      "role": "table-data-cell",
+      "note": "命中表格后，表头文本作为列标题被消费（decision=emit，承载在列节点的 Value 上）；表格内其余文本（行标题、单位、单元格文本，含输入框实例内部的固定文本）一律 decision=omit，避免泄漏成根级 TextBlock。该角色已登记进 validate-iocontrol-provenance.js 的 OMIT_ROLES。"
+    },
+    "valuePolicy": {
+      "attr": "Value",
+      "decision": "pending-business",
+      "allowEmpty": true,
+      "note": "DataGrid 根节点的 Value 指向 PageData 数据文件，设计稿里没有可靠来源：按固定模板写空串占位，并在 mapping.tableAudits[].valuePending 与 bundle 审计里标记「待业务确认」，禁止编造文件名。"
     },
     "variants": {
       "Table": {
