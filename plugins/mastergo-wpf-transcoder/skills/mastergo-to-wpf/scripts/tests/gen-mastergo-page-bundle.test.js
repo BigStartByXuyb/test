@@ -52,6 +52,12 @@ fs.writeFileSync(mapping, JSON.stringify({
 const dslSnapshot = path.join(root, "dsl.snapshot.json");
 fs.writeFileSync(dslSnapshot, JSON.stringify({
   schemaVersion: "mastergo-dsl-capture/1",
+  // capture provenance（AI-27）：快照回指原始 getDsl capture 的字节哈希/字节数与出网链路。
+  // 生成器把它搬进 mapping.source，校验器据此硬断言 provenance 存在且非空；
+  // 本 fixture 代表冻结守卫上线后的新产物，所以必须带上。
+  captureSha256: "0123456789abcdef".repeat(4),
+  captureBytes: 2048,
+  egress: "direct",
   fileId: "test-file",
   layerId: "body-text",
   pageName: "mapping-test",

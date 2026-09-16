@@ -1,10 +1,16 @@
 #!/usr/bin/env node
 /**
  * Validate IOContorl text provenance and geometry evidence.
- * Mapping format: { contentOriginY, sourceNodes: [{ ref, parentRef,
+ * Mapping format: { contentOriginY, source: { sourceSha256, sourceBytes, egress,
+ * snapshotSha256, snapshotBytes }, sourceNodes: [{ ref, parentRef,
  * pageAbsX, pageAbsY, relativeX, relativeY, width, height, text }],
  * nodes: [{ xmlId, sourceRef, sourceText, valueSource,
  * expectedLeft, expectedTop, expectedWidth, expectedHeight, heightSource }] }
+ *
+ * capture provenance：mapping.source 的五项 provenance 必须存在且非空（AI-27 的冻结基准），
+ * 缺任何一项都以非零状态失败——这是与既有规则相互独立的一道门禁，不改变其他校验的判定。
+ * 冻结守卫上线前的历史产物没有这些字段：要么按下面的说明重新冻结，要么显式传
+ * --allow-legacy-provenance 把「缺失」降级为警告（形状写错的值任何情况下都不豁免）。
  */
 'use strict';
 
@@ -12,7 +18,8 @@ const fs = require('fs');
 // 模板表规则块的解析唯一实现（见 scripts/lib/iocontrol-map-rules.js；禁止在本脚本再抄一份）。
 const MAP_RULES = require('./lib/iocontrol-map-rules');
 // 数值解析的唯一实现（见 scripts/lib/script-helpers.js；本校验器与坐标核对器共用同一口径）。
-const { numberOrNull: num } = require('./lib/script-helpers');
+// 哈希的唯一实现同源（sha256File）——本校验器不再抄一份，否则会撞上脚本复用门禁。
+const { numberOrNull: num, sha256File } = require('./lib/script-helpers');
 
 // 按钮族固定参数：真值来源为模板表 mtslg-iocontrol-map.json 的 buttonFamily；
 // 传入 --map 时读取该表，未传入或表缺字段时退回内置默认（与表内容一致）。
@@ -142,19 +149,159 @@ function validateTextAudit(manifest, entries) {
   return errors;
 }
 
-function validate(xmlPath, manifestPath) {
+// ---- capture provenance（AI-27 的冻结基准）----
+// mapping.source 是 provenance 随页面产物一起流转的唯一载体，五项必须齐全：
+//   sourceSha256 / sourceBytes / egress —— 原始 capture（getDsl 响应文件）的事实，由快照回指带过来；
+//   snapshotSha256 / snapshotBytes      —— 本次实际消费的 dsl.snapshot.json 自身字节。
+// 本校验器只判「存在且非空」与形状；值由生成侧写入。哈希口径与生成侧统一：
+// 文件字节的 SHA256、十六进制小写（唯一实现见 lib/script-helpers.js）。
+const PROVENANCE_SOURCE_KEY = 'mapping.source';
+const PROVENANCE_HASH_FIELDS = ['sourceSha256', 'snapshotSha256'];
+const PROVENANCE_BYTES_FIELDS = ['sourceBytes', 'snapshotBytes'];
+const PROVENANCE_EGRESS_FIELD = 'egress';
+const PROVENANCE_FIELDS = PROVENANCE_HASH_FIELDS.concat(PROVENANCE_BYTES_FIELDS, [PROVENANCE_EGRESS_FIELD]);
+const SHA256_HEX = /^[0-9a-f]{64}$/;
+// 旁证文件 → mapping.source 的字段对应关系：同一个事实在两处必须逐字相同，否则「capture → 快照 → mapping」是断链。
+// 快照记的是 capture* 前缀（它就是回指），取数 sidecar 记的是自身文件的 sha256/bytes。
+const PROVENANCE_WITNESS_FIELDS = {
+  snapshot: { captureSha256: 'sourceSha256', captureBytes: 'sourceBytes', egress: 'egress' },
+  captureProvenance: { sha256: 'sourceSha256', bytes: 'sourceBytes', egress: 'egress' }
+};
+
+// 缺失口径：字段不存在、为 null、或是全空白字符串都算「没记录」。
+// AI-27 的快照里没有 capture provenance 时生成器会如实写 null，所以 null 必须走「缺失」这条路径，
+// 不能与「写了个错值」混为一谈。
+function isAbsentFact(value) {
+  return value === undefined || value === null ||
+    (typeof value === 'string' && value.trim() === '');
+}
+
+function readProvenanceWitness(filePath, label) {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return { error: label + ' 必须是 JSON 对象: ' + filePath };
+    }
+    return { value: parsed };
+  } catch (error) {
+    return { error: '读取 ' + label + ' 失败: ' + filePath + ': ' + error.message };
+  }
+}
+
+/**
+ * 断言 mapping.source 上的 capture provenance。
+ *
+ * @param manifest 映射清单（对象形态；数组形态没有 source，一律失败）
+ * @param options.allowLegacyProvenance 历史产物豁免：只把「缺失」降级为警告。
+ *        形状错误（哈希不是 64 位小写十六进制、字节数不是正整数、egress 不是字符串）永远失败——
+ *        缺字段说明这是冻结守卫上线前的旧产物，写错值说明记录本身不可信，两者不能互相抵消。
+ * @param options.snapshotPath 可选的 dsl.snapshot.json：复算 snapshotSha256/snapshotBytes，
+ *        并核对快照对原始 capture 的回指与 mapping.source 一致。
+ * @param options.captureProvenancePath 可选的取数 sidecar `<out>.provenance.json`：
+ *        核对它记录的 sha256/bytes/egress 与 mapping.source 一致（这是唯一能对到真实 capture 字节的一环）。
+ * @returns { errors, warnings }
+ */
+function validateCaptureProvenance(manifest, options) {
+  const settings = options || {};
   const errors = [];
+  const warnings = [];
+  const source = manifest && !Array.isArray(manifest) && typeof manifest === 'object'
+    ? manifest.source : null;
+  if (!source || typeof source !== 'object' || Array.isArray(source)) {
+    const problem = '映射清单缺少 ' + PROVENANCE_SOURCE_KEY + '（capture provenance）：无法证明本次生成消费的是哪次冻结 capture';
+    if (settings.allowLegacyProvenance) {
+      warnings.push('历史产物豁免（未断言 provenance）: ' + problem);
+      return { errors: errors, warnings: warnings };
+    }
+    errors.push(problem);
+    return { errors: errors, warnings: warnings };
+  }
+
+  const missing = PROVENANCE_FIELDS.filter(function (field) { return isAbsentFact(source[field]); });
+  if (missing.length > 0) {
+    const problem = PROVENANCE_SOURCE_KEY + ' 缺少 provenance 字段（或值为空）: ' + missing.join(', ') +
+      '；这些字段由 mastergo-dsl-pipeline.ps1（Capture）与 gen-mtslg-mapping-from-dsl.js 写入，' +
+      '值为 null 表示快照里没有 capture provenance（冻结守卫上线前的产物）';
+    if (settings.allowLegacyProvenance) warnings.push('历史产物豁免（未断言 provenance）: ' + problem);
+    else errors.push(problem);
+  }
+
+  for (const field of PROVENANCE_HASH_FIELDS) {
+    if (isAbsentFact(source[field])) continue;
+    if (typeof source[field] !== 'string' || !SHA256_HEX.test(source[field])) {
+      errors.push(PROVENANCE_SOURCE_KEY + '.' + field + ' 必须是 64 位小写十六进制的 SHA256: ' +
+        JSON.stringify(source[field]));
+    }
+  }
+  for (const field of PROVENANCE_BYTES_FIELDS) {
+    if (isAbsentFact(source[field])) continue;
+    if (typeof source[field] !== 'number' || !Number.isInteger(source[field]) || source[field] <= 0) {
+      errors.push(PROVENANCE_SOURCE_KEY + '.' + field + ' 必须是正整数字节数: ' + JSON.stringify(source[field]));
+    }
+  }
+  if (!isAbsentFact(source[PROVENANCE_EGRESS_FIELD]) && typeof source[PROVENANCE_EGRESS_FIELD] !== 'string') {
+    errors.push(PROVENANCE_SOURCE_KEY + '.' + PROVENANCE_EGRESS_FIELD + ' 必须是非空字符串（出网链路标签）: ' +
+      JSON.stringify(source[PROVENANCE_EGRESS_FIELD]));
+  }
+
+  // ---- 闭环核对：只对调用方显式给出的旁证文件做，缺省不改变既有判定 ----
+  const witnesses = [
+    { key: 'snapshot', label: 'DSL 快照', path: settings.snapshotPath },
+    { key: 'captureProvenance', label: '取数 provenance sidecar', path: settings.captureProvenancePath }
+  ];
+  for (const witness of witnesses) {
+    if (!witness.path) continue;
+    const read = readProvenanceWitness(witness.path, witness.label);
+    if (read.error) { errors.push(read.error); continue; }
+    const fields = PROVENANCE_WITNESS_FIELDS[witness.key];
+    for (const ownField of Object.keys(fields)) {
+      const mappedField = fields[ownField];
+      const actual = read.value[ownField];
+      if (isAbsentFact(actual)) {
+        errors.push(witness.label + ' 缺少 ' + ownField + ': ' + witness.path +
+          '（无法与 ' + PROVENANCE_SOURCE_KEY + '.' + mappedField + ' 对齐）');
+        continue;
+      }
+      if (!isAbsentFact(source[mappedField]) && String(actual) !== String(source[mappedField])) {
+        errors.push(witness.label + ' 的 ' + ownField + ' 与 ' + PROVENANCE_SOURCE_KEY + '.' + mappedField +
+          ' 不一致: ' + JSON.stringify(actual) + ' != ' + JSON.stringify(source[mappedField]));
+      }
+    }
+    // 快照自身字节：直接复算，证明 snapshotSha256/snapshotBytes 记的就是这份文件。
+    if (witness.key !== 'snapshot') continue;
+    const recomputed = sha256File(witness.path);
+    if (!isAbsentFact(source.snapshotSha256) && source.snapshotSha256 !== recomputed) {
+      errors.push('DSL 快照字节与 ' + PROVENANCE_SOURCE_KEY + '.snapshotSha256 不一致: ' +
+        witness.path + ' 实际为 ' + recomputed);
+    }
+    const actualBytes = fs.statSync(witness.path).size;
+    if (!isAbsentFact(source.snapshotBytes) && source.snapshotBytes !== actualBytes) {
+      errors.push('DSL 快照字节数与 ' + PROVENANCE_SOURCE_KEY + '.snapshotBytes 不一致: ' +
+        witness.path + ' 实际为 ' + actualBytes);
+    }
+  }
+  return { errors: errors, warnings: warnings };
+}
+
+function validate(xmlPath, manifestPath, options) {
+  const errors = [];
+  const warnings = [];
   let xml;
   let manifest;
   try { xml = fs.readFileSync(xmlPath, 'utf8'); }
-  catch (e) { return { ok: false, errors: ['读取 XML 失败: ' + e.message] }; }
+  catch (e) { return { ok: false, errors: ['读取 XML 失败: ' + e.message], warnings: warnings }; }
   try { manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8')); }
-  catch (e) { return { ok: false, errors: ['读取映射清单失败: ' + e.message] }; }
+  catch (e) { return { ok: false, errors: ['读取映射清单失败: ' + e.message], warnings: warnings }; }
+
+  // provenance 断言先于其余规则：它只判新增字段，不动其他既有校验的判定。
+  const provenance = validateCaptureProvenance(manifest, options);
+  errors.push(...provenance.errors);
+  warnings.push(...provenance.warnings);
 
   const entries = Array.isArray(manifest) ? manifest : manifest.nodes;
-  if (!Array.isArray(entries)) return { ok: false, errors: ['映射清单必须是数组或 {nodes: []}'] };
+  if (!Array.isArray(entries)) return { ok: false, errors: ['映射清单必须是数组或 {nodes: []}'], warnings: warnings };
   if (!Array.isArray(manifest.sourceNodes)) {
-    return { ok: false, errors: ['映射清单缺少 sourceNodes：不能证明 mapping 本身来自真实 DSL'] };
+    return { ok: false, errors: ['映射清单缺少 sourceNodes：不能证明 mapping 本身来自真实 DSL'], warnings: warnings };
   }
   const sourceMap = new Map(manifest.sourceNodes.map(n => [n.ref, n]));
   const originY = Number(manifest.contentOriginY !== undefined
@@ -162,7 +309,7 @@ function validate(xmlPath, manifestPath) {
     : (manifest.contentOrigin && manifest.contentOrigin.y) || 192);
   if (originY !== 192) {
     errors.push('contentOriginY 必须固定为 192');
-    return { ok: false, errors };
+    return { ok: false, errors: errors, warnings: warnings };
   }
   errors.push(...validateTextAudit(manifest, entries));
   const rootRef = manifest.rootRef || (manifest.source && manifest.source.layerId) ||
@@ -331,15 +478,19 @@ function validate(xmlPath, manifestPath) {
   for (const x of actual.filter(a => a.ControlType === 'TextBlock')) {
     if (!mappedIds.has(x.ID)) errors.push('TextBlock 未建立来源映射: xmlId="' + (x.ID || '') + '"');
   }
-  return { ok: errors.length === 0, errors };
+  return { ok: errors.length === 0, errors: errors, warnings: warnings };
 }
+
+const USAGE = '用法: node validate-iocontrol-provenance.js --xml <page.xml> --mapping <mapping.json> ' +
+  '[--map mtslg-iocontrol-map.json] [--snapshot <dsl.snapshot.json>] ' +
+  '[--capture-provenance <getDsl.json.provenance.json>] [--allow-legacy-provenance]';
 
 if (require.main === module) {
   const args = process.argv.slice(2);
   const get = flag => { const i = args.indexOf(flag); return i >= 0 ? args[i + 1] : null; };
   const xml = get('--xml');
   const manifest = get('--mapping');
-  if (!xml || !manifest) { console.error('用法: node validate-iocontrol-provenance.js --xml <page.xml> --mapping <mapping.json> [--map mtslg-iocontrol-map.json]'); process.exit(2); }
+  if (!xml || !manifest) { console.error(USAGE); process.exit(2); }
   const mapPath = get('--map');
   if (mapPath) {
 BUTTON_FAMILY_RULES = loadButtonFamilyRules(mapPath);
@@ -347,9 +498,17 @@ BUTTON_FAMILY_CONTROL_TYPES = BUTTON_FAMILY_RULES.controlTypes;
 BUTTON_ALWAYS_ATTRS = BUTTON_FAMILY_RULES.alwaysWrittenAttrs;
 REQUIRED_ATTRS_BY_CONTROL_TYPE = loadControlTypeRequiredAttrs(mapPath);
   }
-  const result = validate(xml, manifest);
+  // --allow-legacy-provenance：冻结守卫上线前的历史产物没有 provenance 字段，用它把「缺失」
+  // 降级为警告。这是显式豁免——必须由调用方写出来，默认（不带该参数）缺 provenance 就是失败。
+  const result = validate(xml, manifest, {
+    allowLegacyProvenance: args.includes('--allow-legacy-provenance'),
+    snapshotPath: get('--snapshot'),
+    captureProvenancePath: get('--capture-provenance')
+  });
+  // 豁免必须可见：即使通过也把警告打出来，避免「静默放行」被当成「已断言」。
+  for (const warning of result.warnings || []) console.error('WARN: ' + warning);
   if (!result.ok) { console.error(result.errors.join('\n')); process.exit(1); }
   console.log('PASS: provenance and geometry validation');
 }
 
-module.exports = { validate, validateTextAudit };
+module.exports = { validate, validateTextAudit, validateCaptureProvenance };

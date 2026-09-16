@@ -18,7 +18,7 @@
 
 完整页面转换包含三项强制工具：
 
-- `skills/mastergo-to-wpf/scripts/mastergo-dsl-pipeline.ps1` — 用 `-Action Capture` 把一次性 `getDsl` 响应固化为唯一的 `dsl.snapshot.json`，并校验根节点、递归节点、唯一 ref 和父子链；只有覆盖报告为 `complete` 才能继续生成。固化时把原始 capture 的 `captureSha256`/`captureBytes`/`egress` 写进 `manifest.json` 与快照（快照据此回指原始 capture），并带**冻结守卫**：`-Out` 下已有 `manifest.json` 且其 `captureSha256` 与本次输入不一致（或旧产物没有该字段）时拒绝执行，须显式归档/删除旧 manifest 才能重新冻结。
+- `skills/mastergo-to-wpf/scripts/mastergo-dsl-pipeline.ps1` — 用 `-Action Capture` 把一次性 `getDsl` 响应固化为唯一的 `dsl.snapshot.json`，并校验根节点、递归节点、唯一 ref 和父子链；只有覆盖报告为 `complete` 才能继续生成。固化时把原始 capture 的 `captureSha256`/`captureBytes`/`egress` 写进 `manifest.json` 与快照（快照据此回指原始 capture），并带**冻结守卫**：`-Out` 下已有 `manifest.json` 且其 `captureSha256` 与本次输入不一致（或旧产物没有该字段）时拒绝执行，须显式归档/删除旧 manifest 才能重新冻结。这道冻结基准由 `validate-iocontrol-provenance.js` 在交付前硬断言：mapping 清单 `source` 上的五项 provenance 缺一即校验失败（旧产物可显式加 `--allow-legacy-provenance` 豁免「缺失」，警告打到 stderr，写错的值不豁免）。
 - `skills/mastergo-to-wpf/scripts/resolve-mastergo-visibility.js` — 从 DSL 机械提取节点可见属性、祖先继承后的有效可见状态、TEXT/PATH 索引和可见性来源；只生成 visibility audit，不直接生成 mapping。
 - `skills/mastergo-to-wpf/scripts/gen-mastergo-page-bundle.js` — 接收已确认的页面 mapping，统一生成页面 XML、Icon、Layout、WPF 宿主和审计产物。
 
