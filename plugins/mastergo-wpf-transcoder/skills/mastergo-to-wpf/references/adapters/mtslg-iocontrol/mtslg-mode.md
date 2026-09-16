@@ -97,7 +97,7 @@
 
 - `ControlType="DataGrid"` 必须声明 `Value`；该值用于定位 PageData 数据文件。
 - **`Value` 的三种状态**：① 数据源已确认 → 必须是可被当前运行配置解析的非空数据文件名；② 数据源尚未确认（设计稿里没有来源，表格族命中后即属此类）→ 写**空串占位**并在映射 `tableAudits[].valuePending=true`、Bundle 审计 `tables[].valuePending=true` 与交付说明里同时标「待业务确认」；③ 工程师已绑定 → 直接写真实文件名并置 `valuePending=false`。属性本身恒写、不省略（`controlTypeRequiredAttrs.DataGrid` 含 `Value`）。
-- 缺字段与空串的区别必须守住：**省略 `Value`** 会在 `IODataGrid.LoadDataSource` 触发空引用，因此任何状态都不得省略该属性；而 `Value=""` 是状态②的合法中间态，不是交付缺陷——前提是审计与交付说明里点名了「数据源待确认」。
+- 缺字段与空串的区别必须守住：**任何状态都不得省略 `Value` 属性**——这是本插件可自证的操作要求（`controlTypeRequiredAttrs.DataGrid` 含 `Value`，生成器恒写）。至于「省略 `Value` 时运行时究竟如何表现」，属于目标项目 DataGrid 契约，必须由目标项目的控件契约、源码或实际验证确认，不能从其他项目的页面或异常信息推断；未确认前不得把它当作已验证结论写入交付说明。`Value=""` 是状态②的合法中间态，不是交付缺陷——前提是审计与交付说明里点名了「数据源待确认」。
 - 「最终页面的 `Value` 必须非空」只约束**数据源已确认**（状态①/③）的页面；状态②允许带着 `valuePending=true` 交付并移交工程师填数据源，但不得把它说成已完成的数据绑定。
 - 子列结构、数据源字段和错误表现均以目标项目 DataGrid 契约为准；不能从其他项目的页面或异常信息推导。
 

@@ -433,11 +433,9 @@ assert.ok(feishuMapping.includes("组件集=Table"),
 // 这些断言来自 2026-09-16 的语义审计：条件条数、Value 三态、图层名例外清单、命中路径唯一性、
 // 隐藏列与列 Value 的旧表述、structuralPolicy 的 pending 范围——只写「出现某 token」挡不住这些，
 // 必须把「不允许再出现的旧表述」也钉住。
-assert.ok(!Object.prototype.hasOwnProperty.call(tableStructural, "property") ||
-  tableStructural.property === undefined,
-  "表格族不得再登记 match.property（该键一旦命中就会走到需要结构签名的渲染分支）；命中路径只有 structural 一条");
-assert.strictEqual(tableFamily.match.property, undefined,
-  "tableTemplates.match.property 必须删除（REVIEW-004：无用命中路径 + 报错误导）");
+// 判据必须落在 match 上（上一版误写在 match.structural 上，等于没守护）。
+assert.ok(!Object.prototype.hasOwnProperty.call(tableFamily.match, "property"),
+  "tableTemplates.match 不得再登记 property（该键一旦命中就会走到需要结构签名的渲染分支）；命中路径只有 structural 一条");
 assert.ok(tableFamily.structuralPolicy.includes("五项同时成立"),
   "structuralPolicy 必须写「五项同时成立」（条件条数要与 signature 一一对应）");
 assert.ok(tableFamily.structuralPolicy.includes("部分命中"),

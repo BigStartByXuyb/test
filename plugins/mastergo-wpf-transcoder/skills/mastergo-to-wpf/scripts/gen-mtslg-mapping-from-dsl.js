@@ -366,7 +366,7 @@ function structuralTableMatches(n) {
       reason: "表格结构签名与图层名没有同时成立，未按 Table 模板发射（保留 DSL 来源待确认）: " +
         "图层名" + (status.nameOk ? "以「" + tableTemplate.structural.nameSuffix + "」结尾" : "不以「" +
           tableTemplate.structural.nameSuffix + "」结尾") +
-        "，结构签名" + (status.signatureOk ? "成立" : "不成立（缺表头群组或行群组）")
+        "，结构签名" + (status.signatureOk ? "成立" : "不成立（缺表头群组、缺行群组，或表头没有可见文本）")
     });
     return [];
   }
