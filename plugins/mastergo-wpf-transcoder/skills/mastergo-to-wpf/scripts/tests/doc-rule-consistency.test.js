@@ -517,10 +517,14 @@ const pageLang = fs.readFileSync(PAGE_LANG, "utf8");
 const newlineRule = map.textNewlinePolicy;
 assert.ok(newlineRule, "映射表必须登记 textNewlinePolicy 规则");
 assert.strictEqual(newlineRule.normalizedValue, "LF (U+000A)", "textNewlinePolicy.normalizedValue 必须是 LF (U+000A)");
-assert.deepStrictEqual(newlineRule.designNewlineCodepoints, ["U+000A", "U+000D", "U+2028", "U+2029"],
+assert.deepStrictEqual(newlineRule.designNewlineCodepoints, ["U+2028", "U+2029", "U+000D", "U+000A"],
   "textNewlinePolicy 必须登记四种设计换行码点");
 assert.strictEqual(newlineRule.xmlAttrEscaping, "&#x0a;", "XML 属性换行写法必须是 &#x0a;");
 assert.strictEqual(newlineRule.langDictionaryEscaping, "&#x0a;", "语言字典换行写法必须是 &#x0a;");
+assert.ok(/script-helpers\.js/.test(newlineRule.implementationSource || ""),
+  "映射表必须登记实现真值源（scripts/lib/script-helpers.js），而不是自称运行期真值源");
+assert.ok(typeof newlineRule.langDictionaryValueTransform === "string" && newlineRule.langDictionaryValueTransform,
+  "映射表必须登记字典值的空白处理口径（与页面 XML 属性不同）");
 
 // 实现只允许有一份：共享库提供四个函数，生成器/校验器/字典发射器都引用它。
 for (const fn of ["normalizeNewlines", "decodeXmlEntities", "normalizeForCompare", "xmlElementText"]) {
@@ -542,6 +546,7 @@ for (const [label, text] of [
 ]) {
   assert.ok(text.includes("&#x0a;"), label + " 必须写明换行写成字符引用 &#x0a;");
   assert.ok(text.includes("U+2028"), label + " 必须写明设计换行码点 U+2028");
+  assert.ok(text.includes("实现真值源"), label + " 必须写明实现真值源（script-helpers.js），不得把映射表写成运行期唯一真值源");
 }
 assert.ok(modeDoc.includes("压成空格会让两行文案退化成一行"),
   "mtslg-mode.md 必须写明字典压成空格的后果");

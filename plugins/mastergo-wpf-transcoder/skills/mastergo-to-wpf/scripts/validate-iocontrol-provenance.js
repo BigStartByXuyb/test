@@ -139,7 +139,9 @@ function validateTextAudit(manifest, entries) {
       const mappedText = outputForSource && outputForSource.sourceSlotTexts && typeof outputForSource.sourceSlotTexts[source.ref] === 'string'
         ? outputForSource.sourceSlotTexts[source.ref]
         : outputForSource && outputForSource.sourceText;
-      if (!outputForSource || outputForSource.valueSource !== 'dsl.text' || mappedText !== source.text) {
+      // 文案比对与其它三处同口径：先解码字符引用、再归一换行（normalizeForCompare）。
+      if (!outputForSource || outputForSource.valueSource !== 'dsl.text' ||
+          normalizeForCompare(mappedText) !== normalizeForCompare(source.text)) {
         errors.push('可见普通 TEXT 没有对应的 dsl.text 输出节点: ' + source.ref);
       }
     } else {

@@ -93,13 +93,13 @@
 
 ### 4.0 文本换行口径（所有文案属性与语言字典通用）
 
-设计换行码点（`U+2028` 行分隔符 / `U+2029` 段分隔符 / `CR` / `CRLF`）一律归一成 **LF（U+000A）**，并按框架写法发射为字符引用 **`&#x0a;`**：
+设计换行码点（`U+2028` 行分隔符 / `U+2029` 段分隔符 / `CR`(U+000D) / `LF`(U+000A) / `CRLF`）一律归一成 **LF（U+000A）**，并按框架写法发射为字符引用 **`&#x0a;`**：
 
 - 页面 XML 的所有文案属性（`Value` / `Header` / `MenuItem Name` / `TopLeftContent` …）写 `&#x0a;`——属性里**不能出现字面换行**（XML 解析器会把它归一成空格）。
 - 页面语言字典值（`{页面名}_{LOCALE}.xaml`）同样写 `&#x0a;`：运行时按 `LangName` 取字典值，字典里把换行压成空格会让两行文案退化成一行。
 - 同一行内不同字体的多个 text run 是 `text` 数组多项、按空串拼接，**不是换行**；只有单个 run 内部的换行码点才算换行。
-- 键派生 / 译文查找 / 术语表匹配用「压平值」（空白折叠 + trim），字典值用「保留换行值」，两条口径并存不冲突。
-- 唯一真值来源是映射表 `textNewlinePolicy`；实现集中在 `scripts/lib/script-helpers.js`（`normalizeNewlines` / `xmlAttr` / `xmlElementText` / `normalizeForCompare`），生成器、校验器、Bundle 共用，不允许各写一份。
+- **空白处理**：页面 XML 属性文案只归一换行、其余空白原样保留；字典值额外做「行内空白折叠 + 行首行尾 trim」（设计稿左右留白是排版产物）；键派生 / 译文查找 / 术语表匹配则用全量「压平值」。三者用途不同，不是同一份字符串。
+- **实现真值源**是 `scripts/lib/script-helpers.js`（`normalizeNewlines` / `xmlAttr` / `xmlElementText` / `normalizeForCompare`），生成器、校验器、Bundle 共用，不允许各写一份；映射表 `textNewlinePolicy` 登记同一口径供人读与回归断言比对，不是脚本的运行期输入。
 
 ### 4.1 DataGrid 的命中口径与 Value 现阶段口径
 

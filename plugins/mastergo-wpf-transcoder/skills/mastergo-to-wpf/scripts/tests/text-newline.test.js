@@ -53,7 +53,9 @@ assert.strictEqual(map.textNewlinePolicy.normalizedValue, "LF (U+000A)");
 assert.strictEqual(xmlAttr("x\n y"), "x&#x0a; y");
 assert.strictEqual(map.textNewlinePolicy.xmlAttrEscaping, "&#x0a;");
 assert.strictEqual(map.textNewlinePolicy.langDictionaryEscaping, "&#x0a;");
-assert.deepStrictEqual(map.textNewlinePolicy.designNewlineCodepoints, ["U+000A", "U+000D", "U+2028", "U+2029"]);
+assert.deepStrictEqual(map.textNewlinePolicy.designNewlineCodepoints, ["U+2028", "U+2029", "U+000D", "U+000A"]);
+assert.ok(/script-helpers\.js/.test(map.textNewlinePolicy.implementationSource || ""),
+  "映射表必须登记实现真值源（scripts/lib/script-helpers.js）");
 
 // 5) 端到端：语言键派生 + 字典发射保留换行；页面 XML 写 &#x0a;；provenance 仍 PASS。
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "mastergo-newline-"));
