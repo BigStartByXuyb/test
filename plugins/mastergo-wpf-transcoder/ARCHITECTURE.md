@@ -81,7 +81,7 @@ flowchart LR
 
 | 共享模块 | 内容 | 使用方 |
 |---|---|---|
-| `lib/script-helpers.js` | `fail` / `failWithPrefix` / `failAndExit`、`normalizeNewlines`、`decodeXmlEntities`、`normalizeForCompare`、`xmlAttr`、`xmlDocText`、`xmlElementText`、`normalizeToken`、`numberOrNull`、`readJson`、`backupFile` | 全部脚本 |
+| `lib/script-helpers.js` | `fail` / `failWithPrefix` / `failAndExit`、`normalizeNewlines`、`langValueText`、`decodeXmlEntities`、`normalizeForCompare`、`xmlAttr`、`xmlDocText`、`xmlElementText`、`normalizeToken`、`numberOrNull`、`readJson`、`backupFile` | 全部脚本 |
 | `lib/project-csproj.js` | `.csproj` Include 解析、宿主路径推断（`inferHostPaths`） | `gen-mastergo-page-bundle.js`、`gen-mw-wpf-page.js` |
 | `lib/iocontrol-map-rules.js` | 模板表 `controlTypeRequiredAttrs` / `buttonFamily` 的读取与解析 | `gen-iocontrol-xml.js`、`validate-iocontrol-provenance.js` |
 | `lib/mastergo-rules.js` | DSL 层共用判定（如宿主壳标记词 `isHostShellName`） | `gen-mtslg-mapping-from-dsl.js`、`apply-container-containment.js` |

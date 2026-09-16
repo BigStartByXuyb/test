@@ -61,7 +61,8 @@
 const fs = require("fs");
 const path = require("path");
 // 跨脚本共用工具的唯一实现（见 scripts/lib/script-helpers.js；禁止在本脚本再抄一份）。
-const { readJson, failWithPrefix, normalizeNewlines } = require(path.join(__dirname, "lib", "script-helpers.js"));
+// langValueText（字典值的换行 + 空白处理）由共享库提供唯一实现，本脚本不再自带一份。
+const { readJson, failWithPrefix, normalizeNewlines, langValueText } = require(path.join(__dirname, "lib", "script-helpers.js"));
 const fail = failWithPrefix("语言键派生失败");
 
 const KEY_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -87,17 +88,6 @@ function toText(value) {
 
 function normalizeText(value) {
   return toText(value).replace(/\s+/g, " ").trim();
-}
-
-// 语言字典**值**的文案归一：保留换行（统一归一成 LF），只折叠行内空白与行首行尾空白。
-// 键派生、文案匹配、待翻译判定仍用 normalizeText（压平成单行）——两者分工不同：
-//   压平值 → 派生键名 / 查译文 / 查术语表 / 判 pending；
-//   保留换行值 → 写进字典（运行时按 LangName 取它，必须与设计稿的换行一致）。
-function langValueText(value) {
-  return normalizeNewlines(toText(value))
-    .replace(/[^\S\n]+/g, " ")
-    .replace(/ *\n */g, "\n")
-    .trim();
 }
 
 // 不可翻译文本判定。核心原则：中英文一致的文本不需要语言键。

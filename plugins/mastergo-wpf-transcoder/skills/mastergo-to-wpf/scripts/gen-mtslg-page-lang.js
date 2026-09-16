@@ -35,7 +35,9 @@
 const fs = require("fs");
 const path = require("path");
 // 跨脚本共用工具的唯一实现（见 scripts/lib/script-helpers.js；禁止在本脚本再抄一份）。
-// 字典值是 XAML 元素内容：换行口径与页面 XML 一致（&#x0a;），见映射表 textNewlinePolicy。
+// 字典值是 XAML 元素内容：换行口径与页面 XML 一致（&#x0a;）。实现真值源是
+// scripts/lib/script-helpers.js（xmlElementText / normalizeNewlines）；映射表 textNewlinePolicy
+// 只登记同一口径供人读与回归断言比对，不是本脚本的运行期输入。
 const { failWithPrefix, xmlElementText: xmlText } = require(path.join(__dirname, "lib", "script-helpers.js"));
 // 多语言发射的失败口径（模块前缀由共享工厂装配，本脚本不再自建 fail）。
 const fail = failWithPrefix("页面多语言生成失败");

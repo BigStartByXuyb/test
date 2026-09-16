@@ -506,11 +506,12 @@ assert.ok(!modeDoc.includes("列=子 TextBlock/ComboBox"),
 
 console.log("PASS 表格族（tableTemplates 结构签名 + DataGrid 列定义）一致性回归测试");
 
-// ---------- 文本换行口径：映射表 textNewlinePolicy 是唯一真值源 ----------
+// ---------- 文本换行口径：实现真值源 = lib/script-helpers.js，映射表 textNewlinePolicy 只登记 ----------
 // 背景：设计换行（U+2028）原先被原样写进 XML 属性、却被语言字典压成空格，
 // 同一份文案因此有两个版本，运行时按 LangName 取字典时两行文案退化成一行。
 const HELPERS = path.join(__dirname, "..", "lib", "script-helpers.js");
 const PAGE_LANG = path.join(__dirname, "..", "gen-mtslg-page-lang.js");
+const LANG_KEYS_SCRIPT = path.join(__dirname, "..", "gen-mtslg-lang-keys-from-dsl.js");
 const helpers = fs.readFileSync(HELPERS, "utf8");
 const pageLang = fs.readFileSync(PAGE_LANG, "utf8");
 
@@ -526,10 +527,16 @@ assert.ok(/script-helpers\.js/.test(newlineRule.implementationSource || ""),
 assert.ok(typeof newlineRule.langDictionaryValueTransform === "string" && newlineRule.langDictionaryValueTransform,
   "映射表必须登记字典值的空白处理口径（与页面 XML 属性不同）");
 
-// 实现只允许有一份：共享库提供四个函数，生成器/校验器/字典发射器都引用它。
-for (const fn of ["normalizeNewlines", "decodeXmlEntities", "normalizeForCompare", "xmlElementText"]) {
+// 实现只允许有一份：共享库提供五个函数，生成器/校验器/字典发射器都引用它。
+for (const fn of ["normalizeNewlines", "langValueText", "decodeXmlEntities", "normalizeForCompare", "xmlElementText"]) {
   assert.ok(new RegExp("function " + fn + "\\b").test(helpers), "script-helpers.js 必须提供 " + fn);
 }
+assert.ok((newlineRule.implementationSource || "").includes("langValueText"),
+  "textNewlinePolicy.implementationSource 必须登记字典值变换 langValueText 的实现位置");
+assert.ok((newlineRule.langDictionaryValueTransform || "").includes("langValueText"),
+  "langDictionaryValueTransform 必须点名实现函数 langValueText");
+assert.ok(!/function langValueText/.test(fs.readFileSync(LANG_KEYS_SCRIPT, "utf8")),
+  "gen-mtslg-lang-keys-from-dsl.js 不得自带 langValueText 实现（必须用共享库）");
 assert.ok(/normalizeNewlines\(value\)[\s\S]{0,80}&#x0a;/.test(helpers) || /normalizeNewlines\(value\)/.test(helpers),
   "xmlAttr 必须先归一换行再发射");
 assert.ok(helpers.includes('.replace(/\\n/g, "&#x0a;")'), "xmlAttr / xmlElementText 必须把 LF 写成 &#x0a;");
@@ -547,7 +554,10 @@ for (const [label, text] of [
   assert.ok(text.includes("&#x0a;"), label + " 必须写明换行写成字符引用 &#x0a;");
   assert.ok(text.includes("U+2028"), label + " 必须写明设计换行码点 U+2028");
   assert.ok(text.includes("实现真值源"), label + " 必须写明实现真值源（script-helpers.js），不得把映射表写成运行期唯一真值源");
+  assert.ok(text.includes("三条用途") || text.includes("三条"), label + " 空白口径必须写成「三条用途」，与映射表 note 一致");
+  assert.ok(!text.includes("空白处理的两条口径"), label + " 不得保留「空白处理的两条口径」的口径基数");
 }
+assert.ok(/三条用途/.test(newlineRule.note || ""), "映射表 note 必须写明空白处理分三条用途");
 assert.ok(modeDoc.includes("压成空格会让两行文案退化成一行"),
   "mtslg-mode.md 必须写明字典压成空格的后果");
 

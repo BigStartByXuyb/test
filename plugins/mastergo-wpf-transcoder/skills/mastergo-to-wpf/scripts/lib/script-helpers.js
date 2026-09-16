@@ -29,11 +29,25 @@ function failAndExit(code) {
   };
 }
 
-// 设计换行归一：MasterGo DSL 的换行码点（U+2028 行分隔符、U+2029 段分隔符、CR、CRLF）
-// 统一归一成 LF（U+000A）。这是「设计文本 → 发射文本」的唯一换行口径，
-// 真值来源 = 映射表 textNewlinePolicy（脚本、校验器、文档共用同一条）。
+// 设计换行归一：MasterGo DSL 的换行码点（U+2028 行分隔符、U+2029 段分隔符、CR、CRLF、LF）
+// 统一归一成 LF（U+000A）。这是「设计文本 → 发射文本」换行口径的**实现真值源**：
+// 生成器、校验器、Bundle、字典发射器都只从这里取；映射表 textNewlinePolicy 只登记同一口径
+// 供人读与回归断言比对（它不是脚本的运行期输入）。
 function normalizeNewlines(value) {
   return String(value === undefined || value === null ? "" : value).replace(/\r\n|[\r\u2028\u2029]/g, "\n");
+}
+
+// 语言字典**值**的文案变换（实现真值源）：
+//   1) 归一换行（与页面 XML 属性同口径）；
+//   2) 行内空白（空格 / 制表符等非换行空白）折叠成单个空格；
+//   3) 去掉行首行尾空白（trim）。
+// 页面 XML 属性文案只做第 1 步、其余空白原样保留；键派生 / 查译文 / 术语表匹配另用全量压平值
+// （见 gen-mtslg-lang-keys-from-dsl.js 的 normalizeText）。三者用途不同，不是同一份字符串。
+function langValueText(value) {
+  return normalizeNewlines(value)
+    .replace(/[^\S\n]+/g, " ")
+    .replace(/ *\n */g, "\n")
+    .trim();
 }
 
 // XML 字符引用解码：校验器/比对器拿到的是 XML 原始文本（可能是 &#x0a; 这类引用），
@@ -110,6 +124,7 @@ module.exports = {
   failWithPrefix: failWithPrefix,
   failAndExit: failAndExit,
   normalizeNewlines: normalizeNewlines,
+  langValueText: langValueText,
   decodeXmlEntities: decodeXmlEntities,
   normalizeForCompare: normalizeForCompare,
   xmlAttr: xmlAttr,

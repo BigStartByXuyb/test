@@ -22,7 +22,7 @@ const PAGE_LANG = path.join(SCRIPT_DIR, "gen-mtslg-page-lang.js");
 const XML_SCRIPT = path.join(SCRIPT_DIR, "gen-iocontrol-xml.js");
 const PROVENANCE = path.join(SCRIPT_DIR, "validate-iocontrol-provenance.js");
 
-const { normalizeNewlines, decodeXmlEntities, normalizeForCompare, xmlAttr, xmlElementText } = require(HELPERS);
+const { normalizeNewlines, langValueText, decodeXmlEntities, normalizeForCompare, xmlAttr, xmlElementText } = require(HELPERS);
 
 // 1) 归一：四种设计换行都变成 LF，且其它字符不受影响。
 assert.strictEqual(normalizeNewlines("保存\u2028激光"), "保存\n激光");
@@ -31,6 +31,12 @@ assert.strictEqual(normalizeNewlines("A\r\nB"), "A\nB");
 assert.strictEqual(normalizeNewlines("A\rB"), "A\nB");
 assert.strictEqual(normalizeNewlines("A\nB"), "A\nB");
 assert.strictEqual(normalizeNewlines("无换行"), "无换行");
+
+// 1b) 字典值变换（共享实现 langValueText）：换行保留，行内空白折叠，行首行尾 trim。
+assert.strictEqual(langValueText("保存\u2028激光- JF"), "保存\n激光- JF");
+assert.strictEqual(langValueText("A  \n  B"), "A\nB");
+assert.strictEqual(langValueText("    对位模式    "), "对位模式");
+assert.strictEqual(langValueText("A\u2028B"), "A\nB");
 
 // 2) XML 属性转义：& < > " 照旧；换行写成 &#x0a;。
 assert.strictEqual(xmlAttr('a&b<c>d"e'), "a&amp;b&lt;c&gt;d&quot;e");
