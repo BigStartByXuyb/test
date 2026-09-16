@@ -440,6 +440,40 @@ const orderIds = [...fs.readFileSync(orderOutput, 'utf8').matchAll(/ID="(MG_[A-Z
 assert.deepStrictEqual(orderIds, ['MG_A', 'MG_B', 'MG_C'],
   '页面 XML 必须按设计稿上下顺序发射（Top 主序、同一行 Left 次序），与 mapping 数组顺序无关');
 
+// ---- 发射顺序：同一"视觉行"（Top 差 ≤ 15px）按 Left 从左到右 ----
+// 设计稿里成对的"标签 + 输入框"常有十几像素高差（标签 Top=52、下拉框 Top=40）。
+// 严格按 Top 排序会把它们拆成两行、把成对控件排散；这里断言它们保持"标签 → 输入框"的阅读顺序。
+const rowMapping = path.join(dir, 'visual-row-mapping.json');
+const rowOutput = path.join(dir, 'visual-row-page.xml');
+fs.writeFileSync(rowMapping, JSON.stringify({
+  rootRef: 'root',
+  sourceNodes: [
+    { ref: 'root', parentRef: null, pageAbsX: 0, pageAbsY: 0, relativeX: 0, relativeY: 0, width: 1280, height: 1024 },
+    { ref: 'l1', parentRef: 'root', pageAbsX: 687, pageAbsY: 202, relativeX: 687, relativeY: 202, width: 80, height: 40, type: 'TEXT', text: '镜头倍率' },
+    { ref: 'l2', parentRef: 'root', pageAbsX: 766, pageAbsY: 202, relativeX: 766, relativeY: 202, width: 80, height: 40, type: 'TEXT', text: '低倍率' },
+    { ref: 'combo', parentRef: 'root', pageAbsX: 766, pageAbsY: 232, relativeX: 766, relativeY: 232, width: 120, height: 40 },
+    { ref: 'l3', parentRef: 'root', pageAbsX: 687, pageAbsY: 244, relativeX: 687, relativeY: 244, width: 80, height: 40, type: 'TEXT', text: '光源通道' }
+  ],
+  textAudit: [
+    { sourceRef: 'l1', sourceText: '镜头倍率', visibility: true, role: 'content', decision: 'emit', outputRefs: ['ROW_L1'] },
+    { sourceRef: 'l2', sourceText: '低倍率', visibility: true, role: 'content', decision: 'emit', outputRefs: ['ROW_L2'] },
+    { sourceRef: 'l3', sourceText: '光源通道', visibility: true, role: 'content', decision: 'emit', outputRefs: ['ROW_L3'] }
+  ],
+  // 故意打乱：下拉框 → 光源通道 → 镜头倍率 → 低倍率
+  nodes: [
+    { ref: 'combo', sourceRef: 'combo', sourceParent: 'root', id: 'ROW_COMBO', xmlId: 'ROW_COMBO', controlType: 'ComboBox', absX: 766, absY: 232, w: 120, h: 40, attrs: { Value: 'Auto' } },
+    orderTextNode('l3', 'ROW_L3', '光源通道', 687, 244),
+    orderTextNode('l1', 'ROW_L1', '镜头倍率', 687, 202),
+    orderTextNode('l2', 'ROW_L2', '低倍率', 766, 202)
+  ]
+}, null, 2));
+const rowRun = spawnSync(process.execPath, [path.join(__dirname, '..', 'gen-iocontrol-xml.js'),
+  '--fresh', rowMapping, '--out', rowOutput], { encoding: 'utf8' });
+assert.strictEqual(rowRun.status, 0, '视觉行用例必须能渲染: ' + rowRun.stderr);
+const rowIds = [...fs.readFileSync(rowOutput, 'utf8').matchAll(/ID="(ROW_[A-Z0-9]+)"/g)].map((match) => match[1]);
+assert.deepStrictEqual(rowIds, ['ROW_L1', 'ROW_L2', 'ROW_L3', 'ROW_COMBO'],
+  '同一视觉行（Top 差 ≤ 15px）内必须按 Left 从左到右：标签"光源通道"要排在下拉框之前');
+
 // ---- 图标字段按 ControlType 模板收窄：非图标模板不发射，iconSize 不脱离 Icon 单独消费 ----
 const iconScopeMapping = path.join(dir, 'icon-scope-mapping.json');
 const iconScopeOutput = path.join(dir, 'icon-scope-page.xml');

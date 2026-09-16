@@ -113,6 +113,48 @@ function sortNodesByDesignOrder(list) {
 }
 
 const nodes = sortNodesByDesignOrder(mapping.nodes || []);
+
+// 「视觉行」容差：同一父容器内，相邻控件 Top 差 ≤ 该值视为同一行，行内按 Left 从左到右。
+// 依据：设计稿里成对的"标签 + 输入框"常有十几像素的高差（例如标签 Top=52、下拉框 Top=40），
+// 严格按 Top 排序会把它们拆成两行、把成对控件排散。容差只用于排序，不改坐标/属性/层级。
+const VISUAL_ROW_TOLERANCE_PX = 15;
+
+// 按"先上后下、同一视觉行先左后右"排列同一个父容器下的直接子节点。
+// 行聚类从每行第一个（Top 最小）节点起算，避免链式合并导致整块并成一行。
+function orderChildrenByVisualRows(list) {
+  if (!Array.isArray(list) || list.length < 2) return Array.isArray(list) ? list.slice() : [];
+  const items = list.map(function (node, index) {
+    const y = Number(node && node.absY);
+    const x = Number(node && node.absX);
+    return {
+      node: node,
+      index: index,
+      y: Number.isFinite(y) ? y : Number.POSITIVE_INFINITY,
+      x: Number.isFinite(x) ? x : Number.POSITIVE_INFINITY
+    };
+  });
+  items.sort(function (a, b) {
+    if (a.y !== b.y) return a.y - b.y;
+    if (a.x !== b.x) return a.x - b.x;
+    return a.index - b.index;
+  });
+  const rows = [];
+  for (const item of items) {
+    const row = rows[rows.length - 1];
+    if (row && Math.abs(item.y - row.originY) <= VISUAL_ROW_TOLERANCE_PX) row.items.push(item);
+    else rows.push({ originY: item.y, items: [item] });
+  }
+  const ordered = [];
+  for (const row of rows) {
+    row.items.sort(function (a, b) {
+      if (a.x !== b.x) return a.x - b.x;
+      if (a.y !== b.y) return a.y - b.y;
+      return a.index - b.index;
+    });
+    for (const item of row.items) ordered.push(item.node);
+  }
+  return ordered;
+}
 const TOP_PUBLIC_BAR_Y = 126;
 const TOP_ARTIFACT_TITLE_Y = 66;
 const contentOriginY = TOP_PUBLIC_BAR_Y + TOP_ARTIFACT_TITLE_Y;
@@ -455,7 +497,7 @@ function renderFresh() {
     applyButtonFamilyAttrs(node, attrMap);
     applyRequiredAttrs(node, attrMap);
 
-    const kids = childMap.get(node.ref) || [];
+    const kids = orderChildrenByVisualRows(childMap.get(node.ref) || []);
     if (node.comment) lines.push(`${indent}<!-- ${node.comment} -->`);
     if (kids.length > 0) {
       lines.push(renderTag(attrMap, indent, indent + '    ', false, 'multi'));
@@ -465,7 +507,8 @@ function renderFresh() {
       lines.push(renderTag(attrMap, indent, indent + '    ', true, 'multi'));
     }
   };
-  for (const n of rootChildren) emit(n, 1, 0, 0, null);
+  // 发射顺序：每个父容器内按"先上后下、同一视觉行先左后右"排列（只改顺序，不动坐标/属性/层级）。
+  for (const n of orderChildrenByVisualRows(rootChildren)) emit(n, 1, 0, 0, null);
   lines.push('</IOContorl>');
   return lines.join('\n') + '\n';
 }
@@ -710,7 +753,7 @@ function mergeMode() {
     attrMap2.Left = fmtNum(n.absX - pa.x);
     attrMap2.Top = fmtNum(normalizedY(n.absY) - pa.y);
     const indent = '    '.repeat(depthOfRef(ref));
-    const kids = nodes.filter(k => (k.parent || null) === ref);
+    const kids = orderChildrenByVisualRows(nodes.filter(k => (k.parent || null) === ref));
 
     const renderSub = (node, d) => {
       const pa2 = resolveParentAbs(node);
@@ -723,7 +766,7 @@ function mergeMode() {
       if (outputHeight(node) !== undefined && outputHeight(node) !== null) am.Height = fmtNum(outputHeight(node));
       applyButtonFamilyAttrs(node, am);
       applyRequiredAttrs(node, am);
-      const kk = nodes.filter(x => (x.parent || null) === node.ref);
+      const kk = orderChildrenByVisualRows(nodes.filter(x => (x.parent || null) === node.ref));
       const ind = '    '.repeat(d);
       const parts = [];
       if (node.comment) parts.push(`${ind}<!-- ${node.comment} -->\n`);
