@@ -1402,10 +1402,10 @@
     },
     "valuePolicy": {
       "attr": "Value",
-      "decision": "pending-business",
+      "decision": "fixed-empty",
       "allowEmpty": true,
-      "note": "DataGrid 根节点的 Value 指向 PageData 数据文件，设计稿里没有可靠来源：按固定模板写空串占位，并在 mapping.tableAudits[].valuePending 与 bundle 审计里标记「待业务确认」，禁止编造文件名。",
-      "pendingRule": "Value=\"\" 是**待业务确认**的合法中间态：此时必须同时带 tableAudits[].valuePending=true，并在交付说明里点名「该表数据源待确认」。mtslg-mode.md §4.1「最终页面的 Value 必须非空」只约束**数据源已确认**的页面；数据源确认后由工程师或运行时绑定填入文件名，再置 valuePending=false。"
+      "note": "DataGrid 根节点的 Value 当前阶段**固定写空串**（`Value=\"\"`）：本阶段不再要求 AI 去找数据文件名，数据源由工程师或运行时后续绑定。禁止编造文件名，也不得因为「空串」把该控件判成未完成——它是当前阶段的正式产物形态。",
+      "pendingRule": "空串必须同时带 `tableAudits[].valuePending=true` 与 Bundle `tables[].valuePending=true` 作为**待绑定提示**（便于工程师接手时一眼看到哪张表还没绑数据源）；该标记是提示性审计字段，不是交付门禁，也不影响 provenance/坐标门禁的通过。工程师绑定真实数据文件名后把 `valuePending` 置 false。"
     },
     "variants": {
       "Table": {
@@ -1664,11 +1664,8 @@
       ]
     },
     "DataGrid": {
-      "description": "数据表格。**本插件可自证的两条**：① `Value` 属固定必写字段、恒写且不省略（见 requiredAttrs）；② 列子节点是**列定义**不是页面控件，几何与字段集按 tableTemplates.columnTemplate、列 ControlType 按 columnControlTypePolicy 判定。**其余一律不是本插件的规则**：`Value` 的来源与占位口径（数据源已确认 / 待业务确认 / 已绑定三态，含 Value=\"\" 的合法性）以 tableTemplates.valuePolicy 为唯一真值源；`Value` 指向哪个文件、子列结构与数据源字段、以及省略属性或空值指向不存在文件时如何表现，全部归目标项目 DataGrid 控件契约，须由契约/源码/实测确认后才能落笔。",
+      "description": "数据表格。**本插件可自证的两条**：① `Value` 属固定必写字段、恒写且不省略——必写字段集的唯一登记点是本文件顶层的 controlTypeRequiredAttrs.DataGrid（`Value` / `IOName` / `IOEnable` / `IOVisible`），生成器与校验器都只读那一处；② 列子节点是**列定义**不是页面控件，几何与字段集按 tableTemplates.columnTemplate、列 ControlType 按 columnControlTypePolicy 判定。**其余一律不是本插件的规则**：`Value` 当前阶段的占位口径（固定空串 + 待绑定审计标记）以 tableTemplates.valuePolicy 为唯一真值源；`Value` 在运行时指向哪个文件、子列结构与数据源字段、以及省略属性或空值指向不存在文件时如何表现，全部归目标项目 DataGrid 控件契约，须由契约/源码/实测确认后才能落笔。",
       "nested": true,
-      "requiredAttrs": [
-        "Value"
-      ],
       "attrs": [
         "IOName",
         "IsAutoRefresh",

@@ -465,8 +465,12 @@ assert.ok(tableFamily.structuralPolicy.includes("五项同时成立"),
   "structuralPolicy 必须写「五项同时成立」（条件条数要与 signature 一一对应）");
 assert.ok(tableFamily.structuralPolicy.includes("部分命中"),
   "structuralPolicy 必须写清 pending 的范围是「部分命中」（REVIEW-007）");
-assert.ok(tableFamily.valuePolicy.pendingRule && tableFamily.valuePolicy.pendingRule.includes("数据源已确认"),
-  "valuePolicy 必须登记 pendingRule：Value=\"\" 的合法状态与「最终必须非空」的适用范围（REVIEW-002）");
+// 当前阶段口径：DataGrid 根 Value 固定空串 + valuePending 作为待绑定提示（提示性，不是交付门禁）。
+assert.strictEqual(tableFamily.valuePolicy.decision, "fixed-empty",
+  "valuePolicy.decision 必须是当前阶段口径 fixed-empty（Value 固定空串）");
+assert.ok(tableFamily.valuePolicy.pendingRule && tableFamily.valuePolicy.pendingRule.includes("待绑定提示") &&
+  tableFamily.valuePolicy.pendingRule.includes("提示性审计字段"),
+  "valuePolicy.pendingRule 必须写明 valuePending 是待绑定提示、属提示性审计字段而不是交付门禁");
 assert.ok(!(columnTemplate.alwaysWrittenAttrs || []).includes("IOVisible"),
   "列定义不得登记 IOVisible（表头文本没有「是否主键」信息，没有可靠来源；REVIEW-005）");
 
@@ -480,8 +484,8 @@ for (const [label, text] of [
     label + " 必须与映射表同口径写「五项同时成立」（不得留「四项同时成立」）");
   assert.ok(!text.includes("四项同时成立"),
     label + " 不得保留「四项同时成立」（REVIEW-001）");
-  assert.ok(text.includes("待业务确认"),
-    label + " 必须写明数据源未确认时写空串占位并标「待业务确认」（REVIEW-002）");
+  assert.ok(text.includes("固定写空串"),
+    label + " 必须写明 DataGrid 根 Value 当前阶段固定写空串（数据源由工程师后续绑定）");
 }
 // 图层名例外清单：SKILL.md 与 mtslg-mode.md 必须把「底部栏 + 表格族」两条例外并列登记。
 for (const [label, text] of [["SKILL.md", mainSkill], ["mtslg-mode.md", modeDoc]]) {
