@@ -274,12 +274,13 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 ### 来源清单与不可交付门禁
 
 - mapping 的 `source` 必须带 provenance，且**两份哈希都要有**：`sourceSha256`/`sourceBytes`/`egress` 记录原始 `getDsl` capture 的事实（由快照回指带过来，生成期不重取、不推断），`snapshotSha256`/`snapshotBytes` 记录本次实际消费的 `dsl.snapshot.json` 自身字节哈希（生成器直接对读到的字节复算）。只记一层就断了「capture → 快照 → 页面产物」的来源链；快照里没有 capture provenance 时如实记 `null`，不得编造。
+- **provenance 是硬门禁**：`validate-iocontrol-provenance.js` 断言上面五项**存在且非空**，缺任何一项（含值为 `null` 的旧快照形态）一律非零退出；形状不符同样失败（哈希必须是 64 位小写十六进制、字节数必须是正整数字节数、`egress` 必须是非空字符串）——缺字段说明这是冻结守卫上线前的旧产物，写错值说明记录本身不可信，两者不能互相抵消。这道断言**只针对这五项新增字段**，不改变其他既有校验的判定：传了 provenance 的产物报出的错误与以前完全一致。**QA 口径**：历史产物（冻结守卫上线前生成、`mapping.source` 里这些字段为 `null`）现在会因此失败，这是预期行为而非回归缺陷——要么按「MasterGo DSL 单响应采集流水线」重新冻结后再交付，要么在明确的旧产物回归场景里显式加 `--allow-legacy-provenance`（只把「缺失」降级为警告，警告会打到 stderr，写错的值任何情况下都不豁免）。
 - 生成 IOContorl XML 前必须建立逐节点 mapping manifest；manifest 必须同时包含从原始 DSL 机械提取的 sourceNodes。每条 sourceNodes 记录至少包含 ref、parentRef、pageAbsX/pageAbsY、relativeX/relativeY、width/height 和真实 text（文本节点）；每条输出节点记录至少包含 xmlId、唯一 sourceRef、sourceParent、sourceText（文本节点）、输出父节点依据、expectedLeft/expectedTop/expectedWidth/expectedHeight。
 - **输出父节点可以不同于 `sourceParent`，但只能在声明过的容器重挂步骤里改**：`sourceParent` 永远保留 DSL 真实父节点作为来源事实，`parent`/`layoutParent` 记录实际输出父节点；`validate-iocontrol-provenance.js` 已支持该形态——它要求 `layoutParent`（否则 `parent`、再否则 `sourceParent`）存在于 `sourceNodes`，并据此独立重算 `expectedLeft/expectedTop`（容器内子节点按父容器归一化原点相对计算，内容区偏移只扣一次），不要求它与 `sourceParent` 相等。目前唯一合法的改写来源是 Bundle 的容器嵌套步骤（`apply-container-containment.js`，见「辅助脚本触发矩阵」与固定调用顺序），它只把命中 `childPolicy=nested-page-templates` 的容器子控件重挂进该容器。任何绕过该步骤、手工把 `parent`/`layoutParent` 改成未登记容器，或让子控件坐标不再等于相对新父容器的机械换算值，都属于静默发射，必须拒绝交付。
 - 文本节点的 Value 必须机械复制 sourceText；valueSource 必须为 dsl.text。禁止用 XML ID、组件属性名、字段名、坐标方向、视觉位置、模板槽位或业务语义生成 Value。RelativePositionXLabel 不得生成 Value="X"。
 - 坐标必须机械计算：MTSLG 根级/展平节点以 `pageAbsX - contentOriginX`、`pageAbsY - 192` 发射；保留父容器的子节点以 `pageAbs - parent.pageAbs - parent.contentInset` 发射（`contentInset` 只有容器类控件才有：GroupBox 的模板是标题条 + 内容区两段式，子坐标从内容区原点量，inset 按容器 Style 登记在映射表 `infoGroupTemplates.styleInsets`），并且内容区偏移只在根级扣一次；`Width/Height` 必须来自同一 sourceRef 的 bbox。禁止用 ID、相邻节点、截图观感、固定模板或“应该在这里”补坐标。MW WPF 复用同一份已归一化页面来源，但最终布局仍须由目标 WPF 容器确定。
 - 坐标空间必须明确：`sourceNodes` 永远保存 MasterGo 原始页面绝对坐标；输出节点的 `expectedLeft/expectedTop` 记录实际发射坐标，而不是替代来源事实。校验器必须用 `sourceNodes`、真实父子链和根级内容区偏移独立重算。
-- 生成器必须在写文件前执行 scripts/validate-iocontrol-provenance.js；校验器不得把 nodes 中的 expected 值当作 DSL 事实，必须用 sourceNodes 独立重算。任何 sourceNodes 缺失、UNTRACKED、Value != sourceText、缺少来源字段、父节点缺失或几何不匹配都必须以非零状态失败。验证失败时禁止输出、覆盖或交付 XML。
+- 生成器必须在写文件前执行 scripts/validate-iocontrol-provenance.js；校验器不得把 nodes 中的 expected 值当作 DSL 事实，必须用 sourceNodes 独立重算。任何 sourceNodes 缺失、UNTRACKED、Value != sourceText、缺少来源字段、父节点缺失、几何不匹配或 `mapping.source` 的 provenance 五项缺失/形状不符都必须以非零状态失败。验证失败时禁止输出、覆盖或交付 XML。
 - 禁止仅凭 XML 可解析、控件数量正确或肉眼看起来接近就宣称完成；必须保留 manifest 和校验输出作为交付证据。无法建立来源链的已映射节点必须停止并标记待确认；未映射组件则保留其来源记录，不得伪造 XML 节点。
 
 ## MasterGo DSL 单响应采集流水线（强制）
@@ -324,7 +325,7 @@ AI 必须同时读取原始 DSL、`visibility.json` 和正式组件映射，按�
 默认交付完整页面，不是截图、占位控件或近似原型。生成后必须按目标模式验证：
 
 - WPF：检查项目引用、Style/Resource 键、命名空间、绑定和原有代码风格，并执行可用的编译/加载验证；
-- IOContorl：在 XML 结构检查前，使用 node scripts/validate-iocontrol-provenance.js --xml <page.xml> --mapping <mapping.json> 做 Value/来源/坐标硬校验；非零退出码即停止交付；
+- IOContorl：在 XML 结构检查前，使用 node scripts/validate-iocontrol-provenance.js --xml <page.xml> --mapping <mapping.json> [--snapshot <runDir>/dsl.snapshot.json] [--capture-provenance <runDir>/getDsl.json.provenance.json] 做 provenance/Value/来源/坐标硬校验；非零退出码即停止交付。两个可选参数把 provenance 从「存在且非空」升级为闭环核对：`--snapshot` 会复算快照字节并核对它回指的 capture 哈希与 `mapping.source` 一致，`--capture-provenance` 会核对取数 sidecar 的 `sha256`/`bytes`/`egress`（唯一能对到真实 capture 字节的一环）。只有拿冻结守卫上线前的旧产物做回归时才加 `--allow-legacy-provenance`，并把它写进交付说明；
 - IOContorl：检查 XML 结构、`ControlType`、属性白名单、父子坐标，执行 Ctrl+R 或等价加载验证；
 - 两种模式都要做设计稿与运行结果的视觉核对。
 

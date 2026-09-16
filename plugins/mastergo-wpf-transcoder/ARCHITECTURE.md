@@ -71,7 +71,7 @@ flowchart LR
 | 多语言 | `gen-mtslg-lang-keys-from-dsl.js`、`gen-mtslg-page-lang.js` | 派生语言键、发射 CN/EN 字典 |
 | 宿主 | `gen-mw-wpf-page.js` | 生成 View / code-behind / ViewModel 与 csproj 登记 |
 | 编排 | **`gen-mastergo-page-bundle.js`（主入口）** | 串起模板解析 → 容器嵌套重挂 → 语言键 → LangName → XML → 校验 → Icon → Layout → 宿主 → 最终校验 |
-| 门禁 | `validate-iocontrol-provenance.js`、`check-iocontrol-coords.js` | 来源闭环、必写字段、坐标 0 MISMATCH / 0 EXTRA |
+| 门禁 | `validate-iocontrol-provenance.js`、`check-iocontrol-coords.js` | 来源闭环、`mapping.source` 的 capture provenance 硬断言、必写字段、坐标 0 MISMATCH / 0 EXTRA |
 | 审计/运维 | `audit-mtslg-feishu-map.js`、`classify-mastergo-groups.js`、`scan-mtslg-keys.ps1`、`sync-to-mt.ps1`、`cap-window*.ps1` | 文档覆盖审计、组件分类、键查证、运行目录同步、视觉截图 |
 | 脚本复用门禁 | `audit-script-duplication.js`（由 `tests/script-duplication.test.js` 调用） | 禁止「同一个功能写两份」：复制体（函数体完全相同）直接失败；同名函数必须在 `lib/script-reuse-registry.json` 登记原因 |
 
@@ -81,7 +81,7 @@ flowchart LR
 
 | 共享模块 | 内容 | 使用方 |
 |---|---|---|
-| `lib/script-helpers.js` | `fail` / `failWithPrefix` / `failAndExit`、`xmlAttr`、`xmlDocText`、`normalizeToken`、`numberOrNull`、`readJson`、`backupFile` | 全部脚本 |
+| `lib/script-helpers.js` | `fail` / `failWithPrefix` / `failAndExit`、`sha256Text` / `sha256File`（provenance 哈希的唯一实现）、`xmlAttr`、`xmlDocText`、`normalizeToken`、`numberOrNull`、`readJson`、`backupFile` | 全部脚本 |
 | `lib/project-csproj.js` | `.csproj` Include 解析、宿主路径推断（`inferHostPaths`） | `gen-mastergo-page-bundle.js`、`gen-mw-wpf-page.js` |
 | `lib/iocontrol-map-rules.js` | 模板表 `controlTypeRequiredAttrs` / `buttonFamily` 的读取与解析 | `gen-iocontrol-xml.js`、`validate-iocontrol-provenance.js` |
 | `lib/mastergo-rules.js` | DSL 层共用判定（如宿主壳标记词 `isHostShellName`） | `gen-mtslg-mapping-from-dsl.js`、`apply-container-containment.js` |
@@ -127,6 +127,7 @@ flowchart LR
 | 门禁 | 执行者 | 覆盖范围（规则见 SKILL.md / 映射表） |
 |---|---|---|
 | 来源与固定字段 | `validate-iocontrol-provenance.js` | 节点 ↔ DSL ref ↔ 父链 ↔ 文本的闭环、`ControlType` 必写字段、TextBlock 尺寸约束 |
+| capture provenance | `validate-iocontrol-provenance.js` | `mapping.source` 的 `sourceSha256`/`sourceBytes`/`egress`/`snapshotSha256`/`snapshotBytes` 必须存在且非空，形状必须是 64 位小写十六进制哈希 / 正整数字节数 / 非空字符串。可选 `--snapshot` / `--capture-provenance` 追加闭环核对（复算快照字节、核对快照与 sidecar 的回指与 `mapping.source` 一致）。冻结守卫上线前的历史产物默认失败；`--allow-legacy-provenance` 只豁免「缺失」并把警告打到 stderr，写错的值不豁免 |
 | 坐标 | `check-iocontrol-coords.js` | Left/Top/Width/Height 独立重算，要求 0 MISMATCH / 0 EXTRA |
 | 图标闭合 | `gen-mastergo-page-bundle.js` 内置校验 | Icon 键唯一与引用闭合、页面 Icon 文件结构 |
 | 语言闭环 | Bundle 的语言绑定与字典校验 | `LangName` 引用必须存在于本页字典，各语言 key 一致 |

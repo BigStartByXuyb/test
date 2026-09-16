@@ -3,14 +3,25 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { validate, validateTextAudit } = require('../validate-iocontrol-provenance');
+const { validate, validateTextAudit, validateCaptureProvenance } = require('../validate-iocontrol-provenance');
+
+// 新产物的 capture provenance 基准（AI-27）：校验器现在硬断言 mapping.source 五项存在且非空。
+// 下面每个「应当通过」的 fixture 都是新产物形态，所以都要带上——否则失败信息会变成缺 provenance，
+// 而不是本用例真正要验证的那条规则。
+const PROVENANCE = {
+  egress: 'direct',
+  sourceSha256: '0123456789abcdef'.repeat(4),
+  sourceBytes: 2048,
+  snapshotSha256: 'fedcba9876543210'.repeat(4),
+  snapshotBytes: 4096
+};
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'iocontrol-provenance-'));
 const xmlPath = path.join(dir, 'bad.xml');
 const manifestPath = path.join(dir, 'mapping.json');
 
 fs.writeFileSync(xmlPath, '<IOContorl ID="" Left="NaN" Top="NaN" Width="NaN" Height="NaN"><IOContorl ID="RelativePositionXLabel" ControlType="TextBlock" Value="X" Left="658" Top="476" Width="10" Height="16" /></IOContorl>');
-fs.writeFileSync(manifestPath, JSON.stringify({ contentOriginY: 192, sourceNodes: [
+fs.writeFileSync(manifestPath, JSON.stringify({ contentOriginY: 192, source: PROVENANCE, sourceNodes: [
   { ref: '3:44417', parentRef: null, pageAbsX: 0, pageAbsY: 0, relativeX: 0, relativeY: 0, width: 1280, height: 1024 },
   { ref: '3:56338/3:53325/3:53243', parentRef: '3:44417', pageAbsX: 658, pageAbsY: 668, relativeX: 658, relativeY: 668, width: 63, height: 16, text: '镜头倍率' }
 ], nodes: [{
@@ -33,7 +44,7 @@ if (!result.errors.some(x => /expectedLeft/.test(x))) throw new Error('缺少 so
 const flatXmlPath = path.join(dir, 'flat.xml');
 const flatManifestPath = path.join(dir, 'flat.json');
 fs.writeFileSync(flatXmlPath, '<IOContorl ID="" Left="NaN" Top="NaN" Width="NaN" Height="NaN"><IOContorl ID="FlatChild" ControlType="TextBlock" Value="SCAN" Left="150" Top="158" Width="NaN" Height="40" /></IOContorl>');
-fs.writeFileSync(flatManifestPath, JSON.stringify({ contentOriginY: 192, rootRef: 'root', sourceNodes: [
+fs.writeFileSync(flatManifestPath, JSON.stringify({ contentOriginY: 192, source: PROVENANCE, rootRef: 'root', sourceNodes: [
   { ref: 'root', parentRef: null, pageAbsX: 0, pageAbsY: 0, relativeX: 0, relativeY: 0, width: 1280, height: 1024 },
   { ref: 'component', parentRef: 'root', pageAbsX: 100, pageAbsY: 300, relativeX: 100, relativeY: 300, width: 384, height: 132 },
   { ref: 'component/scan', parentRef: 'component', pageAbsX: 150, pageAbsY: 350, relativeX: 50, relativeY: 50, width: 45, height: 18, text: 'SCAN' }
@@ -47,7 +58,7 @@ if (!flatResult.ok) throw new Error('展平模板节点应按 layoutParent=null 
 const fixed40XmlPath = path.join(dir, 'fixed40.xml');
 const fixed40ManifestPath = path.join(dir, 'fixed40.json');
 fs.writeFileSync(fixed40XmlPath, '<IOContorl ID="" Left="NaN" Top="NaN" Width="NaN" Height="NaN"><IOContorl ID="FixedText" ControlType="TextBlock" Value="标题" FontSize="16" Left="10" Top="20" Width="NaN" Height="40" /></IOContorl>');
-fs.writeFileSync(fixed40ManifestPath, JSON.stringify({ contentOriginY: 192, sourceNodes: [
+fs.writeFileSync(fixed40ManifestPath, JSON.stringify({ contentOriginY: 192, source: PROVENANCE, sourceNodes: [
   { ref: 'root', parentRef: null, pageAbsX: 0, pageAbsY: 0, relativeX: 0, relativeY: 0, width: 1280, height: 1024 },
   { ref: 'text', parentRef: 'root', pageAbsX: 10, pageAbsY: 212, relativeX: 10, relativeY: 212, width: 50, height: 16, text: '标题' }
 ], nodes: [{
@@ -105,6 +116,7 @@ function buttonCase(tagAttrs, nodeExtra) {
     Object.entries(tagAttrs).map(([k, v]) => k + '="' + v + '"').join(' ') + ' /></IOContorl>';
   const manifest = {
     contentOriginY: 192,
+    source: PROVENANCE,
     sourceNodes: buttonSourceNodes,
     nodes: [Object.assign({
       xmlId: 'BTN', sourceRef: 'btn', sourceParent: 'root', controlType: 'IconButton',
@@ -157,7 +169,7 @@ if (plainButtonResult.ok || !plainButtonResult.errors.some(x => /无图标按钮
 const numericTextXmlPath = path.join(dir, 'textblock-numeric-width.xml');
 const numericTextManifestPath = path.join(dir, 'textblock-numeric-width.json');
 fs.writeFileSync(numericTextXmlPath, '<IOContorl ID="" Left="NaN" Top="NaN" Width="NaN" Height="NaN"><IOContorl ID="TextWidth" ControlType="TextBlock" Value="标签" Left="10" Top="220" Width="76" Height="40" /></IOContorl>');
-fs.writeFileSync(numericTextManifestPath, JSON.stringify({ contentOriginY: 192, rootRef: 'root', sourceNodes: [
+fs.writeFileSync(numericTextManifestPath, JSON.stringify({ contentOriginY: 192, source: PROVENANCE, rootRef: 'root', sourceNodes: [
   { ref: 'root', parentRef: null, pageAbsX: 0, pageAbsY: 0, relativeX: 0, relativeY: 0, width: 1280, height: 1024 },
   { ref: 'text', parentRef: 'root', pageAbsX: 10, pageAbsY: 412, relativeX: 10, relativeY: 412, width: 76, height: 22, text: '标签' }
 ], nodes: [{
@@ -186,6 +198,7 @@ fs.writeFileSync(cliXmlPath, [
 ].join('\n'));
 fs.writeFileSync(cliMappingPath, JSON.stringify({
   contentOriginY: 192,
+  source: PROVENANCE,
   rootRef: 'root',
   sourceNodes: [
     { ref: 'root', parentRef: null, pageAbsX: 0, pageAbsY: 0, relativeX: 0, relativeY: 0, width: 1280, height: 1024 },
@@ -229,6 +242,7 @@ fs.writeFileSync(scopedXmlPath, '<IOContorl ID="" Left="NaN" Top="NaN" Width="Na
   'IOEnable="" Left="600" Top="108" Width="60" Height="60" /></IOContorl>');
 fs.writeFileSync(scopedMappingPath, JSON.stringify({
   contentOriginY: 192,
+  source: PROVENANCE,
   sourceNodes: [
     { ref: 'root', parentRef: null, pageAbsX: 0, pageAbsY: 0, relativeX: 0, relativeY: 0, width: 1280, height: 1024 },
     { ref: 'plain', parentRef: 'root', pageAbsX: 600, pageAbsY: 300, relativeX: 600, relativeY: 300, width: 60, height: 60 },
@@ -276,6 +290,7 @@ fs.writeFileSync(missingEntryBadXmlPath,
   ' IconWidth="50" IconHeight="40" /></IOContorl>');
 fs.writeFileSync(missingEntryMappingPath, JSON.stringify({
   contentOriginY: 192,
+  source: PROVENANCE,
   sourceNodes: [
     { ref: 'root', parentRef: null, pageAbsX: 0, pageAbsY: 0, relativeX: 0, relativeY: 0, width: 1280, height: 1024 },
     { ref: 'plain', parentRef: 'root', pageAbsX: 600, pageAbsY: 300, relativeX: 600, relativeY: 300, width: 60, height: 60 }
@@ -310,6 +325,7 @@ fs.writeFileSync(headerXmlPath, [
 ].join('\n'));
 fs.writeFileSync(headerMappingPath, JSON.stringify({
   contentOriginY: 192,
+  source: PROVENANCE,
   rootRef: 'root',
   sourceNodes: [
     { ref: 'root', parentRef: null, pageAbsX: 0, pageAbsY: 0, relativeX: 0, relativeY: 0, width: 1280, height: 1024 },
@@ -339,3 +355,130 @@ assert.notStrictEqual(headerMissingRun.status, 0, '既没有 Value 也没有 Hea
 assert.match(headerMissingRun.stderr + headerMissingRun.stdout, /既没有 Value 也没有 Header/);
 
 console.log('PASS provenance Header-carrier regression test');
+
+// ---- capture provenance 硬门禁（AI-28）----
+// 断言只针对 AI-27 新增的 provenance 字段：五项存在且非空 + 形状正确。
+// 历史产物（冻结守卫上线前，快照里没有 capture provenance）默认失败，可用
+// --allow-legacy-provenance 显式把「缺失」降级为警告——但豁免不覆盖「写错的值」。
+const { sha256File } = require('../lib/script-helpers');
+const PROVENANCE_FIELD_NAMES = ['sourceSha256', 'sourceBytes', 'snapshotSha256', 'snapshotBytes', 'egress'];
+
+assert.deepStrictEqual(validateCaptureProvenance({ source: PROVENANCE }, {}).errors, [],
+  '五项齐全的 provenance 不得报错');
+assert.deepStrictEqual(validateCaptureProvenance({ source: PROVENANCE }, {}).warnings, [],
+  '断言通过时不得留下警告');
+for (const field of PROVENANCE_FIELD_NAMES) {
+  const dropped = Object.assign({}, PROVENANCE);
+  delete dropped[field];
+  assert.ok(validateCaptureProvenance({ source: dropped }, {}).errors.some(x => x.includes(field)),
+    '缺 ' + field + ' 必须失败并点名该字段');
+  // AI-27 的快照没有 capture provenance 时生成器如实写 null，null 必须走「缺失」这条路径
+  assert.ok(validateCaptureProvenance({ source: Object.assign({}, PROVENANCE, { [field]: null }) }, {})
+    .errors.some(x => x.includes(field)), field + ' 为 null 必须视同缺失');
+}
+assert.ok(validateCaptureProvenance({}, {}).errors.some(x => /缺少 mapping\.source/.test(x)),
+  '整个 source 缺失必须失败');
+assert.ok(validateCaptureProvenance([], {}).errors.some(x => /缺少 mapping\.source/.test(x)),
+  '数组形态映射清单没有 source，必须失败');
+
+// 形状：哈希 64 位小写十六进制、字节数正整数、egress 非空字符串——写错的值永远失败。
+for (const bad of [PROVENANCE.sourceSha256.toUpperCase(), PROVENANCE.sourceSha256.slice(0, 63),
+  PROVENANCE.sourceSha256 + 'z', 123]) {
+  assert.ok(validateCaptureProvenance({ source: Object.assign({}, PROVENANCE, { sourceSha256: bad }) }, {})
+    .errors.some(x => /sourceSha256 必须是 64 位小写十六进制/.test(x)), '哈希形状错误必须失败: ' + bad);
+}
+for (const bad of [0, -1, 1.5, '2048']) {
+  assert.ok(validateCaptureProvenance({ source: Object.assign({}, PROVENANCE, { snapshotBytes: bad }) }, {})
+    .errors.some(x => /snapshotBytes 必须是正整数字节数/.test(x)), '字节数形状错误必须失败: ' + bad);
+}
+assert.ok(validateCaptureProvenance({ source: Object.assign({}, PROVENANCE, { egress: '   ' }) }, {})
+  .errors.some(x => /egress/.test(x)), '全空白的 egress 必须视同缺失');
+assert.ok(validateCaptureProvenance({ source: Object.assign({}, PROVENANCE, { egress: 7 }) }, {})
+  .errors.some(x => /egress 必须是非空字符串/.test(x)), '非字符串 egress 必须失败');
+
+// 历史产物豁免：只把「缺失」降级为警告，且必须留下可见警告。
+const legacyProvenance = { egress: null, sourceSha256: null, sourceBytes: null, snapshotSha256: null, snapshotBytes: null };
+assert.ok(validateCaptureProvenance({ source: legacyProvenance }, {}).errors.length > 0,
+  '历史产物默认必须失败');
+const legacyExempt = validateCaptureProvenance({ source: legacyProvenance }, { allowLegacyProvenance: true });
+assert.deepStrictEqual(legacyExempt.errors, [], '豁免后缺失不再是错误');
+assert.ok(legacyExempt.warnings.length > 0, '豁免必须留下可见的警告，不得静默放行');
+assert.ok(validateCaptureProvenance({ source: Object.assign({}, legacyProvenance, { snapshotSha256: 'NOTHEX' }) },
+  { allowLegacyProvenance: true }).errors.some(x => /snapshotSha256 必须是 64 位小写十六进制/.test(x)),
+  '豁免不得放过形状错误的哈希：缺字段与写错值不能互相抵消');
+
+// 闭环核对：--snapshot / --capture-provenance 是可选旁证，核对同一份字节的事实。
+const chainCaptureSha = 'a1b2c3d4'.repeat(8);
+const chainSnapshotPath = path.join(dir, 'chain.dsl.snapshot.json');
+fs.writeFileSync(chainSnapshotPath, JSON.stringify({
+  schemaVersion: 'mastergo-dsl-snapshot/2', fileId: 'f', layerId: 'root',
+  captureSha256: chainCaptureSha, captureBytes: 2048, egress: 'direct'
+}, null, 2) + '\n');
+const chainSource = {
+  egress: 'direct', sourceSha256: chainCaptureSha, sourceBytes: 2048,
+  snapshotSha256: sha256File(chainSnapshotPath), snapshotBytes: fs.statSync(chainSnapshotPath).size
+};
+const chainOptions = { snapshotPath: chainSnapshotPath };
+assert.deepStrictEqual(validateCaptureProvenance({ source: chainSource }, chainOptions).errors, [],
+  '快照与 mapping.source 闭环一致时不得报错');
+assert.ok(validateCaptureProvenance({ source: Object.assign({}, chainSource, { snapshotSha256: PROVENANCE.snapshotSha256 }) },
+  chainOptions).errors.some(x => /快照字节与 mapping\.source\.snapshotSha256 不一致/.test(x)),
+  'snapshotSha256 与快照真实字节不符必须失败（防止抄一份别的页面的哈希）');
+assert.ok(validateCaptureProvenance({ source: Object.assign({}, chainSource, { snapshotBytes: chainSource.snapshotBytes + 1 }) },
+  chainOptions).errors.some(x => /快照字节数与 mapping\.source\.snapshotBytes 不一致/.test(x)),
+  'snapshotBytes 与快照实际大小不符必须失败');
+assert.ok(validateCaptureProvenance({ source: Object.assign({}, chainSource, { sourceSha256: PROVENANCE.sourceSha256 }) },
+  chainOptions).errors.some(x => /captureSha256 与 mapping\.source\.sourceSha256 不一致/.test(x)),
+  '快照回指的 capture 哈希与 mapping.source 不符必须失败（断链）');
+const orphanSnapshotPath = path.join(dir, 'orphan.dsl.snapshot.json');
+fs.writeFileSync(orphanSnapshotPath, JSON.stringify({ fileId: 'f', layerId: 'root' }, null, 2) + '\n');
+assert.ok(validateCaptureProvenance({ source: chainSource }, { snapshotPath: orphanSnapshotPath })
+  .errors.some(x => /缺少 captureSha256/.test(x)),
+  '快照自己缺 captureSha256 时必须失败，不得当作已核对');
+assert.ok(validateCaptureProvenance({ source: chainSource }, { snapshotPath: path.join(dir, 'no-such-snapshot.json') })
+  .errors.some(x => /读取 DSL 快照 失败/.test(x)),
+  '显式给出的旁证文件读不到必须失败，不得静默跳过已声明的核对');
+
+const chainSidecarPath = path.join(dir, 'getDsl.json.provenance.json');
+fs.writeFileSync(chainSidecarPath, JSON.stringify({
+  schemaVersion: 'mastergo-mcp-capture-provenance/1', sha256: chainCaptureSha, bytes: 2048, egress: 'direct'
+}, null, 2) + '\n');
+const sidecarOptions = { captureProvenancePath: chainSidecarPath };
+assert.deepStrictEqual(validateCaptureProvenance({ source: chainSource }, sidecarOptions).errors, [],
+  '取数 sidecar 与 mapping.source 一致时不得报错');
+assert.ok(validateCaptureProvenance({ source: Object.assign({}, chainSource, { sourceSha256: PROVENANCE.sourceSha256 }) },
+  sidecarOptions).errors.some(x => /provenance sidecar 的 sha256 与 mapping\.source\.sourceSha256 不一致/.test(x)),
+  'sidecar 哈希与 mapping.source 不符必须失败——这是唯一能对到真实 capture 字节的一环');
+assert.ok(validateCaptureProvenance({ source: Object.assign({}, chainSource, { egress: 'corp-proxy' }) },
+  sidecarOptions).errors.some(x => /egress 与 mapping\.source\.egress 不一致/.test(x)),
+  '出网链路声明前后不一致必须失败');
+
+// CLI 接线：默认硬失败、显式豁免可见、--snapshot 真的参与核对。
+const legacyCliMappingPath = path.join(dir, 'header-group-legacy.json');
+const legacyCliMapping = JSON.parse(fs.readFileSync(headerMappingPath, 'utf8'));
+delete legacyCliMapping.source;
+fs.writeFileSync(legacyCliMappingPath, JSON.stringify(legacyCliMapping, null, 2));
+const gateFailRun = spawnSync(process.execPath, [cliScript, '--xml', headerXmlPath, '--mapping', legacyCliMappingPath], { encoding: 'utf8' });
+assert.notStrictEqual(gateFailRun.status, 0, '缺 provenance 的历史产物默认必须校验失败');
+assert.match(gateFailRun.stderr + gateFailRun.stdout, /缺少 mapping\.source/,
+  '失败信息必须点名缺的是 capture provenance');
+const gateExemptRun = spawnSync(process.execPath, [cliScript, '--xml', headerXmlPath, '--mapping', legacyCliMappingPath,
+  '--allow-legacy-provenance'], { encoding: 'utf8' });
+assert.strictEqual(gateExemptRun.status, 0,
+  '显式豁免历史产物后必须通过: ' + gateExemptRun.stderr + gateExemptRun.stdout);
+assert.match(gateExemptRun.stderr, /WARN: 历史产物豁免/,
+  '豁免必须留在 stderr 上可见，不得静默放行');
+const chainCliMappingPath = path.join(dir, 'header-group-chain.json');
+fs.writeFileSync(chainCliMappingPath, JSON.stringify(
+  Object.assign({}, JSON.parse(fs.readFileSync(headerMappingPath, 'utf8')), { source: chainSource }), null, 2));
+const chainCliRun = spawnSync(process.execPath, [cliScript, '--xml', headerXmlPath, '--mapping', chainCliMappingPath,
+  '--snapshot', chainSnapshotPath], { encoding: 'utf8' });
+assert.strictEqual(chainCliRun.status, 0,
+  '闭环一致时 --snapshot 不得误报: ' + chainCliRun.stderr + chainCliRun.stdout);
+const chainCliBadRun = spawnSync(process.execPath, [cliScript, '--xml', headerXmlPath, '--mapping', headerMappingPath,
+  '--snapshot', chainSnapshotPath], { encoding: 'utf8' });
+assert.notStrictEqual(chainCliBadRun.status, 0, '--snapshot 与 mapping.source 的哈希不符必须失败');
+assert.match(chainCliBadRun.stderr + chainCliBadRun.stdout, /snapshotSha256 不一致/,
+  '失败信息必须点名是快照字节对不上');
+
+console.log('PASS capture provenance gate regression test');
