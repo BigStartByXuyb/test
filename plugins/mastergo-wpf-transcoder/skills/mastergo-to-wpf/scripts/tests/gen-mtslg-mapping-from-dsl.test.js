@@ -585,7 +585,7 @@ assert.ok(!tableMapping.nodes.some(node => node.sourceRef.startsWith('tbl:root/t
 assert.strictEqual(tableMapping.tableAudits.length, 1, '必须登记一条表格审计');
 const tableAudit = tableMapping.tableAudits[0];
 assert.strictEqual(tableAudit.xmlId, dataGrid.xmlId);
-assert.strictEqual(tableAudit.valuePending, true, 'Value 待业务确认必须显式登记');
+assert.strictEqual(tableAudit.valuePending, true, 'Value 固定空串时必须显式登记 valuePending 待绑定提示');
 assert.strictEqual(tableAudit.columns.length, 3);
 assert.deepStrictEqual(tableAudit.columns.map(column => column.cellKinds),
   [['IntNumberBox', 'IntNumberBox'], ['IntNumberBox', 'TextBlock'], []],

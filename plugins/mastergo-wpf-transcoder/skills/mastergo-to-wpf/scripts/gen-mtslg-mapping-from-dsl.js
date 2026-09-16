@@ -1025,7 +1025,7 @@ for (const table of tableAudits) {
   console.error("表格已发射: [" + table.ref + "] " + (table.name || "") +
     " → DataGrid " + table.xmlId + "，" + table.columns.length + " 列（" +
     table.columns.map(column => column.controlType).join("/") + "），" +
-    table.rows.length + " 行按数据登记（未发射控件）；Value 待业务确认。" +
+    table.rows.length + " 行按数据登记（未发射控件）；Value 固定空串（已置 valuePending 待绑定提示）。" +
     (table.geometry.declaredBoxCoversContent ? "" : " 注意：图层声明尺寸覆盖不了内容范围，见 tableAudits.geometry。"));
 }
 if (templateConflicts.length) {

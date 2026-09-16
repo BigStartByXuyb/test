@@ -392,7 +392,7 @@ assert.ok(typeof tableFamily.rowPolicyNote === "string" && tableFamily.rowPolicy
 assert.ok(tableFamily.innerTextPolicy && tableFamily.innerTextPolicy.role, "必须登记表格内文本的 omit 角色");
 assert.strictEqual(tableFamily.innerTextPolicy.decision, "omit", "表格行内文本必须 decision=omit");
 assert.ok(tableFamily.valuePolicy && tableFamily.valuePolicy.attr === "Value", "必须登记 DataGrid 根节点的 Value 策略");
-assert.strictEqual(tableFamily.valuePolicy.allowEmpty, true, "数据源未确认时允许空串占位并标待业务确认");
+assert.strictEqual(tableFamily.valuePolicy.allowEmpty, true, "当前阶段允许（并要求）空串占位 + valuePending 待绑定提示");
 
 // 规则块必须由共享解析器读取（禁止各脚本再抄一份默认值）。
 assert.ok(mapRules.includes("parseTableTemplate"), "lib/iocontrol-map-rules.js 必须提供 parseTableTemplate 共享解析");

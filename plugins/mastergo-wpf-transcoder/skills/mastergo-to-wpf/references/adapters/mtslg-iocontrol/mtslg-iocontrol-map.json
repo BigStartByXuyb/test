@@ -1413,9 +1413,7 @@
         "style": null,
         "iconPolicy": "none",
         "childPolicy": "columns-from-page-mapping",
-        "requiredAttrs": [
-          "Value"
-        ],
+        "requiredAttrsNote": "本变体不再登记 requiredAttrs：必写字段集的唯一登记点是本文件顶层的 controlTypeRequiredAttrs.DataGrid（生成器与校验器都只读那一处），此处重复登记会造成第二个真值点。",
         "slots": [
           {
             "slot": "table",
