@@ -490,10 +490,10 @@ Style 与内部组件对照（只对下表列出的真实值成立）：
 ### 匹配规则
 
 - 本族真值源：映射表 `tableTemplates`（`match.structural` 结构签名、`columnTemplate` 列定义模板、`columnControlTypePolicy` 列类型判定、`rowPolicy`/`innerTextPolicy` 行内容处置、`valuePolicy` 数据源策略）。
-- 独立识别 MasterGo 组件集 Table；组件集 ID 和实例 ID 只作来源追踪，不参与唯一匹配。
-- **表格在团队组件库里通常没有组件集**（设计稿里只是一个 `GROUP`），因此本族额外登记一条**结构签名**命中路径：节点类型 `GROUP` + 图层名以「表格」结尾 + 孩子里含名为「表头」的群组 + 至少一个名为 `item` 的行群组 + 表头至少有 1 条可见文本，**五项同时成立**才算命中。结构签名是主判据、图层名后缀是交叉核对项：只成立一半时登记 `pending` 并写明是哪一半不成立（既不静默套模板，也不假装已识别）。这是本插件对「图层名称只用于核对、不参与匹配」登记的第二个例外（另一个是底部栏按组件名匹配）。
+- 本族**只登记结构签名一条命中路径**：映射表里没有 `match.property`、没有 `componentSet`（团队组件库当前也没有 Table 组件集）。组件集 ID、实例 ID 与图层重命名只作来源追踪，不参与唯一匹配；将来若组件库正式发布 Table 组件集，再按「组件集名 + 公开属性」登记第二条路径，并在本节补写。
+- **表格在团队组件库里通常没有组件集**（设计稿里只是一个 `GROUP`），因此本族按**结构签名**命中：节点类型 `GROUP` + 图层名以「表格」结尾 + 孩子里含名为「表头」的群组 + 至少一个名为 `item` 的行群组 + 表头至少有 `signature.minHeaderTexts` 条可见文本，**五项同时成立**才算命中。结构签名是主判据、图层名后缀是交叉核对项：**部分命中**（后缀或签名之一成立）时登记 `pending` 并写明是哪一半不成立（既不静默套模板，也不假装已识别），两项都不成立的普通 `GROUP` 不属于候选。这是本插件对「图层名称只用于核对、不参与匹配」登记的第二个例外（另一个是底部栏按组件名匹配）。
 - 父节点、子节点关系和表格列顺序按 MasterGo 实际结构读取；若父节点明确是 TabControl，则外层按 TabControl/TabItem 规则处理，Table 子节点仍只映射为 DataGrid。
-- 根节点数据源必须映射到非空 Value；无法确认数据源时写空字符串占位并标记「待业务确认」（映射 `tableAudits[].valuePending=true`），不得省略、不得编造。
+- 根节点数据源必须映射到 Value；**数据源未确认时写空字符串占位并标记「待业务确认」**（映射 `tableAudits[].valuePending=true`，交付说明里点名），不得省略 `Value`、不得编造文件名。数据源确认后由工程师或运行时绑定填入文件名并置 `valuePending=false`。
 - **列 = 表头可见文本**（从左到右），行 = PageData 数据：行不发射控件，只按行登记进 `tableAudits[].rows`（行标题 / 单位 / 每格原文与类型都留档）。
 - **列子节点是列结构，不是页面控件**：几何按下方 `columnTemplate` 固定发射（`Left=0` / `Top=0` / `Height=45`、不写 `Width`），属性只发射 `Value` + 恒写 `IOName` 空占位，**不套** `controlTypeRequiredAttrs`（那是页面控件的字段集）。列 `ControlType` 由该列各行单元格类型**严格多数**（> 50%）判定，没有严格多数时退化为 `TextBlock`；每列的类型分布记进 `tableAudits[].columns` 供复核。
 - 表格内文本的处置：表头文本承载列 `Value`（`valueSource=dsl.text`，`decision=emit`）；行内文本（行标题 / 单位 / 单元格文本，含输入框实例内部的固定文本）一律 `decision=omit` + `role=table-data-cell`，避免泄漏成根级 TextBlock。
@@ -513,13 +513,13 @@ Style 与内部组件对照（只对下表列出的真实值成立）：
 
 字段来源：数据源→根节点 Value（设计稿没有来源时写空串占位并标待业务确认）；业务字段/表标识→IOName；加载、刷新或选中动作→IOCommand；可用条件→IOEnable；自动刷新→IsAutoRefresh；根节点位置和尺寸→表格图层 bbox；列节点位置尺寸→映射表 `columnTemplate` 固定值。Style 只填 MasterGo 节点实际提供且代码库已登记的样式。
 
-列节点按表头展开：列标题→子节点 Value（必须回溯到该表头文本的 layerId/ref），列业务字段→子节点 IOName（设计无来源写空串），列控件类型按该列单元格类型严格多数判定（`TextBlock` / `NumberBox` / `IntNumberBox` / `TextBox` 等已登记类型；没有多数退化为 `TextBlock`）。隐藏主键列使用 `IOVisible="false"`。列控件类型不是加载器必填契约，但必须由单元格机械判定并把分布写进 `tableAudits[].columns`，不得凭外观猜。
+列节点按表头展开：**列数 = 表头可见文本数**，列标题→子节点 Value（必须回溯到该表头文本的 layerId/ref），列业务字段→子节点 IOName（设计无来源写空串），列控件类型按该列单元格类型严格多数判定（`TextBlock` / `NumberBox` / `IntNumberBox` / `TextBox` 等已登记类型；没有多数退化为 `TextBlock`）。列控件类型不是加载器必填契约，但必须由单元格机械判定并把分布写进 `tableAudits[].columns`，不得凭外观猜。**本族不为列发射 `IOVisible`**（表头文本没有「是否主键」这类信息，没有可靠来源）；确实需要隐藏列时，先在映射表 `columnTemplate` 登记来源判据与发射口径，再四处人读文档同步。
 
 # 固定字段与可选字段规则
 
 - **必写字段与按钮族固定参数（IconButton / Button / StatusButton）**：每个 ControlType 的固定必写字段集登记在 `mtslg-iocontrol-map.json` 的 `controlTypeRequiredAttrs`，生成器必须发射这些属性，取不到来源时写**空字符串占位**。按钮族在此基础上恒写 `PageName`、`IOVisible`、`IOCommand`、`IOEnable`；`IconButton` 模板含 `Icon`/`IconWidth`/`IconHeight`：有图标槽位时机械取**图标图形节点自身的 bbox**（不是控件宽高，也不是图标容器尺寸）四舍五入取整，无图标槽位时这三项写空字符串；`Button`/`StatusButton` 模板不含图标字段，不发射 `Icon`/`IconWidth`/`IconHeight`。映射带 `Icon` 却缺少 `iconSize` 时生成器直接失败，禁止猜尺寸。`LangName` 是唯一例外：只在多语言绑定层给出真实 key 时发射，动态值等 `noLangRefs` 豁免节点不写空占位。
 - 固定：ControlType、节点数量、父子关系、槽位顺序。
-- 几何/显示字段：Value、Left、Top、Width、Height、FontSize、FontWeight、字体/颜色/Style；其中 DSL 提供字体样式时 FontSize 必填，Height 与 FontSize 独立取值；`FontWeight` 是**命中才写**的条件属性（设计稿字重非 normal 时发射，值取设计稿 `styles[...].value.style` 的 `fontStyle`，如 `Bold`；**判定顺序固定为两步：先看样式名，命中映射表 `textBlockFontWeight.normalStyleNames` 即判为 normal、不写；只有样式名取不到时才回退用 `normalValues` 按 `weight` 判定**），不参与 `controlTypeRequiredAttrs` 恒写集合，规则以 `mtslg-mode.md` 的 TextBlock 字体规则与映射表 `textBlockFontWeight` 为准；MTSLG TextBlock 的 Height 固定为 40、**Width 固定为 `NaN`（自适应，不使用文本 bbox 宽度）**；输入框和选择框外框的 Height 按 MasterGo 的 40/36/32/28 变体处理；Height 与 FontSize 必须分别读取。一般显示型子节点缺少 Value 时控件仍会生成，但文字内容为空；**DataGrid 根节点例外，其 Value 属性必填且最终值必须非空**。列子节点 Value 是否填写取决于 MasterGo 是否提供可靠的字段/标题来源，不属于 DataGrid 加载器的必填契约。Style 只有 MasterGo 明确提供且代码库存在对应资源键时才填写。只有当 MasterGo 层级明确存在父级容器并且该父级有样式选择器时，才由父级为子控件提供样式；不得根据外观或组件名称自行添加父级容器。
+- 几何/显示字段：Value、Left、Top、Width、Height、FontSize、FontWeight、字体/颜色/Style；其中 DSL 提供字体样式时 FontSize 必填，Height 与 FontSize 独立取值；`FontWeight` 是**命中才写**的条件属性（设计稿字重非 normal 时发射，值取设计稿 `styles[...].value.style` 的 `fontStyle`，如 `Bold`；**判定顺序固定为两步：先看样式名，命中映射表 `textBlockFontWeight.normalStyleNames` 即判为 normal、不写；只有样式名取不到时才回退用 `normalValues` 按 `weight` 判定**），不参与 `controlTypeRequiredAttrs` 恒写集合，规则以 `mtslg-mode.md` 的 TextBlock 字体规则与映射表 `textBlockFontWeight` 为准；MTSLG TextBlock 的 Height 固定为 40、**Width 固定为 `NaN`（自适应，不使用文本 bbox 宽度）**；输入框和选择框外框的 Height 按 MasterGo 的 40/36/32/28 变体处理；Height 与 FontSize 必须分别读取。一般显示型子节点缺少 Value 时控件仍会生成，但文字内容为空；**DataGrid 根节点例外：`Value` 恒写，数据源未确认时写空串占位并置 `valuePending=true`（待业务确认，见 §4.1 与 `valuePolicy.pendingRule`）；「最终值必须非空」只约束数据源已确认的页面**。列子节点是**列定义**不是页面控件：`Value` 一律等于该列表头文本（由表头机械展开，不是「可选字段」），列几何与字段集走 `tableTemplates.columnTemplate`，不套用本条页面控件字段集。Style 只有 MasterGo 明确提供且代码库存在对应资源键时才填写。只有当 MasterGo 层级明确存在父级容器并且该父级有样式选择器时，才由父级为子控件提供样式；不得根据外观或组件名称自行添加父级容器。
 - 运行时：IOName、IOCommand、PageName、IOEnable、IOState、LangName。
 - ID 按 MX_GUID/Pin 规则生成，不复制 MasterGo layer ID。
 

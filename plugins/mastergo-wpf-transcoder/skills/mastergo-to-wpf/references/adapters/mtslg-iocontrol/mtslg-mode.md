@@ -65,7 +65,7 @@
 - **必写字段（所有 ControlType）**：每个 ControlType 的固定必写字段集登记在 `mtslg-iocontrol-map.json` 的 `controlTypeRequiredAttrs`；生成器必须发射这些属性，取不到来源时写**空字符串占位**（个别字段在 `controlTypeAttrDefaults` 里登记了默认值，如 `Border.Value` 线宽默认 `1`）。`LangName` 是唯一例外：只在多语言绑定层给出真实 key 时发射，动态值等 `noLangRefs` 豁免节点不写空占位。
 - **多语言默认开启**：Bundle 在 manifest 缺少 `languages` 时自动按 `languages.auto=true` + CN/EN 生成页面字典并强制 `LangName` 闭环；只有显式 `languages=false` / `{disabled:true, reason:"…"}` 才关闭，关闭原因写入审计。多语言是默认能力，不是可选项。
 - **按钮族固定参数（IconButton / Button / StatusButton）**：`PageName`、`IOVisible`、`IOCommand`、`IOEnable` 四个运行时参数无论能否取到来源都恒写，取不到时写空字符串值（merge 时保留工程师已有真实值）；`IconButton` 的 `Icon`/`IconWidth`/`IconHeight` 同样恒写：有图标槽位时取**图标图形节点自身 bbox**（映射字段 `iconSize`，四舍五入取整，不是控件宽高），无图标槽位时写空字符串；`Button`/`StatusButton` 模板不含图标字段，不发射 `Icon`、`IconWidth`、`IconHeight`。映射带 `Icon` 却没有 `iconSize` 时生成器直接失败，禁止猜图标尺寸。
-- **模板匹配键**：组件族匹配使用“组件集名 + 公开属性名 + 真实属性值”。设计稿里的图层名称只用于核对，不参与匹配（**底部栏除外**：底部栏实例的属性里没有变体信息，按 `layoutRules.bottomBar.match` 登记的组件名匹配，见《页面壳层 Layout 映射规范》）；历史上按“父节点语义”分流的表已作废（映射表里没有这类字段；右栏可直接放置的独立组件由 `rightSidebarComponentTemplates` 按组件集名匹配，如 `右侧栏-左右结构-icon+文案`）。变体登记 `componentSet` 时，解析先用公开属性值命中变体，再用变体内部实例的组件名交叉核对；两者不一致**直接失败并要求重新核对**，不静默选边（`resolve-mtslg-template-mapping.js` 按此实现）。
+- **模板匹配键**：组件族匹配使用“组件集名 + 公开属性名 + 真实属性值”，或在映射表里登记 `structural`（结构签名）的族按结构签名匹配。设计稿里的图层名称只用于核对，不参与匹配，**例外只有两条**：① 底部栏实例的属性里没有变体信息，按 `layoutRules.bottomBar.match` 登记的组件名匹配（见《页面壳层 Layout 映射规范》）；② 表格族（`tableTemplates`）在设计稿里没有组件集，按 `match.structural` 登记的**结构签名 + 图层名后缀**匹配（见 4.1）。两条例外都登记在映射表里，不是“按图层名兜底”。历史上按“父节点语义”分流的表已作废（映射表里没有这类字段；右栏可直接放置的独立组件由 `rightSidebarComponentTemplates` 按组件集名匹配，如 `右侧栏-左右结构-icon+文案`）。变体登记 `componentSet` 时，解析先用公开属性值命中变体，再用变体内部实例的组件名交叉核对；两者不一致**直接失败并要求重新核对**，不静默选边（`resolve-mtslg-template-mapping.js` 按此实现）。
 - **图标尺寸来源**：`IconWidth`/`IconHeight` 取页面图标映射中几何来源节点（`sourceRef`，缺失时回退 `sourceId`）的 bbox；右栏这类带图标槽位的按钮，图标来自 `实例` 属性指向的图标节点；空占位虚线框视为没有图标。
 - **图标几何补充来源（extractSvg 去重）**：`extractSvg` 只输出 PATH 自身的 `d` + `transform`，几何完全相同的复用实例会被去重（同一方向图标经组级 `rotate`/`flipV` 复用时只返回一条），因此会出现「按钮有图标槽位却没有 `Icon`」。补齐办法：`gen-mtslg-page-icons.js` 追加第 4 个参数（`dsl.snapshot.json`），图标映射条目加 `"fromDsl": true`（按 PATH 原始 `d` + 自身 matrix 合成，与 extractSvg 等价并平移到原点）；需要区分方向时再加 `"bakeAncestorTransform": true`，把祖先 `rotate`/`flipH`/`flipV` 烘焙进坐标。烘焙结果必须视觉复核；同一组图标在 DSL 里几何完全相同（如「向左」与「向右」）时属于设计侧缺图，标记待确认，不得自行镜像猜测。
 - **设计稿最上方示例标题默认剥离**：位于根节点或展示外壳、仅用于说明组件或工件示教的标题标记为 `design-artifact-title`，不写入页面 XML。业务内容容器内部且运行时需要的标题才保留。
@@ -86,19 +86,19 @@
 
 按钮族（IconButton / Button / StatusButton）另有固定参数：`PageName`/`IOVisible`/`IOCommand`/`IOEnable` 恒写（取不到写空字符串值）；`IconButton` 的 `Icon`/`IconWidth`/`IconHeight` 同样恒写——有图标槽位时按图标图形节点 bbox 四舍五入发射，无图标槽位时写空字符串，`Button`/`StatusButton` 不含图标字段、不发射这三项；详见飞书组件库映射规范的“固定字段与可选字段规则”。
 | 选择 | ComboBox（选项=子 TextBlock；ItemsSourceFile/DisplayMemberPath/SelectedValuePath） |
-| 数据 | DataGrid（Value=数据文件名；列=子 TextBlock/ComboBox；命中口径见 4.1）、ProgressBar、RangeProgressBar、PowerControl（实时功率曲线） |
+| 数据 | DataGrid（Value=数据文件名；列=**列定义子节点**，默认 TextBlock，可按该列单元格类型为 NumberBox / IntNumberBox / TextBox，命中与列口径见 4.1；这里的“列定义”不是页面控件，不套 `controlTypeRequiredAttrs`）、ProgressBar、RangeProgressBar、PowerControl（实时功率曲线） |
 | 视觉/设备 | Image（Value=绝对路径）、Camera（DesignPanelID）、AutoCutCamera、HighAngleCamera、LowAngleCamera、EMTCamera |
 
 控件属性允许集与每类控件的固定必写字段集分别在同目录 `mtslg-iocontrol-map.json` 的 `controlTypes` 与 `controlTypeRequiredAttrs`；生成器不得把白名单外属性当作合法字段，也不得漏发必写字段（取不到来源写空字符串）。Style、Icon、LangName 与 PageName 还必须通过第 6 节键查证。资源字典是否共享、资源键来自何处，均由项目适配记录确认。
 
 ### 4.1 DataGrid 的命中口径与 Value 数据源门禁
 
-**命中口径（表格族 `tableTemplates`）**：表格在团队组件库里通常没有组件集（设计稿里只是一个 `GROUP`），因此本族按**结构签名**命中——节点类型 `GROUP` + 图层名以「表格」结尾 + 孩子里含名为「表头」的群组 + 至少一个名为 `item` 的行群组 + 表头至少 1 条可见文本，五项同时成立；只成立一半时登记 `pending`（写明哪一半不成立），既不平铺假装没看见、也不静默套模板。命中后发射一个 `DataGrid` 根节点 + 由表头可见文本从左到右展开的**列定义子节点**：列节点是列结构不是页面控件，几何按映射表 `tableTemplates.columnTemplate` 固定发射（`Left=0` / `Top=0` / `Height=45`、不写 `Width`），属性只发射 `Value`（列标题）+ `alwaysWrittenAttrs` 空占位，不套 `controlTypeRequiredAttrs`；列 `ControlType` 由该列单元格类型严格多数判定（没有多数退化为 `TextBlock`）。表格的**行是 PageData 数据不是控件**：行内文本一律 `omit` + `role=table-data-cell`，行内容按行登记进 `mapping.tableAudits[].rows`，单元格实例不再按 `inputTemplates` 单独发射。表格图层声明尺寸覆盖不了内容范围时记 `tableAudits[].geometry.declaredBoxCoversContent=false`。
+**命中口径（表格族 `tableTemplates`）**：表格在团队组件库里通常没有组件集（设计稿里只是一个 `GROUP`），因此本族**只登记一条命中路径**（映射表里没有 `match.property` / `componentSet`），按**结构签名**命中——节点类型 `GROUP` + 图层名以「表格」结尾 + 孩子里含名为「表头」的群组 + 至少一个名为 `item` 的行群组 + 表头至少有 `signature.minHeaderTexts` 条可见文本，**五项同时成立**；**部分命中**（后缀或签名之一成立）时登记 `pending`（写明哪一半不成立），两项都不成立的普通 `GROUP` 不属于候选。命中后发射一个 `DataGrid` 根节点 + 由表头可见文本从左到右展开的**列定义子节点**：列节点是列结构不是页面控件，几何按映射表 `tableTemplates.columnTemplate` 固定发射（`Left=0` / `Top=0` / `Height=45`、不写 `Width`），属性只发射 `Value`（列标题）+ `alwaysWrittenAttrs` 空占位，不套 `controlTypeRequiredAttrs`；列数 = 表头可见文本数（没有额外隐藏列），列 `ControlType` 由该列单元格类型严格多数判定（没有多数退化为 `TextBlock`）。表格的**行是 PageData 数据不是控件**：行内文本一律 `omit` + `role=table-data-cell`，行内容按行登记进 `mapping.tableAudits[].rows`，单元格实例不再按 `inputTemplates` 单独发射。表格图层声明尺寸覆盖不了内容范围时记 `tableAudits[].geometry.declaredBoxCoversContent=false`。
 
 - `ControlType="DataGrid"` 必须声明 `Value`；该值用于定位 PageData 数据文件。
-- 最终页面中的 `Value` 必须是非空、可由当前运行配置解析的数据文件名。若真实数据源尚未确认，应将该控件标记为“待绑定/未完成”并向用户确认，不能把空值当作最终配置。
-- 缺少 `Value` 时的运行时行为必须通过目标项目的控件契约或实际验证确认；若目标运行时要求该字段，缺失即视为未完成，不能作为最终交付。
-- `Value=""` 仅可作为经用户确认的诊断中间态；最终交付必须填入可解析的数据源，或明确标记待绑定。
+- **`Value` 的三种状态**：① 数据源已确认 → 必须是可被当前运行配置解析的非空数据文件名；② 数据源尚未确认（设计稿里没有来源，表格族命中后即属此类）→ 写**空串占位**并在映射 `tableAudits[].valuePending=true`、Bundle 审计 `tables[].valuePending=true` 与交付说明里同时标「待业务确认」；③ 工程师已绑定 → 直接写真实文件名并置 `valuePending=false`。属性本身恒写、不省略（`controlTypeRequiredAttrs.DataGrid` 含 `Value`）。
+- 缺字段与空串的区别必须守住：**省略 `Value`** 会在 `IODataGrid.LoadDataSource` 触发空引用，因此任何状态都不得省略该属性；而 `Value=""` 是状态②的合法中间态，不是交付缺陷——前提是审计与交付说明里点名了「数据源待确认」。
+- 「最终页面的 `Value` 必须非空」只约束**数据源已确认**（状态①/③）的页面；状态②允许带着 `valuePending=true` 交付并移交工程师填数据源，但不得把它说成已完成的数据绑定。
 - 子列结构、数据源字段和错误表现均以目标项目 DataGrid 契约为准；不能从其他项目的页面或异常信息推导。
 
 ```xml

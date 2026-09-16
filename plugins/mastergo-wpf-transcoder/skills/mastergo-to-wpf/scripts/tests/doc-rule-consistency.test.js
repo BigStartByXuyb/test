@@ -429,4 +429,52 @@ for (const [label, text] of [
 assert.ok(feishuMapping.includes("组件集=Table"),
   "人读映射文档必须保留「组件集=Table」的固定模板标题（文档格式约定）");
 
+// ---- 8.1 表格口径的 7 条 CI REVIEW 对应的防回归断言 ----
+// 这些断言来自 2026-09-16 的语义审计：条件条数、Value 三态、图层名例外清单、命中路径唯一性、
+// 隐藏列与列 Value 的旧表述、structuralPolicy 的 pending 范围——只写「出现某 token」挡不住这些，
+// 必须把「不允许再出现的旧表述」也钉住。
+assert.ok(!Object.prototype.hasOwnProperty.call(tableStructural, "property") ||
+  tableStructural.property === undefined,
+  "表格族不得再登记 match.property（该键一旦命中就会走到需要结构签名的渲染分支）；命中路径只有 structural 一条");
+assert.strictEqual(tableFamily.match.property, undefined,
+  "tableTemplates.match.property 必须删除（REVIEW-004：无用命中路径 + 报错误导）");
+assert.ok(tableFamily.structuralPolicy.includes("五项同时成立"),
+  "structuralPolicy 必须写「五项同时成立」（条件条数要与 signature 一一对应）");
+assert.ok(tableFamily.structuralPolicy.includes("部分命中"),
+  "structuralPolicy 必须写清 pending 的范围是「部分命中」（REVIEW-007）");
+assert.ok(tableFamily.valuePolicy.pendingRule && tableFamily.valuePolicy.pendingRule.includes("数据源已确认"),
+  "valuePolicy 必须登记 pendingRule：Value=\"\" 的合法状态与「最终必须非空」的适用范围（REVIEW-002）");
+assert.ok(!(columnTemplate.alwaysWrittenAttrs || []).includes("IOVisible"),
+  "列定义不得登记 IOVisible（表头文本没有「是否主键」信息，没有可靠来源；REVIEW-005）");
+
+for (const [label, text] of [
+  ["SKILL.md", mainSkill],
+  ["mastergo-iocontrol-document-format/SKILL.md", docFormat],
+  ["mtslg-mode.md", modeDoc],
+  ["feishu-component-library-mapping.md", feishuMapping],
+]) {
+  assert.ok(text.includes("五项同时成立"),
+    label + " 必须与映射表同口径写「五项同时成立」（不得留「四项同时成立」）");
+  assert.ok(!text.includes("四项同时成立"),
+    label + " 不得保留「四项同时成立」（REVIEW-001）");
+  assert.ok(text.includes("待业务确认"),
+    label + " 必须写明数据源未确认时写空串占位并标「待业务确认」（REVIEW-002）");
+}
+// 图层名例外清单：SKILL.md 与 mtslg-mode.md 必须把「底部栏 + 表格族」两条例外并列登记。
+for (const [label, text] of [["SKILL.md", mainSkill], ["mtslg-mode.md", modeDoc]]) {
+  assert.ok(text.includes("例外只有两条"),
+    label + " 的图层名例外清单必须并列登记两条例外（底部栏 + 表格族结构签名；REVIEW-003）");
+  assert.ok(text.includes("tableTemplates.match.structural") || text.includes("match.structural"),
+    label + " 的例外清单必须点名表格族的结构签名登记位置");
+}
+// 旧表述不得残留。
+assert.ok(!feishuMapping.includes("其 `Value` 属性必填且最终值必须非空"),
+  "feishu 映射文档不得保留「DataGrid 根 Value 必填且最终值必须非空」的绝对表述（REVIEW-002）");
+assert.ok(!feishuMapping.includes("隐藏主键列使用"),
+  "feishu 映射文档不得保留「隐藏主键列使用 IOVisible=false」（列集合里没有这条实现路径；REVIEW-005）");
+assert.ok(!feishuMapping.includes("列子节点 Value 是否填写取决于"),
+  "feishu 映射文档不得保留「列 Value 是否填写取决于…」（列 Value 一律等于表头文本；REVIEW-006）");
+assert.ok(!modeDoc.includes("列=子 TextBlock/ComboBox"),
+  "mtslg-mode.md 不得保留「列=子 TextBlock/ComboBox」的旧摘要（列是列定义，不是页面控件；REVIEW-006）");
+
 console.log("PASS 表格族（tableTemplates 结构签名 + DataGrid 列定义）一致性回归测试");

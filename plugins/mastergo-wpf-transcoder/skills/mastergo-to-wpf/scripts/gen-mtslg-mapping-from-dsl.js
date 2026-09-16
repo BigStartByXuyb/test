@@ -765,8 +765,14 @@ for (const { item: inst, match } of matched) {
     // 表格（结构签名命中的 GROUP）→ DataGrid + 表头派生的列定义；行按数据登记，不发射控件。
     const columnTemplate = tableTemplate && tableTemplate.columnTemplate;
     if (!columnTemplate || !match.signature) {
-      throw new Error("表格族命中缺少 columnTemplate 或结构签名: " + inst.ref +
-        "；请在映射表 tableTemplates 里登记 columnTemplate 与 match.structural.signature");
+      // 表格族只登记结构签名一条命中路径（映射表里没有 match.property / componentSet），
+      // 因此走到这里只可能是结构签名或列模板缺失，报错必须点名真因，不能让人去查已经存在的登记项。
+      throw new Error("表格族命中缺少" +
+        (!match.signature ? "结构签名（match.signature）" : "") +
+        (!match.signature && !columnTemplate ? " 与 " : "") +
+        (!columnTemplate ? "列定义模板（tableTemplates.columnTemplate）" : "") +
+        ": " + inst.ref +
+        "；结构签名由 structuralTableMatches 产出（命中路径只有这一条，本族不登记 match.property / componentSet）");
     }
     emitTable(inst, spec, match, columnTemplate);
     // 变体值来自结构签名（顶点是 GROUP，没有公开属性），resolver 按 instance.variant 解析。
