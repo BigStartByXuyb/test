@@ -1421,7 +1421,7 @@
             "slot": "table",
             "controlType": "DataGrid",
             "iconPolicy": "none",
-            "note": "根节点 Value 指向 PageData 数据文件，**没有** dsl.text 来源（列标题才来自表头文本，见 columnTemplate.note）。本槽位只固定 ControlType 与「根节点就是这张表」的结构事实；Value 的来源与占位口径以同族 valuePolicy 为唯一真值源——不得在这里再声明 valueSource。"
+            "note": "本槽位只固定 ControlType 与「根节点就是这张表」的结构事实；根节点属性的来源与占位口径一律以同族 valuePolicy 为唯一真值源，不在此复述。"
           }
         ]
       }

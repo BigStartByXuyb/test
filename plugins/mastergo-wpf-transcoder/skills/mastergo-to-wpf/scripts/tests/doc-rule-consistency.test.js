@@ -433,9 +433,16 @@ assert.ok(feishuMapping.includes("组件集=Table"),
 // 这些断言来自 2026-09-16 的语义审计：条件条数、Value 三态、图层名例外清单、命中路径唯一性、
 // 隐藏列与列 Value 的旧表述、structuralPolicy 的 pending 范围——只写「出现某 token」挡不住这些，
 // 必须把「不允许再出现的旧表述」也钉住。
-// 判据必须落在 match 上（上一版误写在 match.structural 上，等于没守护）。
-assert.ok(!Object.prototype.hasOwnProperty.call(tableFamily.match, "property"),
-  "tableTemplates.match 不得再登记 property（该键一旦命中就会走到需要结构签名的渲染分支）；命中路径只有 structural 一条");
+// 命中路径唯一：property 与 componentSet 都不得登记（两者都会让实例走「需要结构签名」的渲染分支）。
+// 历史备注：1.0.139 曾把同一条判据写了两遍，其中一条落在 match.structural 上（对删除结果没有守护力），
+// 现在只保留判据落在 match 上的这两条，并把 componentSet 一并纳入。
+for (const key of ["property", "componentSet"]) {
+  assert.ok(!Object.prototype.hasOwnProperty.call(tableFamily.match, key),
+    "tableTemplates.match 不得登记 " + key + "（该键一旦命中就会走到需要结构签名的渲染分支）；命中路径只有 structural 一条");
+}
+const tableSlot = ((tableFamily.variants[tableStructural.variant] || {}).slots || [])[0] || {};
+assert.ok(!Object.prototype.hasOwnProperty.call(tableSlot, "valueSource"),
+  "Table 变体的 table 槽位不得登记 valueSource（根 Value 指向 PageData 数据文件，来源与占位口径只以 valuePolicy 为准）");
 assert.ok(tableFamily.structuralPolicy.includes("五项同时成立"),
   "structuralPolicy 必须写「五项同时成立」（条件条数要与 signature 一一对应）");
 assert.ok(tableFamily.structuralPolicy.includes("部分命中"),

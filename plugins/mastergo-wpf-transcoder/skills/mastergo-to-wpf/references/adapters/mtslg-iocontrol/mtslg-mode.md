@@ -95,11 +95,10 @@
 
 **命中口径（表格族 `tableTemplates`）**：表格在团队组件库里通常没有组件集（设计稿里只是一个 `GROUP`），因此本族**只登记一条命中路径**（映射表里没有 `match.property` / `componentSet`），按**结构签名**命中——节点类型 `GROUP` + 图层名以「表格」结尾 + 孩子里含名为「表头」的群组 + 至少一个名为 `item` 的行群组 + 表头至少有 `signature.minHeaderTexts` 条可见文本，**五项同时成立**；**部分命中**（后缀或签名之一成立）时登记 `pending`（写明哪一半不成立），两项都不成立的普通 `GROUP` 不属于候选。命中后发射一个 `DataGrid` 根节点 + 由表头可见文本从左到右展开的**列定义子节点**：列节点是列结构不是页面控件，几何按映射表 `tableTemplates.columnTemplate` 固定发射（`Left=0` / `Top=0` / `Height=45`、不写 `Width`），属性只发射 `Value`（列标题）+ `alwaysWrittenAttrs` 空占位，不套 `controlTypeRequiredAttrs`；列数 = 表头可见文本数（没有额外隐藏列），列 `ControlType` 由该列单元格类型严格多数判定（没有多数退化为 `TextBlock`）。表格的**行是 PageData 数据不是控件**：行内文本一律 `omit` + `role=table-data-cell`，行内容按行登记进 `mapping.tableAudits[].rows`，单元格实例不再按 `inputTemplates` 单独发射。表格图层声明尺寸覆盖不了内容范围时记 `tableAudits[].geometry.declaredBoxCoversContent=false`。
 
-- `ControlType="DataGrid"` 必须声明 `Value`；该值用于定位 PageData 数据文件。
-- **`Value` 的三种状态**：① 数据源已确认 → 必须是可被当前运行配置解析的非空数据文件名；② 数据源尚未确认（设计稿里没有来源，表格族命中后即属此类）→ 写**空串占位**并在映射 `tableAudits[].valuePending=true`、Bundle 审计 `tables[].valuePending=true` 与交付说明里同时标「待业务确认」；③ 工程师已绑定 → 直接写真实文件名并置 `valuePending=false`。属性本身恒写、不省略（`controlTypeRequiredAttrs.DataGrid` 含 `Value`）。
-- 缺字段与空串的区别必须守住：**任何状态都不得省略 `Value` 属性**——这是本插件可自证的操作要求（`controlTypeRequiredAttrs.DataGrid` 含 `Value`，生成器恒写）。至于「省略 `Value` 时运行时究竟如何表现」，属于目标项目 DataGrid 契约，必须由目标项目的控件契约、源码或实际验证确认，不能从其他项目的页面或异常信息推断；未确认前不得把它当作已验证结论写入交付说明。`Value=""` 是状态②的合法中间态，不是交付缺陷——前提是审计与交付说明里点名了「数据源待确认」。
+- **本插件可自证的规则只有一条**：`ControlType="DataGrid"` 必须声明并**恒写** `Value`（依据：`controlTypeRequiredAttrs.DataGrid` 含 `Value`，生成器恒写、禁止省略该属性；省略会让属性缺失，而缺失与空串是两种不同的产物状态）。
+- **`Value` 的三种状态**：① 数据源已确认 → 必须是可被当前运行配置解析的非空数据文件名；② 数据源尚未确认（设计稿里没有来源，表格族命中后即属此类）→ 写**空串占位**并在映射 `tableAudits[].valuePending=true`、Bundle 审计 `tables[].valuePending=true` 与交付说明里同时标「待业务确认」；③ 工程师已绑定 → 直接写真实文件名并置 `valuePending=false`。`Value=""` 是状态②的合法中间态，不是交付缺陷——前提是审计与交付说明里点名了「数据源待确认」。
+- **运行时刻画一律归目标项目契约**：`Value` 指向哪个文件、子列结构与数据源字段、以及「省略 `Value`（属性缺失）」「`Value=""` 指向不存在的数据文件」这些情形下究竟如何表现，都必须由目标项目的 DataGrid 控件契约、源码或实际验证确认，不能从其他项目的页面、异常信息或本插件的推测推导；未确认前不得以规则口气落笔，也不得作为已验证结论写进交付说明。
 - 「最终页面的 `Value` 必须非空」只约束**数据源已确认**（状态①/③）的页面；状态②允许带着 `valuePending=true` 交付并移交工程师填数据源，但不得把它说成已完成的数据绑定。
-- 子列结构、数据源字段和错误表现均以目标项目 DataGrid 契约为准；不能从其他项目的页面或异常信息推导。
 
 ```xml
 <IOContorl
