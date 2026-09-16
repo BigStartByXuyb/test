@@ -554,7 +554,7 @@ for (const [label, text] of [
   assert.ok(text.includes("&#x0a;"), label + " 必须写明换行写成字符引用 &#x0a;");
   assert.ok(text.includes("U+2028"), label + " 必须写明设计换行码点 U+2028");
   assert.ok(text.includes("实现真值源"), label + " 必须写明实现真值源（script-helpers.js），不得把映射表写成运行期唯一真值源");
-  assert.ok(text.includes("三条用途") || text.includes("三条"), label + " 空白口径必须写成「三条用途」，与映射表 note 一致");
+  assert.ok(text.includes("三条用途"), label + " 空白口径必须写成「三条用途」，与映射表 note 一致");
   assert.ok(!text.includes("空白处理的两条口径"), label + " 不得保留「空白处理的两条口径」的口径基数");
 }
 assert.ok(/三条用途/.test(newlineRule.note || ""), "映射表 note 必须写明空白处理分三条用途");

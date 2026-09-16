@@ -44,7 +44,9 @@ function normalizeNewlines(value) {
 // 页面 XML 属性文案只做第 1 步、其余空白原样保留；键派生 / 查译文 / 术语表匹配另用全量压平值
 // （见 gen-mtslg-lang-keys-from-dsl.js 的 normalizeText）。三者用途不同，不是同一份字符串。
 function langValueText(value) {
-  return normalizeNewlines(value)
+  // 数组入参按「同一行的多个 text run」处理：空串拼接（与 DSL 文本取值同口径），不做逗号连接。
+  const text = Array.isArray(value) ? value.join("") : value;
+  return normalizeNewlines(text)
     .replace(/[^\S\n]+/g, " ")
     .replace(/ *\n */g, "\n")
     .trim();

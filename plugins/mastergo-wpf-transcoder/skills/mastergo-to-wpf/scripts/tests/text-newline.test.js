@@ -37,6 +37,7 @@ assert.strictEqual(langValueText("保存\u2028激光- JF"), "保存\n激光- JF"
 assert.strictEqual(langValueText("A  \n  B"), "A\nB");
 assert.strictEqual(langValueText("    对位模式    "), "对位模式");
 assert.strictEqual(langValueText("A\u2028B"), "A\nB");
+assert.strictEqual(langValueText(["A\u2028", "B"]), "A\nB", "数组入参按空串拼接（同一行的多个 text run）");
 
 // 2) XML 属性转义：& < > " 照旧；换行写成 &#x0a;。
 assert.strictEqual(xmlAttr('a&b<c>d"e'), "a&amp;b&lt;c&gt;d&quot;e");
