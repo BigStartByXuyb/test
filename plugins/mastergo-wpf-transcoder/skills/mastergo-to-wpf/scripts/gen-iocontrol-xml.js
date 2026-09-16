@@ -745,8 +745,35 @@ function mergeMode() {
   };
 
   const insertions = new Map(); // closeTokenIdx -> [chunks]
-  for (const [ref, r] of rendered) {
+  // merge 新增的「同级兄弟」也必须按「视觉行」排序（与 fresh 同一口径）：
+  // 先按父分组，再对每组的**新节点**跑一次 orderChildrenByVisualRows，得到组内名次；
+  // 然后把新节点按（父, 组内名次）顺序生成块，插入时同级新增就是"先上后下、行内先左后右"。
+  const pendingNew = [];
+  for (const r of rendered.values()) {
     if (r.tokenIdx !== null) continue;
+    pendingNew.push(r);
+  }
+  const newRankByRef = new Map();
+  const newByParent = new Map();
+  for (const r of pendingNew) {
+    const parentKey = r.n.parent || '';
+    if (!newByParent.has(parentKey)) newByParent.set(parentKey, []);
+    newByParent.get(parentKey).push(r.n);
+  }
+  for (const list of newByParent.values()) {
+    orderChildrenByVisualRows(list).forEach(function (node, index) {
+      newRankByRef.set(node.ref, index);
+    });
+  }
+  pendingNew.sort(function (a, b) {
+    const pa = a.n.parent || '';
+    const pb = b.n.parent || '';
+    if (pa !== pb) return pa < pb ? -1 : 1;
+    return (newRankByRef.get(a.n.ref) || 0) - (newRankByRef.get(b.n.ref) || 0);
+  });
+
+  for (const r of pendingNew) {
+    const ref = r.n.ref;
     const { n, attrMap } = r;
     const pa = resolveParentAbs(n);
     const attrMap2 = Object.assign({}, attrMap);

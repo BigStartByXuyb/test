@@ -519,7 +519,59 @@ assert.match(staleIconButtonTag, /Icon=""/, 'IconButton 无 Icon 时仍要发射
 assert.match(staleIconButtonTag, /IconWidth=""/, 'IconButton 无 Icon 时 iconSize 不得单独生效，IconWidth 写空占位');
 assert.match(staleIconButtonTag, /IconHeight=""/, 'IconButton 无 Icon 时 iconSize 不得单独生效，IconHeight 写空占位');
 
+// ---- merge 新增「同级」节点也必须按视觉行排序（与 fresh 同一口径）----
+// 场景：既有页面里没有这两个控件，merge 时把它们新增到 root 下。
+// 旧的（严格 Top）实现会按 232 → 244 排成「下拉框 → 光源通道」；视觉行口径应为「光源通道 → 下拉框」。
+const mergeRowMapping = path.join(dir, 'merge-row-mapping.json');
+const mergeRowExisting = path.join(dir, 'merge-row-existing.xml');
+const mergeRowMerged = path.join(dir, 'merge-row-merged.xml');
+fs.writeFileSync(mergeRowMapping, JSON.stringify({
+  rootRef: 'root',
+  sourceNodes: [
+    { ref: 'root', parentRef: null, pageAbsX: 0, pageAbsY: 0, relativeX: 0, relativeY: 0, width: 1280, height: 1024 },
+    { ref: 'exist', parentRef: 'root', pageAbsX: 100, pageAbsY: 202, relativeX: 100, relativeY: 202, width: 80, height: 40, type: 'TEXT', text: '既有标签' },
+    { ref: 'l3', parentRef: 'root', pageAbsX: 687, pageAbsY: 244, relativeX: 687, relativeY: 244, width: 80, height: 40, type: 'TEXT', text: '光源通道' },
+    { ref: 'combo', parentRef: 'root', pageAbsX: 766, pageAbsY: 232, relativeX: 766, relativeY: 232, width: 120, height: 40 }
+  ],
+  textAudit: [
+    { sourceRef: 'exist', sourceText: '既有标签', visibility: true, role: 'content', decision: 'emit', outputRefs: ['MROW_EXIST'] },
+    { sourceRef: 'l3', sourceText: '光源通道', visibility: true, role: 'content', decision: 'emit', outputRefs: ['MROW_L3'] }
+  ],
+  // 故意把下拉框排在前（严格 Top 顺序），断言 merge 后按视觉行重排
+  nodes: [
+    { ref: 'exist', sourceRef: 'exist', sourceParent: 'root', id: 'MROW_EXIST', xmlId: 'MROW_EXIST', controlType: 'TextBlock', absX: 100, absY: 202, w: 80, h: 40, sourceText: '既有标签', valueSource: 'dsl.text', attrs: { Value: '既有标签' } },
+    { ref: 'combo', sourceRef: 'combo', sourceParent: 'root', id: 'MROW_COMBO', xmlId: 'MROW_COMBO', controlType: 'ComboBox', absX: 766, absY: 232, w: 120, h: 40, attrs: { Value: 'Auto' } },
+    orderTextNode('l3', 'MROW_L3', '光源通道', 687, 244)
+  ]
+}, null, 2));
+fs.writeFileSync(mergeRowExisting, [
+  '<?xml version="1.0" encoding="utf-8"?>',
+  '<IOContorl',
+  '    ID=""',
+  '    Left="NaN"',
+  '    Top="NaN"',
+  '    Width="NaN"',
+  '    Height="NaN">',
+  '    <IOContorl',
+  '        ID="MROW_EXIST"',
+  '        ControlType="TextBlock"',
+  '        Value="既有标签"',
+  '        Width="NaN"',
+  '        Height="40"',
+  '        Left="100"',
+  '        Top="10" />',
+  '</IOContorl>',
+  ''
+].join('\n'));
+const mergeRowRun = spawnSync(process.execPath, [path.join(__dirname, '..', 'gen-iocontrol-xml.js'),
+  '--merge', mergeRowExisting, mergeRowMapping, '--out', mergeRowMerged], { encoding: 'utf8' });
+assert.strictEqual(mergeRowRun.status, 0, 'merge 视觉行用例必须成功: ' + mergeRowRun.stderr);
+const mergeRowIds = [...fs.readFileSync(mergeRowMerged, 'utf8').matchAll(/ID="(MROW_[A-Z0-9]+)"/g)].map((m) => m[1]);
+assert.deepStrictEqual(mergeRowIds, ['MROW_EXIST', 'MROW_L3', 'MROW_COMBO'],
+  'merge 新增的同级节点必须按视觉行排序：标签"光源通道"要排在下拉框之前');
+
 console.log('PASS IOContorl typed-node gate regression test');
 console.log('PASS IconButton fixed-attribute regression test');
 console.log('PASS button-family rules are read from the template map');
 console.log('PASS icon attributes follow the ControlType template scope');
+console.log('PASS merge new siblings follow visual-row order');
