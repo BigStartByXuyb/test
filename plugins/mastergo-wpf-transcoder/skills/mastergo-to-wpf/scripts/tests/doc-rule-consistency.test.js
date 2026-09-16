@@ -430,7 +430,7 @@ assert.ok(feishuMapping.includes("组件集=Table"),
   "人读映射文档必须保留「组件集=Table」的固定模板标题（文档格式约定）");
 
 // ---- 8.1 表格口径的 7 条 CI REVIEW 对应的防回归断言 ----
-// 这些断言来自 2026-09-16 的语义审计：条件条数、Value 三态、图层名例外清单、命中路径唯一性、
+// 这些断言来自 2026-09-16 的语义审计：条件条数、Value 现阶段口径、图层名例外清单、命中路径唯一性、
 // 隐藏列与列 Value 的旧表述、structuralPolicy 的 pending 范围——只写「出现某 token」挡不住这些，
 // 必须把「不允许再出现的旧表述」也钉住。
 // 命中路径唯一：property 与 componentSet 都不得登记（两者都会让实例走「需要结构签名」的渲染分支）。
@@ -458,7 +458,7 @@ for (const banned of ["最终配置必须非空", "空字符串仅可用于诊�
     "映射表任意位置都不得保留已退役表述: " + banned);
 }
 assert.ok(!Object.prototype.hasOwnProperty.call(dataGridSpec, "requiredNonEmptyAttrs"),
-  "映射表不得再登记 requiredNonEmptyAttrs（没有消费者，且与 tableTemplates.valuePolicy 的三态口径相反）");
+  "映射表不得再登记 requiredNonEmptyAttrs（没有消费者，且与 tableTemplates.valuePolicy 的现阶段口径相反（固定空串 + 待绑定提示））");
 assert.ok(dataGridSpec.description.includes("tableTemplates.valuePolicy"),
   "映射表 DataGrid 描述必须把 Value 的来源与占位口径指向 tableTemplates.valuePolicy");
 assert.ok(tableFamily.structuralPolicy.includes("五项同时成立"),

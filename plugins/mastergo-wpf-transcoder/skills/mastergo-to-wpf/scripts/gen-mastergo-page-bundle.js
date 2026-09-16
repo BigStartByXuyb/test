@@ -1208,7 +1208,7 @@ function main() {
         conflicts: nestingReport ? nestingReport.conflicts.length : 0
       },
       // 表格：结构签名命中后发射的 DataGrid（列定义来自表头，行按数据登记不发射控件）。
-      // valuePending=true 表示根节点 Value（PageData 数据文件名）在设计稿里没有来源、待人确认。
+      // valuePending=true 表示该表根节点的 Value 仍是当前阶段的空串占位（数据源待工程师/运行时绑定）。
       tables: (Array.isArray(mapping.tableAudits) ? mapping.tableAudits : []).map(function (table) {
         return {
           ref: table.ref,

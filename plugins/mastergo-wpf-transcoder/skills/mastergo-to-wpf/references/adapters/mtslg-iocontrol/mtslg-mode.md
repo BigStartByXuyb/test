@@ -86,7 +86,7 @@
 
 按钮族（IconButton / Button / StatusButton）另有固定参数：`PageName`/`IOVisible`/`IOCommand`/`IOEnable` 恒写（取不到写空字符串值）；`IconButton` 的 `Icon`/`IconWidth`/`IconHeight` 同样恒写——有图标槽位时按图标图形节点 bbox 四舍五入发射，无图标槽位时写空字符串，`Button`/`StatusButton` 不含图标字段、不发射这三项；详见飞书组件库映射规范的“固定字段与可选字段规则”。
 | 选择 | ComboBox（选项=子 TextBlock；ItemsSourceFile/DisplayMemberPath/SelectedValuePath） |
-| 数据 | DataGrid（Value=数据文件名；列=**列定义子节点**，默认 TextBlock，可按该列单元格类型为 NumberBox / IntNumberBox / TextBox，命中与列口径见 4.1；这里的“列定义”不是页面控件，不套 `controlTypeRequiredAttrs`）、ProgressBar、RangeProgressBar、PowerControl（实时功率曲线） |
+| 数据 | DataGrid（Value=当前阶段固定空串 `Value=""`，见 4.1；列=**列定义子节点**，默认 TextBlock，可按该列单元格类型为 NumberBox / IntNumberBox / TextBox，命中与列口径见 4.1；这里的“列定义”不是页面控件，不套 `controlTypeRequiredAttrs`）、ProgressBar、RangeProgressBar、PowerControl（实时功率曲线） |
 | 视觉/设备 | Image（Value=绝对路径）、Camera（DesignPanelID）、AutoCutCamera、HighAngleCamera、LowAngleCamera、EMTCamera |
 
 控件属性允许集与每类控件的固定必写字段集分别在同目录 `mtslg-iocontrol-map.json` 的 `controlTypes` 与 `controlTypeRequiredAttrs`；生成器不得把白名单外属性当作合法字段，也不得漏发必写字段（取不到来源写空字符串）。Style、Icon、LangName 与 PageName 还必须通过第 6 节键查证。资源字典是否共享、资源键来自何处，均由项目适配记录确认。
@@ -104,7 +104,7 @@
 <IOContorl
     ID="MX_ExampleGrid"
     ControlType="DataGrid"
-    Value="ExampleData.xml"
+    Value=""
     Left="0"
     Top="0"
     Width="600"

@@ -539,7 +539,7 @@ const tableMapping = runMappingCase('table-structural', tableFixture('校准参�
 const dataGrid = tableMapping.nodes.find(node => node.controlType === 'DataGrid');
 assert.ok(dataGrid, '结构签名命中的表格必须发射 DataGrid 根节点');
 assert.strictEqual(dataGrid.sourceRef, 'tbl:root/table', 'DataGrid 的来源必须是表格那个 GROUP 自己');
-assert.strictEqual(dataGrid.attrs.Value, '', 'Value（PageData 数据文件名）无设计来源时必须空串占位');
+assert.strictEqual(dataGrid.attrs.Value, '', 'Value 当前阶段固定空串（数据源由工程师后续绑定）');
 assert.strictEqual(dataGrid.expectedLeft, 50, 'DataGrid 的 Left 取表格图层 bbox');
 assert.strictEqual(dataGrid.expectedTop, 507 - 192, '根级 DataGrid 的 Top 仍扣 192');
 assert.strictEqual(dataGrid.expectedWidth, 646);
