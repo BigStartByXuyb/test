@@ -440,9 +440,27 @@ for (const key of ["property", "componentSet"]) {
   assert.ok(!Object.prototype.hasOwnProperty.call(tableFamily.match, key),
     "tableTemplates.match 不得登记 " + key + "（该键一旦命中就会走到需要结构签名的渲染分支）；命中路径只有 structural 一条");
 }
-const tableSlot = ((tableFamily.variants[tableStructural.variant] || {}).slots || [])[0] || {};
+const tableVariant = tableFamily.variants[tableStructural.variant] || {};
+assert.ok(Array.isArray(tableVariant.slots) && tableVariant.slots.length > 0,
+  "Table 变体必须登记 table 槽位（否则下面那条「槽位不得带 valueSource」会空通过）");
+const tableSlot = tableVariant.slots[0];
+assert.strictEqual(tableSlot.slot, "table", "Table 变体的首个槽位必须是 table");
 assert.ok(!Object.prototype.hasOwnProperty.call(tableSlot, "valueSource"),
   "Table 变体的 table 槽位不得登记 valueSource（根 Value 指向 PageData 数据文件，来源与占位口径只以 valuePolicy 为准）");
+
+// 真值源（映射表）本身也不得再出现被退役的绝对表述与旧列口径——上一轮只守住了人读文档。
+const dataGridSpec = map.controlTypes.DataGrid;
+assert.ok(dataGridSpec && typeof dataGridSpec.description === "string", "映射表必须登记 controlTypes.DataGrid.description");
+for (const banned of ["最终配置必须非空", "空字符串仅可用于诊断中间态", "IODataGrid.LoadDataSource", "列=子 TextBlock/ComboBox"]) {
+  assert.ok(!dataGridSpec.description.includes(banned),
+    "映射表 controlTypes.DataGrid.description 不得保留已退役表述: " + banned);
+  assert.ok(!JSON.stringify(map).includes(banned),
+    "映射表任意位置都不得保留已退役表述: " + banned);
+}
+assert.ok(!Object.prototype.hasOwnProperty.call(dataGridSpec, "requiredNonEmptyAttrs"),
+  "映射表不得再登记 requiredNonEmptyAttrs（没有消费者，且与 tableTemplates.valuePolicy 的三态口径相反）");
+assert.ok(dataGridSpec.description.includes("tableTemplates.valuePolicy"),
+  "映射表 DataGrid 描述必须把 Value 的来源与占位口径指向 tableTemplates.valuePolicy");
 assert.ok(tableFamily.structuralPolicy.includes("五项同时成立"),
   "structuralPolicy 必须写「五项同时成立」（条件条数要与 signature 一一对应）");
 assert.ok(tableFamily.structuralPolicy.includes("部分命中"),

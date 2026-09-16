@@ -1664,12 +1664,9 @@
       ]
     },
     "DataGrid": {
-      "description": "数据表格；Value 为必填且最终配置必须非空，填写 PageData 文件夹下可解析的数据文件名；完全省略 Value 会在 IODataGrid.LoadDataSource 中触发空引用，空字符串仅可用于诊断中间态；列=子 TextBlock/ComboBox（Left=0 Top=0 Height=45）",
+      "description": "数据表格。**本插件可自证的两条**：① `Value` 属固定必写字段、恒写且不省略（见 requiredAttrs）；② 列子节点是**列定义**不是页面控件，几何与字段集按 tableTemplates.columnTemplate、列 ControlType 按 columnControlTypePolicy 判定。**其余一律不是本插件的规则**：`Value` 的来源与占位口径（数据源已确认 / 待业务确认 / 已绑定三态，含 Value=\"\" 的合法性）以 tableTemplates.valuePolicy 为唯一真值源；`Value` 指向哪个文件、子列结构与数据源字段、以及省略属性或空值指向不存在文件时如何表现，全部归目标项目 DataGrid 控件契约，须由契约/源码/实测确认后才能落笔。",
       "nested": true,
       "requiredAttrs": [
-        "Value"
-      ],
-      "requiredNonEmptyAttrs": [
         "Value"
       ],
       "attrs": [
