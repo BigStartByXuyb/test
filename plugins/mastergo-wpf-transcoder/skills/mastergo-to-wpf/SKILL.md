@@ -320,7 +320,7 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 - `audit-mtslg-feishu-map.js`：组件映射文档或模板 JSON 修改后运行，用于检查文档覆盖（`missing` / `unregisteredFamilies` / `unregisteredVariants` / `undocumented` / `duplicateMatchKeys` 必须全为空），不是页面生成步骤；新增或修改映射的整批同步清单见 `skills/mastergo-iocontrol-document-format/SKILL.md` 的「新增/修改映射的同步清单」。
 - `audit-script-duplication.js`：**改任何脚本后由 `tests/script-duplication.test.js` 自动运行**。同一个功能只允许一份实现：复制体（函数体完全相同）直接失败；同名函数必须复用 `scripts/lib/` 下的共享实现，或在 `scripts/lib/script-reuse-registry.json` 登记 reason。
 - `cap-window.ps1` / `cap-window2.ps1`：运行时宿主加载成功后做视觉截图验证；不能替代 XML/provenance 校验。
-- `sync-to-mt.ps1`：静态 XML、来源、坐标、键和运行时加载验证完成，并且用户要求部署到运行目录后运行；不能作为生成步骤自动调用。
+- `sync-to-mt.ps1`：静态 XML、来源、坐标与键查证全部通过，**且用户要求部署到运行目录**时运行（属「项目运行时交付」门禁）；同步是部署动作，宿主加载验证在同步之后执行；不能作为生成步骤自动调用。
 - `apply-container-containment.js`：**由 Bundle 默认自动调用**（不是手工触发）；在模板解析之后、语言键派生之前，把命中 `childPolicy=nested-page-templates` 的容器（信息分组 / 手动控制弹层）按「坐标完全包含」重挂子控件，改写 `parent`/`layoutParent` 并重算 `expectedLeft/expectedTop`；报告落 `Generated/<页面名>.nesting-report.json`，Bundle 审计写入 `nesting: { enabled, containers, reparented, conflicts }`。可用 `manifest.nesting = { "enabled": false }` 一键关闭，关闭后行为与未引入嵌套完全一致。未登记容器、未命中模板的组件实例不参与重挂。
 主 Bundle 的固定调用顺序是：模板解析 → **容器嵌套重挂（`apply-container-containment.js`，默认开启，可用 `manifest.nesting.enabled=false` 关闭）** → 语言键派生（`languages.auto`）→ LangName 绑定 → XML 生成 → provenance/坐标校验 → Icon discovery/生成 → Layout → WPF 宿主 → 最终校验。辅助脚本不得被误认为已自动包含在 Bundle 中；`apply-container-containment.js` 是唯一例外。
 
