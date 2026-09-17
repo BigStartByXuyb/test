@@ -20,7 +20,8 @@
 
 - `skills/mastergo-to-wpf/scripts/mastergo-dsl-pipeline.ps1` — 用 `-Action Capture` 把一次性 `getDsl` 响应固化为唯一的 `dsl.snapshot.json`，并校验根节点、递归节点、唯一 ref 和父子链；只有覆盖报告为 `complete` 才能继续生成。
 - `skills/mastergo-to-wpf/scripts/resolve-mastergo-visibility.js` — 从 DSL 机械提取节点可见属性、祖先继承后的有效可见状态、TEXT/PATH 索引和可见性来源；只生成 visibility audit，不直接生成 mapping。
-- `skills/mastergo-to-wpf/scripts/gen-mastergo-page-bundle.js` — 接收已确认的页面 mapping，统一生成页面 XML、Icon、Layout、WPF 宿主和审计产物。
+- `skills/mastergo-to-wpf/scripts/gen-mtslg-mapping-from-dsl.js` — 从 DSL 快照、visibility audit 和正式组件映射机械生成页面 mapping 与 `textAudit`；新建页面由 Bundle 在本次生成中自动调用，不接受人工逐条改写的 mapping。
+- `skills/mastergo-to-wpf/scripts/gen-mastergo-page-bundle.js` — 页面项目生成的唯一入口，统一生成 mapping、页面 XML、Icon、Layout、WPF 宿主和审计产物。
 
 Layout 增量注册与 `--overwrite` 的语义：
 
@@ -38,7 +39,7 @@ MasterGo 转换默认优先检查并调用 MasterGo MCP；浏览器、截图和�
 
 项目运行时交付直接读取目标项目的 `framework.config.json`、`.csproj`、现有页面、Icon、Layout 和项目本地索引，确认框架 Profile、源码、资源键、页面宿主和运行目录。该事实读取适用于当前启用的 `mtslg-iocontrol`。没有目标项目时仍可生成正式静态结构和完整脚手架，但不能宣称编译、加载或运行时验证已完成。
 
-可见性脚本的输出是 AI 映射的事实输入，不是最终页面文件。AI 仍需结合原始 DSL、visibility audit、正式组件映射和目标运行时资料生成 mapping；mapping 再由 Bundle 生成 XML、Icon、Layout 和宿主文件。
+可见性脚本的输出是 mapping 生成器的事实输入，不是最终页面文件。新建页面的 mapping 由 `gen-mtslg-mapping-from-dsl.js` 从原始 DSL、visibility audit 和正式组件映射机械生成（Bundle 自动调用），不由人工/AI 逐条改写；mapping 再由 Bundle 生成 XML、Icon、Layout 和宿主文件。人工/AI 的产出是**输入与边界决策**：`manifest.excludeInstances` 的组件隔离、`manifest.pageTitleText` / `langGlossary` / `languages.translations` 的文案语义，以及 `pending` / `unmappedComponents` 的处理结论。
 
 当前启用的 `mtslg-iocontrol` 在没有目标项目时也生成完整项目脚手架：`.csproj`、`framework.config.json`、WPF 宿主壳、页面 XML、Icon 资源容器、Layout 壳层、mapping/provenance 和待配置清单都必须存在；只跳过编译、WPF 加载和真实运行时验证。脚手架与正式项目使用同一套页面生成结构。
 

@@ -603,4 +603,32 @@ assert.ok(modeDoc.includes("压成空格会让两行文案退化成一行"),
   assert.ok(!/三份人读文档/.test(newlineRule.mapRole || ""), "映射表 mapRole 不得再写「三份人读文档」");
 }
 
+// ---------- mapping 生成者口径（防回归） ----------
+// 背景：README 与 SKILL.md 曾长期把 mapping 描述成「AI 逐条生成/改写」的中间稿，
+// 而 2026-09-10（f2286ed）起 gen-mtslg-mapping-from-dsl.js 已是唯一 mapping 生成者：
+// Bundle 在清单提供 dslPath 时重算并覆盖 mappingPath，手写 mapping 不进入链路。
+// 这段断言防止文档再写回旧链路（旧链路的手写生成器痕迹止于 Generated/F2/build-mapping.js）。
+{
+  const readme = fs.readFileSync(path.join(__dirname, "..", "..", "..", "..", "README.md"), "utf8");
+  const mappingGenerator = fs.readFileSync(path.join(__dirname, "..", "gen-mtslg-mapping-from-dsl.js"), "utf8");
+  const bundle = fs.readFileSync(path.join(__dirname, "..", "gen-mastergo-page-bundle.js"), "utf8");
+
+  // 脚本侧事实：生成器发射算法 Tag；Bundle 以生成的 mapping 覆盖 mappingPath。
+  assert.ok(mappingGenerator.includes("新页面完整DSL映射"),
+    "映射生成器必须发射 mappingTag=新页面完整DSL映射");
+  assert.ok(bundle.includes('"--out", mappingPath'),
+    "Bundle 必须在提供 dslPath 时重算并覆盖 mappingPath");
+
+  for (const [name, text] of [["README.md", readme], ["SKILL.md", mainSkill]]) {
+    assert.ok(!/AI 仍需[^\n]*生成 mapping/.test(text),
+      name + " 不得再写「AI 仍需…生成 mapping」（mapping 由脚本机械生成）");
+    assert.ok(!/供 AI 生成 mapping/.test(text),
+      name + " 不得再写「供 AI 生成 mapping」");
+    assert.ok(!/也不替代 AI mapping/.test(text),
+      name + " 不得再写「也不替代 AI mapping」");
+    assert.ok(/gen-mtslg-mapping-from-dsl\.js/.test(text),
+      name + " 必须写明 mapping 由 gen-mtslg-mapping-from-dsl.js 机械生成");
+  }
+}
+
 console.log("PASS 文本换行口径（textNewlinePolicy）一致性回归测试");
