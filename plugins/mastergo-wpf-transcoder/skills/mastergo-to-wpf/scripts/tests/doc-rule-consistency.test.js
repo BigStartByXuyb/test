@@ -582,4 +582,25 @@ assert.ok(LAYOUT_DOC.includes("U+2028"), "feishu-layout-mapping.md 必须写明�
 assert.ok(modeDoc.includes("压成空格会让两行文案退化成一行"),
   "mtslg-mode.md 必须写明字典压成空格的后果");
 
+// 换行口径的同步范围：映射表 mapRole 与组件库映射文档必须给出同一份「四文档」清单
+// （BLOCK-001：两处基数/集合不一致会让维护者按其中一处执行时漏同步）。
+{
+  const docList = [
+    "skills/mastergo-to-wpf/SKILL.md",
+    "skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/mtslg-mode.md",
+    "skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/feishu-component-library-mapping.md",
+    "skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/feishu-layout-mapping.md",
+  ];
+  for (const docPath of docList) {
+    assert.ok((newlineRule.mapRole || "").includes(docPath),
+      "映射表 textNewlinePolicy.mapRole 必须以插件根相对路径登记同步对象: " + docPath);
+    assert.ok(feishuMapping.includes(docPath),
+      "组件库映射文档的换行同步清单必须登记同一路径: " + docPath);
+  }
+  assert.ok(!/人读文档：SKILL\.md/.test(newlineRule.mapRole || ""),
+    "mapRole 不得用裸文件名 SKILL.md 指代同步对象（插件内有两份 SKILL.md）");
+  assert.ok(!feishuMapping.includes("三份人读文档"), "组件库映射文档不得再写「三份人读文档」");
+  assert.ok(!/三份人读文档/.test(newlineRule.mapRole || ""), "映射表 mapRole 不得再写「三份人读文档」");
+}
+
 console.log("PASS 文本换行口径（textNewlinePolicy）一致性回归测试");

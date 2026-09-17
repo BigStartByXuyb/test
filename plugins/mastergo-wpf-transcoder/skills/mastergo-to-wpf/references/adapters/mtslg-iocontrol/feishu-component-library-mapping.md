@@ -553,7 +553,7 @@ Style 与内部组件对照（只对下表列出的真实值成立）：
 - 页面语言字典是运行时按 `LangName` 取文案的载体，字典值必须与设计稿换行一致（写 `&#x0a;`）；把换行压成空格会让两行文案在运行时退化成一行，属于缺陷。
 - **空白处理分三条用途（同一文案因此有三种字符串形态，不要混用）**：① 页面 XML 属性文案只做换行归一、其余空白原样保留；② 字典值额外做「行内空白折叠成单个空格 → 换行两侧空白一并去掉 → 行首行尾 trim」（设计稿的左右留白是排版产物，字典值去掉它；`A␠␠\n␠␠B` → `A\nB`）——实现是 `scripts/lib/script-helpers.js` 的 `langValueText`；③ 键派生、译文查找、术语表匹配用「压平值」（所有空白折叠成单个空格并 trim）。
 - 发射、校验、Bundle 与字典发射器共用同一实现（`scripts/lib/script-helpers.js` 的 `normalizeNewlines` / `langValueText` / `xmlAttr` / `xmlElementText` / `normalizeForCompare`）：页面 XML 的原始属性值与 mapping 文案比较时先解码字符引用、再归一换行，避免同一文案因写法不同被判成冲突。
-- **实现真值源**是 `scripts/lib/script-helpers.js`（换行归一 `normalizeNewlines`、字典值变换 `langValueText`、属性/元素转义 `xmlAttr` / `xmlElementText`、比对归一 `normalizeForCompare` 的唯一实现），生成器、校验器、Bundle、字典发射器共用同一份，不允许各写一份；映射表 `textNewlinePolicy` 只**登记**同一口径（码点集合、归一目标、两种发射写法、字典值空白变换）供人读与回归断言比对，不是脚本的运行期输入。改口径时先改实现，再同步映射表登记块与三份人读文档（`SKILL.md` / `mtslg-mode.md` / 本文档）。
+- **实现真值源**是 `scripts/lib/script-helpers.js`（换行归一 `normalizeNewlines`、字典值变换 `langValueText`、属性/元素转义 `xmlAttr` / `xmlElementText`、比对归一 `normalizeForCompare` 的唯一实现），生成器、校验器、Bundle、字典发射器共用同一份，不允许各写一份；映射表 `textNewlinePolicy` 只**登记**同一口径（码点集合、归一目标、两种发射写法、字典值空白变换）供人读与回归断言比对，不是脚本的运行期输入。改口径时先改实现，再同步映射表登记块与**四份人读文档**：`skills/mastergo-to-wpf/SKILL.md`、`skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/mtslg-mode.md`、`skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/feishu-component-library-mapping.md`（本文档）、`skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/feishu-layout-mapping.md`。
 
 # 页面生成总规则
 
