@@ -629,6 +629,22 @@ assert.ok(modeDoc.includes("压成空格会让两行文案退化成一行"),
     assert.ok(/gen-mtslg-mapping-from-dsl\.js/.test(text),
       name + " 必须写明 mapping 由 gen-mtslg-mapping-from-dsl.js 机械生成");
   }
+
+  // README「N 项强制工具」的标题基数必须与紧随其后的条目数一致。
+  // 背景：CI 语义审计（v1.0.154 的 REVIEW-001）报过「标题写三项、实际列四项」——
+  // 这类计数漂移当时的门禁完全没覆盖，所以补在这里。
+  const forcedHeading = /完整页面转换包含([一二两三四五六七八九十])项强制工具：/.exec(readme);
+  if (forcedHeading) {
+    const zhNum = { 一: 1, 二: 2, 两: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9, 十: 10 };
+    const declared = zhNum[forcedHeading[1]];
+    const tail = readme.slice(forcedHeading.index).replace(/\r\n/g, "\n");
+    const listBlock = tail.slice(tail.indexOf("\n- ") + 1).split("\n\n")[0];
+    const actual = (listBlock.match(/^- /gm) || []).length;
+    assert.strictEqual(actual, declared,
+      "README 的「" + declared + " 项强制工具」标题基数必须与清单条目数一致（实际 " + actual + " 条）");
+  } else {
+    assert.ok(false, "README 必须保留「完整页面转换包含 N 项强制工具：」小节标题");
+  }
 }
 
 console.log("PASS 文本换行口径（textNewlinePolicy）一致性回归测试");

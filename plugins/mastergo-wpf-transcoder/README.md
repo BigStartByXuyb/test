@@ -20,8 +20,7 @@
 
 - `skills/mastergo-to-wpf/scripts/mastergo-dsl-pipeline.ps1` — 用 `-Action Capture` 把一次性 `getDsl` 响应固化为唯一的 `dsl.snapshot.json`，并校验根节点、递归节点、唯一 ref 和父子链；只有覆盖报告为 `complete` 才能继续生成。
 - `skills/mastergo-to-wpf/scripts/resolve-mastergo-visibility.js` — 从 DSL 机械提取节点可见属性、祖先继承后的有效可见状态、TEXT/PATH 索引和可见性来源；只生成 visibility audit，不直接生成 mapping。
-- `skills/mastergo-to-wpf/scripts/gen-mtslg-mapping-from-dsl.js` — 从 DSL 快照、visibility audit 和正式组件映射机械生成页面 mapping 与 `textAudit`；新建页面由 Bundle 在本次生成中自动调用，不接受人工逐条改写的 mapping。
-- `skills/mastergo-to-wpf/scripts/gen-mastergo-page-bundle.js` — 页面项目生成的唯一入口，统一生成 mapping、页面 XML、Icon、Layout、WPF 宿主和审计产物。
+- `skills/mastergo-to-wpf/scripts/gen-mastergo-page-bundle.js` — 页面项目生成的唯一入口；内部由 `gen-mtslg-mapping-from-dsl.js` 从 DSL 快照、visibility audit、正式组件映射和图标台账**机械生成**页面 mapping 与 `textAudit`（不接受人工逐条改写的 mapping），再统一生成页面 XML、Icon、Layout、WPF 宿主和审计产物。
 
 Layout 增量注册与 `--overwrite` 的语义：
 

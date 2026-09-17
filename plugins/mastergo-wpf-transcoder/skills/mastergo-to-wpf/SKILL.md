@@ -291,7 +291,7 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 3. 只有 `coverage-report.json.status=complete` 且 `duplicateNodeRefs=[]`、`unknownParentRefs=[]` 时，才允许进入组件映射、Icon 发现和 `gen-mastergo-page-bundle.js`。一次性 `getDsl` 没有独立的远端节点总数，`capturedNodeCount` 只表示本地递归解析到的节点数，不得把它当成远端完整性证明。
    - 完全相同的同 ID、同父节点节点允许在 Capture 阶段折叠为一个，并写入 `collapsedDuplicateRefs` 审计；同 ID 但父节点、类型、内容或几何不同仍写入 `duplicateNodeRefs` 并阻断生成。
 4. 覆盖校验失败时，停止本次转换并报告重复 ref、缺失 id 或断裂父子链；不得改为分段读取或凭不完整数据生成 XML、Icon、Layout 或 WPF 宿主。
-5. 该流水线只负责一次性 DSL 快照的结构完整性和来源保留。当前 MTSLG 页面转换还必须在 `getDsl` 成功后按需调用 `extractSvg`，将响应保存为 `<runDir>/extractSvg.json`；Bundle 清单的 `svgPath` 必须指向该文件。没有可用运行时 Icon 时也必须提供合法的 `{ "svgs": [] }` 输入，不能省略 `svgPath`。随后再执行正式映射、`gen-iocontrol-xml.js`、`gen-mtslg-page-icons.js`、`gen-mtslg-layout.js` 和 `gen-mastergo-page-bundle.js`。
+5. 该流水线只负责一次性 DSL 快照的结构完整性和来源保留。当前 MTSLG 页面转换还必须在 `getDsl` 成功后按需调用 `extractSvg`，将响应保存为 `<runDir>/extractSvg.json`；Bundle 清单的 `svgPath` 必须指向该文件。没有可用运行时 Icon 时也必须提供合法的 `{ "svgs": [] }` 输入，不能省略 `svgPath`。随后再执行 `gen-iocontrol-xml.js`、`gen-mtslg-page-icons.js`、`gen-mtslg-layout.js` 和 `gen-mastergo-page-bundle.js`；页面 mapping 不是这一步手工产出的前置输入，而是由 Bundle 内部调用 `scripts/gen-mtslg-mapping-from-dsl.js` 生成（见下节）。
 
 ### 可见性事实提取与 mapping 机械生成
 
@@ -299,7 +299,7 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 
 `scripts/gen-mtslg-mapping-from-dsl.js` 同时读取 DSL 快照、`visibility.json` 和正式组件映射，按有效可见状态**机械**决定每个普通 TEXT、F 文本和 Icon 是否进入 mapping：可见的当前页面文本必须生成，明确 hidden 文本删除；只有页面根级/工件级大标题标记为 `page-title` 时永远删除，组件内部标题、GroupBox Header、表格列标题以及组件库占位文案都按自身可见属性生成。宿主公共栏由结构边界剥离，不作为组件文本删除理由。生成的 mapping 用 `textAudit` 记录每个 TEXT 的 `sourceRef`、真实文本、可见性、角色、输出决定和 `outputRefs`，再交给 Bundle 生成页面文件。
 
-新建页面的 mapping 由 Bundle 在本次生成中调用该脚本创建，**不由人工/AI 逐条改写**：输入只有 DSL 快照、`visibility.json`、正式映射表和图标台账，产物带 `mappingTag=新页面完整DSL映射`；提供 `manifest.dslPath` 时 Bundle 会重新生成并覆盖该路径，手写内容不会进入链路。需要偏离机械结果时改的是**输入**而不是 mapping 产物——组件结构与模板不符时用 `manifest.excludeInstances` 隔离该实例（登记进 `pending`/`unmappedComponents`，不猜 `ControlType`），文案语义用 `manifest.pageTitleText` / `langGlossary` / `languages.translations` 表达。人工/AI 的输出是这些输入清单与边界决策，不是 mapping 文件本身。
+新建页面的 mapping 由 Bundle 在本次生成中调用该脚本创建，**不由人工/AI 逐条改写**：输入来自 DSL 快照、`visibility.json`、正式映射表、图标台账和可选的 `--exclude-instances` 隔离清单，产物带 `mappingTag=新页面完整DSL映射`；提供 `manifest.dslPath` 时 Bundle 会重新生成并覆盖该路径，手写内容不会进入链路。需要偏离机械结果时改的是**输入**而不是 mapping 产物——组件结构与模板不符时用 `manifest.excludeInstances` 隔离该实例（登记进 `pending`/`unmappedComponents`，不猜 `ControlType`），文案语义用 `manifest.pageTitleText` / `langGlossary` / `languages.translations` 表达。人工/AI 的输出是这些输入清单与边界决策，不是 mapping 文件本身。
 
 - `_placeholder=true` 只是 MasterGo 组件库来源提示，不是删除条件。即使正式组件映射把文本标记为 placeholder，只要它属于当前页面或当前组件的可见内容，也必须生成。`decision=omit` 分两条路径，真值源都在 `validate-iocontrol-provenance.js`：① **明确 hidden 的文本**（`visibility=false`）按可见性 omit，`omitReason='hidden'`，登记在 `OMIT_REASONS`；② **可见文本的角色驱动 omit**，`role` 必须落在 `OMIT_ROLES` 集合（当前为 `page-title`、`host-shell`、`excluded-component`、`unmapped-component`、`camera-viewport-internal`、`table-data-cell`：分别是页面根级大标题、宿主公共栏、被隔离组件内部、未命中模板组件内部、**整体控件内部渲染**——相机视口按映射表 `cameraTemplates.innerTextPolicy` 要求其内部 TEXT 整体 omit、**表格行数据**——表格按映射表 `tableTemplates.innerTextPolicy` 要求其行内文本（行标题、单位、单元格文本，含输入框实例内部的固定文本）整体 omit，因为表格的行是 PageData 数据不是页面控件）。可见文本的角色不在 `OMIT_ROLES` 内时校验直接拒绝；新增任何一种 omit 角色都必须同时登记进该集合，并在本节同步说明，不得只在文档或映射表里单方面声明。
 
