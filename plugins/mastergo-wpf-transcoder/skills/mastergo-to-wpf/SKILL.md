@@ -29,7 +29,7 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 5. 如果一次性 `getDsl` 返回错误，停止本次转换并报告原因；不得改用其他设计数据接口、浏览器或截图继续生成。
 6. `extractSvg` 只能作为一次 `getDsl` 成功后的独立图标资源解析步骤，用于生成页面 Icon；它不得读取、替代或补充页面结构。页面生成必须继续走本 Skill 的单响应 DSL capture 和适配器 Bundle 流程。
 7. **调用方式固定（防止整页 DSL 进入上下文）**：必须通过 `scripts/call-mastergo-mcp.js` 调用 `getDsl`、`extractSvg` 及其他 MasterGo MCP 工具，响应**只落盘**（约定 `<runDir>/getDsl.json`、`<runDir>/extractSvg.json`），脚本 stdout 只保留一行摘要（工具名、路径、字节数）。**禁止**把整页 DSL/SVG 原文放进模型上下文、回复正文或日志；引用设计数据时只允许给条数、字节数、哈希等摘要信息。在会话里直接调用 MCP 工具导致整页 DSL 进入上下文，视为违反本门禁。
-8. **转换链路不得读图（强制）**：页面生成（DSL capture → mapping → XML / Icon / Layout）全程只以 DSL、`extractSvg` 和脚本的计算结果为事实源。**不得**打开、渲染或裁剪设计稿图片/截图/图标位图来做判断题，**不得**用像素采样、ASCII/字符画粗渲染、栅格化预览、图像识别或任何"看一眼像不像"的方式确认图形外观、图形含义或朝向。图标朝向只由 DSL 的 `rotate` / `flipH` / `flipV` 按树序机械烘焙得出，**脚本算出什么就是什么**；发现同一组图标几何完全一致（设计侧缺图）时，照常出图并登记待确认交设计侧处理，不自行镜像、旋转、转正或否决结果。
+8. **转换链路不得读图（强制）**：页面生成（DSL capture → mapping → XML / Icon / Layout）全程只以 DSL、`extractSvg` 和脚本的计算结果为事实源。**不得**打开、渲染或裁剪**设计稿图片/截图/图标位图**来做判断题，**不得**用像素采样、ASCII/字符画粗渲染、栅格化预览、图像识别或任何“看一眼像不像”的方式确认图形外观、图形含义或朝向。本条约束的是**人与模型读图做判断**，不约束脚本内部用于数值比较的机械栅格化（例如 `gen-mtslg-page-icons.js` 比较 EvenOdd 与 Nonzero 填充规则渲染差异），该脚本照常运行。图标朝向只由 DSL 的 `rotate` / `flipH` / `flipV` 按树序机械烘焙得出，**脚本算出什么就是什么**；发现同一组图标几何完全一致（设计侧缺图）时，照常出图并登记待确认交设计侧处理，不自行镜像、旋转、转正或否决结果。**宿主运行截图不属设计稿读图**：它只用于建立宿主公共栏边界这类目标项目适配事实（见 `mtslg-mode.md` 第 3、8 节），同样不得用来判断设计稿图形、图标含义或朝向。
 
 先判断交付目标：
 
@@ -330,7 +330,7 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 
 - WPF：检查项目引用、Style/Resource 键、命名空间、绑定和原有代码风格，并执行可用的编译/加载验证；
 - IOContorl：在 XML 结构检查前，使用 node scripts/validate-iocontrol-provenance.js --xml <page.xml> --mapping <mapping.json> 做 Value/来源/坐标硬校验；非零退出码即停止交付；
-- IOContorl：检查 XML 结构、`ControlType`、属性白名单、父子坐标，执行 Ctrl+R 或等价加载验证；
+- IOContorl：检查 XML 结构、`ControlType`、属性白名单、父子坐标（静态检查，本步不加载宿主、不截图）；
 - 运行时交付门禁（`Ctrl+R`/加载验证、截图核对、视觉一致性报告）只在用户明确要求时执行；纯转换交付以 XML/provenance/坐标校验结果为准，**不读图、不做视觉判断**。
 
 ## 公共参考（仅在对应条件满足时读取）
