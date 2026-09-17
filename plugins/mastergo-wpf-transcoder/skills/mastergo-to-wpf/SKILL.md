@@ -117,6 +117,7 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 
 - 默认只合成「PATH 原始 `d` + PATH 自身 `matrix`」并平移到原点，与 `extractSvg` 的输出等价；
 - `"bakeAncestorTransform": true` 时额外把祖先节点的 `rotate` / `flipH` / `flipV`（绕各自盒子中心）烘焙进坐标，用于区分只靠组级变换区分的方向图标；
+- **祖先朝向由脚本自动判定并烘焙（机械兜底，不靠手写字段）**：只要图标节点的 PATH 祖先链上出现 `rotate` / `flipH` / `flipV`，`gen-mtslg-page-icons.js` 就自动改用「DSL + 烘焙」——包括 `extractSvg` 恰好也有条目的情况（extractSvg 只给 PATH 自身的变换，表达不了祖先朝向）。自动烘焙的图标会在 stdout 逐条报告，供交付说明引用。台账显式写 `fromDsl` + `bakeAncestorTransform` 时结果与自动一致；祖先链上没有朝向时行为不变（仍优先 `extractSvg`）。该判定需要第 4 个参数（DSL 快照），不传快照时只保留显式声明这条路径。
 - 本模式是**机械计算**：按树序把祖先的 `rotate` / `flipH` / `flipV` 烘进坐标，**计算结果即产物**。不做视觉判断、不读图、不调用模型识别图形外观，也不以"看起来像不像"为由修改或否决结果。
 - 如果同一组图标在 DSL 里几何**完全一致**（把祖先变换一并算进去后逐字段相同，例如「向左」与「向右」），说明设计侧缺少独立图形：**照常按槽位语义命名并出图**（产物以机械结果为准），同时在 mapping 与交付说明中标记待确认、要求设计补图；**不得自行镜像、旋转或猜测朝向**。
 

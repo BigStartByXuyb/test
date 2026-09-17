@@ -34,9 +34,13 @@
  *   （例如同一图标被旋转/翻转复用），因此某些方向按钮拿不到条目。此时可传入
  *   DSL 快照，并用 `fromDsl: true` 让脚本从 DSL 的 PATH 节点合成几何：
  *     - 默认只合成「原始 d + PATH 自身 matrix」，与 extractSvg 的输出保持一致；
- *     - `bakeAncestorTransform: true` 时，额外把祖先节点的 rotate / flipH / flipV
- *       （绕各自盒子中心）烘焙进坐标，用于区分「只靠组级翻转/旋转区分」的方向图标。
- *       该模式是机械计算：按树序把祖先 rotate / flipH / flipV 烘进坐标，计算结果即产物。
+ *     - **祖先朝向自动烘焙（机械兜底）**：只要图标节点的 PATH 祖先链上出现
+ *       rotate / flipH / flipV（典型就是「方向按钮组」靠组级变换区分方向），脚本就自动
+ *       改用「DSL + 烘焙」，**不依赖台账手写** `bakeAncestorTransform`——方向只存在于祖先
+ *       变换上，extractSvg 与「DSL 但不烘焙」都表达不了它，漏写字段会静默产出方向错的几何。
+ *       自动烘焙的图标会在 stdout 报告，可据此核对。祖先链无朝向时行为不变（仍走 extractSvg）。
+ *     - `bakeAncestorTransform: true` 仍可显式声明；显式与自动的结果一致。
+ *       烘焙是机械计算：按树序把祖先 rotate / flipH / flipV 烘进坐标，计算结果即产物。
  *       不做视觉判断、不读图、不识别图形外观；几何完全一致的复用实例按同一份几何出图，
  *       属设计侧缺图，登记待确认即可，不得自行镜像或猜测朝向。
  *     - `sourceRef` 可以指向 PATH 节点，也可以指向**图标组**：指向组时，收集组内
@@ -44,8 +48,10 @@
  *       路径拼成）按 extractSvg 的口径就是一个条目、多条 d，必须走这条路才不会缺图形；
  *       组内一个 PATH 都没有时直接失败，不静默产出空图标。
  *   注意：`extractSvg` 条目与祖先朝向是两件独立的事。走 extractSvg 时**不会**带上
- *   祖先的 rotate/flip（它只给 PATH 自身的 d + transform）；需要按设计稿的组级朝向
- *   出图时，必须显式改用 `fromDsl` + `bakeAncestorTransform`。
+ *   祖先的 rotate/flip（它只给 PATH 自身的 d + transform）；祖先链上有朝向时，即使
+ *   extractSvg 恰好有条目，也必须按设计稿的组级朝向出图——脚本会自动改用 DSL + 烘焙，
+ *   台账显式写 `fromDsl` + `bakeAncestorTransform` 则与自动结果一致。
+ *   自动判定需要第 4 个参数（DSL 快照）；不传快照时只保留显式声明这条路径。
  *
  * Geometry 默认只输出路径数据，不写 F0/F1 填充规则标记（框架解析器不使用该标记）。
  * 为保证去掉标记后外观不变，脚本会先对重复子路径安全去重，再用内置栅格化比较
@@ -242,6 +248,11 @@ function buildDslIndex(snapshot) {
 }
 
 // 祖先 rotate/flip 合成矩阵（由外到内）。
+function isIdentityMatrix(matrix) {
+  return matrix[0] === 1 && matrix[1] === 0 && matrix[2] === 0
+    && matrix[3] === 1 && matrix[4] === 0 && matrix[5] === 0;
+}
+
 function ancestorOrientationMatrix(index, nodeId) {
   const chain = [];
   let current = index.parentById.get(nodeId) || null;
@@ -254,7 +265,7 @@ function ancestorOrientationMatrix(index, nodeId) {
   for (const id of chain) {
     const node = index.nodeById.get(id);
     const next = nodeOrientationMatrix(node);
-    if (next[0] === 1 && next[1] === 0 && next[2] === 0 && next[3] === 1 && next[4] === 0 && next[5] === 0) continue;
+    if (isIdentityMatrix(next)) continue;
     matrix = multiplyMatrix(matrix, next);
   }
   return matrix;
@@ -595,15 +606,28 @@ for (const icon of iconMap.icons) {
   }
   const key = resolveKey(icon.name);
   const svg = svgById.get(icon.sourceId);
-  const useDsl = Boolean(icon.fromDsl) || !svg;
+  // 机械兜底：只靠祖先 rotate / flipH / flipV 区分方向的图标（典型是「方向按钮组」），
+  // extractSvg 与「DSL 但不烘焙」都表达不了方向——两者都会输出未带祖先变换的原图。
+  // 台账没声明 bakeAncestorTransform 时由脚本自己判定并烘焙，避免漏写字段就静默出方向错的几何。
+  const requestedBake = Boolean(icon.bakeAncestorTransform);
+  let autoBaked = false;
+  if (!requestedBake && dslIndex) {
+    const iconNode = dslIndex.nodeById.get(icon.sourceRef) || dslIndex.nodeById.get(icon.sourceId);
+    if (iconNode) {
+      autoBaked = collectPathNodes(dslIndex, iconNode)
+        .some(pathNode => !isIdentityMatrix(ancestorOrientationMatrix(dslIndex, pathNode.id)));
+    }
+  }
+  const bake = requestedBake || autoBaked;
+  const useDsl = Boolean(icon.fromDsl) || bake || !svg;
   let paths;
   let geometrySource;
   if (useDsl) {
     if (!dslIndex) {
       throw new Error(`Icon ${icon.name} needs the DSL snapshot (extractSvg 缺该条目): ${icon.sourceId}`);
     }
-    paths = synthesizeFromDsl(dslIndex, icon, Boolean(icon.bakeAncestorTransform));
-    geometrySource = icon.bakeAncestorTransform ? 'dsl+ancestor-transform' : 'dsl';
+    paths = synthesizeFromDsl(dslIndex, icon, bake);
+    geometrySource = bake ? 'dsl+ancestor-transform' : 'dsl';
   } else {
     paths = parsePaths(svg, icon.sourceId);
     if (paths.some(path => path.transform && !path.matrix)) {
@@ -637,6 +661,7 @@ for (const icon of iconMap.icons) {
   geometryReport.push({
     key,
     geometrySource,
+    autoBaked,
     sourceRule,
     keepFillRule: plan.keepFillRule,
     deduped: plan.deduped,
@@ -664,4 +689,8 @@ if (fillRuleIcons.length > 0) {
   console.log(`  保留 F1（渲染依赖 Nonzero）: ${fillRuleIcons.map(item => item.key).join(', ')}`);
 } else {
   console.log('  全部图标已无需填充规则标记');
+}
+const autoBakedIcons = geometryReport.filter(item => item.autoBaked);
+if (autoBakedIcons.length > 0) {
+  console.log(`  自动烘焙祖先朝向（台账未声明 bakeAncestorTransform）: ${autoBakedIcons.map(item => item.key).join(', ')}`);
 }

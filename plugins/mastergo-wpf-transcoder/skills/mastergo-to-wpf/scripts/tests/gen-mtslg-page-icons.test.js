@@ -129,24 +129,57 @@ fs.writeFileSync(dslSnapshotFile, JSON.stringify({
           layoutStyle: { width: 26, height: 14, relativeX: 0, relativeY: 10 },
           path: [{ data: 'M26,38L34,38L34,42L44,42L44,38L52,38L39.000001,28L26,38Z', transform: 'matrix(-1,0,0,-1,52,56)' }]
         }]
+      }, {
+        // 祖先链上没有任何 rotate/flip：不得被自动烘焙（用于验证兜底不会误伤普通图标）。
+        type: 'GROUP', id: 'page/plain', name: '组 9999',
+        layoutStyle: { width: 26, height: 14, relativeX: 40, relativeY: 0 },
+        children: [{
+          type: 'PATH', id: 'page/plain/path', name: '路径 1',
+          layoutStyle: { width: 26, height: 14, relativeX: 0, relativeY: 0 },
+          path: [{ data: 'M26,4 L18,4 L18,0 L8,0 L8,4 L0,4 L12.999999,14 L26,4 Z' }]
+        }]
       }]
     }]
   }
 }, null, 2), 'utf8');
 fs.writeFileSync(dslMapFile, JSON.stringify({ icons: [
-  { sourceId: 'page/up/path', sourceRef: 'page/up/path', name: 'PlainDslGeometry', comment: '未烘焙', fromDsl: true },
-  { sourceId: 'page/up/path', sourceRef: 'page/up/path', name: 'BakedDslGeometry', comment: '已烘焙', fromDsl: true, bakeAncestorTransform: true }
+  { sourceId: 'page/up/path', sourceRef: 'page/up/path', name: 'AutoBakedDslGeometry', comment: '祖先带朝向·未声明 bake', fromDsl: true },
+  { sourceId: 'page/up/path', sourceRef: 'page/up/path', name: 'BakedDslGeometry', comment: '显式烘焙', fromDsl: true, bakeAncestorTransform: true },
+  { sourceId: 'page/up/path', sourceRef: 'page/up/path', name: 'AutoFromSvgGeometry', comment: 'extractSvg 有条目但祖先带朝向' },
+  { sourceId: 'page/plain/path', sourceRef: 'page/plain/path', name: 'UnbakedDslGeometry', comment: '祖先无朝向', fromDsl: true }
 ]}), 'utf8');
 result = spawnSync(process.execPath, [script, emptySvgFile, dslMapFile, dslOut, dslSnapshotFile], { encoding: 'utf8' });
 assert.strictEqual(result.status, 0, result.stderr);
 const dslXaml = fs.readFileSync(dslOut, 'utf8');
 const dslBody = key => dslXaml.match(new RegExp('x:Key="' + key + '">([\\s\\S]*?)</Geometry>'))[1];
-// 默认合成 = 「PATH 自身 transform」的结果并平移到原点（与 extractSvg 的原始几何等价，仅去掉偏移）
-assert.match(dslBody('PlainDslGeometry'), /M26,4 L18,4 L18,0 L8,0 L8,4 L0,4 L12\.999999,14/, '默认合成必须与 extractSvg 输出等价（不烘焙祖先变换）');
-assert.match(dslBody('PlainDslGeometry'), /12\.999999,14/, '默认合成的尖端在下方（未翻转）');
-assert.match(dslBody('BakedDslGeometry'), /M26,10 L18,10 L18,14 L8,14 L8,10 L0,10 L12\.999999,0/, '组级 flipV 必须烘焙进坐标');
-assert.match(dslBody('BakedDslGeometry'), /12\.999999,0/, '烘焙后尖端翻到上方');
+// 祖先朝向自动烘焙（机械兜底）：方向只存在于祖先 rotate/flip 上，「DSL 但不烘焙」与
+// extractSvg 一样表达不了它；过去靠台账手写 bakeAncestorTransform，漏写就静默出方向错的几何。
+assert.match(dslBody('AutoBakedDslGeometry'), /M26,10 L18,10 L18,14 L8,14 L8,10 L0,10 L12\.999999,0/,
+  '祖先带 flipV 且未声明 bake 时必须自动烘焙');
+assert.strictEqual(dslBody('AutoBakedDslGeometry'), dslBody('BakedDslGeometry'),
+  '自动烘焙结果必须与显式 bakeAncestorTransform 逐字符相同');
+assert.match(result.stdout, /自动烘焙祖先朝向（台账未声明 bakeAncestorTransform）: /, '自动烘焙必须报告');
+assert.match(result.stdout, /自动烘焙祖先朝向（台账未声明 bakeAncestorTransform）: [^\n]*AutoBakedDslGeometry/,
+  '被自动烘焙的图标必须逐条列出');
+assert.doesNotMatch(result.stdout, /自动烘焙祖先朝向[^\n]*UnbakedDslGeometry/,
+  '祖先链无朝向的图标不得被自动烘焙');
+// 祖先链无朝向：行为不变，仍是「PATH 自身 transform + 平移到原点」（与 extractSvg 等价，仅去掉偏移）。
+assert.match(dslBody('UnbakedDslGeometry'), /M26,4 L18,4 L18,0 L8,0 L8,4 L0,4 L12\.999999,14/,
+  '祖先无朝向时必须保持不烘焙');
 assert.doesNotMatch(dslXaml, /PathGeometry|MatrixTransform|GeometryGroup/);
+
+// extractSvg 恰好也有该条目时，仍必须改用 DSL 烘焙：extractSvg 只给 PATH 自身的
+// d + transform，用它就会丢掉组级朝向——这正是「方向按钮四个方向出同一图形」的成因。
+const autoSvgFile = path.join(dir, 'auto-bake-extractSvg.json');
+const autoSvgOut = path.join(dir, 'AutoBakeFromSvgIcons.xaml');
+fs.writeFileSync(autoSvgFile, JSON.stringify({ svgs: [
+  { id: 'page/up/path', name: '组 1521', svg: '<svg><path d="M0,0L1,1"/></svg>' }
+]}), 'utf8');
+result = spawnSync(process.execPath, [script, autoSvgFile, dslMapFile, autoSvgOut, dslSnapshotFile], { encoding: 'utf8' });
+assert.strictEqual(result.status, 0, result.stderr);
+const autoSvgBody = key => fs.readFileSync(autoSvgOut, 'utf8').match(new RegExp('x:Key="' + key + '">([\\s\\S]*?)</Geometry>'))[1];
+assert.match(autoSvgBody('AutoFromSvgGeometry'), /12\.999999,0/,
+  'extractSvg 有条目但祖先带朝向时必须改用 DSL 烘焙（不得用方向错误的 extractSvg 几何）');
 
 const noDslOut = path.join(dir, 'NoDslIcons.xaml');
 result = spawnSync(process.execPath, [script, emptySvgFile, dslMapFile, noDslOut], { encoding: 'utf8' });
