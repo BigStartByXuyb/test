@@ -52,7 +52,7 @@
     "langDictionaryEscaping": "&#x0a;",
     "valueComparison": "normalizeForCompare：先解码字符引用（&#x0a; 等）、再把换行码点归一成 LF，然后逐字比较",
     "implementationSource": "scripts/lib/script-helpers.js 的 normalizeNewlines / langValueText / xmlAttr / xmlElementText / normalizeForCompare（**实现真值源**；生成器、校验器、Bundle、字典发射器共用同一份，不允许别处再写一份换行/字典值处理）",
-    "mapRole": "本块**登记**同一口径供人读与回归断言比对（不是脚本的运行期输入）：换行码点、归一目标与两种发射写法必须与实现真值源一致；改口径时先改实现，再同步本块与三份人读文档。",
+    "mapRole": "本块**登记**同一口径供人读与回归断言比对（不是脚本的运行期输入）：换行码点、归一目标与两种发射写法必须与实现真值源一致；改口径时先改实现，再同步本块与四份人读文档：SKILL.md、mtslg-mode.md、feishu-component-library-mapping.md、feishu-layout-mapping.md。",
     "langDictionaryValueTransform": "字典值 = 归一换行 → 行内空白（空格/制表符）折叠成单个空格 → 换行两侧空白一并去掉 → 行首行尾空白去掉（trim）。示例：`A␠␠\\n␠␠B` → `A\\nB`；`␠␠␠␠对位模式␠␠␠␠` → `对位模式`。实现位置 = scripts/lib/script-helpers.js 的 `langValueText`（唯一实现；gen-mtslg-lang-keys-from-dsl.js 只调用它，不自带一份）。",
     "note": "设计稿一个文本 run 内部的换行以 U+2028（行分隔符）/U+2029（段分隔符）编码（另有 CR/CRLF/LF），必须归一成 LF 后按框架写法发射：**XML 属性里不能出现字面换行**（解析器会把它归一成空格），所以一律写成字符引用 &#x0a;。同一行内不同字体的多个 text run 是 text 数组多项，按空串拼接，**不是**换行。语言字典是运行时按 LangName 取文案的载体，必须与设计稿换行一致（写成 &#x0a;），否则两行文案在运行时退化成一行。空白处理分**三条用途**：① 页面 XML 属性文案只归一换行、其余空白原样保留；② 字典值额外折叠行内空白、去掉换行两侧空白并 trim（逐字规则见 langDictionaryValueTransform）；③ 键派生 / 译文查找 / 术语表匹配用全量压平值（normalizeText）。三者用途不同，不是同一份字符串。"
   },

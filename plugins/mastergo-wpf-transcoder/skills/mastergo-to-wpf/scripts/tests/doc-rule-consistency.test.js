@@ -564,8 +564,21 @@ const LAYOUT_DOC = fs.readFileSync(
   path.join(__dirname, "..", "..", "references", "adapters", "mtslg-iocontrol", "feishu-layout-mapping.md"), "utf8");
 assert.ok(LAYOUT_DOC.includes("&#x0a;"), "feishu-layout-mapping.md 必须写明 MenuItem 文案换行写 &#x0a;");
 assert.ok(LAYOUT_DOC.includes("U+2028"), "feishu-layout-mapping.md 必须写明设计换行码点 U+2028");
-assert.ok(/MenuItem/.test(LAYOUT_DOC.replace("页面壳层 → MTSLG Layout.xml 映射标准", "")),
-  "feishu-layout-mapping.md 必须保留 MenuItem 参数说明（换行口径挂在它下面）");
+// 位置校验：换行口径必须挂在「### MenuItem 参数」小节内（标题之后、下一个标题之前），
+// 否则整段被搬走时前面的 contains 断言仍会通过，守护就形同虚设。
+{
+  const layoutLines = LAYOUT_DOC.split(/\r?\n/);
+  const sectionStart = layoutLines.findIndex((line) => line.startsWith("### MenuItem 参数"));
+  assert.ok(sectionStart >= 0, "feishu-layout-mapping.md 必须保留「### MenuItem 参数」小节");
+  let sectionEnd = layoutLines.length;
+  for (let i = sectionStart + 1; i < layoutLines.length; i += 1) {
+    if (/^#{2,3} /.test(layoutLines[i])) { sectionEnd = i; break; }
+  }
+  const section = layoutLines.slice(sectionStart, sectionEnd).join("\n");
+  assert.ok(section.includes("&#x0a;"),
+    "换行口径必须写在「### MenuItem 参数」小节内（当前挂在第 " + (sectionStart + 1) + " 行的小节之后未命中）");
+  assert.ok(section.includes("U+2028"), "MenuItem 小节内的换行口径必须写明设计换行码点 U+2028");
+}
 assert.ok(modeDoc.includes("压成空格会让两行文案退化成一行"),
   "mtslg-mode.md 必须写明字典压成空格的后果");
 
