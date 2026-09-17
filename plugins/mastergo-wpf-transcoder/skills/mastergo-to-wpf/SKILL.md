@@ -29,6 +29,7 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 5. 如果一次性 `getDsl` 返回错误，停止本次转换并报告原因；不得改用其他设计数据接口、浏览器或截图继续生成。
 6. `extractSvg` 只能作为一次 `getDsl` 成功后的独立图标资源解析步骤，用于生成页面 Icon；它不得读取、替代或补充页面结构。页面生成必须继续走本 Skill 的单响应 DSL capture 和适配器 Bundle 流程。
 7. **调用方式固定（防止整页 DSL 进入上下文）**：必须通过 `scripts/call-mastergo-mcp.js` 调用 `getDsl`、`extractSvg` 及其他 MasterGo MCP 工具，响应**只落盘**（约定 `<runDir>/getDsl.json`、`<runDir>/extractSvg.json`），脚本 stdout 只保留一行摘要（工具名、路径、字节数）。**禁止**把整页 DSL/SVG 原文放进模型上下文、回复正文或日志；引用设计数据时只允许给条数、字节数、哈希等摘要信息。在会话里直接调用 MCP 工具导致整页 DSL 进入上下文，视为违反本门禁。
+8. **转换链路不得读图（强制）**：页面生成（DSL capture → mapping → XML / Icon / Layout）全程只以 DSL、`extractSvg` 和脚本的计算结果为事实源。**不得**打开、渲染或裁剪设计稿图片/截图/图标位图来做判断题，**不得**用像素采样、ASCII/字符画粗渲染、栅格化预览、图像识别或任何"看一眼像不像"的方式确认图形外观、图形含义或朝向。图标朝向只由 DSL 的 `rotate` / `flipH` / `flipV` 按树序机械烘焙得出，**脚本算出什么就是什么**；发现同一组图标几何完全一致（设计侧缺图）时，照常出图并登记待确认交设计侧处理，不自行镜像、旋转、转正或否决结果。
 
 先判断交付目标：
 
@@ -99,7 +100,7 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
    - 页面可以没有任何运行时 Icon。PATH/SVG 候选只是来源审计；只有 IOContorl 节点或 Layout 菜单实际引用的 Icon，才必须在当前页面 Icon 文件中存在对应 Geometry 资源键。
     - **Layout 必须先完成映射清单，再生成 XML。** 读取完全部 MasterGo DSL 后，按 `feishu-layout-mapping.md` 生成 Layout manifest；已命中的底部栏组件必须生成对应的 `menuItems`。底部栏变体按 `layoutRules.bottomBar.match` 登记的**一个**键识别（当前是组件名——底部栏实例的属性里没有变体信息），既非装饰、又不在常驻分组、又没命中变体的实例计入 `layoutEvidence.unresolvedBottomBarItems` 并拒绝生成，不允许静默丢按钮。当前固定模板声明的运行时字段缺失时写入空字符串并标记待配置；没有声明的字段不新增，不能因此把整个 `Menu` 留空。`layoutStatus`、`layoutEvidence` 和数量一致性由 `gen-mtslg-layout.js` 强制校验；校验失败表示“清单不完整”，不是拒绝生成页面，补齐清单后重新运行即可。
    - 顶部栏 `HeaderItem` 的运行时 `Id/Target` 仍须来自目标项目事实源；无法确认时单独标记待确认，不得用顶部文字或图标名称猜写。页面中间的 `主菜单button` 也不因存在 F 键就自动写入 Layout，只有正式 Layout 映射命中时才写入。
-3. 在 XML 结构检查前运行 `scripts/validate-iocontrol-provenance.js`；需要独立坐标检查时以节点数组调用 `scripts/check-iocontrol-coords.js`，有 Geometry 时调用 `scripts/scan-icon-coords.js`，再执行宿主加载与视觉核对。
+3. 在 XML 结构检查前运行 `scripts/validate-iocontrol-provenance.js`；需要独立坐标检查时以节点数组调用 `scripts/check-iocontrol-coords.js`，有 Geometry 时调用 `scripts/scan-icon-coords.js`。**本步骤到此结束。** 宿主加载与截图核对属于上文的「项目运行时交付」门禁，只有用户明确要求替换/部署/加载页面或报告可运行、Ctrl+R、视觉一致时才执行；它不是每次转换的固定步骤，也不参与任何图标图形或朝向的判断。
 
 本作业不得写入 WPF 私有协议，例如 `s:Action`、WPF `PageName` 或 WPF ResourceDictionary/绑定语法；没有正式映射时不得降级为普通 Button、无类型容器或静态占位结构。未映射组件仅进入静态来源清单，不进入伪造的 IOContorl 节点。
 
@@ -116,7 +117,8 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 
 - 默认只合成「PATH 原始 `d` + PATH 自身 `matrix`」并平移到原点，与 `extractSvg` 的输出等价；
 - `"bakeAncestorTransform": true` 时额外把祖先节点的 `rotate` / `flipH` / `flipV`（绕各自盒子中心）烘焙进坐标，用于区分只靠组级变换区分的方向图标；
-- 该模式属于几何推断，交付前必须做一次视觉核对；如果同一组图标在 DSL 里几何完全相同（例如「向左」与「向右」完全一致），说明设计侧缺少独立图形，应标记待确认并要求设计补图，不得自行镜像或猜测朝向。
+- 本模式是**机械计算**：按树序把祖先的 `rotate` / `flipH` / `flipV` 烘进坐标，**计算结果即产物**。不做视觉判断、不读图、不调用模型识别图形外观，也不以"看起来像不像"为由修改或否决结果。
+- 如果同一组图标在 DSL 里几何**完全一致**（把祖先变换一并算进去后逐字段相同，例如「向左」与「向右」），说明设计侧缺少独立图形：**照常按槽位语义命名并出图**（产物以机械结果为准），同时在 mapping 与交付说明中标记待确认、要求设计补图；**不得自行镜像、旋转或猜测朝向**。
 
 每个页面必须单独维护一个 Icon 文件。转换时先从当前页 MasterGo PATH/SVG 自动发现候选；图标映射输入逐项提供目标项目已确认或页面内生成的英文资源名、中文注释名和 DSL 来源，禁止从图层 ID、坐标或几何外观直接拼出 `MGIcon_<layer-id>` 形式的资源名。资源名必须是英文标识符且在当前页面唯一；重复名称由生成器按稳定数字后缀处理。没有目标项目键时，允许使用页面内唯一的临时 Geometry 键，状态标记为 `provisional` 并保留 sourceId/sourceRef。只有未被任何实际 Icon 槽位引用的 PATH 候选才进入 `candidates/unmapped` 而不进入 XAML。XAML 注释只写中文名称，溯源和 `keyStatus` 写入 mapping/manifest。`mw-wpf`（作业 A，暂不开放）的页面以 `StaticResource` 引用该页 Geometry（作业 A 的 Icon 合并前置条件以本节路线条目为准；作业 A 的整体启用前置条件见「作业 A：MW 框架 WPF」一节）；`mtslg-iocontrol`（作业 B，当前唯一启用）的页面 XML 与 Layout 仅引用该页 Icon 文件中已生成的键。
 
@@ -329,7 +331,7 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 - WPF：检查项目引用、Style/Resource 键、命名空间、绑定和原有代码风格，并执行可用的编译/加载验证；
 - IOContorl：在 XML 结构检查前，使用 node scripts/validate-iocontrol-provenance.js --xml <page.xml> --mapping <mapping.json> 做 Value/来源/坐标硬校验；非零退出码即停止交付；
 - IOContorl：检查 XML 结构、`ControlType`、属性白名单、父子坐标，执行 Ctrl+R 或等价加载验证；
-- 两种模式都要做设计稿与运行结果的视觉核对。
+- 运行时交付门禁（`Ctrl+R`/加载验证、截图核对、视觉一致性报告）只在用户明确要求时执行；纯转换交付以 XML/provenance/坐标校验结果为准，**不读图、不做视觉判断**。
 
 ## 公共参考（仅在对应条件满足时读取）
 

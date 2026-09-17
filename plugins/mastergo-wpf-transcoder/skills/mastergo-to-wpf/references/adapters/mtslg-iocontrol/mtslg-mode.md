@@ -67,7 +67,7 @@
 - **按钮族固定参数（IconButton / Button / StatusButton）**：`PageName`、`IOVisible`、`IOCommand`、`IOEnable` 四个运行时参数无论能否取到来源都恒写，取不到时写空字符串值（merge 时保留工程师已有真实值）；`IconButton` 的 `Icon`/`IconWidth`/`IconHeight` 同样恒写：有图标槽位时取**图标图形节点自身 bbox**（映射字段 `iconSize`，四舍五入取整，不是控件宽高），无图标槽位时写空字符串；`Button`/`StatusButton` 模板不含图标字段，不发射 `Icon`、`IconWidth`、`IconHeight`。映射带 `Icon` 却没有 `iconSize` 时生成器直接失败，禁止猜图标尺寸。
 - **模板匹配键**：组件族匹配使用“组件集名 + 公开属性名 + 真实属性值”，或在映射表里登记 `structural`（结构签名）的族按结构签名匹配。设计稿里的图层名称只用于核对，不参与匹配，**例外只有两条**：① 底部栏实例的属性里没有变体信息，按 `layoutRules.bottomBar.match` 登记的组件名匹配（见《页面壳层 Layout 映射规范》）；② 表格族（`tableTemplates`）在设计稿里没有组件集，按 `match.structural` 登记的**结构签名 + 图层名后缀**匹配（见 4.1）。两条例外都登记在映射表里，不是“按图层名兜底”。历史上按“父节点语义”分流的表已作废（映射表里没有这类字段；右栏可直接放置的独立组件由 `rightSidebarComponentTemplates` 按组件集名匹配，如 `右侧栏-左右结构-icon+文案`）。变体登记 `componentSet` 时，解析先用公开属性值命中变体，再用变体内部实例的组件名交叉核对；两者不一致**直接失败并要求重新核对**，不静默选边（`resolve-mtslg-template-mapping.js` 按此实现）。
 - **图标尺寸来源**：`IconWidth`/`IconHeight` 取页面图标映射中几何来源节点（`sourceRef`，缺失时回退 `sourceId`）的 bbox；右栏这类带图标槽位的按钮，图标来自 `实例` 属性指向的图标节点；空占位虚线框视为没有图标。
-- **图标几何补充来源（extractSvg 去重）**：`extractSvg` 只输出 PATH 自身的 `d` + `transform`，几何完全相同的复用实例会被去重（同一方向图标经组级 `rotate`/`flipV` 复用时只返回一条），因此会出现「按钮有图标槽位却没有 `Icon`」。补齐办法：`gen-mtslg-page-icons.js` 追加第 4 个参数（`dsl.snapshot.json`），图标映射条目加 `"fromDsl": true`（按 PATH 原始 `d` + 自身 matrix 合成，与 extractSvg 等价并平移到原点）；需要区分方向时再加 `"bakeAncestorTransform": true`，把祖先 `rotate`/`flipH`/`flipV` 烘焙进坐标。烘焙结果必须视觉复核；同一组图标在 DSL 里几何完全相同（如「向左」与「向右」）时属于设计侧缺图，标记待确认，不得自行镜像猜测。
+- **图标几何补充来源（extractSvg 去重）**：`extractSvg` 只输出 PATH 自身的 `d` + `transform`，几何完全相同的复用实例会被去重（同一方向图标经组级 `rotate`/`flipV` 复用时只返回一条），因此会出现「按钮有图标槽位却没有 `Icon`」。补齐办法：`gen-mtslg-page-icons.js` 追加第 4 个参数（`dsl.snapshot.json`），图标映射条目加 `"fromDsl": true`（按 PATH 原始 `d` + 自身 matrix 合成，与 extractSvg 等价并平移到原点）；需要区分方向时再加 `"bakeAncestorTransform": true`，把祖先 `rotate`/`flipH`/`flipV` 烘焙进坐标。该烘焙是机械计算：按树序把祖先变换烘进坐标，计算结果即产物，不做视觉复核、不读图、不识别图形外观。同一组图标在 DSL 里几何完全一致（如「向左」与「向右」，把祖先变换一并算进去后逐字段相同）时属于设计侧缺图：照常按槽位语义命名并出图，同时标记待确认并要求设计补图，不得自行镜像猜测。
 - **设计稿最上方示例标题默认剥离**：位于根节点或展示外壳、仅用于说明组件或工件示教的标题标记为 `design-artifact-title`，不写入页面 XML。业务内容容器内部且运行时需要的标题才保留。
 - **设计稿像素直传（归一后）**：`Left = pageAbsX − parentPageAbsX`，`Top = pageAbsY − parentPageAbsY`，Width/Height 原样；`TextBlock` 例外：`Height` 固定 `40`、`Width` 固定 `NaN`。目标画布尺寸必须与第 1 节适配记录一致；不允许从固定分辨率、截图缩放或其他页面推断。
 - 允许小数与负数；`NaN` 表示自适应（根节点四属性均为 `NaN`；叶子无宽高时省略属性）。具体数值必须来自当前实例的 MasterGo bbox。
@@ -186,6 +186,8 @@
 
 ## 8. 验证方法
 
+**看图禁令（强制）**：页面生成阶段（DSL → mapping → XML / Icon / Layout）**不读图**——不得截图、栅格化、像素采样、ASCII/字符画粗渲染，也不得用图像识别或"看起来像不像"判断任何图形外观、含义或朝向。图标朝向由 DSL 的 `rotate` / `flipH` / `flipV` 机械烘焙得出，**计算结果即产物**。下面「运行时」小节属于「项目运行时交付」门禁：只在用户明确要求替换/部署/加载页面或报告可运行、Ctrl+R、视觉一致时执行，不是每次转换的固定步骤；其中的截图只用于确认页面能加载、关键控件位置与页面稳定性，**不得**用来判断图标朝向、修改已生成的 Geometry 或否决机械产物。
+
 静态（生成后立即）：
 - `check-iocontrol-coords.js`：0 MISMATCH、0 EXTRA（容差 0.5px）。
 - 键白名单校验（手动/生成器报告交叉核对）。
@@ -195,7 +197,7 @@
 1. 切到目标页，执行适配记录中的重载动作，并等待目标项目完成加载。
 2. 使用 `cap-window.ps1` 或目标项目认可的截图方式，传入已确认的运行宿主与输出路径。
 3. 坐标换算：以适配记录中的目标客户区尺寸为基准；若运行时存在缩放，记录客户区原点与缩放系数后再逐区比对。
-4. 按 DSL bbox 裁剪关键区逐区对照；没有可视化通道时，可用像素采样、ASCII 粗渲染、UI Automation 或间隔截图像素差异确认页面稳定性与关键控件位置。
+4. 按 DSL bbox 裁剪关键区逐区对照；没有可视化通道时，可用像素采样、UI Automation 或间隔截图像素差异确认页面**稳定性与关键控件位置**（仅限本运行时门禁；不得据此判断图标朝向、改 Geometry 或推断设计侧缺失）。
 5. 检查目标项目要求的语言环境中 LangName 生效，且 IOEnable/IOVisible 无缺键报错。
 
 ## 9. 风险与实测待办
