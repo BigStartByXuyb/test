@@ -558,6 +558,14 @@ for (const [label, text] of [
   assert.ok(!text.includes("空白处理的两条口径"), label + " 不得保留「空白处理的两条口径」的口径基数");
 }
 assert.ok(/三条用途/.test(newlineRule.note || ""), "映射表 note 必须写明空白处理分三条用途");
+
+// Layout 映射文档也要写明「MenuItem 文案含换行同样写 &#x0a;」（四份人读文档同口径）。
+const LAYOUT_DOC = fs.readFileSync(
+  path.join(__dirname, "..", "..", "references", "adapters", "mtslg-iocontrol", "feishu-layout-mapping.md"), "utf8");
+assert.ok(LAYOUT_DOC.includes("&#x0a;"), "feishu-layout-mapping.md 必须写明 MenuItem 文案换行写 &#x0a;");
+assert.ok(LAYOUT_DOC.includes("U+2028"), "feishu-layout-mapping.md 必须写明设计换行码点 U+2028");
+assert.ok(/MenuItem/.test(LAYOUT_DOC.replace("页面壳层 → MTSLG Layout.xml 映射标准", "")),
+  "feishu-layout-mapping.md 必须保留 MenuItem 参数说明（换行口径挂在它下面）");
 assert.ok(modeDoc.includes("压成空格会让两行文案退化成一行"),
   "mtslg-mode.md 必须写明字典压成空格的后果");
 

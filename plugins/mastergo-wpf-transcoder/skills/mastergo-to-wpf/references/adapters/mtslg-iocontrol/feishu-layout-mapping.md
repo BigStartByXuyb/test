@@ -218,6 +218,8 @@ MasterGo 顶部栏组件用于识别宿主插槽和核对显示内容；运行�
 | IOEnable | 菜单项是否启用，必须按项目 Layout.xml 或框架约定填写。 |
 | UserRightId | 菜单项所需的用户权限标识，项目未提供时不猜写。 |
 
+**文案属性的换行**：`Name`（菜单名）与 `TopLeftContent` 等文案属性若含换行，一律写字符引用 **`&#x0a;`**——与页面 XML 同一条换行口径：设计换行（`U+2028` 行分隔符 / `U+2029` 段分隔符 / `CR` / `CRLF`）先统一归一成 LF，再按框架写法发射；**属性里不能出现字面换行**（XML 解析器会把它归一成空格）。发射由共享的 `xmlAttr` 保证（实现真值源在 `scripts/lib/script-helpers.js`），Layout 生成器不另写一份转义。
+
 ## 键盘提示
 
 MasterGo 底部组件中的 F1、F2、F3、F6、F7、F8、F10 等提示，映射到 MenuItem.TopLeftContent。Index 与 F 标签互不推导：F 标签只写 TopLeftContent，菜单项顺序只按当前页面底栏的视觉排列重排为 `1..menuItems.length`（见上文「固定模板」）。同一 Layout.xml 里**本次没有被重写**的其他页面，其既有 MenuItem 的 Index 原样保留。
