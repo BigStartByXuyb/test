@@ -153,4 +153,81 @@ result = spawnSync(process.execPath, [script, emptySvgFile, dslMapFile, noDslOut
 assert.notStrictEqual(result.status, 0, '缺少 DSL 快照时 fromDsl 条目必须失败');
 assert.match(result.stderr, /needs the DSL snapshot/);
 
+// 组收集：sourceRef 指向图标组时，必须把组内全部 PATH 合成同一条 Geometry。
+// 多路径图标（如「双侧箭头」由两条路径拼成）在 extractSvg 里是一个条目、多条 d；
+// DSL 合成必须同口径，否则只取第一条会让图标缺一半。这里用 extractSvg 做基准对比。
+const groupSnapshotFile = path.join(dir, 'dsl-group.snapshot.json');
+const groupMapFile = path.join(dir, 'dsl-group-map.json');
+const groupOut = path.join(dir, 'DslGroupIcons.xaml');
+const groupSvgFile = path.join(dir, 'group-extractSvg.json');
+const P1 = 'M0,36L8,36L8,40L18,40L18,36L26,36L13.000001,26L0,36Z';
+const P2 = 'M38,36L46,36L46,40L56,40L56.203125,36L64,36L51.000001,26L38,36Z';
+const T1 = 'matrix(0,-1,1,0,-26,26)';
+const T2 = 'matrix(0,-1,-1,0,64,64)';
+fs.writeFileSync(groupSvgFile, JSON.stringify({ svgs: [{
+  id: 'page/both',
+  svg: '<svg><path d="' + P1 + '" transform="' + T1 + '"/><path d="' + P2 + '" transform="' + T2 + '"/></svg>'
+}] }), 'utf8');
+fs.writeFileSync(groupSnapshotFile, JSON.stringify({
+  dsl: {
+    nodes: [{
+      type: 'INSTANCE', id: 'page', name: '页面',
+      layoutStyle: { width: 1280, height: 1024, relativeX: 0, relativeY: 0 },
+      children: [
+        {
+          type: 'GROUP', id: 'page/both', name: '组 1525',
+          layoutStyle: { width: 38, height: 26, relativeX: 0, relativeY: 0 },
+          children: [
+            {
+              type: 'PATH', id: 'page/both/p1', name: '路径 119',
+              layoutStyle: { width: 26, height: 14, relativeX: 0, relativeY: 0 },
+              path: [{ data: P1, transform: T1 }]
+            },
+            {
+              type: 'PATH', id: 'page/both/p2', name: '路径 120',
+              layoutStyle: { width: 26, height: 14, relativeX: 12, relativeY: 0 },
+              path: [{ data: P2, transform: T2 }]
+            }
+          ]
+        },
+        {
+          type: 'GROUP', id: 'page/nopath', name: '按钮-指向上',
+          layoutStyle: { width: 84, height: 48, relativeX: 0, relativeY: 0 },
+          children: [{
+            type: 'LAYER', id: 'page/nopath/rect', name: '矩形 127',
+            layoutStyle: { width: 4, height: 10, relativeX: 0, relativeY: 0 }
+          }]
+        }
+      ]
+    }]
+  }
+}, null, 2), 'utf8');
+
+fs.writeFileSync(groupMapFile, JSON.stringify({ icons: [
+  { sourceId: 'page/both', sourceRef: 'page/both', name: 'GroupFromDsl', comment: '组收集', fromDsl: true },
+  { sourceId: 'page/both', sourceRef: 'page/both/p1', name: 'GroupFromSvg', comment: 'extractSvg 基准' }
+]}), 'utf8');
+result = spawnSync(process.execPath, [script, groupSvgFile, groupMapFile, groupOut, groupSnapshotFile], { encoding: 'utf8' });
+assert.strictEqual(result.status, 0, result.stderr);
+const groupXaml = fs.readFileSync(groupOut, 'utf8');
+const groupBody = key => groupXaml.match(new RegExp('x:Key="' + key + '">([\\s\\S]*?)</Geometry>'))[1];
+assert.strictEqual((groupBody('GroupFromDsl').match(/\bM/g) || []).length, 2,
+  '图标组的全部 PATH 必须合成同一条 Geometry（不得只取第一条）');
+assert.strictEqual(
+  groupBody('GroupFromDsl').replace(/\s+/g, ' ').trim(),
+  groupBody('GroupFromSvg').replace(/\s+/g, ' ').trim(),
+  '组收集（不烘焙）必须与 extractSvg 输出等价'
+);
+assert.doesNotMatch(groupXaml, /PathGeometry|MatrixTransform|GeometryGroup/);
+
+// 组内没有 PATH 时必须明确失败，不得静默产出空图标
+const noPathMapFile = path.join(dir, 'dsl-nopath-map.json');
+const noPathOut = path.join(dir, 'DslNoPathIcons.xaml');
+fs.writeFileSync(noPathMapFile, JSON.stringify({ icons: [
+  { sourceId: 'page/nopath', sourceRef: 'page/nopath', name: 'NoPathGeometry', comment: '组内无路径', fromDsl: true }
+]}), 'utf8');
+result = spawnSync(process.execPath, [script, emptySvgFile, noPathMapFile, noPathOut, groupSnapshotFile], { encoding: 'utf8' });
+assert.notStrictEqual(result.status, 0, '组内没有 PATH 时必须失败');
+assert.match(result.stderr, /has no PATH with path data/);
+
 console.log('PASS semantic icon naming regression test');

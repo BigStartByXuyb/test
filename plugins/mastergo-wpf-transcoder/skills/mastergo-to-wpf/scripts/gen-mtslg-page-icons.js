@@ -11,7 +11,9 @@
  *   "icons": [
  *     { "sourceId": "exact extractSvg entry id", "name": "ExitGeometry", "comment": "退出", "sourceRef": "MasterGo DSL ref" },
  *     { "sourceId": "DSL PATH 节点 id", "sourceRef": "同一 PATH 节点 id", "name": "AxisDownGeometry", "comment": "向下",
- *       "fromDsl": true, "bakeAncestorTransform": true }
+ *       "fromDsl": true, "bakeAncestorTransform": true },
+ *     { "sourceId": "DSL 图标组 id", "sourceRef": "同一图标组 id", "name": "BothSidesGeometry", "comment": "双侧",
+ *       "fromDsl": true }
  *   ]
  * }
  *
@@ -35,6 +37,13 @@
  *     - `bakeAncestorTransform: true` 时，额外把祖先节点的 rotate / flipH / flipV
  *       （绕各自盒子中心）烘焙进坐标，用于区分「只靠组级翻转/旋转区分」的方向图标。
  *       该模式属于几何推断，必须配合视觉复核后再交付。
+ *     - `sourceRef` 可以指向 PATH 节点，也可以指向**图标组**：指向组时，收集组内
+ *       全部 PATH（按树序）合成同一条 Geometry。多路径图标（例如「双侧箭头」由两条
+ *       路径拼成）按 extractSvg 的口径就是一个条目、多条 d，必须走这条路才不会缺图形；
+ *       组内一个 PATH 都没有时直接失败，不静默产出空图标。
+ *   注意：`extractSvg` 条目与祖先朝向是两件独立的事。走 extractSvg 时**不会**带上
+ *   祖先的 rotate/flip（它只给 PATH 自身的 d + transform）；需要按设计稿的组级朝向
+ *   出图时，必须显式改用 `fromDsl` + `bakeAncestorTransform`。
  *
  * Geometry 默认只输出路径数据，不写 F0/F1 填充规则标记（框架解析器不使用该标记）。
  * 为保证去掉标记后外观不变，脚本会先对重复子路径安全去重，再用内置栅格化比较
@@ -249,25 +258,52 @@ function ancestorOrientationMatrix(index, nodeId) {
   return matrix;
 }
 
-// 从 DSL 的 PATH 节点合成路径数据；bakeAncestor=true 时把祖先 rotate/flip 一并烘焙。
+// 收集节点自身（若本身是 PATH）或其子树里的全部 PATH，按树序返回。
+// 多路径图标（例如「双侧箭头」由两条路径拼成）在 extractSvg 里是「一个条目、多条 d」，
+// 这里用同样的口径：sourceRef 指向图标组，就把组内所有 PATH 收进同一条 Geometry。
+function collectPathNodes(index, node) {
+  const found = [];
+  (function walk(current) {
+    if (!current) return;
+    if (current.type === 'PATH' && Array.isArray(current.path) && current.path.length > 0) {
+      found.push(current);
+    }
+    for (const child of current.children || []) walk(child);
+  })(node);
+  return found;
+}
+
+// 从 DSL 合成路径数据。
+//   - sourceRef 可以是 PATH 节点（单路径图标），也可以是图标组（多路径图标）；
+//   - bakeAncestor=true 时把每个 PATH 的祖先 rotate/flip 一并烘焙（组自身的变换也在链上）。
+// 不烘焙时输出与 extractSvg 的口径一致：只取各 PATH 自身的 d + transform。
 function synthesizeFromDsl(index, icon, bakeAncestor) {
   const node = index.nodeById.get(icon.sourceRef) || index.nodeById.get(icon.sourceId);
   if (!node) throw new Error(`DSL node not found for icon ${icon.name}: ${icon.sourceRef || icon.sourceId}`);
-  if (node.type !== 'PATH' || !Array.isArray(node.path) || node.path.length === 0) {
-    throw new Error(`DSL node is not a PATH with path data: ${icon.name}`);
+  const pathNodes = collectPathNodes(index, node);
+  if (pathNodes.length === 0) {
+    throw new Error(
+      `DSL node has no PATH with path data: ${icon.name} (${node.type} ${icon.sourceRef || icon.sourceId})`
+    );
   }
-  const ancestor = bakeAncestor ? ancestorOrientationMatrix(index, node.id) : [1, 0, 0, 1, 0, 0];
   const paths = [];
-  for (const entry of node.path) {
-    const data = entry && typeof entry.data === 'string' ? entry.data.trim() : '';
-    if (!data) continue;
-    const matrix = entry.transform ? parseMatrix(entry.transform.replace(/^matrix\(([^)]*)\)$/i, '$1'), icon.name) : [1, 0, 0, 1, 0, 0];
-    const composed = multiplyMatrix(ancestor, matrix);
-    paths.push({
-      d: data,
-      fillRule: 'Nonzero',
-      matrix: composed.map(value => formatNumber(value)).join(','),
-    });
+  for (const pathNode of pathNodes) {
+    const ancestor = bakeAncestor
+      ? ancestorOrientationMatrix(index, pathNode.id)
+      : [1, 0, 0, 1, 0, 0];
+    for (const entry of pathNode.path) {
+      const data = entry && typeof entry.data === 'string' ? entry.data.trim() : '';
+      if (!data) continue;
+      const matrix = entry.transform
+        ? parseMatrix(entry.transform.replace(/^matrix\(([^)]*)\)$/i, '$1'), icon.name)
+        : [1, 0, 0, 1, 0, 0];
+      const composed = multiplyMatrix(ancestor, matrix);
+      paths.push({
+        d: data,
+        fillRule: 'Nonzero',
+        matrix: composed.map(value => formatNumber(value)).join(','),
+      });
+    }
   }
   if (paths.length === 0) throw new Error(`DSL PATH has no usable path data: ${icon.name}`);
   return paths;
