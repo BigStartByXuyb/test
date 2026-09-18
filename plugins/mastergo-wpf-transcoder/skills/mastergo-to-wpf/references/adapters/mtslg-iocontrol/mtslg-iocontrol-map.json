@@ -647,9 +647,9 @@
           }
         ]
       },
-    "上下结构-icon+文案": {
-      "componentSet": "右侧栏-上下结构-icon+文案",
-      "controlType": "IconButton",
+      "上下结构-icon+文案": {
+        "componentSet": "右侧栏-上下结构-icon+文案",
+        "controlType": "IconButton",
         "style": "UpDownRightButtonStyle",
         "iconPolicy": "single-path",
         "slots": [

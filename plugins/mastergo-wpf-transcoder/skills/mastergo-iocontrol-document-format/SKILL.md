@@ -121,7 +121,7 @@ description: 强制规范 MasterGo → MTSLG IOContorl 映射文档的写法，�
 
 1. **机器真值源**：`skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/mtslg-iocontrol-map.json`（以插件根为基准）——模板族结构、`match`（一族一键：组件模板族用公开属性名或 `componentSet`；`componentName` 只用于 Layout 层的底部栏）、`variants` 真实属性值、`controlTypeRequiredAttrs` 必写字段、按钮族 `iconSize` 等。同一个「匹配属性名 + 属性值」只能登记在一个模板族。
 2. **人读口径**：本规范约束的映射文档 `skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/feishu-component-library-mapping.md`——按上面的层级、匹配规则、固定模板和 XML 格式补齐同一条映射。
-3. **审计脚本的家族登记**：映射表里新出现 `*Templates` 族时，同步登记到 `skills/mastergo-to-wpf/scripts/audit-mtslg-feishu-map.js` 的家族清单；漏登记会被覆盖审计的 `unregisteredFamilies` 报出并以退出码 2 结束（该族的 `missing` 方向会整族失效）。
+3. **审计脚本的族与变体登记**：映射表里**新出现 `*Templates` 族**时，同步登记到 `skills/mastergo-to-wpf/scripts/audit-mtslg-feishu-map.js` 的家族清单（漏登记会被覆盖审计的 `unregisteredFamilies` 报出并以退出码 2 结束，该族的 `missing` 方向整族失效）；**既有族新增/改名/删除变体**时，同样要同步该脚本里这一族的**变体枚举**（例如 `rightSidebarTemplates`、`rightSidebarComponentTemplates`、`cameraTemplates` 的数组）——`missing` 方向是按这份变体枚举逐条遍历的，漏改不会报错、只会静默少检。凡本 Skill、映射文档或其他脚本里**逐个列举变体/组件名**的地方（含本节与「匹配键」一节的括注枚举），都按同一批改动同步；能改成"以映射表 `variants` 为准"的表述就不要复制清单。
 4. **回归用例**：在 `skills/mastergo-to-wpf/scripts/tests/` 下按需补断言（文档覆盖、模板匹配、按钮族图标字段口径、TextBlock 尺寸、坐标等）。
 5. **版本号**：`.claude-plugin/plugin.json` 递增；不要在上一轮 CI 未结束时连续推送。
 6. **在线同步副本**：发版前把映射文档同步到对应的飞书在线文档（按标题检索定位、不写死地址、整篇重建并记录 revision）。同步工具是可选项、不是交付链路的运行依赖：本机没有该工具时，在交付说明里标注"在线文档未同步"即可，不阻塞本次改动。
