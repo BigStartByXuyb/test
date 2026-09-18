@@ -84,7 +84,7 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 
 ## 作业 B：MTSLG IOContorl（`Adapter: mtslg-iocontrol`）
 
-`mtslg-iocontrol` 路线需要生成完整页面项目时，使用 `scripts/gen-mastergo-page-bundle.js` 作为总入口；适配器仍记录为 `mtslg-iocontrol`。Bundle 生成的项目文件、页面 XML、Icon、Layout、mapping/provenance 和目标项目要求的 WPF 宿主壳共同组成这条完整路线的交付物。宿主壳只负责加载 MTSLG 页面 XML，不是第二套 WPF 业务页面适配器，也不得在其中猜写 WPF 业务控件或把 WPF 私有协议写入 IOContorl XML。
+`mtslg-iocontrol` 路线需要生成完整页面项目时，使用 `scripts/gen-mastergo-page-bundle.js` 作为总入口；适配器仍记录为 `mtslg-iocontrol`。**它的输入清单契约（字段、必填、缺省、前置条件）见 `references/adapters/mtslg-iocontrol/bundle-manifest.md`**——不要照抄上一页的 `bundle.json` 反推字段。Bundle 生成的项目文件、页面 XML、Icon、Layout、mapping/provenance 和目标项目要求的 WPF 宿主壳共同组成这条完整路线的交付物。宿主壳只负责加载 MTSLG 页面 XML，不是第二套 WPF 业务页面适配器，也不得在其中猜写 WPF 业务控件或把 WPF 私有协议写入 IOContorl XML。
 
 ### MTSLG 页面入口分流（必须先判断）
 
@@ -94,7 +94,7 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 - Bundle manifest 必须提供 `svgPath`，并指向 `getDsl` 成功后按需执行 `extractSvg` 保存的 JSON；没有运行时 Icon 时也提供合法的 `{ "svgs": [] }` 文件。
 - 新建页面的 mapping 必须由当前 DSL 在本次生成中创建，并带有中文 Tag `新页面完整DSL映射`；该 mapping 是当前页面的专属产物，不作为跨页面共享参考。修改已有页面仍按 `merge` 流程保留运行时业务属性。
 
-1. 先读 `references/adapters/mtslg-iocontrol/mtslg-mode.md`；再读取 `feishu-component-library-mapping.md` 和 `mtslg-iocontrol-map.json`，核对正式组件映射、XML 属性白名单、现有 IOContorl 页面、Layout 与页面宿主。设计稿包含顶部栏、底部栏或快捷键，或本次需要创建/修改 Layout 注册时，必须再读 `feishu-layout-mapping.md`；未触发页面壳层或 Layout 注册时不读取该文件。不得读取 MW WPF 控件协议作为 XML 事实源。
+1. 读 `references/adapters/mtslg-iocontrol/mtslg-mode.md`。`feishu-component-library-mapping.md` 与 `mtslg-iocontrol-map.json` **默认不预读**：组件匹配、`ControlType`、槽位、属性白名单与必写字段由 `resolve-mtslg-template-mapping.js` / `gen-mtslg-mapping-from-dsl.js` 按映射表执行，文档与映射表的一致性由 `audit-mtslg-feishu-map.js` 强制；两者都不是页面生成的运行时输入。**只有**当脚本报出 `pending` / `unmappedComponents` / `templateConflicts` 时，才按 ref **定点查**对应小节（关键词检索，不通读整份）。设计稿包含顶部栏、底部栏或快捷键，或本次需要创建/修改 Layout 注册时，必须再读 `feishu-layout-mapping.md`；未触发页面壳层或 Layout 注册时不读取该文件。不得读取 MW WPF 控件协议作为 XML 事实源。
 2. 生成真实 `IOContorl` XML、逐节点 mapping/provenance 和必要的 Layout 注册；`ControlType`、固定组件层级和槽位首先使用正式映射表。目标项目已确认的字段按事实填写；固定模板中存在但缺少可靠来源的 `IOName`、`IOCommand`、`LangName`、`IOEnable`、`IOState`、`PageName`、`UserRightId` 等保留属性并输出空字符串值，不删除整个节点；不在模板中的属性不新增。使用 `scripts/gen-iocontrol-xml.js` 发射 XML；先发现当前页面 PATH/SVG 候选，再由 `scripts/gen-mtslg-page-icons.js` 生成当前页面的 Icon 文件。Icon 资源名优先使用中文语义对应的英文键；无法形成可靠语义名时才使用当前页面内唯一的临时键。临时键必须写入 mapping/manifest，不能使用 `MGIcon_<layer-id>`，并必须保持页面内唯一。Layout 只引用该页面 Icon 文件中已生成的键。
    - 新页面默认禁止覆盖页面 XML、Icon、View、ViewModel 或审计文件；同名目标存在时停止并要求确认。用户明确要求替换时，必须使用 `operation=replace-existing` + `--overwrite`，并为所有被替换文件保留备份。Layout 仍由 `gen-mtslg-layout.js` 负责增量追加；已有同名 `Page Target` 默认停止，用户明确要求替换并传入 `--overwrite` 时才定点更新并备份。
    - 页面可以没有任何运行时 Icon。PATH/SVG 候选只是来源审计；只有 IOContorl 节点或 Layout 菜单实际引用的 Icon，才必须在当前页面 Icon 文件中存在对应 Geometry 资源键。
@@ -212,6 +212,8 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 
 ## 页面输出目录
 
+新建页面的页面名（Target）按 `references/adapters/mtslg-iocontrol/mtslg-mode.md` 第 1 节的「页面名（Target）的确定口径」确定：先查项目登记表/Layout，未登记时按 `F{区域编号}{英文语义名}` 推导并**人工确认一次**后写入登记表；推导不出或冲突则落 `pending` 并拒绝生成。
+
 > **全局固定常量：`contentOriginY = 192px`。** 所有 MasterGo 业务页面都必须按 `normalizedY = pageAbsY - 192` 计算；192 不是页面参数、不是可选配置，也不能由单个项目、页面或控件改写。只在页面根级扣除一次，嵌套控件不得重复扣除。
 
 - MW WPF 页面优先写入目标项目 .csproj 已声明的 View/ViewModel 路径，例如 `UI/<区域>/View` 和 `UI/<区域>/ViewModel`；只有项目没有路径证据时，才使用目标项目根目录下的 `Pages/` 作为通用兜底。不得为同一页面同时生成两套 View。
@@ -247,7 +249,7 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 ### 组件内部内容与来源
 
 - 所有适配器都必须读取组件实例的完整 DSL 父子链；组件内部的 TEXT、PATH/SVG、FRAME 只能按已选适配器的正式映射解释，不能因视觉外观提升为独立业务控件。
-- 输入框、选择框的 MTSLG 控件类型、40/36/32 变体、内部 padding、TEXT/PATH 归属和 XML 输出模板只在作业 B 读取 `references/adapters/mtslg-iocontrol/feishu-component-library-mapping.md`；总 Skill 不重复维护这些映射事实。
+- 输入框、选择框的 MTSLG 控件类型、40/36/32 变体、内部 padding、TEXT/PATH 归属和 XML 输出模板归作业 B 的适配器手册 `references/adapters/mtslg-iocontrol/feishu-component-library-mapping.md` 维护，总 Skill 不重复这些映射事实；转换时的读取口径按第 2 步（默认不预读，异常时定点查）。
 
 
 ### 文本来源与 Value 绑定硬门禁

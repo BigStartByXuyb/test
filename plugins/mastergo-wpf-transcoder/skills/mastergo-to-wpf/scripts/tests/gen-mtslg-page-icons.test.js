@@ -263,4 +263,41 @@ result = spawnSync(process.execPath, [script, emptySvgFile, noPathMapFile, noPat
 assert.notStrictEqual(result.status, 0, '组内没有 PATH 时必须失败');
 assert.match(result.stderr, /has no PATH with path data/);
 
+// 自动烘焙改用 sourceId 解析的节点：extractSvg 是按 sourceId 取几何的，`sourceRef` 常只指向
+// 图标里的单个 PATH（用来取 iconSize 的 bbox）。若自动烘焙时改用 sourceRef 收集，含多条 PATH 的
+// 图标（如「双侧箭头」两条路径）会静默丢掉其它子路径——这正是 2026-09-18 回归里发现的丢图形问题。
+const bakeBothSnapshotFile = path.join(dir, 'dsl-bake-both.snapshot.json');
+const bakeBothMapFile = path.join(dir, 'dsl-bake-both-map.json');
+const bakeBothOut = path.join(dir, 'DslBakeBothIcons.xaml');
+fs.writeFileSync(bakeBothSnapshotFile, JSON.stringify({
+  dsl: {
+    nodes: [{
+      type: 'INSTANCE', id: 'page', name: '页面',
+      layoutStyle: { width: 1280, height: 1024, relativeX: 0, relativeY: 0 },
+      children: [{
+        type: 'GROUP', id: 'page/both', name: '组 1525',
+        layoutStyle: { width: 38, height: 26, relativeX: 0, relativeY: 0, flipV: true },
+        children: [
+          { type: 'PATH', id: 'page/both/p1', name: '路径 119',
+            layoutStyle: { width: 26, height: 14, relativeX: 0, relativeY: 0 },
+            path: [{ data: 'M0,0 L8,0 L8,4 L18,4 L18,0 L26,0 L13,14 Z' }] },
+          { type: 'PATH', id: 'page/both/p2', name: '路径 120',
+            layoutStyle: { width: 26, height: 14, relativeX: 12, relativeY: 0 },
+            path: [{ data: 'M38,0 L30,0 L30,4 L20,4 L20,0 L12,0 L25,14 Z' }] }
+        ]
+      }]
+    }]
+  }
+}, null, 2), 'utf8');
+fs.writeFileSync(bakeBothMapFile, JSON.stringify({ icons: [
+  // sourceId 指组（两条 PATH）、sourceRef 只指第一条 PATH（用来取 iconSize）；祖先带 flipV → 自动烘焙
+  { sourceId: 'page/both', sourceRef: 'page/both/p1', name: 'AutoBakeBothGeometry', comment: '双侧·自动烘焙' }
+]}), 'utf8');
+result = spawnSync(process.execPath, [script, groupSvgFile, bakeBothMapFile, bakeBothOut, bakeBothSnapshotFile], { encoding: 'utf8' });
+assert.strictEqual(result.status, 0, result.stderr);
+const bakeBothBody = fs.readFileSync(bakeBothOut, 'utf8')
+  .match(/x:Key="AutoBakeBothGeometry">([\s\S]*?)<\/Geometry>/)[1];
+assert.strictEqual((bakeBothBody.match(/\bM/g) || []).length, 2,
+  '自动烘焙时 sourceRef 比 sourceId 窄，也必须按 sourceId 收集全部子路径（不得丢图形）');
+
 console.log('PASS semantic icon naming regression test');

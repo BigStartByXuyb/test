@@ -290,8 +290,8 @@ function collectPathNodes(index, node) {
 //   - sourceRef 可以是 PATH 节点（单路径图标），也可以是图标组（多路径图标）；
 //   - bakeAncestor=true 时把每个 PATH 的祖先 rotate/flip 一并烘焙（组自身的变换也在链上）。
 // 不烘焙时输出与 extractSvg 的口径一致：只取各 PATH 自身的 d + transform。
-function synthesizeFromDsl(index, icon, bakeAncestor) {
-  const node = index.nodeById.get(icon.sourceRef) || index.nodeById.get(icon.sourceId);
+function synthesizeFromDsl(index, icon, bakeAncestor, nodeOverride) {
+  const node = nodeOverride || index.nodeById.get(icon.sourceRef) || index.nodeById.get(icon.sourceId);
   if (!node) throw new Error(`DSL node not found for icon ${icon.name}: ${icon.sourceRef || icon.sourceId}`);
   const pathNodes = collectPathNodes(index, node);
   if (pathNodes.length === 0) {
@@ -611,11 +611,16 @@ for (const icon of iconMap.icons) {
   // 台账没声明 bakeAncestorTransform 时由脚本自己判定并烘焙，避免漏写字段就静默出方向错的几何。
   const requestedBake = Boolean(icon.bakeAncestorTransform);
   let autoBaked = false;
+  // 自动烘焙会把来源从 extractSvg 换成 DSL。extractSvg 是按 `sourceId` 解析的，所以合成时必须用
+  // **同一个节点**，否则覆盖范围会变窄：`sourceRef` 常常指向图标里的单个 PATH（用作 iconSize 取 bbox），
+  // 而图标本体可能是含多条 PATH 的组（例如「双侧箭头」两条路径）。用 sourceRef 合成会静默丢掉其它子路径。
+  let autoBakeNode = null;
   if (!requestedBake && dslIndex) {
-    const iconNode = dslIndex.nodeById.get(icon.sourceRef) || dslIndex.nodeById.get(icon.sourceId);
+    const iconNode = dslIndex.nodeById.get(icon.sourceId) || dslIndex.nodeById.get(icon.sourceRef);
     if (iconNode) {
       autoBaked = collectPathNodes(dslIndex, iconNode)
         .some(pathNode => !isIdentityMatrix(ancestorOrientationMatrix(dslIndex, pathNode.id)));
+      if (autoBaked && !icon.fromDsl) autoBakeNode = iconNode;
     }
   }
   const bake = requestedBake || autoBaked;
@@ -626,7 +631,7 @@ for (const icon of iconMap.icons) {
     if (!dslIndex) {
       throw new Error(`Icon ${icon.name} needs the DSL snapshot (extractSvg 缺该条目): ${icon.sourceId}`);
     }
-    paths = synthesizeFromDsl(dslIndex, icon, bake);
+    paths = synthesizeFromDsl(dslIndex, icon, bake, autoBakeNode);
     geometrySource = bake ? 'dsl+ancestor-transform' : 'dsl';
   } else {
     paths = parsePaths(svg, icon.sourceId);
