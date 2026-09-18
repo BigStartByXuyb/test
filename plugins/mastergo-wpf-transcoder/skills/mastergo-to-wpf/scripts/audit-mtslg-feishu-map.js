@@ -19,7 +19,7 @@ function extractDocumentedRules(markdown) {
       "stop", "start", "恢复切割", "删除料盒-1", "删除料盒-2", "文案-小button",
       "enter", "exit", "startstop"
     ],
-    rightSidebarComponentTemplates: ["右侧栏-左右结构-icon+文案", "start"],
+    rightSidebarComponentTemplates: ["右侧栏-左右结构-icon+文案", "右侧栏-上下结构-icon+文案", "start"],
     inputTemplates: [],
     selectBoxTemplates: ["选择框-40", "选择框-36", "选择框-32", "选择框-28"],
     selectionInfoTemplates: ["单选-选中/未选择", "多选-选中/未选中"],

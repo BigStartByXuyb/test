@@ -158,6 +158,17 @@ for (const [component, style] of [
   assert.strictEqual(entry.controlType, "IconButton", "独立组件必须是 IconButton: " + component);
   assert.strictEqual(entry.style, style, "独立组件 Style 必须与其聚合变体一致: " + component);
 }
+// 聚合变体登记的 componentSet 必须与同名独立组件一致：登记后解析器会拿内部实例的组件名交叉核对，
+// 不一致直接失败；文档对照表的「内部独立组件名（componentSet）」列也依赖这一项（BLOCK-001）。
+for (const [variant, component] of [
+  ["左右结构-icon+文案", "右侧栏-左右结构-icon+文案"],
+  ["上下结构-icon+文案", "右侧栏-上下结构-icon+文案"],
+]) {
+  assert.strictEqual(templateMap.rightSidebarTemplates.variants[variant].componentSet, component,
+    "聚合变体 " + variant + " 必须登记 componentSet=" + component + "（否则交叉核对被静默跳过）");
+  assert.ok(templateMap.rightSidebarComponentTemplates.variants[component],
+    "componentSet 指向的独立组件必须在 rightSidebarComponentTemplates 中登记: " + component);
+}
 const documentedTemplateFamilies = {
   inputTemplates: [
     "输入框-整数-40", "输入框-整数-36", "输入框-整数-32",
