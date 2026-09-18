@@ -291,13 +291,30 @@ fs.writeFileSync(bakeBothSnapshotFile, JSON.stringify({
 }, null, 2), 'utf8');
 fs.writeFileSync(bakeBothMapFile, JSON.stringify({ icons: [
   // sourceId 指组（两条 PATH）、sourceRef 只指第一条 PATH（用来取 iconSize）；祖先带 flipV → 自动烘焙
-  { sourceId: 'page/both', sourceRef: 'page/both/p1', name: 'AutoBakeBothGeometry', comment: '双侧·自动烘焙' }
+  { sourceId: 'page/both', sourceRef: 'page/both/p1', name: 'AutoBakeBothGeometry', comment: '双侧·自动烘焙' },
+  // 同一条目显式声明 bakeAncestorTransform：节点解析口径必须与自动烘焙一致，否则「写不写字段」
+  // 会改变几何（自动用 sourceId 收全两条、显式用 sourceRef 只收一条）。
+  { sourceId: 'page/both', sourceRef: 'page/both/p1', name: 'ExplicitBakeBothGeometry', comment: '双侧·显式烘焙', bakeAncestorTransform: true },
+  // 显式 fromDsl + 显式烘焙：同样必须收全两条。
+  { sourceId: 'page/both', sourceRef: 'page/both/p1', name: 'ExplicitDslBakeBothGeometry', comment: '双侧·fromDsl+烘焙', fromDsl: true, bakeAncestorTransform: true }
 ]}), 'utf8');
 result = spawnSync(process.execPath, [script, groupSvgFile, bakeBothMapFile, bakeBothOut, bakeBothSnapshotFile], { encoding: 'utf8' });
 assert.strictEqual(result.status, 0, result.stderr);
-const bakeBothBody = fs.readFileSync(bakeBothOut, 'utf8')
-  .match(/x:Key="AutoBakeBothGeometry">([\s\S]*?)<\/Geometry>/)[1];
-assert.strictEqual((bakeBothBody.match(/\bM/g) || []).length, 2,
-  '自动烘焙时 sourceRef 比 sourceId 窄，也必须按 sourceId 收集全部子路径（不得丢图形）');
+const bakeBothXaml = fs.readFileSync(bakeBothOut, 'utf8');
+const bakeBothBody = (key) => bakeBothXaml.match(new RegExp('x:Key="' + key + '">([\\s\\S]*?)</Geometry>'))[1];
+for (const key of ['AutoBakeBothGeometry', 'ExplicitBakeBothGeometry', 'ExplicitDslBakeBothGeometry']) {
+  assert.strictEqual((bakeBothBody(key).match(/\bM/g) || []).length, 2,
+    key + '：sourceRef 比 sourceId 窄时也必须按 sourceId 收集全部子路径（不得丢图形）');
+}
+assert.strictEqual(
+  bakeBothBody('AutoBakeBothGeometry').replace(/\s+/g, ' ').trim(),
+  bakeBothBody('ExplicitBakeBothGeometry').replace(/\s+/g, ' ').trim(),
+  '自动烘焙与显式 bakeAncestorTransform 必须逐字符相同（节点解析口径唯一）'
+);
+assert.strictEqual(
+  bakeBothBody('AutoBakeBothGeometry').replace(/\s+/g, ' ').trim(),
+  bakeBothBody('ExplicitDslBakeBothGeometry').replace(/\s+/g, ' ').trim(),
+  '自动烘焙与 fromDsl + bakeAncestorTransform 必须逐字符相同（节点解析口径唯一）'
+);
 
 console.log('PASS semantic icon naming regression test');

@@ -39,7 +39,6 @@ node scripts/gen-mastergo-page-bundle.js --manifest <bundle.json> [--overwrite]
 | `viewModelPath` | `UI/{area}/ViewModel/{name}ViewModel.cs` | 同上 |
 | `layoutPath` | `Resources/Layout/Layout.xml` | `:105` |
 | `contentOriginY` | `192` | 只允许 192，写别的直接失败（`:999`） |
-| `dslPath` / `visibilityPath` / `svgPath` / `iconMapPath` / `mappingPath` / `templateMapPath` | 无 | 输入文件；`templateMapPath` 缺省用插件内映射表 |
 | `csproj` / `rootNamespace` / `projectName` / `projectMode` / `scaffold` / `frameworkConfigPath` | 见脚本 | 目标项目定位与脚手架模式 |
 | `languages` | 见下 | `{ "auto", "locales", "bindByText", "requireLangName", "translations" }` |
 | `languages.translations` | 无 | `{ 中文文案: 译文 }` 对象或 JSON 文件路径；给了就必须存在（`:393` `:396`） |
@@ -50,6 +49,16 @@ node scripts/gen-mastergo-page-bundle.js --manifest <bundle.json> [--overwrite]
 | `generatedRoot` / `pagesRoot` / `iconsRoot` / `indexRoot` / `sourceRoot` / `resourceRoots` | 见脚本 | 目录约定覆盖 |
 
 `viewName` / `viewModelName` / `xmlPageName` / `pageTarget` / `pageLangName` / `pageTitleText` / `comment` 缺省由 `name` 派生（`{name}View` / `{name}ViewModel` / `{name}Page` / `{name}` / `{name}PageTitle`）。
+
+## 3.1 输入文件（必填 / 条件必填，**不属于**第 3 节的可选字段）
+
+| 字段 | 必填性 | 说明 |
+|---|---|---|
+| `svgPath` | **必填** | `extractSvg` 落盘的 JSON；没有运行时 Icon 时也必须给合法的 `{ "svgs": [] }` 文件（`:909` 逐个做存在性检查） |
+| `dslPath` + `visibilityPath` | **新建页面必填** | 同时提供且文件存在；mapping 由本次生成创建（`:907` `:913` `:916`） |
+| `mappingPath` | **已有页面必填** | `modify-existing` / `replace-existing` 走 merge 时必须提供；新建页面由本次生成，不需要传 |
+| `iconMapPath` | 必填（页面有图标槽时） | 图标台账输入；没有图标槽位时可给空 `icons[]` |
+| `templateMapPath` | 可选 | 缺省 = 插件内 `mtslg-iocontrol-map.json`（`gen-mastergo-page-bundle.js:27` 的 `DEFAULT_TEMPLATE_MAP`）；它是**脚本在生成期读取**的运行期输入，只是不需要模型预读进上下文 |
 
 ## 4. 前置条件：**csproj 登记必须人工先做好**
 
