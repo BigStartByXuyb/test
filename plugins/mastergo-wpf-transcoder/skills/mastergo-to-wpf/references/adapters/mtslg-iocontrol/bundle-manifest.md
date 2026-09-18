@@ -91,7 +91,8 @@ Bundle **不会**把新页面的文件写进 `.csproj`（实测 `csprojChanged=F
 | **Layout.xml 缺少当前页面注册即失败** | `validateBundleOutputs()` → `fail("Layout.xml 缺少当前页面注册: ")` |
 | View XAML 含 MaxWell `PageDesign` 宿主 | `validateBundleOutputs()` → `fail("View XAML 缺少 MaxWell PageDesign 宿主: ")` |
 | 各语言 key 完全一致（含顺序）；`LangName` 必须命中本页字典 | `validateLangOutputs()` → `fail("多语言文件 key 数量与语言清单不一致: ")`、`fail("各语言 key 必须完全一致（含顺序）: ")`、`fail("LangName 引用了本页多语言文件中不存在的 key：")` |
-| provenance 与坐标核对（`validate-iocontrol-provenance.js` / `check-iocontrol-coords.js`） | `main()` → 以 `run(<脚本>, ["--xml", tempXml, "--mapping", tempMapping])` 调起；判定口径见 `validate-iocontrol-provenance.js` / `check-iocontrol-coords.js` |
+| provenance 硬校验（`validate-iocontrol-provenance.js`） | `main()` → `run(PROVENANCE_SCRIPT, ["--xml", tempXml, "--mapping", tempMapping])` |
+| 坐标逐控件核对（`check-iocontrol-coords.js`） | `validateBundleOutputs()` → `run(COORDS_SCRIPT, ["--xml", info.pageXmlPath, "--nodes", <coords.json>])` |
 
 ## 6. 与本文的关系
 
