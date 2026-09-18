@@ -42,14 +42,65 @@ function args(argv) {
   return result;
 }
 
-function exactExtractEntry(svgs, ref) {
+// 候选 PATH ↔ extractSvg 条目 的归属匹配，与 gen-mtslg-mapping-from-dsl.js 的图标归属同口径：
+//   ① 树判据（首选）：该条目节点（item.id）的子树里是否含有这条 PATH。
+//      部分设计稿里「图标组 / 按钮组」的 id 不是其子 PATH id 的字符串前缀，
+//      只按字符串前缀会漏配，候选就会误报成 no-exact-extractSvg-entry。
+//   ② 历史口径（回退）：id 字符串前缀相等/包含关系。
+// 多条命中时取树深度最深（最专属）的条目，其次取 id 更长者。
+function buildTree(sourceNodes) {
+  const childrenByParent = new Map();
+  const parentByRef = new Map();
+  for (const node of sourceNodes) {
+    if (!node || typeof node.ref !== "string" || !node.ref) continue;
+    const parent = node.parentRef === undefined ? null : node.parentRef;
+    parentByRef.set(node.ref, parent);
+    if (!childrenByParent.has(parent)) childrenByParent.set(parent, []);
+    childrenByParent.get(parent).push(node.ref);
+  }
+  return { childrenByParent, parentByRef };
+}
+
+function isInsideRef(tree, containerId, ref) {
+  if (typeof containerId !== "string" || !containerId) return false;
+  if (containerId === ref) return true;
+  const stack = [containerId];
+  const seen = new Set();
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (seen.has(current)) continue;
+    seen.add(current);
+    for (const child of tree.childrenByParent.get(current) || []) {
+      if (child === ref) return true;
+      stack.push(child);
+    }
+  }
+  return false;
+}
+
+function depthOfRef(tree, ref) {
+  let depth = 0;
+  let current = tree.parentByRef.get(ref) || null;
+  const seen = new Set();
+  while (current && !seen.has(current)) {
+    seen.add(current);
+    depth += 1;
+    current = tree.parentByRef.get(current) || null;
+  }
+  return depth;
+}
+
+function exactExtractEntry(svgs, ref, tree) {
   if (typeof ref !== "string" || !ref) return null;
   let best = null;
   for (const item of svgs) {
     if (!item || typeof item.id !== "string" || typeof item.svg !== "string") continue;
-    if (ref === item.id || ref.startsWith(item.id + "/")) {
-      if (!best || item.id.length > best.id.length) best = item;
-    }
+    const matched = ref === item.id || ref.startsWith(item.id + "/") || isInsideRef(tree, item.id, ref);
+    if (!matched) continue;
+    if (!best) { best = item; continue; }
+    const byDepth = depthOfRef(tree, item.id) - depthOfRef(tree, best.id);
+    if (byDepth > 0) best = item;
+    else if (byDepth === 0 && item.id.length > best.id.length) best = item;
   }
   return best;
 }
@@ -63,6 +114,7 @@ function main() {
   if (!Array.isArray(mapping.sourceNodes)) throw new Error("page mapping JSON must contain sourceNodes[]");
   if (!Array.isArray(confirmed.icons)) throw new Error("confirmed page icon map must contain icons[]");
 
+  const tree = buildTree(mapping.sourceNodes);
   const confirmedByRef = new Map();
   const confirmedBySource = new Map();
   for (const icon of confirmed.icons) {
@@ -77,7 +129,7 @@ function main() {
     if (!node || node.type !== "PATH" || typeof node.ref !== "string" || !node.ref) continue;
     if (seenRefs.has(node.ref)) continue;
     seenRefs.add(node.ref);
-    const svg = exactExtractEntry(svgData.svgs, node.ref);
+    const svg = exactExtractEntry(svgData.svgs, node.ref, tree);
     const confirmedIcon = (svg && confirmedBySource.get(`${svg.id}\u0000${node.ref}`)) || confirmedByRef.get(node.ref);
     // A confirmed page mapping is allowed to point at an extracted SVG whose
     // PATH ref is not an ancestor (for example an icon container PATH).  In

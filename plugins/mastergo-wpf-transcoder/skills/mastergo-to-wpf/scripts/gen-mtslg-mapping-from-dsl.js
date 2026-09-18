@@ -208,23 +208,56 @@ function firstText(ref, predicate = () => true) {
   const match = textDescendants(ref).find(x => visible(x) && predicate(source(x))) || null;
   return match ? source(match) : null;
 }
-function iconForPath(pathRef) {
-  const match = iconEntries
-    .filter(icon => icon && typeof icon.sourceRef === "string" && (pathRef === icon.sourceRef || pathRef.startsWith(icon.sourceRef + "/") || icon.sourceRef.startsWith(pathRef + "/")))
-    .sort((a, b) => String(b.sourceRef).length - String(a.sourceRef).length)[0];
-  return match?.name || null;
+// 图标台账条目 → 按钮 的归属匹配（两段判据，缺一不可）：
+//   ① 树判据（首选）：条目节点（sourceRef）的 PATH 子树与按钮子树的 PATH 有交集。
+//      部分设计稿里「图标组 / 按钮组」的 id **不是**其子 PATH id 的字符串前缀
+//      （同一实例内的节点 id 只共享外层实例前缀），只按字符串前缀会静默匹配不到，
+//      按钮的 Icon 就会留空且不报错。
+//   ② 历史口径（回退）：id 字符串前缀相等/包含关系，保证既有台账继续可用。
+// 多条命中时取树深度最深（最专属）的条目，避免外层容器把内层按钮的图标抢走。
+function subtreePathIds(ref) {
+  const item = nodeByRef.get(ref);
+  if (!item) return [];
+  const out = [];
+  (function walk(node) {
+    if (node.type === "PATH") out.push(node.id);
+    for (const child of node.children || []) walk(child);
+  })(item.node);
+  return out;
+}
+function treeDepth(ref) {
+  let depth = 0;
+  let current = parents.get(ref) || null;
+  while (current) {
+    depth += 1;
+    current = parents.get(current) || null;
+  }
+  return depth;
+}
+function iconEntryCandidates(ref) {
+  const buttonPaths = new Set(pathDescendants(ref));
+  if (buttonPaths.size === 0) return [];
+  const byTree = iconEntries.filter(icon => {
+    if (!icon || typeof icon.sourceRef !== "string" || !icon.sourceRef) return false;
+    return subtreePathIds(icon.sourceRef).some(path => buttonPaths.has(path));
+  });
+  const pathRef = pathDescendants(ref)[0];
+  const pool = byTree.length > 0
+    ? byTree
+    : iconEntries.filter(icon => icon && typeof icon.sourceRef === "string" &&
+      (pathRef === icon.sourceRef || pathRef.startsWith(icon.sourceRef + "/") || icon.sourceRef.startsWith(pathRef + "/")));
+  return pool.sort((a, b) => {
+    const byDepth = treeDepth(b.sourceRef) - treeDepth(a.sourceRef);
+    if (byDepth !== 0) return byDepth;
+    return String(b.sourceRef).length - String(a.sourceRef).length;
+  });
 }
 function iconFor(ref) {
-  const pathRef = pathDescendants(ref)[0];
-  return pathRef ? iconForPath(pathRef) : null;
+  const match = iconEntryCandidates(ref)[0];
+  return match && typeof match.name === "string" ? match.name : null;
 }
 function iconEntryFor(ref) {
-  const pathRef = pathDescendants(ref)[0];
-  if (!pathRef) return null;
-  return iconEntries
-    .filter(icon => icon && typeof icon.sourceRef === "string" &&
-      (pathRef === icon.sourceRef || pathRef.startsWith(icon.sourceRef + "/") || icon.sourceRef.startsWith(pathRef + "/")))
-    .sort((a, b) => String(b.sourceRef).length - String(a.sourceRef).length)[0] || null;
+  return iconEntryCandidates(ref)[0] || null;
 }
 // 图标图形节点 bbox：优先用图标映射的 sourceRef 节点，缺失时回退 sourceId 节点。
 function iconSizeFor(ref) {

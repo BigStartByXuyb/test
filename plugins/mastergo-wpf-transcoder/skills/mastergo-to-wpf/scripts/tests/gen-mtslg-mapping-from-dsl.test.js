@@ -209,6 +209,76 @@ assert.strictEqual(standalone.componentInstances[0].template, 'rightSidebarCompo
 assert.strictEqual(standalone.componentInstances[0].componentSet, '右侧栏-左右结构-icon+文案');
 assert.strictEqual(standalone.nodes.find(node => node.controlType === 'IconButton').attrs.Style, 'RightButtonStyle');
 
+// ---- 图标归属的「树判据」回归：图标组 id 不是其子 PATH id 的字符串前缀时，
+//      台账按「图标组」登记也必须绑定成功。
+//      部分设计稿里同一实例内的节点 id 只共享外层实例前缀（如 …/1066:329570 的
+//      子 PATH 是 …/1066:329573），只按 id 字符串前缀匹配会静默匹配不到、按钮
+//      Icon 留空且不报错。----
+function nestedIconSidebarDsl() {
+  const sidebarRef = 'nested:root';
+  const innerRef = sidebarRef + '/inner';
+  const iconGroupRef = innerRef + '/1066:329570';
+  const iconPathRef = innerRef + '/1066:329573';
+  return {
+    styles: {},
+    nodes: [{
+      type: 'INSTANCE',
+      id: sidebarRef,
+      name: '右侧栏',
+      layoutStyle: { width: 170, height: 80, relativeX: 0, relativeY: 0 },
+      componentInfo: { properties: { '按钮类型': '左右结构-icon+文案' } },
+      children: [{
+        type: 'INSTANCE',
+        id: innerRef,
+        name: '右侧栏-左右结构-icon+文案',
+        layoutStyle: { width: 170, height: 80, relativeX: 0, relativeY: 0 },
+        componentInfo: {},
+        children: [
+          {
+            type: 'GROUP',
+            id: iconGroupRef,
+            name: '图标组',
+            layoutStyle: { width: 32, height: 24, relativeX: 36, relativeY: 18 },
+            children: [{
+              type: 'PATH',
+              id: iconPathRef,
+              name: '路径 203',
+              layoutStyle: { width: 16, height: 24, relativeX: 0, relativeY: 0 },
+              children: []
+            }]
+          },
+          {
+            type: 'TEXT',
+            id: innerRef + '/text',
+            name: '固定文本框',
+            layoutStyle: { width: 75, height: 44, relativeX: 79, relativeY: 18 },
+            text: [{ text: '保存' }],
+            children: []
+          }
+        ]
+      }]
+    }],
+    components: []
+  };
+}
+
+const nestedIcon = runMappingCase(
+  'sidebar-icon-group-not-id-prefix',
+  nestedIconSidebarDsl(),
+  [{
+    sourceId: 'nested:root/inner/1066:329570',
+    sourceRef: 'nested:root/inner/1066:329570',
+    name: 'SaveGeometry',
+    comment: '保存'
+  }]
+);
+const nestedIconButton = nestedIcon.nodes.find(node => node.controlType === 'IconButton');
+assert.strictEqual(nestedIconButton.attrs.Icon, 'SaveGeometry',
+  '图标组 id 不是其子 PATH id 的字符串前缀时，必须按 DSL 树归属绑定（否则 Icon 会静默留空）');
+assert.deepStrictEqual(nestedIconButton.iconSize,
+  { width: 32, height: 24, sourceRef: 'nested:root/inner/1066:329570' },
+  'iconSize 取命中条目节点的 bbox（本用例为图标组）');
+
 const conflicted = runMappingCase(
   'sidebar-conflict',
   rightSidebarDsl('右侧栏', {}, 'exit', 'start'),
