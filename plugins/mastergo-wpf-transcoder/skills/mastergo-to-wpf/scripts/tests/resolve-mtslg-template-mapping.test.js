@@ -143,6 +143,21 @@ for (const variant of ["F+文案", "文案 大button", "删除料盒-1", "删除
 for (const variant of ["enter", "exit", "start", "恢复切割", "stop", "左右结构-icon+文案"]) {
   assert.strictEqual(templateMap.rightSidebarTemplates.variants[variant].style, "RightButtonStyle", "左右结构变体必须使用 RightButtonStyle: " + variant);
 }
+// 独立组件族（可直接放置的右栏按钮）：按组件名（componentSet）命中，Style 与同名聚合变体一致。
+assert.ok(templateMap.rightSidebarComponentTemplates, "缺少右栏独立组件模板族");
+assert.deepStrictEqual(templateMap.rightSidebarComponentTemplates.match, { componentSet: true },
+  "右栏独立组件族必须按 componentSet 匹配");
+for (const [component, style] of [
+  ["右侧栏-左右结构-icon+文案", "RightButtonStyle"],
+  ["右侧栏-上下结构-icon+文案", "UpDownRightButtonStyle"],
+  ["start", "RightButtonStyle"],
+]) {
+  const entry = templateMap.rightSidebarComponentTemplates.variants[component];
+  assert.ok(entry, "右栏独立组件族缺少登记: " + component);
+  assert.strictEqual(entry.componentSet, component, "componentSet 必须等于组件名: " + component);
+  assert.strictEqual(entry.controlType, "IconButton", "独立组件必须是 IconButton: " + component);
+  assert.strictEqual(entry.style, style, "独立组件 Style 必须与其聚合变体一致: " + component);
+}
 const documentedTemplateFamilies = {
   inputTemplates: [
     "输入框-整数-40", "输入框-整数-36", "输入框-整数-32",

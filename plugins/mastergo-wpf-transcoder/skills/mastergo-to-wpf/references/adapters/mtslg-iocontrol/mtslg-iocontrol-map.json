@@ -812,21 +812,35 @@
     },
     "componentSetPolicy": "独立组件（团队组件库中可直接放置的按钮组件）按组件名命中；组件名取自实例自身的组件名，图层重命名不改变组件名。",
     "variants": {
-      "右侧栏-左右结构-icon+文案": {
-        "componentSet": "右侧栏-左右结构-icon+文案",
-        "controlType": "IconButton",
-        "style": "RightButtonStyle",
-        "iconPolicy": "single-path",
-        "slots": [
-          {
-            "slot": "button",
-            "controlType": "IconButton",
-            "style": "RightButtonStyle",
-            "iconPolicy": "single-path"
-          }
-        ]
-      },
-      "start": {
+    "右侧栏-左右结构-icon+文案": {
+      "componentSet": "右侧栏-左右结构-icon+文案",
+      "controlType": "IconButton",
+      "style": "RightButtonStyle",
+      "iconPolicy": "single-path",
+      "slots": [
+        {
+          "slot": "button",
+          "controlType": "IconButton",
+          "style": "RightButtonStyle",
+          "iconPolicy": "single-path"
+        }
+      ]
+    },
+    "右侧栏-上下结构-icon+文案": {
+      "componentSet": "右侧栏-上下结构-icon+文案",
+      "controlType": "IconButton",
+      "style": "UpDownRightButtonStyle",
+      "iconPolicy": "single-path",
+      "slots": [
+        {
+          "slot": "button",
+          "controlType": "IconButton",
+          "style": "UpDownRightButtonStyle",
+          "iconPolicy": "single-path"
+        }
+      ]
+    },
+    "start": {
         "componentSet": "start",
         "controlType": "IconButton",
         "style": "RightButtonStyle",

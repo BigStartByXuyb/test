@@ -227,7 +227,7 @@ Style 与内部组件对照（只对下表列出的真实值成立）：
 | exit | RightButtonStyle | exit |
 | stop | RightButtonStyle | 待组件库登记 |
 | 恢复切割 | RightButtonStyle | 待组件库登记 |
-| 上下结构-icon+文案 | UpDownRightButtonStyle | 待组件库登记 |
+| 上下结构-icon+文案 | UpDownRightButtonStyle | 右侧栏-上下结构-icon+文案 |
 | startstop | UpDownRightButtonStyle | 待组件库登记 |
 | F+文案 | null（不写 Style） | 待组件库登记 |
 | 文案 大button | null（不写 Style） | 待组件库登记 |
@@ -237,15 +237,19 @@ Style 与内部组件对照（只对下表列出的真实值成立）：
 
 文案→Value；业务字段/动作→IOName/IOCommand；PageName/IOVisible/IOCommand 按“按钮族固定参数”一节恒写；图标→Icon，图标尺寸→IconWidth/IconHeight（取图标图形节点 bbox）；独立组件没有 F 键槽位，不生成 TopLeftContent。Icon 键可使用目标项目已确认键或当前页面唯一的临时 Geometry 键。
 
-### 固定模板：独立组件=右侧栏-左右结构-icon+文案 / start
+### 固定模板：独立组件=右侧栏-左右结构-icon+文案 / 右侧栏-上下结构-icon+文案 / start
 
-固定节点：一个 IconButton IOContorl；ControlType 固定为 IconButton，Style 固定为 RightButtonStyle；节点数量、父子关系和槽位顺序固定。独立组件被直接放置到页面（没有聚合集合的“按钮类型”属性）时，按组件名命中本模板。
+固定节点：一个 IconButton IOContorl；ControlType 固定为 IconButton；节点数量、父子关系和槽位顺序固定；组件名只决定 Style（`右侧栏-左右结构-icon+文案` 与 `start` → RightButtonStyle，`右侧栏-上下结构-icon+文案` → UpDownRightButtonStyle）。独立组件被直接放置到页面（没有聚合集合的“按钮类型”属性）时，按**组件名**命中本模板。
 
 ```xml
+<!-- 右侧栏-左右结构-icon+文案 / start -->
 <IOContorl ID="{id}" ControlType="IconButton" Style="RightButtonStyle" Icon="{icon}" IconWidth="{icon_width}" IconHeight="{icon_height}" PageName="{page_name}" IOName="{io_name}" IOCommand="{io_command}" IOEnable="{io_enable}" IOState="{io_state}" IOVisible="{io_visible}" LangName="{lang_name}" Value="{value}" Left="{left}" Top="{top}" Width="{width}" Height="{height}" />
+
+<!-- 右侧栏-上下结构-icon+文案 -->
+<IOContorl ID="{id}" ControlType="IconButton" Style="UpDownRightButtonStyle" Icon="{icon}" IconWidth="{icon_width}" IconHeight="{icon_height}" PageName="{page_name}" IOName="{io_name}" IOCommand="{io_command}" IOEnable="{io_enable}" IOState="{io_state}" IOVisible="{io_visible}" LangName="{lang_name}" Value="{value}" Left="{left}" Top="{top}" Width="{width}" Height="{height}" />
 ```
 
-`右侧栏-左右结构-icon+文案` 的公开属性为 实例（图标槽位）、显示icon、显示文案；`start` 没有公开属性。两者的坐标尺寸取当前实例真实 bbox，图标尺寸取图标图形节点 bbox；文案→Value。
+`右侧栏-左右结构-icon+文案` 与 `右侧栏-上下结构-icon+文案` 的公开属性均为 实例（图标槽位）、显示 icon、显示文案（两者是同一个视觉组件的两种形态：前者左右排布、后者上下排布）；`start` 没有公开属性。三者都取当前实例真实 bbox 作为坐标尺寸，图标尺寸取图标图形节点 bbox；文案→Value。
 
 ## 界面内操作组：IconButton 映射关系
 
