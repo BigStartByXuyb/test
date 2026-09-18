@@ -893,7 +893,20 @@ function main() {
   const pageXmlPath = resolvePath(projectRoot, manifest.pageXmlPath, "pageXmlPath");
   const iconPath = resolvePath(projectRoot, manifest.iconPath, "iconPath");
   const layoutPath = resolvePath(projectRoot, manifest.layoutPath || DEFAULT_LAYOUT_PATH, "layoutPath");
+  // mappingPath 是所有模式必填的 mapping 工作落盘路径。缺失时 resolveInput 内部会抛裸
+  // TypeError（path.isAbsolute(undefined)），这里先给出可读的失败信息；口径见
+  // references/adapters/mtslg-iocontrol/bundle-manifest.md §3.1。
+  if (typeof manifest.mappingPath !== "string" || !manifest.mappingPath.trim()) {
+    fail("必须提供 mappingPath：它是 mapping 的工作落盘路径（新建页面时由本次生成写入、随后被重新生成覆盖），" +
+      "不要指向 Generated/<页面名>.mapping.json（审计产物）");
+  }
   const mappingPath = resolveInput(manifestDir, projectRoot, manifest.mappingPath, "mappingPath");
+  // 审计产物路径（与下方 generatedDir/mappingAudit 同口径，定义提前以便在这里前置校验）。
+  const mappingAuditPath = path.join(projectRoot, "Generated", manifest.pageName + ".mapping.json");
+  if (path.resolve(mappingPath) === path.resolve(mappingAuditPath)) {
+    fail("mappingPath 不能与审计产物同路径: " + mappingAuditPath +
+      "；新建模式会因“目标文件已存在”失败，请改用独立工作路径（例如 Generated/_work/<页面名>.mapping.json）");
+  }
   const svgPath = resolveInput(manifestDir, projectRoot, manifest.svgPath, "svgPath");
   const iconMapPath = resolveInput(manifestDir, projectRoot, manifest.iconMapPath, "iconMapPath");
   const templateMapPath = manifest.templateMapPath
@@ -935,7 +948,7 @@ function main() {
     return resolvePath(projectRoot, relative, "langPath");
   });
   const generatedDir = path.join(projectRoot, "Generated");
-  const mappingAudit = path.join(generatedDir, manifest.pageName + ".mapping.json");
+  const mappingAudit = mappingAuditPath;
   const iconMapAudit = path.join(generatedDir, manifest.pageName + ".icon-map.json");
   const bundleAudit = path.join(generatedDir, manifest.pageName + ".bundle.manifest.json");
   const auditTargets = [mappingAudit, iconMapAudit, bundleAudit];

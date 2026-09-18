@@ -28,6 +28,8 @@ node scripts/gen-mastergo-page-bundle.js --manifest <bundle.json> [--overwrite]
 
 **新建页面另需**：`dslPath` + `visibilityPath` 同时提供且文件存在（mapping 由本次生成创建，并必须带 Tag `新页面完整DSL映射`）——`:907` `:913` `:916` `:926`。
 
+**另有必填输入文件**（第 3 节的可选字段不包含它们，见 §3.1）：`svgPath` 与 `iconMapPath`——两者的**文件始终必填**（脚本无条件做存在性检查），页面没有图标槽位时 `iconMapPath` 给一份合法的空 `icons[]` 即可；`mappingPath`（**所有模式**必填，mapping 的工作落盘路径）；新建页面还要 `dslPath` + `visibilityPath`。
+
 ## 3. 常用可选字段（缺省即有默认值）
 
 | 字段 | 缺省 | 说明 |
@@ -43,7 +45,7 @@ node scripts/gen-mastergo-page-bundle.js --manifest <bundle.json> [--overwrite]
 | `languages` | 见下 | `{ "auto", "locales", "bindByText", "requireLangName", "translations" }` |
 | `languages.translations` | 无 | `{ 中文文案: 译文 }` 对象或 JSON 文件路径；给了就必须存在（`:393` `:396`） |
 | `langGlossary` / `keyCatalog` | 无 | 术语表 / 键目录；给了就必须存在（`:371` `:380` `:382`） |
-| `menuItems` / `layoutStatus` / `layoutEvidence` | 无 | Layout 菜单与证据；与 `layoutRules` 联动校验（`:340` `:349`） |
+| `menuItems` / `layoutStatus` / `layoutEvidence` | 无（**底部栏含菜单项或常驻分组时条件必填**） | Layout 菜单与证据；与 `layoutRules` 联动校验（`:340` `:349`）。右下角常驻分组存在时 `residentGroupItems` 必须等于该分组内的实际实例数，且必须满足 `menuItems.length + residentGroupItems === matchedBottomBarItems`；这几个值由 `gen-mtslg-layout-manifest.js` 从 DSL 机械推导，不要手填或省略 |
 | `nesting` | 默认开启 | `{ "enabled": false }` 可关掉容器嵌套重挂 |
 | `excludeInstances` | 无 | 逗号/空白分隔的实例 ref，排除出映射 |
 | `generatedRoot` / `pagesRoot` / `iconsRoot` / `indexRoot` / `sourceRoot` / `resourceRoots` | 见脚本 | 目录约定覆盖 |
@@ -56,7 +58,7 @@ node scripts/gen-mastergo-page-bundle.js --manifest <bundle.json> [--overwrite]
 |---|---|---|
 | `svgPath` | **必填** | `extractSvg` 落盘的 JSON；没有运行时 Icon 时也必须给合法的 `{ "svgs": [] }` 文件（`:909` 逐个做存在性检查） |
 | `dslPath` + `visibilityPath` | **新建页面必填** | 同时提供且文件存在；mapping 由本次生成创建（`:907` `:913` `:916`） |
-| `mappingPath` | **已有页面必填** | `modify-existing` / `replace-existing` 走 merge 时必须提供；新建页面由本次生成，不需要传 |
+| `mappingPath` | **必填（所有模式）** | mapping 的**工作落盘路径**：新建页面时由本次生成写入（随后会被重新生成覆盖，不是输入真值）；已有页面在未提供 `dslPath`/`visibilityPath` 时作为已有 mapping 读入。**不要指向 `Generated/<页面名>.mapping.json`（审计产物）**——新建模式下会因"目标文件已存在"失败（脚本已对此给出前置校验）。 |
 | `iconMapPath` | 必填（页面有图标槽时） | 图标台账输入；没有图标槽位时可给空 `icons[]` |
 | `templateMapPath` | 可选 | 缺省 = 插件内 `mtslg-iocontrol-map.json`（`gen-mastergo-page-bundle.js:27` 的 `DEFAULT_TEMPLATE_MAP`）；它是**脚本在生成期读取**的运行期输入，只是不需要模型预读进上下文 |
 
