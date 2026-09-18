@@ -235,7 +235,7 @@ Style 与内部组件对照（只对下表列出的真实值成立）：
 | 删除料盒-2 | null（不写 Style） | 待组件库登记 |
 | 文案-小button | null（不写 Style） | 待组件库登记 |
 
-文案→Value；业务字段/动作→IOName/IOCommand；PageName/IOVisible/IOCommand 按“按钮族固定参数”一节恒写；图标→Icon，图标尺寸→IconWidth/IconHeight（取图标图形节点 bbox）；独立组件没有 F 键槽位，不生成 TopLeftContent。Icon 键可使用目标项目已确认键或当前页面唯一的临时 Geometry 键。
+文案→Value；业务字段/动作→IOName/IOCommand；PageName/IOVisible/IOCommand 按“按钮族固定参数”一节恒写；图标→Icon，图标尺寸→IconWidth/IconHeight（取台账命中条目节点 bbox）；独立组件没有 F 键槽位，不生成 TopLeftContent。Icon 键可使用目标项目已确认键或当前页面唯一的临时 Geometry 键。
 
 ### 固定模板：独立组件=右侧栏-左右结构-icon+文案 / 右侧栏-上下结构-icon+文案 / start
 
@@ -249,7 +249,7 @@ Style 与内部组件对照（只对下表列出的真实值成立）：
 <IOContorl ID="{id}" ControlType="IconButton" Style="UpDownRightButtonStyle" Icon="{icon}" IconWidth="{icon_width}" IconHeight="{icon_height}" PageName="{page_name}" IOName="{io_name}" IOCommand="{io_command}" IOEnable="{io_enable}" IOState="{io_state}" IOVisible="{io_visible}" LangName="{lang_name}" Value="{value}" Left="{left}" Top="{top}" Width="{width}" Height="{height}" />
 ```
 
-`右侧栏-左右结构-icon+文案` 与 `右侧栏-上下结构-icon+文案` 的公开属性均为 实例（图标槽位）、显示 icon、显示文案（两者是同一个视觉组件的两种形态：前者左右排布、后者上下排布）；`start` 没有公开属性。三者都取当前实例真实 bbox 作为坐标尺寸，图标尺寸取图标图形节点 bbox；文案→Value。
+`右侧栏-左右结构-icon+文案` 与 `右侧栏-上下结构-icon+文案` 的公开属性均为 实例（图标槽位）、显示 icon、显示文案（两者是同一个视觉组件的两种形态：前者左右排布、后者上下排布）；`start` 没有公开属性。三者都取当前实例真实 bbox 作为坐标尺寸，图标尺寸取台账命中条目节点 bbox；文案→Value。
 
 ## 界面内操作组：IconButton 映射关系
 
@@ -352,7 +352,7 @@ Style 与内部组件对照（只对下表列出的真实值成立）：
 
 槽位绑定规则：以八个候选按钮组整体包围盒的中心为基准，按钮中心落在主轴方向决定 up/down/left/right，到中心的距离决定 inner（近）/outer（远）；同一方向距离更近的一组记为 inner。八个按钮的图标、文案、业务字段/动作、状态、位置和尺寸从各自 MasterGo 节点读取。
 
-按钮的 `Left/Top/Width/Height` 必须读取各自按钮外层节点 bbox；内部图标组只提供 Icon 来源和图标尺寸（IconWidth/IconHeight 取图标图形节点自身 bbox），不得用图标 bbox 代替按钮尺寸。即使同一方向内外两个按钮在设计稿中使用同一个图形（几何完全相同），也必须分别绑定各自实例的图标来源；设计侧缺少独立图形时保留按钮节点与 provenance，标记待设计补图，不得自行镜像或猜测朝向。SCAN 为可选取槽位，当前实例没有该 TEXT 节点时不生成，也不得补齐。实例文本、图标和坐标均从当前实例的真实父子链读取。
+按钮的 `Left/Top/Width/Height` 必须读取各自按钮外层节点 bbox；内部图标组只提供 Icon 来源和图标尺寸（IconWidth/IconHeight 取台账命中条目节点 bbox），不得用图标 bbox 代替按钮尺寸。即使同一方向内外两个按钮在设计稿中使用同一个图形（几何完全相同），也必须分别绑定各自实例的图标来源；设计侧缺少独立图形时保留按钮节点与 provenance，标记待设计补图，不得自行镜像或猜测朝向。SCAN 为可选取槽位，当前实例没有该 TEXT 节点时不生成，也不得补齐。实例文本、图标和坐标均从当前实例的真实父子链读取。
 
 ### 固定模板：属性 1=方向
 
@@ -477,7 +477,7 @@ Style 与内部组件对照（只对下表列出的真实值成立）：
 <IOContorl ID="{id}" ControlType="IconButton" Style="MainButtonStyle" Icon="{icon}" IconWidth="{icon_width}" IconHeight="{icon_height}" PageName="{page_name}" TopLeftContent="{top_left_content}" Value="{value}" IOName="{io_name}" IOCommand="{io_command}" IOEnable="{io_enable}" IOState="{io_state}" IOVisible="{io_visible}" LangName="{lang_name}" Left="{left}" Top="{top}" Width="{width}" Height="{height}" />
 ```
 
-按钮文案→Value；F 文本→TopLeftContent；图标 PATH/SVG→Icon；图标尺寸→IconWidth/IconHeight（取图标图形节点 bbox）；跳转目标→PageName（`Jump:{target}`）。位置、尺寸和字体事实从当前实例对应节点读取。显示F关闭时 TopLeftContent 输出空字符串；显示icon关闭时 Icon、IconWidth、IconHeight 输出空字符串（固定字段仍发射）。PageName、IOVisible、IOCommand、IOEnable 按“按钮族固定参数”一节恒写；其余必写字段没有可靠来源时输出空字符串值。
+按钮文案→Value；F 文本→TopLeftContent；图标 PATH/SVG→Icon；图标尺寸→IconWidth/IconHeight（取台账命中条目节点 bbox）；跳转目标→PageName（`Jump:{target}`）。位置、尺寸和字体事实从当前实例对应节点读取。显示F关闭时 TopLeftContent 输出空字符串；显示icon关闭时 Icon、IconWidth、IconHeight 输出空字符串（固定字段仍发射）。PageName、IOVisible、IOCommand、IOEnable 按“按钮族固定参数”一节恒写；其余必写字段没有可靠来源时输出空字符串值。
 
 ### 固定模板：属性 1=主菜单button-文字
 
@@ -521,7 +521,7 @@ Style 与内部组件对照（只对下表列出的真实值成立）：
 
 # 固定字段与可选字段规则
 
-- **必写字段与按钮族固定参数（IconButton / Button / StatusButton）**：每个 ControlType 的固定必写字段集登记在 `mtslg-iocontrol-map.json` 的 `controlTypeRequiredAttrs`，生成器必须发射这些属性，取不到来源时写**空字符串占位**。按钮族在此基础上恒写 `PageName`、`IOVisible`、`IOCommand`、`IOEnable`；`IconButton` 模板含 `Icon`/`IconWidth`/`IconHeight`：有图标槽位时机械取**图标图形节点自身的 bbox**（不是控件宽高，也不是图标容器尺寸）四舍五入取整，无图标槽位时这三项写空字符串；`Button`/`StatusButton` 模板不含图标字段，不发射 `Icon`/`IconWidth`/`IconHeight`。映射带 `Icon` 却缺少 `iconSize` 时生成器直接失败，禁止猜尺寸。`LangName` 是唯一例外：只在多语言绑定层给出真实 key 时发射，动态值等 `noLangRefs` 豁免节点不写空占位。
+- **必写字段与按钮族固定参数（IconButton / Button / StatusButton）**：每个 ControlType 的固定必写字段集登记在 `mtslg-iocontrol-map.json` 的 `controlTypeRequiredAttrs`，生成器必须发射这些属性，取不到来源时写**空字符串占位**。按钮族在此基础上恒写 `PageName`、`IOVisible`、`IOCommand`、`IOEnable`；`IconButton` 模板含 `Icon`/`IconWidth`/`IconHeight`：有图标槽位时机械取**台账命中条目节点的 bbox**（不是控件宽高，也不是图标容器尺寸）四舍五入取整，无图标槽位时这三项写空字符串；`Button`/`StatusButton` 模板不含图标字段，不发射 `Icon`/`IconWidth`/`IconHeight`。映射带 `Icon` 却缺少 `iconSize` 时生成器直接失败，禁止猜尺寸。`LangName` 是唯一例外：只在多语言绑定层给出真实 key 时发射，动态值等 `noLangRefs` 豁免节点不写空占位。
 - 固定：ControlType、节点数量、父子关系、槽位顺序。
 - 几何/显示字段：Value、Left、Top、Width、Height、FontSize、FontWeight、字体/颜色/Style；其中 DSL 提供字体样式时 FontSize 必填，Height 与 FontSize 独立取值；`FontWeight` 是**命中才写**的条件属性（设计稿字重非 normal 时发射，值取设计稿 `styles[...].value.style` 的 `fontStyle`，如 `Bold`；**判定顺序固定为两步：先看样式名，命中映射表 `textBlockFontWeight.normalStyleNames` 即判为 normal、不写；只有样式名取不到时才回退用 `normalValues` 按 `weight` 判定**），不参与 `controlTypeRequiredAttrs` 恒写集合，规则以 `mtslg-mode.md` 的 TextBlock 字体规则与映射表 `textBlockFontWeight` 为准；MTSLG TextBlock 的 Height 固定为 40、**Width 固定为 `NaN`（自适应，不使用文本 bbox 宽度）**；输入框和选择框外框的 Height 按 MasterGo 的 40/36/32/28 变体处理；Height 与 FontSize 必须分别读取。一般显示型子节点缺少 Value 时控件仍会生成，但文字内容为空；**DataGrid 根节点例外：`Value` 恒写、当前阶段固定写空串 `Value=""`（数据源由工程师或运行时后续绑定，禁止编造文件名），并置 `valuePending=true` 作为待绑定提示（提示性审计字段，不是交付门禁；规则见 `mtslg-mode.md` 第 4.1 节「DataGrid 的命中口径与 Value 现阶段口径」与映射表 `valuePolicy`）**。列子节点是**列定义**不是页面控件：`Value` 一律等于该列表头文本（由表头机械展开，不是「可选字段」），列几何与字段集走 `tableTemplates.columnTemplate`，不套用本条页面控件字段集。Style 只有 MasterGo 明确提供且代码库存在对应资源键时才填写。只有当 MasterGo 层级明确存在父级容器并且该父级有样式选择器时，才由父级为子控件提供样式；不得根据外观或组件名称自行添加父级容器。
 - 运行时：IOName、IOCommand、PageName、IOEnable、IOState、LangName。

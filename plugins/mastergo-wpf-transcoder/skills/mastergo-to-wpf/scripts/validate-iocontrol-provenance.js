@@ -370,17 +370,17 @@ function validate(xmlPath, manifestPath, options) {
         if (hasIcon) {
           const size = n.iconSize;
           if (!size || typeof size !== 'object') {
-            errors.push('[' + n.xmlId + '] 按钮族带 Icon 但映射缺少 iconSize（图标图形节点 bbox）');
+            errors.push('[' + n.xmlId + '] 按钮族带 Icon 但映射缺少 iconSize（台账命中条目节点 bbox）');
           } else {
             const iconSource = sourceMap.get(size.sourceRef);
             if (!iconSource) {
               errors.push('[' + n.xmlId + '] iconSize.sourceRef 不存在于 sourceNodes: ' + size.sourceRef);
             } else if (!sameNumber(iconSource.width, size.width) || !sameNumber(iconSource.height, size.height)) {
-              errors.push('[' + n.xmlId + '] iconSize 与图标图形节点 bbox 不一致');
+              errors.push('[' + n.xmlId + '] iconSize 与台账命中条目节点 bbox 不一致');
             }
             if (!sameNumber(x.IconWidth, Math.round(Number(size.width))) ||
                 !sameNumber(x.IconHeight, Math.round(Number(size.height)))) {
-              errors.push('[' + n.xmlId + '] IconWidth/IconHeight 必须等于图标图形节点 bbox 取整值');
+              errors.push('[' + n.xmlId + '] IconWidth/IconHeight 必须等于台账命中条目节点 bbox 取整值');
             }
           }
         } else {

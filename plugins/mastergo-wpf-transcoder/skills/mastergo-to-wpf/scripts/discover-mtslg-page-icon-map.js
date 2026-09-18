@@ -23,6 +23,8 @@ const fs = require("fs");
 const path = require("path");
 // 跨脚本共用工具的唯一实现（见 scripts/lib/script-helpers.js；禁止在本脚本再抄一份）。
 const { readJson } = require(path.join(__dirname, "lib", "script-helpers.js"));
+// 图标归属判据的唯一实现（见 scripts/lib/icon-ownership.js；禁止在本脚本再抄一份）。
+const ICON_OWNERSHIP = require(path.join(__dirname, "lib", "icon-ownership.js"));
 
 function usage() {
   console.error("Usage: node discover-mtslg-page-icon-map.js --svg <extractSvg.json> --mapping <mapping.json> [--confirmed <icon-map.json>] --out <page-icon-map.json>");
@@ -42,67 +44,41 @@ function args(argv) {
   return result;
 }
 
-// 候选 PATH ↔ extractSvg 条目 的归属匹配，与 gen-mtslg-mapping-from-dsl.js 的图标归属同口径：
-//   ① 树判据（首选）：该条目节点（item.id）的子树里是否含有这条 PATH。
-//      部分设计稿里「图标组 / 按钮组」的 id 不是其子 PATH id 的字符串前缀，
-//      只按字符串前缀会漏配，候选就会误报成 no-exact-extractSvg-entry。
-//   ② 历史口径（回退）：id 字符串前缀相等/包含关系。
-// 多条命中时取树深度最深（最专属）的条目，其次取 id 更长者。
-function buildTree(sourceNodes) {
+// 候选 PATH ↔ extractSvg 条目 的归属匹配：与 gen-mtslg-mapping-from-dsl.js 共用
+// lib/icon-ownership.js 的**同一份**判据（① 树判据优先 ② 仅当无树命中才回退 id 前缀
+// ③ 多条命中取树最深者）。本脚本只负责把 mapping.sourceNodes 组装成树索引适配器。
+function buildSourceTreeIndex(sourceNodes) {
+  const nodeByRef = new Map();
   const childrenByParent = new Map();
   const parentByRef = new Map();
   for (const node of sourceNodes) {
     if (!node || typeof node.ref !== "string" || !node.ref) continue;
+    nodeByRef.set(node.ref, node);
     const parent = node.parentRef === undefined ? null : node.parentRef;
     parentByRef.set(node.ref, parent);
     if (!childrenByParent.has(parent)) childrenByParent.set(parent, []);
     childrenByParent.get(parent).push(node.ref);
   }
-  return { childrenByParent, parentByRef };
-}
-
-function isInsideRef(tree, containerId, ref) {
-  if (typeof containerId !== "string" || !containerId) return false;
-  if (containerId === ref) return true;
-  const stack = [containerId];
-  const seen = new Set();
-  while (stack.length > 0) {
-    const current = stack.pop();
-    if (seen.has(current)) continue;
-    seen.add(current);
-    for (const child of tree.childrenByParent.get(current) || []) {
-      if (child === ref) return true;
-      stack.push(child);
-    }
-  }
-  return false;
-}
-
-function depthOfRef(tree, ref) {
-  let depth = 0;
-  let current = tree.parentByRef.get(ref) || null;
-  const seen = new Set();
-  while (current && !seen.has(current)) {
-    seen.add(current);
-    depth += 1;
-    current = tree.parentByRef.get(current) || null;
-  }
-  return depth;
+  return {
+    hasNode: ref => nodeByRef.has(ref),
+    childrenOf: ref => childrenByParent.get(ref) || [],
+    parentOf: ref => (parentByRef.has(ref) ? parentByRef.get(ref) : null),
+    isPathNode: ref => {
+      const node = nodeByRef.get(ref);
+      return Boolean(node && node.type === "PATH");
+    },
+  };
 }
 
 function exactExtractEntry(svgs, ref, tree) {
   if (typeof ref !== "string" || !ref) return null;
-  let best = null;
-  for (const item of svgs) {
-    if (!item || typeof item.id !== "string" || typeof item.svg !== "string") continue;
-    const matched = ref === item.id || ref.startsWith(item.id + "/") || isInsideRef(tree, item.id, ref);
-    if (!matched) continue;
-    if (!best) { best = item; continue; }
-    const byDepth = depthOfRef(tree, item.id) - depthOfRef(tree, best.id);
-    if (byDepth > 0) best = item;
-    else if (byDepth === 0 && item.id.length > best.id.length) best = item;
-  }
-  return best;
+  const owners = ICON_OWNERSHIP.selectOwningEntries({
+    index: tree,
+    entries: svgs,
+    entryRef: item => (item ? item.id : null),
+    targetPathRefs: [ref],
+  });
+  return owners[0] || null;
 }
 
 function main() {
@@ -114,7 +90,7 @@ function main() {
   if (!Array.isArray(mapping.sourceNodes)) throw new Error("page mapping JSON must contain sourceNodes[]");
   if (!Array.isArray(confirmed.icons)) throw new Error("confirmed page icon map must contain icons[]");
 
-  const tree = buildTree(mapping.sourceNodes);
+  const tree = buildSourceTreeIndex(mapping.sourceNodes);
   const confirmedByRef = new Map();
   const confirmedBySource = new Map();
   for (const icon of confirmed.icons) {

@@ -33,7 +33,7 @@
  *   PageName / IOVisible / IOCommand / IOEnable —— 无差别恒写；映射没有可靠来源时写空字符串占位，
  *   映射提供真实值时按真实值发射（merge 时保留现有真实值）。
  *   Icon / IconWidth / IconHeight —— 属 ControlType 固定必写字段：模板含图标字段的 IconButton 恒写，
- *   有图标槽位时 IconWidth / IconHeight 机械取「图标图形节点」bbox（映射字段 iconSize，四舍五入取整），
+ *   有图标槽位时 IconWidth / IconHeight 机械取「台账命中条目节点」bbox（映射字段 iconSize，四舍五入取整），
  *   无图标槽位时三项写空字符串占位；模板不含图标字段的 Button / StatusButton 不发射这三项；
  *   iconSize 只在「模板含图标字段」且「节点带 Icon」时被消费，映射残留的尺寸不单独生效；
  *   带 Icon 却没有 iconSize 视为映射不完整，直接失败，禁止猜图标尺寸。
@@ -234,7 +234,7 @@ function hasIconAttr(node) {
   return typeof icon === 'string' && icon.trim() !== '';
 }
 
-// 图标图形节点 bbox（映射字段 iconSize），取整后用于 IconWidth/IconHeight。
+// 台账命中条目节点 bbox（映射字段 iconSize），取整后用于 IconWidth/IconHeight。
 function iconSizeOf(node) {
   const size = node.iconSize;
   if (!size || typeof size !== 'object') return null;
@@ -249,7 +249,7 @@ function assertButtonFamilyIconSize(node) {
   if (!isButtonFamily(node)) return;
   if (hasIconAttr(node) && !iconSizeOf(node)) {
     throw new Error('映射门禁失败: 按钮族节点 ' + node.ref +
-      ' 带 Icon 但缺少 iconSize（图标图形节点 bbox）；请重新生成 mapping，禁止猜图标尺寸');
+      ' 带 Icon 但缺少 iconSize（台账命中条目节点 bbox）；请重新生成 mapping，禁止猜图标尺寸');
   }
 }
 

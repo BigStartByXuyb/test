@@ -95,8 +95,8 @@ assert.match(buttonTag, /IconHeight=""/, '无图标按钮必须发射空 IconHei
 assert.match(buttonTag, /TopLeftContent=""/, '无图标按钮必须发射空 TopLeftContent 占位');
 const iconButtonTag = (buttonXml.match(/<IOContorl[^>]*ID="BTN_2"[\s\S]*?\/>/) || [''])[0];
 assert.ok(iconButtonTag, 'fresh 输出必须包含带图标按钮节点');
-assert.match(iconButtonTag, /IconWidth="97"/, 'IconWidth 必须取图标图形节点 bbox 并取整');
-assert.match(iconButtonTag, /IconHeight="66"/, 'IconHeight 必须取图标图形节点 bbox 并取整');
+assert.match(iconButtonTag, /IconWidth="97"/, 'IconWidth 必须取台账命中条目节点 bbox 并取整');
+assert.match(iconButtonTag, /IconHeight="66"/, 'IconHeight 必须取台账命中条目节点 bbox 并取整');
 assert.match(iconButtonTag, /PageName="Jump:Home"/, '真实 PageName 必须按映射发射');
 assert.match(iconButtonTag, /IOCommand=""/, '带图标按钮同样要补空 IOCommand 占位');
 assert.match(iconButtonTag, /IOEnable=""/, '带图标按钮同样要补空 IOEnable 占位');

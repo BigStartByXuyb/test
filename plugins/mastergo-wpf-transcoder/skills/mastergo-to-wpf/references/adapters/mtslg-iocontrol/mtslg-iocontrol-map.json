@@ -37,7 +37,7 @@
       "IconWidth",
       "IconHeight"
     ],
-      "iconSizeRule": "IconWidth/IconHeight 取图标图形节点 bbox（映射字段 iconSize，四舍五入取整）；模板含图标字段的 IconButton 的 Icon/IconWidth/IconHeight 属于 controlTypeRequiredAttrs 的恒写字段，无图标槽位时写空字符串；Button/StatusButton 的模板不含图标字段，不发射这三项；iconSize 只在模板含图标字段且节点带 Icon 时被消费，带 Icon 却没有 iconSize 视为映射不完整，生成器直接失败"
+      "iconSizeRule": "IconWidth/IconHeight 取台账命中条目节点 bbox（该条目 sourceRef 指向的节点，缺失回退 sourceId；映射字段 iconSize，四舍五入取整）；台账条目必须登记在只包住该图标图形的节点上，登记在按钮级容器上会取到按钮尺寸；模板含图标字段的 IconButton 的 Icon/IconWidth/IconHeight 属于 controlTypeRequiredAttrs 的恒写字段，无图标槽位时写空字符串；Button/StatusButton 的模板不含图标字段，不发射这三项；iconSize 只在模板含图标字段且节点带 Icon 时被消费，带 Icon 却没有 iconSize 视为映射不完整，生成器直接失败"
   },
   "textNewlinePolicy": {
     "attrScope": "所有 XML 属性里的文案（页面 XML 的 Value / Header，Layout 的 MenuItem Name / TopLeftContent 等）与页面语言字典的字符串值",
@@ -1574,7 +1574,7 @@
       ]
     },
     "IconButton": {
-      "description": "图标按钮（继承 Button）；Icon=Geometry 键，TopLeftContent=F1..F12，IOState 状态色。按钮族固定参数：所有 IconButton 无差别发射 PageName/IOVisible/IOCommand/IOEnable（无可靠来源时为空字符串占位）；Icon/IconWidth/IconHeight 属 controlTypeRequiredAttrs 的恒写字段：有图标槽位时 IconWidth/IconHeight 取图标图形节点 bbox（映射字段 iconSize，四舍五入取整），无图标槽位时三项写空字符串",
+      "description": "图标按钮（继承 Button）；Icon=Geometry 键，TopLeftContent=F1..F12，IOState 状态色。按钮族固定参数：所有 IconButton 无差别发射 PageName/IOVisible/IOCommand/IOEnable（无可靠来源时为空字符串占位）；Icon/IconWidth/IconHeight 属 controlTypeRequiredAttrs 的恒写字段：有图标槽位时 IconWidth/IconHeight 取台账命中条目节点 bbox（映射字段 iconSize，四舍五入取整），无图标槽位时三项写空字符串",
       "nested": false,
       "attrs": [
         "Icon",

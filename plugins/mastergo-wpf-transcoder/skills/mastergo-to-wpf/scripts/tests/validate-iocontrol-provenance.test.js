@@ -142,8 +142,8 @@ if (badIconRefResult.ok || !badIconRefResult.errors.some(x => /iconSize.sourceRe
 }
 
 const badIconBoxResult = buttonCase(iconButtonAttrs, { attrs: { ControlType: 'IconButton', Icon: 'ExitGeometry', PageName: '', IOVisible: '', IOCommand: '' }, iconSize: { width: 40, height: 40, sourceRef: 'btn/icon' } });
-if (badIconBoxResult.ok || !badIconBoxResult.errors.some(x => /iconSize 与图标图形节点 bbox 不一致/.test(x))) {
-  throw new Error('iconSize 与图标图形节点 bbox 不一致时必须失败');
+if (badIconBoxResult.ok || !badIconBoxResult.errors.some(x => /iconSize 与台账命中条目节点 bbox 不一致/.test(x))) {
+  throw new Error('iconSize 与台账命中条目节点 bbox 不一致时必须失败');
 }
 
 const plainButtonAttrs = { ID: 'BTN', ControlType: 'IconButton', PageName: '', IOVisible: '', IOCommand: '', IconWidth: '60', IconHeight: '60', Left: '600', Top: '108', Width: '60', Height: '60' };

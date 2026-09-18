@@ -125,7 +125,7 @@ function withAlwaysAttrs(item, alwaysAttrs) {
   return copy;
 }
 
-// 图标尺寸与页面 XML 按钮族同一规则：有 Icon 必须有 iconSize（图标图形节点 bbox），
+// 图标尺寸与页面 XML 按钮族同一规则：有 Icon 必须有 iconSize（台账命中条目节点 bbox），
 // 取整后写 IconWidth/IconHeight；没有图标槽位时不写这三项。
 function withIconSize(item) {
   const copy = Object.assign({}, item);
@@ -139,7 +139,7 @@ function withIconSize(item) {
   const size = copy.iconSize;
   if (!size || !Number.isFinite(Number(size.width)) || !Number.isFinite(Number(size.height))) {
     fail("MenuItem 带 Icon=\"" + icon + "\"（Index=" + copy.index +
-      "）但缺少 iconSize（图标图形节点 bbox）：请先在清单里补齐尺寸，禁止猜图标尺寸");
+      "）但缺少 iconSize（台账命中条目节点 bbox）：请先在清单里补齐尺寸，禁止猜图标尺寸");
   }
   copy.iconWidth = Math.round(Number(size.width));
   copy.iconHeight = Math.round(Number(size.height));

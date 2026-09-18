@@ -41,4 +41,31 @@ assert.ok(!Object.prototype.hasOwnProperty.call(shell, "name"));
 const known = output.candidates.find((candidate) => candidate.sourceId === "page/known");
 assert.strictEqual(known.status, "confirmed");
 
+// ---- 树判据回归：图标组 id 不是其子 PATH id 的字符串前缀时（部分设计稿里同一实例内的
+//      节点 id 只共享外层实例前缀），候选仍必须归属到该图标组条目。
+//      旧口径（纯 id 前缀）下这条候选会被误报成 no-exact-extractSvgEntry。----
+const treeSvgFile = path.join(dir, "extractSvg.tree.json");
+const treeMappingFile = path.join(dir, "mapping.tree.json");
+const treeOutFile = path.join(dir, "page-icon-map.tree.json");
+fs.writeFileSync(treeSvgFile, JSON.stringify({ svgs: [
+  { id: "tree/root/icon-group", name: "图标组", svg: "<svg><path d=\"M0,0 L1,1\"/></svg>" }
+] }), "utf8");
+fs.writeFileSync(treeMappingFile, JSON.stringify({ sourceNodes: [
+  { ref: "tree/root", type: "INSTANCE", name: "按钮", parentRef: null },
+  { ref: "tree/root/icon-group", type: "GROUP", name: "图标组", parentRef: "tree/root" },
+  // PATH 的父节点是图标组（树包含成立），但 id 不是「图标组 id + /」开头（id 前缀不成立）
+  { ref: "tree/root/1066:329573", type: "PATH", name: "路径 203", svgName: "向上", parentRef: "tree/root/icon-group" }
+] }), "utf8");
+const treeResult = spawnSync(process.execPath,
+  [script, "--svg", treeSvgFile, "--mapping", treeMappingFile, "--out", treeOutFile],
+  { encoding: "utf8" });
+assert.strictEqual(treeResult.status, 0, treeResult.stderr);
+const treeOutput = JSON.parse(fs.readFileSync(treeOutFile, "utf8"));
+assert.strictEqual(treeOutput.candidates.length, 1);
+const treeCandidate = treeOutput.candidates[0];
+assert.strictEqual(treeCandidate.sourceId, "tree/root/icon-group",
+  "id 前缀断裂时，必须按 DSL 树归属匹配到图标组条目");
+assert.strictEqual(treeCandidate.reason, "missing-page-resource-name",
+  "命中条目但未起名 → missing-page-resource-name（而不是 no-exact-extractSvgEntry）");
+
 console.log("PASS page icon discovery regression test");
