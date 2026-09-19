@@ -21,8 +21,9 @@
  *     report.skipped[].reason = "already-owned-by-non-container-node"；挂在容器下的节点照旧参与（幂等）；
  *   - 改写字段：parent 与 layoutParent 同时写为容器 ref，并重算 expectedLeft/expectedTop
  *     （根级父容器扣一次 192；嵌套父容器按"内容区原点"换算：expectedLeft = 子绝对X − 容器绝对X − inset.left，
- *     expectedTop = 子绝对Y − 容器绝对Y − inset.top，inset 来自容器变体登记的 Style 对应的
- *     infoGroupTemplates.styleInsets，即内容区边框 + 标题条高度）；sourceParent / expectedWidth /
+ *     expectedTop = 子绝对Y − 容器绝对Y − inset.top，inset 由容器变体的 contentInsetStyle
+ *     在 infoGroupTemplates.styleInsets 查得（即内容区边框 + 标题条高度；与发射到 XML 的 Style
+ *     是两个字段，GroupBox 的 Style 恒为空串））；sourceParent / expectedWidth /
  *     expectedHeight / 节点顺序保持不变；脚本幂等（重复运行时若 inset 变化会重算并报告）。
  *
  * 退出码：0 = 正常（冲突只记录不失败）；1 = 参数/文件/映射结构错误。
@@ -114,7 +115,7 @@ for (const instance of mapping.componentInstances || []) {
   const insetOk = inset && Number.isFinite(Number(inset.left)) && Number.isFinite(Number(inset.top));
   if (!insetOk) {
     fail('容器缺少内容区原点 contentInset: ' + ref +
-      '（映射表必须为该组件集登记显式 Style，并在 infoGroupTemplates.styleInsets 登记 {left, top}）');
+      '（映射表必须为该组件集登记 contentInsetStyle，并在 infoGroupTemplates.styleInsets 登记 {left, top}）');
   }
   seenContainers.add(ref);
   containerSpecs.push({

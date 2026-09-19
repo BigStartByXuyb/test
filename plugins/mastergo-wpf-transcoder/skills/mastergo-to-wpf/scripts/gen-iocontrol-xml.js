@@ -532,7 +532,8 @@ function renderFresh() {
     if (node.id) attrMap.ID = node.id;
     if (node.controlType) attrMap.ControlType = node.controlType;
     // 父节点是容器（GroupBox 等）时，子坐标从"内容区原点"量：再扣掉内容区边框 + 标题条高度。
-    // 原点由父节点的 contentInset 携带（映射按容器 Style 登记），与 provenance 校验同口径。
+    // 原点由父节点的 contentInset 携带（映射按容器变体的 contentInsetStyle 查 styleInsets 得到，
+    // 与发射到 XML 的 Style 是两个字段），与 provenance 校验同口径。
     const insetLeft = parentInset ? (Number(parentInset.left) || 0) : 0;
     const insetTop = parentInset ? (Number(parentInset.top) || 0) : 0;
     applyNodeGeometry(node, attrMap, parentAbsX, parentAbsY, insetLeft, insetTop);

@@ -912,7 +912,9 @@ for (const { item: inst, match } of matched) {
     // 子控件的相对坐标原点必须能机械换算，因此这里仍 fail-closed：contentInsetStyle 未登记对应
     // styleInsets 时直接报错，不猜原点。
     const styleInsets = templateMap.infoGroupTemplates?.styleInsets || {};
-    const insetStyle = spec.contentInsetStyle || spec.style;
+    // 只认 contentInsetStyle：不再保留"用已废弃的非空 style 当查表键"的回退路径——
+    // 那条回退会让按旧口径登记的变体静默通过，并使文档承诺的 fail-closed 门禁失效。
+    const insetStyle = spec.contentInsetStyle;
     const contentInset = insetStyle ? styleInsets[insetStyle] : null;
     if (!contentInset) {
       throw new Error("容器变体缺少可换算的内容区原点: template=" + match.family +

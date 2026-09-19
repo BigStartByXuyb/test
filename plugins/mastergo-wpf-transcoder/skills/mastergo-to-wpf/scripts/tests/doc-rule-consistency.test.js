@@ -669,4 +669,45 @@ assert.ok(modeDoc.includes("压成空格会让两行文案退化成一行"),
   }
 }
 
+// ---------- 容器族（infoGroupTemplates）GroupBox 的 Style 口径 ----------
+// 背景：CI 语义审计 v1.0.191 的 BLOCK-001 报过「两份权威文档对同一字段互斥」——
+// mtslg-mode.md 仍要求显式非空 Style、飞书文档与映射表已改成恒空串 + contentInsetStyle。
+// 这类漂移当时的门禁完全没覆盖，所以补在这里：映射表 / 生成器 / 三份正文必须同口径。
+{
+  const infoGroup = map.infoGroupTemplates;
+  const insets = infoGroup.styleInsets || {};
+  const variants = Object.entries(infoGroup.variants || {});
+  assert.ok(variants.length > 0, "infoGroupTemplates 必须登记容器变体");
+  for (const [name, spec] of variants) {
+    assert.strictEqual(spec.style, "", name + " 的 style 必须是空串（GroupBox 的 Style 恒空）");
+    assert.strictEqual(typeof spec.contentInsetStyle, "string",
+      name + " 必须登记 contentInsetStyle（仅用于查 styleInsets 的内部键）");
+    assert.ok(Object.prototype.hasOwnProperty.call(insets, spec.contentInsetStyle),
+      name + " 的 contentInsetStyle 必须能在 infoGroupTemplates.styleInsets 查到原点");
+  }
+  // styleInsets 的表头注释必须区分"发射值"与"查表键"。
+  assert.ok(/contentInsetStyle/.test(infoGroup.styleInsetsNote || ""),
+    "styleInsetsNote 必须说明 contentInsetStyle 是原点查表键");
+  // 生成器只认 contentInsetStyle：不得保留"用非空 style 当查表键"的回退。
+  const mappingGenerator = fs.readFileSync(
+    path.join(__dirname, "..", "gen-mtslg-mapping-from-dsl.js"), "utf8");
+  assert.ok(!/contentInsetStyle\s*\|\|\s*spec\.style/.test(mappingGenerator),
+    "映射生成器不得保留 contentInsetStyle || style 的回退路径（会让旧口径静默通过）");
+  assert.ok(/attrs\.Style = spec\.style === undefined \|\| spec\.style === null \? "" : spec\.style/.test(mappingGenerator),
+    "映射生成器必须把变体 style 原样发射（GroupBox 的 Style 是必写字段）");
+  // 三份正文必须同口径：恒空 Style + contentInsetStyle 查原点。
+  for (const [label, text] of [["feishu-component-library-mapping.md", feishuMapping], ["mtslg-mode.md", modeDoc], ["SKILL.md", mainSkill]]) {
+    assert.ok(/contentInsetStyle/.test(text), label + " 必须写明原点查表键是 contentInsetStyle");
+    assert.ok(!/禁止空 Style|禁止容器变体把 Style 写成空/.test(text),
+      label + " 不得再保留「禁止空 Style」的旧口径");
+  }
+  // 飞书文档的两处固定模板必须发射空串 Style。
+  const styledTemplates = feishuMapping.match(/ControlType="GroupBox" Style="[^"]*"/g) || [];
+  assert.ok(styledTemplates.length >= 2, "飞书文档必须给出两处 GroupBox 固定模板");
+  styledTemplates.forEach((tag) => {
+    assert.strictEqual(tag, 'ControlType="GroupBox" Style=""',
+      "GroupBox 固定模板必须以 Style=\"\" 发射，实际：" + tag);
+  });
+}
+
 console.log("PASS 文本换行口径（textNewlinePolicy）一致性回归测试");
