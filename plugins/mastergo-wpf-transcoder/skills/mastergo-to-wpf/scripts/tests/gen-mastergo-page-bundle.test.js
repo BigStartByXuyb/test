@@ -145,6 +145,12 @@ fs.writeFileSync(workProbe, JSON.stringify({ note: "本次运行的输入清单�
 // 它们不在任何输出清单里，必须由生成目录扫描兜住，否则就是"项目里有、登记表里没有"。
 const captureProbe = path.join(project, "Generated", "coverage-report.json");
 fs.writeFileSync(captureProbe, JSON.stringify({ status: "complete" }), "utf8");
+// 历史副本（本次运行之前就存在）：必须同样登记，且标成 createdThisRun=false——
+// 这样"登记表 vs 磁盘"在备份这一类上不留任何允许差异。
+const viewDir = path.join(project, "UI", "F2-Teach", "View");
+fs.mkdirSync(viewDir, { recursive: true });
+const historicalBackup = path.join(viewDir, "F2NewPageView.xaml.bak-20200101000000");
+fs.writeFileSync(historicalBackup, "历史副本\n", "utf8");
 
 let result = spawnSync(process.execPath, [script, "--manifest", manifest], { encoding: "utf8" });
 assert.strictEqual(result.status, 0, result.stderr);
@@ -240,6 +246,13 @@ const auditPaths = bundleAudit.files.filter(function (entry) { return entry.kind
   .map(function (entry) { return entry.path; });
 assert.ok(auditPaths.includes("Generated/coverage-report.json"),
   "生成目录下的采集产物必须登记为 audit");
+// 备份类：历史副本同样登记并标 createdThisRun=false；本次产生的副本标 true。
+const historicalEntry = bundleAudit.files.find(function (entry) {
+  return entry.path === "UI/F2-Teach/View/F2NewPageView.xaml.bak-20200101000000";
+});
+assert.ok(historicalEntry, "历史备份必须登记进 files[]");
+assert.strictEqual(historicalEntry.kind, "backup");
+assert.strictEqual(historicalEntry.createdThisRun, false, "历史备份必须标 createdThisRun=false");
 // work 类：登记 + 收尾删除；输入快照保留在审计里，所以删掉 _work 不会丢本次运行的输入。
 const workEntry = bundleAudit.files.find(function (entry) { return entry.path === "Generated/_work/F2NewPage.bundle.json"; });
 assert.ok(workEntry, "_work 下的中间文件必须登记");
@@ -357,6 +370,15 @@ assert.ok(generatedBackups.length > 0, "生成目录下的备份必须登记进 
 generatedBackups.forEach(function (entry) {
   assert.strictEqual(entry.kind, "backup", "生成目录下的 .bak 必须登记为 backup: " + entry.path);
 });
+// 备份类必须能区分"本次运行产生的"与"历史保留的"：
+// 本次为 true，历史为 false。子脚本（gen-mtslg-layout.js / gen-mw-wpf-page.js）产生的 .bak
+// 不经过 Bundle 的 backups 数组，但会被 scanProjectBackups 扫到并入表。
+assert.ok(
+  rerunAudit.files.some(function (entry) { return entry.kind === "backup" && entry.createdThisRun === true; }),
+  "本次运行产生的备份必须标 createdThisRun=true");
+assert.ok(
+  rerunAudit.files.some(function (entry) { return entry.kind === "backup" && entry.createdThisRun === false; }),
+  "历史备份必须标 createdThisRun=false");
 // 审计文件自己的旧版本也必须登记成 backup（否则就是"登记表写完之后才产生的备份"这个漏项）。
 assert.ok(
   rerunAudit.files.some(function (entry) {

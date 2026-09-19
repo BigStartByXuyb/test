@@ -848,7 +848,18 @@ function bundleFileRegistry(info, options) {
   // （getDsl.json / coverage-report.json / manifest.json / timing.json 等）：一律按证据登记，
   // 避免出现"项目里有这个文件、登记表里却没有"的漏项。
   // 备份先登记：它是最具体的类别，必须先占位，避免被下面的生成目录扫描当成普通证据登记。
-  (options.backups || []).forEach(function (filePath) { push(filePath, "backup"); });
+  // 本次运行产生的（含 Bundle 自身的 copyOutput/writeAuditOutput/备份，以及子脚本 gen-mtslg-layout.js、
+  // gen-mw-wpf-page.js 各自备份的文件）标 createdThisRun=true。
+  (options.backups || []).forEach(function (filePath) {
+    const entry = push(filePath, "backup");
+    if (entry) entry.createdThisRun = true;
+  });
+  // 再补扫项目内其余 .bak-<时间戳>：历史副本同样登记（createdThisRun=false），
+  // 这样"登记表 vs 磁盘"在备份这一类上不再有允许差异。
+  (options.existingBackups || []).forEach(function (relativePath) {
+    const entry = pushRelative(relativePath, "backup");
+    if (entry) entry.createdThisRun = false;
+  });
   (options.sourceFiles || []).forEach(function (filePath) { push(filePath, "audit"); });
   (options.generatedFiles || []).forEach(function (filePath) { push(filePath, "audit"); });
   (options.workFiles || []).forEach(function (filePath) { push(filePath, "work"); });
@@ -874,6 +885,38 @@ function scanGeneratedFiles(generatedDir) {
       // 跳过读不到的条目
     }
   });
+  return collected;
+}
+
+// 备份文件名：<任意文件>.bak-<14 位时间戳>，同秒内多次备份再带 -2/-3 序号。
+const BACKUP_NAME_RE = /\.bak-\d{8,}(-\d+)?$/;
+
+// 递归扫描项目内全部 .bak-<时间戳> 副本（跳过版本库/编译/IDE 目录）。
+function scanProjectBackups(projectRoot) {
+  const skip = new Set([".git", ".svn", ".vs", "bin", "obj", "node_modules", "packages"]);
+  const collected = [];
+  (function walk(dir) {
+    let names;
+    try {
+      names = fs.readdirSync(dir);
+    } catch (error) {
+      return;
+    }
+    names.forEach(function (name) {
+      const full = path.join(dir, name);
+      let stat;
+      try {
+        stat = fs.statSync(full);
+      } catch (error) {
+        return;
+      }
+      if (stat.isDirectory()) {
+        if (!skip.has(name)) walk(full);
+        return;
+      }
+      if (BACKUP_NAME_RE.test(name)) collected.push(full);
+    });
+  })(projectRoot);
   return collected;
 }
 
@@ -1352,7 +1395,10 @@ function main() {
       sourceFiles: [dslInputPath, visibilityInputPath, svgPath].filter(Boolean),
       generatedFiles: scanGeneratedFiles(generatedDir),
       workFiles: workFiles,
-      backups: backups
+      backups: backups,
+      existingBackups: scanProjectBackups(projectRoot).map(function (filePath) {
+        return path.relative(projectRoot, filePath).replace(/\\/g, "/");
+      })
     });
     const removedWorkFiles = workCleanupEnabled ? cleanupWorkFiles(fileRegistry, projectRoot) : [];
     writeAuditOutput(bundleAudit, JSON.stringify({
