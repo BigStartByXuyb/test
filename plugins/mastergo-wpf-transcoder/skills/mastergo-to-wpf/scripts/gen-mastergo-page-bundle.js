@@ -1139,9 +1139,8 @@ function main() {
     }
     // 自动产键：从当前页 DSL/mapping/Layout 菜单项机械派生 LanguageKey，显式登记项优先。
     if (autoLang) {
-      const langDsl = manifest.dslPath
-        ? readJson(resolveInput(manifestDir, projectRoot, manifest.dslPath, "dslPath"))
-        : null;
+      // 复用上面已解析的 dslInputPath：同一个输入不重复解析（路径解析口径只保留一处）。
+      const langDsl = dslInputPath ? readJson(dslInputPath) : null;
       // 页面标题文案取值链（与单脚本 CLI 一致）：
       //   manifest.pageTitleText（显式覆盖）→ mapping.textAudit 的 page-title → DSL 根节点名 → 页面名。
       // textAudit 是 DSL 的机械产物，属于可靠来源；缺省时不再静默落到画板框名，
@@ -1178,9 +1177,8 @@ function main() {
       templateMapPath ? ["--map", templateMapPath] : []));
     // 传入 DSL 快照：extractSvg 因几何完全相同的复用而漏条目时，图标生成器可从 DSL 合成补上；
     // discover 也用它给候选补台账提示（祖先朝向 bakeAncestorTransform）。
-    const iconDslPath = manifest.dslPath
-      ? resolveInput(manifestDir, projectRoot, manifest.dslPath, "dslPath")
-      : null;
+    // 同上：复用 dslInputPath，避免 dslPath 被解析三次。
+    const iconDslPath = dslInputPath;
     run(ICON_DISCOVERY_SCRIPT, [
       "--svg", svgPath,
       "--mapping", mappingPath,
