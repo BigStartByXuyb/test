@@ -8,6 +8,8 @@ scripts/gen-mw-wpf-page.js 用一个页面清单生成独立页面的固定 WPF 
 
 脚本同时将这些文件，以及清单中声明的 Icon Page 和页面 XML Content，补入目标旧式 .csproj。需要一次生成 XML、Icon、Layout、WPF 宿主和审计文件时，使用 scripts/gen-mastergo-page-bundle.js；页面 XML 的控件内容和 Icon Geometry 不在本脚本中猜测，分别由 IOContorl XML 和页面 Icon 生成器从 MasterGo DSL 发射。
 
+**code-behind 挂在同页 View.xaml 下**：注册 `.csproj` 时，`<Page>View.xaml` 与它的 `<Compile>View.xaml.cs` 写成一组嵌套条目——Compile 条目带 `<DependentUpon>View.xaml</DependentUpon>`，形态与在 Visual Studio 里把 `.xaml.cs` 拖到 `.xaml` 上之后 VS 写出的**完全一致**（Solution Explorer 里表现为 `View.xaml` 一个节点、展开出 `.xaml.cs`），不需要人工拖拽。ViewModel 没有 `.xaml` 主文件，仍发射平级 `<Compile Include="…" />`。只有 code-behind 恰好等于「View 路径 + `.cs`」时才写 `DependentUpon`；清单显式给出的 `viewPath`/`codeBehindPath` 不成对时不猜主文件。重新生成时，已存在的平级 `<Compile Include="…xaml.cs" />` 会被**就地升级**成该嵌套块（幂等：不新增、不重复）。
+
 **生成的 View 不合并页面 Icon 资源字典**：`<Page>View.xaml` 只由 `UserControl` 头 + `<Grid>` 里的 `uidesign:PageDesign` 组成，**不生成** `<UserControl.Resources><ResourceDictionary Source="/<程序集>;component/Resources/Pages/<页面名>/<页面名>Icons.xaml" /></UserControl.Resources>` 这一段。页面 Icon 文件本身仍照常生成，并按 Icon Page 注册进 `.csproj`；宿主脚本不写页面级资源合并声明。
 
 **脚本层面的精确事实与两路线的差异**：`scripts/gen-mw-wpf-page.js` 的 `renderView` **没有路线分支**——它对两条路线都恒不发射这段合并声明。因此：

@@ -2,6 +2,7 @@
 "use strict";
 
 // 生成一个独立 MW WPF 页面：View、code-behind、ViewModel，并注册到旧式 csproj。
+// code-behind 以 <DependentUpon> 挂在同页 View.xaml 下（等价于在 VS 里把 .xaml.cs 拖到 .xaml 上）。
 // 页面 XML 与 Icon Geometry 仍由各自生成器负责，本脚本只生成 WPF 宿主壳。
 
 const fs = require("fs");
@@ -162,7 +163,8 @@ function loadManifest(manifestPath) {
   const viewModelRelative = hostPaths.viewModelRelative;
   const files = [
     { kind: "Page", relative: viewRelative },
-    { kind: "Compile", relative: codeBehindRelative },
+    { kind: "Compile", relative: codeBehindRelative,
+      master: codeBehindMaster(viewRelative, codeBehindRelative) },
     { kind: "Compile", relative: viewModelRelative }
   ];
   if (iconPath) files.push({ kind: "Page", relative: iconPath });
@@ -379,7 +381,16 @@ function resolveButtonHandlers(manifest, buttonNames, viewModelName) {
   return { methods: methods, inlineTodoCases: inlineTodoCases };
 }
 
-function itemBlock(kind, include) {
+// code-behind 的嵌套主文件：只有 code-behind 恰好等于「View 路径 + .cs」时才挂到该 View 下。
+// 清单显式给了不成对的 viewPath/codeBehindPath 时不写 <DependentUpon>（不猜主文件）。
+function codeBehindMaster(viewRelative, codeBehindRelative) {
+  if (typeof viewRelative !== "string" || typeof codeBehindRelative !== "string") return null;
+  if (!/\.xaml$/i.test(viewRelative) || !/\.xaml\.cs$/i.test(codeBehindRelative)) return null;
+  if (codeBehindRelative !== viewRelative + ".cs") return null;
+  return viewRelative.slice(viewRelative.lastIndexOf("/") + 1);
+}
+
+function itemBlock(kind, include, master) {
   const escaped = xmlAttr(include);
   if (kind === "Page") {
     return [
@@ -389,6 +400,14 @@ function itemBlock(kind, include) {
       "    </Page>"
     ].join("\n");
   }
+  // 带主文件的 Compile 发射 VS 拖拽后写出的同款嵌套块（Solution Explorer 里挂在 .xaml 节点下）。
+  if (master) {
+    return [
+      "    <" + kind + " Include=\"" + escaped + "\">",
+      "      <DependentUpon>" + xmlAttr(master) + "</DependentUpon>",
+      "    </" + kind + ">"
+    ].join("\n");
+  }
   return "    <" + kind + " Include=\"" + escaped + "\" />";
 }
 
@@ -396,9 +415,38 @@ function regexEscape(value) {
   return value.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&");
 }
 
-function ensureItemInclude(text, kind, include) {
+// 定位已存在的条目并返回整段范围；自闭合条目只覆盖标签本身。
+function findItemElement(text, kind, include) {
   const escaped = regexEscape(xmlAttr(include));
+  const open = new RegExp("<" + kind + "\\s+Include=[\"']" + escaped + "[\"']\\s*(/?)>", "i");
+  const match = open.exec(text);
+  if (!match) return null;
+  if (match[1] === "/") {
+    return { start: match.index, end: match.index + match[0].length, nested: false, body: "" };
+  }
+  const closeTag = "</" + kind + ">";
+  const closeAt = text.toLowerCase().indexOf(closeTag.toLowerCase(), match.index + match[0].length);
+  if (closeAt < 0) return null;
+  return {
+    start: match.index,
+    end: closeAt + closeTag.length,
+    nested: true,
+    body: text.slice(match.index + match[0].length, closeAt)
+  };
+}
+
+function ensureItemInclude(text, kind, include, master) {
+  const escaped = regexEscape(xmlAttr(include));
+  const existing = findItemElement(text, kind, include);
+  if (existing) {
+    // 已有条目：带主文件时把「平级自闭合条目」就地升级成嵌套块；已挂好的原样返回（幂等）。
+    if (!master) return text;
+    if (existing.nested && /<DependentUpon>/i.test(existing.body)) return text;
+    return text.slice(0, existing.start) +
+      itemBlock(kind, include, master).replace(/^\s{4}/, "") + text.slice(existing.end);
+  }
   if (new RegExp("<" + kind + "\\s+Include=[\"']" + escaped + "[\"']", "i").test(text)) {
+    // 有条目但不是标准形态（带额外属性/跨行）：保持原样，不重复登记也不擅自改写。
     return text;
   }
   const groupRegex = /<ItemGroup>[\s\S]*?<\/ItemGroup>/gi;
@@ -407,7 +455,7 @@ function ensureItemInclude(text, kind, include) {
     if (!new RegExp("<" + kind + "\\s+Include=", "i").test(match[0])) continue;
     const block = match[0];
     const newlineAtEnd = block.lastIndexOf("\n");
-    const insertion = block.slice(0, newlineAtEnd) + "\n" + itemBlock(kind, include) +
+    const insertion = block.slice(0, newlineAtEnd) + "\n" + itemBlock(kind, include, master) +
       block.slice(newlineAtEnd);
     return text.slice(0, match.index) + insertion + text.slice(match.index + block.length);
   }
@@ -415,7 +463,7 @@ function ensureItemInclude(text, kind, include) {
   if (projectClose < 0) fail("csproj 缺少 </Project>");
   const prefix = text.slice(0, projectClose).replace(/\s*$/, "");
   const suffix = text.slice(prefix.length, projectClose);
-  const block = "\n  <ItemGroup>\n" + itemBlock(kind, include) + "\n  </ItemGroup>\n";
+  const block = "\n  <ItemGroup>\n" + itemBlock(kind, include, master) + "\n  </ItemGroup>\n";
   return prefix + suffix + block + text.slice(projectClose);
 }
 
@@ -451,10 +499,10 @@ function main() {
 
   let csproj = config.csprojText;
   const registered = config.files.map(function (file) {
-    return { kind: file.kind, include: projectInclude(file.relative) };
+    return { kind: file.kind, include: projectInclude(file.relative), master: file.master || null };
   });
   registered.forEach(function (item) {
-    csproj = ensureItemInclude(csproj, item.kind, item.include);
+    csproj = ensureItemInclude(csproj, item.kind, item.include, item.master);
   });
   if (csproj !== config.csprojText) {
     if (args.overwrite) backups.push(backupFile(config.csprojPath));

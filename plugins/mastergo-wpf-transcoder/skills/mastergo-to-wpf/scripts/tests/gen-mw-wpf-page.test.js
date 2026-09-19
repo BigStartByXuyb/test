@@ -107,7 +107,12 @@ assert.strictEqual(handlerCount, methodListCount,
   '一个按钮一个方法：发射的方法数量必须与审计列出的按钮方法一致');
 
 let csproj = fs.readFileSync(csprojPath, 'utf8');
-assert.match(csproj, /<Compile Include="UI\\F2-Teach\\View\\F2NewOperationView\.xaml\.cs"\s*\/>/);
+// View 的 code-behind 必须挂在同页 View.xaml 下（VS 拖拽 .xaml.cs 到 .xaml 上生成的同款形态）。
+assert.match(csproj,
+  /<Compile Include="UI\\F2-Teach\\View\\F2NewOperationView\.xaml\.cs">\s*<DependentUpon>F2NewOperationView\.xaml<\/DependentUpon>\s*<\/Compile>/);
+assert.ok(!/<Compile Include="UI\\F2-Teach\\View\\F2NewOperationView\.xaml\.cs"\s*\/>/.test(csproj),
+  'code-behind 不得以平级自闭合条目登记');
+// ViewModel 没有对应的 .xaml 主文件：保持平级 Compile。
 assert.match(csproj, /<Compile Include="UI\\F2-Teach\\ViewModel\\F2NewOperationViewModel\.cs"\s*\/>/);
 assert.match(csproj, /<Page Include="UI\\F2-Teach\\View\\F2NewOperationView\.xaml">/);
 assert.match(csproj, /<Page Include="Resources\\Pages\\F2NewOperation\\F2NewOperationIcons\.xaml">/);
@@ -150,6 +155,14 @@ fs.writeFileSync(manifestPath, JSON.stringify({
 result = spawnSync(process.execPath, [script, '--manifest', manifestPath, '--overwrite'], { encoding: 'utf8' });
 assert.strictEqual(result.status, 0, result.stderr);
 assert.match(result.stdout, /\.bak-/);
+// 幂等：重复登记不得再插一条，嵌套块只允许出现一次。
+csproj = fs.readFileSync(csprojPath, 'utf8');
+assert.strictEqual(
+  (csproj.match(/<Compile Include="UI\\F2-Teach\\View\\F2NewOperationView\.xaml\.cs">/g) || []).length, 1,
+  'code-behind 嵌套块必须唯一');
+assert.strictEqual(
+  (csproj.match(/<DependentUpon>F2NewOperationView\.xaml<\/DependentUpon>/g) || []).length, 1,
+  'DependentUpon 必须唯一');
 
 const fallbackRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'mw-wpf-pages-fallback-'));
 const fallbackCsproj = path.join(fallbackRoot, 'Fallback.csproj');
@@ -197,5 +210,38 @@ clash = spawnSync(process.execPath, [script, '--manifest',
   ])], { encoding: 'utf8' });
 assert.notStrictEqual(clash.status, 0, '两个按钮算出同一方法名必须直接失败');
 assert.match(clash.stderr, /同一个处理方法名/);
+
+// 老项目重跑：已存在的平级 code-behind 条目必须被就地升级成嵌套块（不新增、不重复）。
+const upgradeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'mw-wpf-page-upgrade-'));
+fs.writeFileSync(path.join(upgradeRoot, 'Up.Pages.csproj'),
+  '<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">\n' +
+  '  <PropertyGroup><RootNamespace>Up.Pages</RootNamespace></PropertyGroup>\n' +
+  '  <ItemGroup>\n' +
+  '    <Compile Include="UI\\F2\\View\\UpView.xaml.cs" />\n' +
+  '  </ItemGroup>\n' +
+  '  <ItemGroup>\n' +
+  '    <Page Include="UI\\F2\\View\\UpView.xaml">\n' +
+  '      <Generator>MSBuild:Compile</Generator>\n' +
+  '      <SubType>Designer</SubType>\n' +
+  '    </Page>\n' +
+  '  </ItemGroup>\n' +
+  '</Project>\n', 'utf8');
+const upgradeManifest = path.join(upgradeRoot, 'page.json');
+fs.writeFileSync(upgradeManifest, JSON.stringify({
+  projectRoot: upgradeRoot,
+  csproj: 'Up.Pages.csproj',
+  area: 'F2',
+  pageName: 'Up',
+  includeIcon: false
+}, null, 2), 'utf8');
+const upgrade = spawnSync(process.execPath, [script, '--manifest', upgradeManifest], { encoding: 'utf8' });
+assert.strictEqual(upgrade.status, 0, upgrade.stderr);
+const upgraded = fs.readFileSync(path.join(upgradeRoot, 'Up.Pages.csproj'), 'utf8');
+assert.strictEqual((upgraded.match(/<Compile Include="UI\\F2\\View\\UpView\.xaml\.cs"/g) || []).length, 1,
+  '平级 code-behind 条目应被就地升级，不得重复登记');
+assert.match(upgraded,
+  /<Compile Include="UI\\F2\\View\\UpView\.xaml\.cs">\s*<DependentUpon>UpView\.xaml<\/DependentUpon>\s*<\/Compile>/);
+assert.ok(!/<Compile Include="UI\\F2\\View\\UpView\.xaml\.cs"\s*\/>/.test(upgraded),
+  '升级后不得残留平级自闭合条目');
 
 console.log('PASS MW WPF page generator regression test');
