@@ -809,7 +809,9 @@ function bundleFileRegistry(info, options) {
   // 已经是项目相对路径的条目（如语言文件）直接登记，不能再过 projectRelative。
   function pushRelative(relativePath, kind) {
     if (!relativePath) return null;
-    const normalized = String(relativePath).split(path.sep).join("/");
+    // 归一成 / 分隔：projectRelative 与本脚本生成的路径都已是 /，这里再兜一次反斜杠输入
+    // （清单里手写的 `Resources\Pages\...` 不会被 path.sep 切分，只会漏掉归一）。
+    const normalized = String(relativePath).replace(/\\/g, "/");
     if (seen.has(normalized)) return null;
     seen.add(normalized);
     const entry = { path: normalized, kind: kind };
