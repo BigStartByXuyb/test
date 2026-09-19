@@ -242,20 +242,20 @@ Style 与内部组件对照（只对下表列出的真实值成立）：
 固定节点：一个 IconButton IOContorl；ControlType 固定为 IconButton；节点数量、父子关系和槽位顺序与右栏聚合模板一致；Style 固定为 `EnterButtonStyle`；`IsSave` 固定为 `"true"`；`Icon` 固定为 `EnterGeometry`（**运行时提供**，本页不生成该 Geometry）；语言键固定为 `{page}Enter`。
 
 ```xml
-<IOContorl ID="{id}" ControlType="IconButton" Style="EnterButtonStyle" Icon="EnterGeometry" IconWidth="{icon_width}" IconHeight="{icon_height}" TopLeftContent="" Value="{value}" LangName="{page}Enter" PageName="" IOCommand="" IOVisible="" IOEnable="" IsSave="true" Width="{width}" Height="{height}" Left="{left}" Top="{top}" />
+<IOContorl ID="{id}" ControlType="IconButton" Style="EnterButtonStyle" Icon="EnterGeometry" TopLeftContent="" Value="{value}" LangName="{page}Enter" PageName="" IOCommand="" IsSave="true" Width="{width}" Height="{height}" IconWidth="{icon_width}" IconHeight="{icon_height}" Left="{left}" Top="{top}" />
 ```
 
-字段来源：`Left`/`Top`/`Width`/`Height` 取设计稿 bbox（`Top = pageAbsY − 192`）；文案取设计文本 → `Value`；`IconWidth`/`IconHeight` 取该实例子树里**唯一 PATH** 的 bbox 四舍五入（多个 PATH 直接失败，要求设计侧消歧；登记台账对该变体无效，禁止猜尺寸）——本变体的台账条目**不存在也不需要**，Bundle 会把命中该 owner 的台账条目剔除并记入 `runtimeIcons` 审计；`Style`/`Icon`/`IsSave`/`LangName` 全部由映射表登记，设计稿不参与取自。
+字段来源：`Left`/`Top`/`Width`/`Height` 取设计稿 bbox（`Top = pageAbsY − 192`）；文案取设计文本 → `Value`；`IconWidth`/`IconHeight` 取该实例子树里**唯一 PATH** 的 bbox 四舍五入（多个 PATH 直接失败，要求设计侧消歧；登记台账对该变体无效，禁止猜尺寸）——本变体的台账条目**不存在也不需要**，Bundle 会把命中该 owner 的台账条目剔除并记入 `runtimeIcons` 审计；`Style`/`Icon`/`IsSave`/`LangName` 全部由映射表登记，设计稿不参与取自。本变体登记 `omitRequiredAttrs`（见公共口径），因此**不发射** `IOVisible`/`IOEnable`/`IsShowStatus`/`IsNeedRedMark`；`IOCommand` 仍按必写字段发空串占位。
 
 ### 固定模板：按钮类型=exit
 
 固定节点：一个 IconButton IOContorl；ControlType 固定为 IconButton；节点数量、父子关系和槽位顺序与右栏聚合模板一致；Style 固定为 `ExitButtonStyle`；`PageName` 固定为 `"GoBack"`；`Icon` 固定为 `ExitGeometry`（**运行时提供**，本页不生成该 Geometry）；语言键固定为 `{page}Exit`。
 
 ```xml
-<IOContorl ID="{id}" ControlType="IconButton" Style="ExitButtonStyle" Icon="ExitGeometry" IconWidth="{icon_width}" IconHeight="{icon_height}" TopLeftContent="" Value="{value}" LangName="{page}Exit" PageName="GoBack" IOCommand="" IOVisible="" IOEnable="" Width="{width}" Height="{height}" Left="{left}" Top="{top}" />
+<IOContorl ID="{id}" ControlType="IconButton" Style="ExitButtonStyle" Icon="ExitGeometry" TopLeftContent="" Value="{value}" LangName="{page}Exit" PageName="GoBack" IOCommand="" Width="{width}" Height="{height}" IconWidth="{icon_width}" IconHeight="{icon_height}" Left="{left}" Top="{top}" />
 ```
 
-字段来源：与 `enter` 同口径（几何取设计稿、文案取设计文本 → `Value`、图标尺寸取实例子树唯一 PATH 的 bbox）；`Style`/`Icon`/`PageName`/`LangName` 由映射表登记。
+字段来源：与 `enter` 同口径（几何取设计稿、文案取设计文本 → `Value`、图标尺寸取实例子树唯一 PATH 的 bbox）；`Style`/`Icon`/`PageName`/`LangName` 由映射表登记；与 `enter` 同样登记 `omitRequiredAttrs`，**不发射** `IOVisible`/`IOEnable`/`IsShowStatus`/`IsNeedRedMark`。
 
 ### 组件级固定变体的公共口径（enter / exit 共用）
 
@@ -263,6 +263,7 @@ Style 与内部组件对照（只对下表列出的真实值成立）：
 
 - **`iconPolicy: "runtime"` + `runtimeIcon`**：`Icon` 是目标项目已存在的资源键，**本页 Icon 文件不生成该 Geometry**，本页台账也没有该条目（有也会被 Bundle 剔除）。`IconWidth`/`IconHeight` 取该实例子树里唯一 PATH 的 bbox（设计稿图标区域尺寸；多个 PATH 直接失败）。引用运行时图标的节点不判为“引用了未生成的 Geometry”，被剔除的台账条目记在 bundle 审计 `runtimeIcons`。
 - **`fixedAttrs`**：逐变体固定属性，生成时逐字发射；设计稿不覆盖这些属性，也不参与它们的取值。
+- **`omitRequiredAttrs`**：逐变体收窄必写字段——登记在这里的属性**不发射**（`controlTypeRequiredAttrs` 与 `buttonFamily.alwaysWrittenAttrs` 仍是唯一真值源，本字段只做本变体的减法）。解析器把它盖成节点标记 `omitAttrs`，`gen-iocontrol-xml.js` 与 `validate-iocontrol-provenance.js` 共用 `scripts/lib/script-helpers.js` 的 `omittedAttrs()` 判据：生成器跳过发射，校验器同步跳过「必须存在」的检查。未登记的变体不受影响。
 - **`langPolicy: "fixed"` + `langKeyTemplate` + `langText`**：语言键由映射表登记，`{page}` 由语言派生器按当前页面名替换，**不从设计文本派生、也不依赖设计文本存在**（设计文本缺失时仍按 `langText` 产键）；词典 CN/EN 取 `langText`。多页共用同一条登记，key 各自带页面名前缀。
 - **作用范围**：只有登记了上述字段的变体才走固定路径；未登记的右栏变体，其 `Style`、图标生成和语言键派生行为与登记前完全一致。
 

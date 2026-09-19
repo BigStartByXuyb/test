@@ -13,7 +13,7 @@ const fs = require('fs');
 const MAP_RULES = require('./lib/iocontrol-map-rules');
 // 数值解析的唯一实现（见 scripts/lib/script-helpers.js；本校验器与坐标核对器共用同一口径）。
 // 文案比对归一（解码字符引用 + 换行归一成 LF）的唯一实现，见 scripts/lib/script-helpers.js。
-const { numberOrNull: num, normalizeForCompare } = require('./lib/script-helpers');
+const { numberOrNull: num, normalizeForCompare, omittedAttrs } = require('./lib/script-helpers');
 
 // 按钮族固定参数：真值来源为模板表 mtslg-iocontrol-map.json 的 buttonFamily；
 // 传入 --map 时读取该表，未传入或表缺字段时退回内置默认（与表内容一致）。
@@ -334,9 +334,13 @@ function validate(xmlPath, manifestPath, options) {
     }
     const controlType = x.ControlType || n.controlType || (n.attrs && n.attrs.ControlType);
     const requiredAttrs = REQUIRED_ATTRS_BY_CONTROL_TYPE[controlType];
+    // 变体登记 omitRequiredAttrs 的节点（如右栏 enter/exit）：被收窄的必写字段不发射，
+    // 因此这里也不要求它们存在。判据与生成器共用 scripts/lib/script-helpers.js 的 omittedAttrs。
+    const omitted = omittedAttrs(n);
     // 表格列定义的字段集来自映射表 columnTemplate（列结构，不是页面控件），不套 controlTypeRequiredAttrs。
     if (!isTableColumn && Array.isArray(requiredAttrs)) {
       for (const attr of requiredAttrs) {
+        if (omitted.has(attr)) continue;
         // LangName 例外：动态值等 noLangRefs 豁免节点不挂 LangName，也不写空占位。
         if (attr === 'LangName') continue;
         if (x[attr] === undefined) {
@@ -346,6 +350,7 @@ function validate(xmlPath, manifestPath, options) {
     }
     if (BUTTON_FAMILY_CONTROL_TYPES.includes(controlType)) {
       for (const attr of BUTTON_ALWAYS_ATTRS) {
+        if (omitted.has(attr)) continue;
         if (x[attr] === undefined) errors.push('[' + n.xmlId + '] 按钮族缺少必写属性 ' + attr);
       }
       // 图标字段判据与生成器保持一致：先看该 ControlType 的模板是否含图标字段；

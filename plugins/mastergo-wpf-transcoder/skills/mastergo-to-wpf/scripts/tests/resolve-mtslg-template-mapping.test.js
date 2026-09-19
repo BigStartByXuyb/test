@@ -158,6 +158,8 @@ for (const [variant, style, icon] of [
     "固定变体必须登记页面级语言键模板: " + variant);
   assert.ok(entry.langText && entry.langText.CN && entry.langText.EN, "固定变体必须登记 CN/EN 文案: " + variant);
   assert.ok(entry.fixedAttrs && typeof entry.fixedAttrs === "object", "固定变体必须登记逐变体固定属性: " + variant);
+  assert.deepStrictEqual(entry.omitRequiredAttrs, ["IOVisible", "IOEnable", "IsShowStatus", "IsNeedRedMark"],
+    "固定变体必须登记收窄掉的必写字段: " + variant);
   assert.strictEqual(entry.slots[0].style, style, "固定变体槽位 Style 必须与变体一致: " + variant);
   assert.strictEqual(entry.slots[0].iconPolicy, "runtime", "固定变体槽位 iconPolicy 必须与变体一致: " + variant);
   assert.strictEqual(entry.slots[0].runtimeIcon, icon, "固定变体槽位 runtimeIcon 必须与变体一致: " + variant);
@@ -364,6 +366,8 @@ assert.strictEqual(resolvedRightEnter.nodes[0].attrs.IsSave, "true");
 assert.strictEqual(resolvedRightEnter.nodes[0].attrs.Icon, "EnterGeometry");
 assert.strictEqual(resolvedRightEnter.nodes[0].runtimeIcon, "EnterGeometry");
 assert.strictEqual(resolvedRightEnter.nodes[0].fixedLang.keyTemplate, "{page}Enter");
+assert.deepStrictEqual(resolvedRightEnter.nodes[0].omitAttrs, ["IOVisible", "IOEnable", "IsShowStatus", "IsNeedRedMark"],
+  "解析器必须把变体登记的 omitRequiredAttrs 盖成节点标记");
 
 // 运行时图标变体不得要求台账里有图标来源：页面台账本来就不该有这两条（由目标项目提供），
 // iconRequired 只对「从 DSL/台账取图标」的变体生效。

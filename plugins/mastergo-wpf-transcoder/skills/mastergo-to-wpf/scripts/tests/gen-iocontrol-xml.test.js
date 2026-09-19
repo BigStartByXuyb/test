@@ -634,3 +634,44 @@ assert.match(columnTag, /IOName=""/, '列定义必须恒写 IOName 空占位');
 assert.ok(!columnTag.includes('FontSize='), '列定义不套页面控件的必写字段集');
 
 console.log('PASS table column definition (DataGrid columns) regression test');
+
+// ---- 变体登记 omitRequiredAttrs：被收窄的必写字段不发射（右栏 enter/exit 用这条） ----
+const omitMap = path.join(__dirname, '..', '..', 'references', 'adapters', 'mtslg-iocontrol', 'mtslg-iocontrol-map.json');
+const omitMapping = path.join(dir, 'omit-attrs-mapping.json');
+const omitOutput = path.join(dir, 'omit-attrs-page.xml');
+fs.writeFileSync(omitMapping, JSON.stringify({
+  rootRef: 'root',
+  contentOriginY: 192,
+  sourceNodes: [
+    { ref: 'root', parentRef: null, pageAbsX: 0, pageAbsY: 0, relativeX: 0, relativeY: 0, width: 1280, height: 1024 },
+    { ref: 'right/enter', parentRef: 'root', pageAbsX: 1090, pageAbsY: 606, relativeX: 1090, relativeY: 606, width: 170, height: 80 },
+    { ref: 'right/enter/icon', parentRef: 'right/enter', pageAbsX: 1112, pageAbsY: 629, relativeX: 22, relativeY: 23, width: 34.677, height: 33.009 }
+  ],
+  nodes: [{
+    ref: 'right/enter', sourceRef: 'right/enter', sourceParent: 'root', id: 'MG_ENT', xmlId: 'MG_ENT',
+    controlType: 'IconButton', parent: null, layoutParent: null, absX: 1090, absY: 606, w: 170, h: 80,
+    expectedLeft: 1090, expectedTop: 414, expectedWidth: 170, expectedHeight: 80,
+    widthSource: 'dsl.bbox', heightSource: 'dsl.bbox',
+    // 解析器（resolve-mtslg-template-mapping.js）按变体登记盖上的收窄标记
+    omitAttrs: ['IOVisible', 'IOEnable', 'IsShowStatus', 'IsNeedRedMark'],
+    iconSize: { width: 34.677, height: 33.009, sourceRef: 'right/enter/icon' },
+    attrs: { Style: 'EnterButtonStyle', Icon: 'EnterGeometry', Value: 'ENTER', LangName: 'DemoEnter', PageName: '', IsSave: 'true' }
+  }]
+}, null, 2));
+const omitResult = spawnSync(process.execPath, [
+  path.join(__dirname, '..', 'gen-iocontrol-xml.js'), '--fresh', omitMapping, '--out', omitOutput, '--map', omitMap
+], { encoding: 'utf8' });
+assert.strictEqual(omitResult.status, 0, omitResult.stderr);
+const omitXml = fs.readFileSync(omitOutput, 'utf8');
+const omitTag = (omitXml.match(/<IOContorl[^>]*ID="MG_ENT"[\s\S]*?\/>/) || [''])[0];
+assert.ok(omitTag, '必须发射该按钮节点');
+for (const attr of ['IOVisible', 'IOEnable', 'IsShowStatus', 'IsNeedRedMark']) {
+  assert.ok(!omitTag.includes(attr + '='), 'omitRequiredAttrs 登记的 ' + attr + ' 不得发射');
+}
+assert.match(omitTag, /IOCommand=""/, '未登记的必写字段仍须空串占位');
+assert.match(omitTag, /Style="EnterButtonStyle"/);
+assert.match(omitTag, /IsSave="true"/, 'fixedAttrs 仍须发射');
+assert.match(omitTag, /IconWidth="35"/, '图标尺寸仍按 bbox 四舍五入发射');
+assert.match(omitTag, /IconHeight="33"/);
+
+console.log('PASS variant omitRequiredAttrs narrowing regression test');

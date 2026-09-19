@@ -121,6 +121,14 @@ function backupFile(filePath) {
   return backup;
 }
 
+// 变体登记 omitRequiredAttrs 的节点：这些必写字段一律不发射、也不参与校验。
+// 唯一真值源是映射表的变体登记（解析器把它盖成节点上的 omitAttrs）；生成器与校验器共用本实现。
+function omittedAttrs(node) {
+  const list = node && node.omitAttrs;
+  if (!Array.isArray(list)) return new Set();
+  return new Set(list.map(function (name) { return String(name).trim(); }).filter(Boolean));
+}
+
 module.exports = {
   fail: fail,
   failWithPrefix: failWithPrefix,
@@ -135,5 +143,6 @@ module.exports = {
   normalizeToken: normalizeToken,
   numberOrNull: numberOrNull,
   readJson: readJson,
+  omittedAttrs: omittedAttrs,
   backupFile: backupFile
 };

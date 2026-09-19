@@ -766,6 +766,12 @@
         "fixedAttrs": {
           "IsSave": "true"
         },
+        "omitRequiredAttrs": [
+          "IOVisible",
+          "IOEnable",
+          "IsShowStatus",
+          "IsNeedRedMark"
+        ],
         "langPolicy": "fixed",
         "langKeyTemplate": "{page}Enter",
         "langText": {
@@ -793,6 +799,12 @@
         "fixedAttrs": {
           "PageName": "GoBack"
         },
+        "omitRequiredAttrs": [
+          "IOVisible",
+          "IOEnable",
+          "IsShowStatus",
+          "IsNeedRedMark"
+        ],
         "langPolicy": "fixed",
         "langKeyTemplate": "{page}Exit",
         "langText": {

@@ -185,6 +185,19 @@ function validateInstance(instance, spec, mapping, sourceMap, nodeMap, usedSourc
     if (spec.fixedAttrs && typeof spec.fixedAttrs === "object" && !Array.isArray(spec.fixedAttrs)) {
       for (const [attrName, attrValue] of Object.entries(spec.fixedAttrs)) targetAttrs[attrName] = attrValue;
     }
+    // 必写字段收窄：变体登记 omitRequiredAttrs 时这些字段不发射——生成器与校验器按同一个
+    // 节点标记跳过（不是删模板真值源，只对本变体生效）。
+    if (spec.omitRequiredAttrs !== undefined) {
+      if (!Array.isArray(spec.omitRequiredAttrs) || spec.omitRequiredAttrs.length === 0) {
+        fail("固定变体 omitRequiredAttrs 必须是非空字符串数组: " + variant);
+      }
+      const omitted = spec.omitRequiredAttrs.map(String).map(function (name) { return name.trim(); });
+      if (omitted.some(function (name) { return name === ""; })) {
+        fail("固定变体 omitRequiredAttrs 含空项: " + variant);
+      }
+      node.omitAttrs = omitted;
+      for (const name of omitted) delete targetAttrs[name];
+    }
     if (spec.langPolicy === "fixed") {
       if (typeof spec.langKeyTemplate !== "string" || spec.langKeyTemplate === "") {
         fail("固定变体 langPolicy=fixed 缺少 langKeyTemplate: " + variant);

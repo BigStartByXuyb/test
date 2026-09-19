@@ -63,7 +63,7 @@ const { validateTextAudit } = require('./validate-iocontrol-provenance');
 // 模板表规则块的解析唯一实现（见 scripts/lib/iocontrol-map-rules.js；禁止在本脚本再抄一份）。
 const MAP_RULES = require('./lib/iocontrol-map-rules');
 // XML 属性转义（含换行 → &#x0a;）的唯一实现（见 scripts/lib/script-helpers.js；禁止在本脚本再抄一份）。
-const { xmlAttr, normalizeForCompare } = require('./lib/script-helpers');
+const { xmlAttr, normalizeForCompare, omittedAttrs } = require('./lib/script-helpers');
 
 // ---------- 参数 ----------
 function usage() {
@@ -257,9 +257,12 @@ function assertButtonFamilyIconSize(node) {
 // 就地补齐按钮族固定参数。
 function applyButtonFamilyAttrs(node, attrMap) {
   if (!isButtonFamily(node)) return;
+  const omitted = omittedAttrs(node);
   for (const key of BUTTON_ALWAYS_ATTRS) {
+    if (omitted.has(key)) continue;                 // 变体登记 omitRequiredAttrs：该字段不发射
     if (attrMap[key] === undefined || attrMap[key] === null) attrMap[key] = '';
   }
+  for (const key of omitted) delete attrMap[key];    // 映射里残留的同名字段同样不发射
   const type = node.controlType || (node.attrs && node.attrs.ControlType);
   const required = REQUIRED_ATTRS_BY_CONTROL_TYPE[type] || [];
   // 该 ControlType 的模板是否含图标字段：Button / StatusButton 的模板不含，恒不发射这三项。
@@ -294,7 +297,9 @@ function applyRequiredAttrs(node, attrMap) {
   const required = REQUIRED_ATTRS_BY_CONTROL_TYPE[type];
   if (!Array.isArray(required)) return;
   const defaults = DEFAULT_ATTRS_BY_CONTROL_TYPE[type] || {};
+  const omitted = omittedAttrs(node);
   for (const key of required) {
+    if (omitted.has(key)) continue;                 // 变体登记 omitRequiredAttrs：该字段不发射
     // LangName 例外：只有多语言绑定层给出真实 key 时才挂，动态值等豁免节点不写空占位。
     if (key === 'LangName') continue;
     if (attrMap[key] === undefined || attrMap[key] === null) {
