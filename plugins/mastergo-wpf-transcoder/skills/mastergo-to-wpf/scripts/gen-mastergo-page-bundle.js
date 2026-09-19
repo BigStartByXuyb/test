@@ -827,21 +827,27 @@ function bundleGeneratedPaths(info) {
 function bundleFileRegistry(info, options) {
   const entries = [];
   const seen = new Set();
-  function push(filePath, kind) {
-    if (!filePath) return null;
-    const relative = projectRelative(info.projectRoot, filePath);
-    if (seen.has(relative)) return null;
-    seen.add(relative);
-    const entry = { path: relative, kind: kind };
+  // 已经是项目相对路径的条目（如语言文件）直接登记，不能再过 projectRelative。
+  function pushRelative(relativePath, kind) {
+    if (!relativePath) return null;
+    const normalized = String(relativePath).split(path.sep).join("/");
+    if (seen.has(normalized)) return null;
+    seen.add(normalized);
+    const entry = { path: normalized, kind: kind };
     entries.push(entry);
     return entry;
+  }
+  function push(filePath, kind) {
+    if (!filePath) return null;
+    return pushRelative(projectRelative(info.projectRoot, filePath), kind);
   }
   const hostPaths = info.hostPaths || [];
   [info.pageXmlPath, info.iconPath, info.layoutPath, info.csprojPath]
     .concat(hostPaths)
-    .concat(info.langPaths || [])
     .concat(info.scaffold && info.frameworkConfigPath ? [info.frameworkConfigPath] : [])
     .forEach(function (filePath) { push(filePath, "project"); });
+  // 语言文件在清单里本来就是项目相对路径，必须原样登记（过 projectRelative 会按 CWD 解析出错路径）。
+  (info.langPaths || []).forEach(function (relativePath) { pushRelative(relativePath, "project"); });
   // View 的 code-behind 在 .csproj 里以 <DependentUpon> 挂在同页 View.xaml 下，登记时标出该归属关系。
   if (hostPaths[0] && hostPaths[1]) {
     const master = projectRelative(info.projectRoot, hostPaths[0]);

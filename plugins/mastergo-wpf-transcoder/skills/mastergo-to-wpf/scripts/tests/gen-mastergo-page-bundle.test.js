@@ -221,6 +221,16 @@ assert.strictEqual(codeBehindEntry.dependsOn, "UI/F2-Teach/View/F2NewPageView.xa
 assert.strictEqual(
   bundleAudit.files.find(function (entry) { return entry.path === "Generated/F2NewPage.mapping.json"; }).kind,
   "audit", "mapping 属于交付证据，登记为 audit");
+// 语言文件是项目文件，且必须按项目相对路径原样登记（不得被解析成 ../ 之类的越界路径）。
+const langEntries = bundleAudit.files.filter(function (entry) {
+  return /F2NewPage_(CN|EN)\.xaml$/.test(entry.path);
+});
+assert.strictEqual(langEntries.length, 2, "语言文件必须登记进统一登记表");
+langEntries.forEach(function (entry) {
+  assert.strictEqual(entry.kind, "project");
+  assert.strictEqual(entry.path, "Resources/Pages/F2NewPage/" + entry.path.split("/").pop(),
+    "语言文件必须登记为项目相对路径");
+});
 // work 类：登记 + 收尾删除；输入快照保留在审计里，所以删掉 _work 不会丢本次运行的输入。
 const workEntry = bundleAudit.files.find(function (entry) { return entry.path === "Generated/_work/F2NewPage.bundle.json"; });
 assert.ok(workEntry, "_work 下的中间文件必须登记");
