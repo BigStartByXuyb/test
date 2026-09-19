@@ -688,9 +688,11 @@ assert.ok(modeDoc.includes("压成空格会让两行文案退化成一行"),
   // styleInsets 的表头注释必须区分"发射值"与"查表键"。
   assert.ok(/contentInsetStyle/.test(infoGroup.styleInsetsNote || ""),
     "styleInsetsNote 必须说明 contentInsetStyle 是原点查表键");
-  // TD-065 的落点必须写成插件根相对全路径：只写 05-best-practices/... 从映射表目录解析不到。
-  assert.ok(/references\/adapters\/mw-wpf\/framework-manual\/05-best-practices\/pending-confirmations\.md/.test(infoGroup.styleInsetsNote || ""),
-    "styleInsetsNote 里 TD-065 的落点路径必须是插件根相对全路径");
+  // 「空 Style 时原点 = {1,35}」是项目框架侧的确定口径，不是待确认项：全仓不得再出现 TD-065。
+  assert.ok(!/TD-065/.test(infoGroup.styleInsetsNote || ""),
+    "styleInsetsNote 不得把确定口径挂成待确认项（不得出现 TD-065）");
+  assert.ok(/确定口径/.test(infoGroup.styleInsetsNote || ""),
+    "styleInsetsNote 必须写明这是项目框架侧的确定口径");
   // _meta 级的泛化句必须带容器内容区原点的例外，否则读者会按"父容器左上角"直接相减。
   const metaNotes = (map._meta && Array.isArray(map._meta.note) ? map._meta.note : []).join("\n");
   assert.ok(/内容区原点|contentInsetStyle|styleInsets/.test(metaNotes),
@@ -707,29 +709,28 @@ assert.ok(modeDoc.includes("压成空格会让两行文案退化成一行"),
   assert.ok(feishuSection.length > 0, "feishu 组件库文档必须保留「组件父子相对坐标」小节");
   assert.ok(/内容区原点/.test(feishuSection) && /contentInsetStyle/.test(feishuSection),
     "「组件父子相对坐标」小节必须带容器内容区原点例外（且写明 contentInsetStyle 查表键）");
-  // 作业 A 的框架手册必须标明"不作为作业 B 运行期口径依据"、指向正确小节，并登记待确认项。
+  // 作业 A 的框架手册必须标明"不作为作业 B 运行期口径依据"并指向正确小节，且不得把它写成待确认项。
   for (const manual of ["io/io-group-box.md", "native/group-box.md"]) {
     const text = fs.readFileSync(path.join(__dirname, "..", "..", "references", "adapters", "mw-wpf", "framework-manual", "02-controls", manual), "utf8");
     assert.ok(/不作为作业 B/.test(text),
       "framework-manual/02-controls/" + manual + " 必须标明不作为作业 B 运行期口径依据");
     assert.ok(/第 3 节（坐标规则）/.test(text),
       "framework-manual/02-controls/" + manual + " 必须指向 mtslg-mode.md 第 3 节（坐标规则）");
-    assert.ok(/TD-065/.test(text),
-      "framework-manual/02-controls/" + manual + " 必须登记 TD-065（空 Style 隐式默认样式几何待确认）");
+    assert.ok(!/TD-065/.test(text),
+      "framework-manual/02-controls/" + manual + " 不得把该确定口径挂成待确认项");
   }
   // map._meta.note 的交叉引用同样必须指到第 3 节。
   assert.ok(/第 3 节（坐标规则）/.test(metaNotes), "map._meta.note 的交叉引用必须指向 mtslg-mode.md 第 3 节");
-  // mtslg-mode 第 3 节必须写明口径来源与待确认项。
-  assert.ok(/TD-065/.test(modeDoc), "mtslg-mode.md 必须登记 TD-065（空 Style 隐式默认样式几何待确认）");
-  // 台账与 guide 自称"一一对应"：新增 TD-065 必须两处都在，且证据行号指向 ContentGroupBoxStyle 行。
+  // mtslg-mode 第 3 节必须写明这是项目框架侧的确定口径，不是待确认项。
+  assert.ok(/确定口径/.test(modeDoc), "mtslg-mode.md 必须写明该口径是项目框架侧的确定口径");
+  assert.ok(!/TD-065/.test(modeDoc), "mtslg-mode.md 不得把该确定口径挂成待确认项");
+  // 台账与 guide 都不得出现 TD-065：它描述的是既定事实，不属于"待框架确认"那一类。
   const manualDir = path.join(__dirname, "..", "..", "references", "adapters", "mw-wpf", "framework-manual", "05-best-practices");
   const ledger = fs.readFileSync(path.join(manualDir, "pending-confirmations.md"), "utf8");
   const guide = fs.readFileSync(path.join(manualDir, "pending-confirmations-guide.md"), "utf8");
-  assert.ok(/TD-065/.test(ledger), "pending-confirmations.md 必须登记 TD-065");
-  assert.ok(/TD-065/.test(guide), "pending-confirmations-guide.md 必须与台账一一对应，补入 TD-065");
-  const td065Row = (ledger.match(/^\| TD-065 \|.*$/m) || [""])[0];
-  assert.ok(/io-group-box\.md:46\/47/.test(td065Row),
-    "TD-065 的证据行号必须指向 io-group-box.md 的 ContentGroupBoxStyle 行与隐式默认样式行（46/47）");
+  assert.ok(!/TD-065/.test(ledger), "pending-confirmations.md 不得登记 TD-065（该口径是确定事实）");
+  assert.ok(!/TD-065/.test(guide), "pending-confirmations-guide.md 不得登记 TD-065（该口径是确定事实）");
+  assert.ok(/TD-047~064/.test(guide), "guide 第六节的编号区间必须回到 TD-047~064");
   // 生成器只认 contentInsetStyle：不得保留"用非空 style 当查表键"的回退。
   const mappingGenerator = fs.readFileSync(
     path.join(__dirname, "..", "gen-mtslg-mapping-from-dsl.js"), "utf8");

@@ -3,7 +3,7 @@
 
 # GroupBox（原生分组框·框架样式）
 
-> **适用范围**：本文属**作业 A（MW WPF / XAML 侧）**参考资料，描述 `TargetType=GroupBox` 的隐式 `Style` 解析，来自某次本地框架快照（版本可能过期）。**不作为作业 B（MTSLG IOContorl 页面 XML）运行期口径的依据**——作业 B 的 GroupBox `Style`（恒为空串）与内容区原点口径见 `mtslg-mode.md` **第 3 节（坐标规则）**与 `mtslg-iocontrol-map.json` 的 `infoGroupTemplates.styleInsets`；两者冲突时以后者为准。该口径依赖「空 `Style` 的隐式默认样式几何」，该项目侧确认项登记为 **TD-065**（见 `05-best-practices/pending-confirmations.md`）。
+> **适用范围**：本文属**作业 A（MW WPF / XAML 侧）**参考资料，描述 `TargetType=GroupBox` 的隐式 `Style` 解析，来自某次本地框架快照（版本可能过期）。**不作为作业 B（MTSLG IOContorl 页面 XML）运行期口径的依据**——作业 B 的 GroupBox `Style`（恒为空串）与内容区原点口径见 `mtslg-mode.md` **第 3 节（坐标规则）**与 `mtslg-iocontrol-map.json` 的 `infoGroupTemplates.styleInsets`；两者冲突时以后者为准（该口径是项目框架侧的确定事实：空 `Style` 的内容区原点就是 `IOGroupBoxSecondary` 的 `{left:1, top:35}`）。
 
 ## 1. 用途
 
