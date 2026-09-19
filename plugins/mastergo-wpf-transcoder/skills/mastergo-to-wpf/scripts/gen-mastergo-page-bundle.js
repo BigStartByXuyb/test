@@ -233,11 +233,13 @@ function copyLayoutOutput(source, target, overwrite, created, backups) {
   copyOutput(source, target, overwrite, created, backups, true);
 }
 
-function writeAuditOutput(target, content, overwrite, backups) {
+// alreadyBackedUp：调用方已提前备份过该文件（为了把这份备份也登记进统一文件登记表），
+// 此时不要再备份一次，否则同一秒内会多出一份重复副本。
+function writeAuditOutput(target, content, overwrite, backups, alreadyBackedUp) {
   fs.mkdirSync(path.dirname(target), { recursive: true });
   if (fs.existsSync(target)) {
     if (!overwrite) fail("审计文件已存在，未覆盖: " + target);
-    backups.push(backupFile(target));
+    if (!alreadyBackedUp) backups.push(backupFile(target));
   }
   fs.writeFileSync(target, content, "utf8");
 }
@@ -795,29 +797,6 @@ function validateBundleOutputs(info) {
   });
 }
 
-function bundleGeneratedPaths(info) {
-  const files = [
-    info.pageXmlPath,
-    info.iconPath,
-    info.hostPaths[0],
-    info.hostPaths[1],
-    info.hostPaths[2],
-    info.layoutPath,
-    info.mappingAudit,
-    info.iconMapAudit,
-    info.bundleAudit,
-    info.csprojPath
-  ];
-  if (info.scaffold) files.push(info.frameworkConfigPath);
-  if (info.langTranslationAudit) files.push(info.langTranslationAudit);
-  if (info.langGlossaryAudit) files.push(info.langGlossaryAudit);
-  if (info.nestingAudit) files.push(info.nestingAudit);
-  // 语言文件在清单里本来就是项目相对路径，不能再过 projectRelative（否则按 CWD 解析出错路径）。
-  return files.map(function (filePath) {
-    return projectRelative(info.projectRoot, filePath);
-  }).concat(info.langPaths || []);
-}
-
 // 统一文件登记：本次运行涉及的全部文件按 kind 分类，随笔写进 bundle 审计。
 // kind 口径（详见 references/adapters/mtslg-iocontrol/bundle-manifest.md「统一文件登记」）：
 //   project —— 项目产物（页面 XML / Icon / View 三件套 / Layout / 语言文件 / csproj / framework.config.json），永不清理；
@@ -839,7 +818,11 @@ function bundleFileRegistry(info, options) {
   }
   function push(filePath, kind) {
     if (!filePath) return null;
-    return pushRelative(projectRelative(info.projectRoot, filePath), kind);
+    // 只登记项目内的文件；清单里指向项目外的输入（如放在别处的 DSL 快照）不属于项目产物，
+    // 登记进来只会产生 ../ 这类越界路径。
+    const resolved = path.resolve(filePath);
+    if (!resolved.startsWith(path.resolve(info.projectRoot) + path.sep)) return null;
+    return pushRelative(projectRelative(info.projectRoot, resolved), kind);
   }
   const hostPaths = info.hostPaths || [];
   [info.pageXmlPath, info.iconPath, info.layoutPath, info.csprojPath]
@@ -859,9 +842,37 @@ function bundleFileRegistry(info, options) {
   [info.mappingAudit, info.iconMapAudit, info.bundleAudit,
     info.langTranslationAudit, info.langGlossaryAudit, info.nestingAudit]
     .forEach(function (filePath) { push(filePath, "audit"); });
-  (options.workFiles || []).forEach(function (filePath) { push(filePath, "work"); });
+  // DSL 采集来源证据（dsl.snapshot / visibility / extractSvg）与生成目录下未显式登记的其它文件
+  // （getDsl.json / coverage-report.json / manifest.json / timing.json 等）：一律按证据登记，
+  // 避免出现"项目里有这个文件、登记表里却没有"的漏项。
+  // 备份先登记：它是最具体的类别，必须先占位，避免被下面的生成目录扫描当成普通证据登记。
   (options.backups || []).forEach(function (filePath) { push(filePath, "backup"); });
+  (options.sourceFiles || []).forEach(function (filePath) { push(filePath, "audit"); });
+  (options.generatedFiles || []).forEach(function (filePath) { push(filePath, "audit"); });
+  (options.workFiles || []).forEach(function (filePath) { push(filePath, "work"); });
   return entries;
+}
+
+// 扫描 <generatedRoot> 顶层文件（不含子目录、不含 _work）：覆盖 DSL 采集阶段的产物。
+// 备份（.bak-<时间戳>）跳过：它们由 backupFile 单独登记为 backup 类。
+function scanGeneratedFiles(generatedDir) {
+  let names;
+  try {
+    names = fs.readdirSync(generatedDir);
+  } catch (error) {
+    return [];
+  }
+  const collected = [];
+  names.forEach(function (name) {
+    if (/\.bak-\d{8,}/.test(name)) return;
+    const full = path.join(generatedDir, name);
+    try {
+      if (fs.statSync(full).isFile()) collected.push(full);
+    } catch (error) {
+      // 跳过读不到的条目
+    }
+  });
+  return collected;
 }
 
 // 扫描 <generatedRoot>/_work/**：本管线的中间工作目录（输入清单、派生清单、校验脚本与日志）。
@@ -1014,6 +1025,11 @@ function main() {
       "；新建模式会因“目标文件已存在”失败，请改用独立工作路径（例如 Generated/_work/<页面名>.mapping.json）");
   }
   const svgPath = resolveInput(manifestDir, projectRoot, manifest.svgPath, "svgPath");
+  // DSL 采集输入路径提前解析：既给映射生成器用，也给统一文件登记表用（登记为 audit 来源证据）。
+  const dslInputPath = manifest.dslPath
+    ? resolveInput(manifestDir, projectRoot, manifest.dslPath, "dslPath") : null;
+  const visibilityInputPath = manifest.visibilityPath
+    ? resolveInput(manifestDir, projectRoot, manifest.visibilityPath, "visibilityPath") : null;
   const iconMapPath = resolveInput(manifestDir, projectRoot, manifest.iconMapPath, "iconMapPath");
   const templateMapPath = manifest.templateMapPath
     ? resolveInput(manifestDir, projectRoot, manifest.templateMapPath, "templateMapPath")
@@ -1030,8 +1046,8 @@ function main() {
   });
   if (manifest.dslPath || manifest.visibilityPath) {
     if (!manifest.dslPath || !manifest.visibilityPath) fail("启用 DSL 自动映射时必须同时提供 dslPath 和 visibilityPath");
-    const dslPath = resolveInput(manifestDir, projectRoot, manifest.dslPath, "dslPath");
-    const visibilityPath = resolveInput(manifestDir, projectRoot, manifest.visibilityPath, "visibilityPath");
+    const dslPath = dslInputPath;
+    const visibilityPath = visibilityInputPath;
     if (!fs.existsSync(dslPath) || !fs.existsSync(visibilityPath)) fail("dslPath/visibilityPath 输入文件不存在");
     run(MAPPING_SCRIPT, [
       "--dsl", dslPath,
@@ -1326,18 +1342,26 @@ function main() {
     // （manifest.cleanup.work === false 可关闭，默认开启——重跑本来就要重新走一遍）。
     const workCleanupEnabled = !(manifest.cleanup && manifest.cleanup.work === false);
     const workFiles = scanWorkFiles(generatedDir);
-    const fileRegistry = bundleFileRegistry(bundleInfo, { workFiles: workFiles, backups: backups });
     // 收尾清理是破坏性的：先确认审计文件可写。审计已存在且未加 --overwrite 时在这里就失败，
     // 避免"先删掉 work、再报错退出"的顺序（那时 work 已经回不来了）。
     if (fs.existsSync(bundleAudit) && !args.overwrite) fail("审计文件已存在，未覆盖: " + bundleAudit);
+    // 审计文件自身的旧版本在登记表之前备份：否则它是"登记表写完之后才产生的备份"，必然漏项。
+    const auditBackup = fs.existsSync(bundleAudit) ? backupFile(bundleAudit) : null;
+    if (auditBackup) backups.push(auditBackup);
+    const fileRegistry = bundleFileRegistry(bundleInfo, {
+      sourceFiles: [dslInputPath, visibilityInputPath, svgPath].filter(Boolean),
+      generatedFiles: scanGeneratedFiles(generatedDir),
+      workFiles: workFiles,
+      backups: backups
+    });
     const removedWorkFiles = workCleanupEnabled ? cleanupWorkFiles(fileRegistry, projectRoot) : [];
     writeAuditOutput(bundleAudit, JSON.stringify({
       adapter: "mtslg-iocontrol",
       hostShell: "maxwell-wpf",
       projectMode: scaffoldInfo.scaffold ? "scaffold" : "target-project",
       contentOriginY: 192,
-      generated: bundleGeneratedPaths(bundleInfo),
-      // 统一文件登记：每条带 kind（project / audit / work / backup），收尾清理按它执行。
+      // 统一文件登记（唯一文件清单）：每条带 kind（project / audit / work / backup），收尾清理按它执行。
+      // 不再单列 generated[]：它与 files[] 完全重叠，保留两份会漂移。
       files: fileRegistry,
       // 输入快照：即使 <generatedRoot>/_work/ 被收尾删除，本次运行的输入清单也能从这里复原。
       inputs: manifest,
@@ -1399,7 +1423,7 @@ function main() {
         evidence: manifest.layoutEvidence,
         menuItemCount: manifest.menuItems.length
       }
-    }, null, 2) + "\n", args.overwrite, backups);
+    }, null, 2) + "\n", args.overwrite, backups, true);
     console.log(JSON.stringify({
       adapter: "mtslg-iocontrol",
       hostShell: "maxwell-wpf",
@@ -1427,7 +1451,6 @@ function main() {
         : (langDisabled
           ? null
           : "manifest 未提供 languages：本次未生成语言字典，页面不会挂 LangName（多语言默认开启，请检查 languages 是否被显式关闭）"),
-      generated: bundleGeneratedPaths(bundleInfo),
       files: {
         project: fileRegistry.filter(function (entry) { return entry.kind === "project"; }).length,
         audit: fileRegistry.filter(function (entry) { return entry.kind === "audit"; }).length,

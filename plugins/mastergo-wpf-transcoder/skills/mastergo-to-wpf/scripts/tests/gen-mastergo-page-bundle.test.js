@@ -141,6 +141,10 @@ const workDir = path.join(project, "Generated", "_work");
 fs.mkdirSync(workDir, { recursive: true });
 const workProbe = path.join(workDir, "F2NewPage.bundle.json");
 fs.writeFileSync(workProbe, JSON.stringify({ note: "本次运行的输入清单快照" }), "utf8");
+// DSL 采集阶段的产物落在 <generatedRoot> 顶层（getDsl/coverage-report/manifest/timing 等），
+// 它们不在任何输出清单里，必须由生成目录扫描兜住，否则就是"项目里有、登记表里没有"。
+const captureProbe = path.join(project, "Generated", "coverage-report.json");
+fs.writeFileSync(captureProbe, JSON.stringify({ status: "complete" }), "utf8");
 
 let result = spawnSync(process.execPath, [script, "--manifest", manifest], { encoding: "utf8" });
 assert.strictEqual(result.status, 0, result.stderr);
@@ -231,6 +235,11 @@ langEntries.forEach(function (entry) {
   assert.strictEqual(entry.path, "Resources/Pages/F2NewPage/" + entry.path.split("/").pop(),
     "语言文件必须登记为项目相对路径");
 });
+// 采集阶段产物由生成目录扫描兜住：必须登记为 audit。
+const auditPaths = bundleAudit.files.filter(function (entry) { return entry.kind === "audit"; })
+  .map(function (entry) { return entry.path; });
+assert.ok(auditPaths.includes("Generated/coverage-report.json"),
+  "生成目录下的采集产物必须登记为 audit");
 // work 类：登记 + 收尾删除；输入快照保留在审计里，所以删掉 _work 不会丢本次运行的输入。
 const workEntry = bundleAudit.files.find(function (entry) { return entry.path === "Generated/_work/F2NewPage.bundle.json"; });
 assert.ok(workEntry, "_work 下的中间文件必须登记");
@@ -338,6 +347,23 @@ result = spawnSync(process.execPath, [script, "--manifest", stringMetricManifest
 assert.strictEqual(result.status, 0,
   "数值字符串度量必须照常执行坐标核对并通过: " + result.stderr + result.stdout);
 
+// 生成目录下的备份必须登记为 backup（不得被生成目录扫描抢成 audit）。
+// 这次是同一页面的第二次生成，Generated/<页面>.*.json 已被覆盖过，所以必然存在 .bak 条目。
+const rerunAudit = JSON.parse(fs.readFileSync(path.join(project, "Generated/F2NewPage.bundle.manifest.json"), "utf8"));
+const generatedBackups = rerunAudit.files.filter(function (entry) {
+  return /^Generated\/.*\.bak-\d{8,}$/.test(entry.path);
+});
+assert.ok(generatedBackups.length > 0, "生成目录下的备份必须登记进 files[]");
+generatedBackups.forEach(function (entry) {
+  assert.strictEqual(entry.kind, "backup", "生成目录下的 .bak 必须登记为 backup: " + entry.path);
+});
+// 审计文件自己的旧版本也必须登记成 backup（否则就是"登记表写完之后才产生的备份"这个漏项）。
+assert.ok(
+  rerunAudit.files.some(function (entry) {
+    return entry.kind === "backup" && /F2NewPage\.bundle\.manifest\.json\.bak-\d{8,}$/.test(entry.path);
+  }),
+  "审计文件自身的备份必须登记进 files[]");
+
 // 容器嵌套：bundle 默认调用 apply-container-containment.js 并产出审计文件；
 // 本 fixture 没有容器实例 → containers=0、无冲突，但审计字段与报告文件必须存在。
 assert.match(scriptText, /apply-container-containment\.js/, "bundle 必须调用 apply-container-containment.js");
@@ -444,9 +470,11 @@ assert.deepStrictEqual(scaffoldAudit.verification, {
   wpfLoad: "skipped",
   runtimeLoad: "skipped"
 });
-assert.ok(scaffoldAudit.generated.includes("EmptyScaffold.csproj"));
-assert.ok(scaffoldAudit.generated.includes("framework.config.json"));
-assert.ok(scaffoldAudit.generated.includes("UI/F2-Teach/View/ScaffoldView.xaml"));
+// 唯一文件清单是 files[]：脚手架模式同样必须把 csproj / framework.config.json / View 登记进去。
+const scaffoldPaths = scaffoldAudit.files.map(function (entry) { return entry.path; });
+assert.ok(scaffoldPaths.includes("EmptyScaffold.csproj"));
+assert.ok(scaffoldPaths.includes("framework.config.json"));
+assert.ok(scaffoldPaths.includes("UI/F2-Teach/View/ScaffoldView.xaml"));
 
 const incompleteManifest = JSON.parse(fs.readFileSync(manifest, "utf8"));
 incompleteManifest.pageName = "NoLayoutState";

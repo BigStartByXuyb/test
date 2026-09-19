@@ -96,15 +96,17 @@ Bundle **不会**把新页面的文件写进 `.csproj`（实测 `csprojChanged=F
 
 ## 5.1 统一文件登记与收尾清理
 
-每次生成结束，bundle 在自己写的审计 `Generated/<页面>.bundle.manifest.json` 里落一份**统一文件登记**，回答"这次到底碰了哪些文件、哪些是项目文件、哪些是副本"：
+每次生成结束，bundle 在自己写的审计 `Generated/<页面>.bundle.manifest.json` 里落一份**统一文件登记**，回答"这次到底碰了哪些文件、哪些是项目文件、哪些是副本"。`files[]` 是**唯一**文件清单——不再另设 `generated[]` 之类的重叠字段（两份清单必然漂移）。
 
 | 字段 | 含义 |
 |---|---|
 | `files[]` | 本次运行涉及的全部文件，每条 `{ path, kind, dependsOn?, removed? }`；`path` 是项目相对路径（`/` 分隔） |
-| `files[].kind` | `project` = 项目产物（页面 XML / 页面 Icon / View 三件套 / Layout / 语言文件 / `.csproj` / `framework.config.json`），**永不清理**；`audit` = 交付证据（mapping / icon-map / nesting-report / 译文与术语表 / 本审计文件），**保留**；`work` = 中间工作文件（`<generatedRoot>/_work/**` 下的输入清单、派生清单、校验脚本与日志），**收尾删除**；`backup` = 覆盖前的 `.bak-<时间戳>` 副本，**只保留最近 2 份** |
+| `files[].kind` | `project` = 项目产物（页面 XML / 页面 Icon / View 三件套 / Layout / 语言文件 / `.csproj` / `framework.config.json`），**永不清理**；`audit` = 交付与来源证据（mapping / icon-map / nesting-report / 译文与术语表 / 本审计文件，以及 DSL 采集产物 `dsl.snapshot.json`、`visibility.json`、`extractSvg.json`、`getDsl.json`、`coverage-report.json`、`manifest.json`、`timing.json` 等生成目录顶层文件），**保留**；`work` = 中间工作文件（`<generatedRoot>/_work/**` 下的输入清单、派生清单、校验脚本与日志），**收尾删除**；`backup` = **本次运行**产生的 `.bak-<时间戳>` 副本（历史备份不在表内），**每个目标文件只保留最近 2 份** |
 | `files[].dependsOn` | 归属关系。当前用于 View 的 code-behind：它登记为 `project`，并标出主文件 `…View.xaml`——`.csproj` 里的 `<DependentUpon>` 与这里同源 |
 | `inputs` | 本次运行的输入清单快照。`_work/` 被收尾删除后，本次输入仍可从审计复原 |
 | `cleanup.work` | `{ enabled, removed[] }`：本次是否执行 work 清理、实际删掉了哪些文件 |
+
+**登记边界（避免误判"漏项"）**：只登记**项目内**的文件——清单里指向项目外的输入（如放在别处的 DSL 快照）不登记；`README.md`、`docs/*.md`、`docs/page-registry.json` 这类**人工维护**的项目文档也不登记（它们不是生成物）。因此"登记表 vs 磁盘"核对时，剩下的差异只允许是这几类：人工文档、项目外输入、以及本次已删除的 `work`。
 
 `work` 清理**默认开启**（重跑本来就要重新走一遍），`manifest.cleanup = { "work": false }` 可关闭；关闭时中间文件全部保留，审计写 `cleanup.work.enabled=false`、`removed=[]`。清理只删"登记为 `work`、路径含 `_work/` 段、且解析后仍在项目内"的文件，任何一步校验不过一律跳过——**清理失败不中断生成**。审计文件已存在且未加 `--overwrite` 时，bundle 在**删除任何 work 文件之前**失败，避免"先删后报错"。
 
