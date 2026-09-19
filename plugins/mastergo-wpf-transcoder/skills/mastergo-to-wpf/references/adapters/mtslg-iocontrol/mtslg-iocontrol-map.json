@@ -37,7 +37,7 @@
       "IconWidth",
       "IconHeight"
     ],
-      "iconSizeRule": "IconWidth/IconHeight 取台账命中条目节点 bbox（该条目 sourceRef 指向的节点，缺失回退 sourceId；映射字段 iconSize，四舍五入取整）；台账条目必须登记在只包住该图标图形的节点上，登记在按钮级容器上会取到按钮尺寸；**例外：变体登记 iconPolicy=runtime 时图标由目标项目提供、本页台账没有也不该有该条目，尺寸改取该实例子树里唯一 PATH 的 bbox（多个 PATH 直接失败并要求登记台账，禁止猜尺寸）**；模板含图标字段的 IconButton 的 Icon/IconWidth/IconHeight 属于 controlTypeRequiredAttrs 的恒写字段，无图标槽位时写空字符串；Button/StatusButton 的模板不含图标字段，不发射这三项；iconSize 只在模板含图标字段且节点带 Icon 时被消费，带 Icon 却没有 iconSize 视为映射不完整，生成器直接失败"
+      "iconSizeRule": "IconWidth/IconHeight 取台账命中条目节点 bbox（该条目 sourceRef 指向的节点，缺失回退 sourceId；映射字段 iconSize，四舍五入取整）；台账条目必须登记在只包住该图标图形的节点上，登记在按钮级容器上会取到按钮尺寸；**例外：变体登记 iconPolicy=runtime 时图标由目标项目提供、本页台账没有也不该有该条目，尺寸改取该实例子树里唯一 PATH 的 bbox（多个 PATH 直接失败，要求设计侧消歧；登记台账对该变体无效，禁止猜尺寸）**；模板含图标字段的 IconButton 的 Icon/IconWidth/IconHeight 属于 controlTypeRequiredAttrs 的恒写字段，无图标槽位时写空字符串；Button/StatusButton 的模板不含图标字段，不发射这三项；iconSize 只在模板含图标字段且节点带 Icon 时被消费，带 Icon 却没有 iconSize 视为映射不完整，生成器直接失败"
   },
   "textNewlinePolicy": {
     "attrScope": "所有 XML 属性里的文案（页面 XML 的 Value / Header，Layout 的 MenuItem Name / TopLeftContent 等）与页面语言字典的字符串值",

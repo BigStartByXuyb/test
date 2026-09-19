@@ -245,7 +245,7 @@ Style 与内部组件对照（只对下表列出的真实值成立）：
 <IOContorl ID="{id}" ControlType="IconButton" Style="EnterButtonStyle" Icon="EnterGeometry" IconWidth="{icon_width}" IconHeight="{icon_height}" TopLeftContent="" Value="{value}" LangName="{page}Enter" PageName="" IOCommand="" IOVisible="" IOEnable="" IsSave="true" Width="{width}" Height="{height}" Left="{left}" Top="{top}" />
 ```
 
-字段来源：`Left`/`Top`/`Width`/`Height` 取设计稿 bbox（`Top = pageAbsY − 192`）；文案取设计文本 → `Value`；`IconWidth`/`IconHeight` 取该实例子树里**唯一 PATH** 的 bbox 四舍五入（多个 PATH 直接失败并要求在台账登记，禁止猜尺寸）——本变体的台账条目**不存在也不需要**，Bundle 会把命中该 owner 的台账条目剔除并记入 `runtimeIcons` 审计；`Style`/`Icon`/`IsSave`/`LangName` 全部由映射表登记，设计稿不参与取自。
+字段来源：`Left`/`Top`/`Width`/`Height` 取设计稿 bbox（`Top = pageAbsY − 192`）；文案取设计文本 → `Value`；`IconWidth`/`IconHeight` 取该实例子树里**唯一 PATH** 的 bbox 四舍五入（多个 PATH 直接失败，要求设计侧消歧；登记台账对该变体无效，禁止猜尺寸）——本变体的台账条目**不存在也不需要**，Bundle 会把命中该 owner 的台账条目剔除并记入 `runtimeIcons` 审计；`Style`/`Icon`/`IsSave`/`LangName` 全部由映射表登记，设计稿不参与取自。
 
 ### 固定模板：按钮类型=exit
 
