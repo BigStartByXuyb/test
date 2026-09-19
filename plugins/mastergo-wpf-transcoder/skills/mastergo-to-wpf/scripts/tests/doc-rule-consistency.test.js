@@ -719,9 +719,13 @@ assert.ok(modeDoc.includes("压成空格会让两行文案退化成一行"),
       "framework-manual/02-controls/" + manual + " 必须指向 mtslg-mode.md 第 3 节（坐标规则）");
     assert.ok(!/TD-065/.test(text),
       "framework-manual/02-controls/" + manual + " 不得把该确定口径挂成待确认项");
-    assert.ok(/作业 B 优先级/.test(text),
-      "framework-manual/02-controls/" + manual + " 的样式族表与写法示例必须带「作业 B 优先级」说明，"
-      + "避免同一文件内「空 Style → ContentGroupBoxStyle」与 MTSLG 口径并存成为无条件矛盾");
+    // 两个承载点分别断言，不做整文件匹配：样式族表的默认样式行、写法示例里的「默认（不写 Style）」句。
+    const defaultRow = (text.match(/^\| （(?:无键默认样式|隐式默认样式)） \|.*$/m) || [""])[0];
+    assert.ok(/作业 B 优先级/.test(defaultRow),
+      "framework-manual/02-controls/" + manual + " 的样式族表默认样式行必须带「作业 B 优先级」说明");
+    const exampleLine = (text.match(/^- 默认（不写 Style）.*$/m) || [""])[0];
+    assert.ok(/注意适用范围/.test(exampleLine),
+      "framework-manual/02-controls/" + manual + " 的写法示例「默认（不写 Style）」句必须带「注意适用范围」说明");
   }
   // map._meta.note 的交叉引用同样必须指到第 3 节。
   assert.ok(/第 3 节（坐标规则）/.test(metaNotes), "map._meta.note 的交叉引用必须指向 mtslg-mode.md 第 3 节");
