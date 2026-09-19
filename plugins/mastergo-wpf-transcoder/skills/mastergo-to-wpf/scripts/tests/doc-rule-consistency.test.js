@@ -688,7 +688,8 @@ assert.ok(modeDoc.includes("压成空格会让两行文案退化成一行"),
   // styleInsets 的表头注释必须区分"发射值"与"查表键"。
   assert.ok(/contentInsetStyle/.test(infoGroup.styleInsetsNote || ""),
     "styleInsetsNote 必须说明 contentInsetStyle 是原点查表键");
-  // 「空 Style 时原点 = {1,35}」是项目框架侧的确定口径，不是待确认项：全仓不得再出现 TD-065。
+  // 「空 Style 时原点 = {1,35}」是项目框架侧的确定口径，不是待确认项。
+  // 本块只断言下面这几处已知承载点不得再出现 TD-065（不是全仓穷举）。
   assert.ok(!/TD-065/.test(infoGroup.styleInsetsNote || ""),
     "styleInsetsNote 不得把确定口径挂成待确认项（不得出现 TD-065）");
   assert.ok(/确定口径/.test(infoGroup.styleInsetsNote || ""),
@@ -718,6 +719,9 @@ assert.ok(modeDoc.includes("压成空格会让两行文案退化成一行"),
       "framework-manual/02-controls/" + manual + " 必须指向 mtslg-mode.md 第 3 节（坐标规则）");
     assert.ok(!/TD-065/.test(text),
       "framework-manual/02-controls/" + manual + " 不得把该确定口径挂成待确认项");
+    assert.ok(/作业 B 优先级/.test(text),
+      "framework-manual/02-controls/" + manual + " 的样式族表与写法示例必须带「作业 B 优先级」说明，"
+      + "避免同一文件内「空 Style → ContentGroupBoxStyle」与 MTSLG 口径并存成为无条件矛盾");
   }
   // map._meta.note 的交叉引用同样必须指到第 3 节。
   assert.ok(/第 3 节（坐标规则）/.test(metaNotes), "map._meta.note 的交叉引用必须指向 mtslg-mode.md 第 3 节");
