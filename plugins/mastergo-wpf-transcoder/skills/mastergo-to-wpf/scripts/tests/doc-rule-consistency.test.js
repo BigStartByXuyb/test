@@ -688,6 +688,9 @@ assert.ok(modeDoc.includes("压成空格会让两行文案退化成一行"),
   // styleInsets 的表头注释必须区分"发射值"与"查表键"。
   assert.ok(/contentInsetStyle/.test(infoGroup.styleInsetsNote || ""),
     "styleInsetsNote 必须说明 contentInsetStyle 是原点查表键");
+  // TD-065 的落点必须写成插件根相对全路径：只写 05-best-practices/... 从映射表目录解析不到。
+  assert.ok(/references\/adapters\/mw-wpf\/framework-manual\/05-best-practices\/pending-confirmations\.md/.test(infoGroup.styleInsetsNote || ""),
+    "styleInsetsNote 里 TD-065 的落点路径必须是插件根相对全路径");
   // _meta 级的泛化句必须带容器内容区原点的例外，否则读者会按"父容器左上角"直接相减。
   const metaNotes = (map._meta && Array.isArray(map._meta.note) ? map._meta.note : []).join("\n");
   assert.ok(/内容区原点|contentInsetStyle|styleInsets/.test(metaNotes),
