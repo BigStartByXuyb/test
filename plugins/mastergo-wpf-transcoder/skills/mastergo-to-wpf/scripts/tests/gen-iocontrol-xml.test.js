@@ -353,7 +353,7 @@ fs.writeFileSync(nestedContainerMapping, JSON.stringify({
       controlType: 'GroupBox', absX: 658, absY: 514, w: 200, h: 160,
       sourceText: '设定XY轴位置', valueSource: 'dsl.text', valueSourceRef: 'grp/title',
       contentInset: { left: 1, top: 35 },
-      attrs: { Style: 'IOGroupBoxSecondary', Header: '设定XY轴位置', IOName: '', IOVisible: '', IOEnable: '', MinValue: '', MaxValue: '' }
+      attrs: { Style: '', Header: '设定XY轴位置', IOName: '', IOVisible: '', IOEnable: '', MinValue: '', MaxValue: '' }
     },
     {
       ref: 'input', sourceRef: 'input', sourceParent: 'root', id: 'NB_9', xmlId: 'NB_9',
@@ -368,7 +368,9 @@ const nestedRun = spawnSync(process.execPath,
 assert.strictEqual(nestedRun.status, 0, '容器嵌套映射必须能正常渲染: ' + nestedRun.stderr);
 const nestedText = fs.readFileSync(nestedContainerOutput, 'utf8');
 const nestedGroupTag = (nestedText.match(/<IOContorl[^>]*ID="GRP_9"[\s\S]*?>/) || [''])[0];
-assert.match(nestedGroupTag, /Style="IOGroupBoxSecondary"/, '容器必须发射已登记的 Style');
+// GroupBox 的 Style 是必写字段但按当前框架口径恒为空串；内容区原点仍按映射的 contentInset 换算。
+assert.match(nestedGroupTag, /Style=""/, '容器必须发射 Style，且值为空串');
+assert.doesNotMatch(nestedGroupTag, /Style="IOGroupBox/, 'Style 不得发射样式键');
 const nestedInputTag = (nestedText.match(/<IOContorl[^>]*ID="NB_9"[\s\S]*?\/>/) || [''])[0];
 assert.match(nestedInputTag, /Left="45"/,
   '容器内子节点的 Left 必须扣掉内容区左边框（704 − 658 − 1 = 45）');

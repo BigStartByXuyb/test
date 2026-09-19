@@ -906,18 +906,23 @@ for (const { item: inst, match } of matched) {
     // 该 TEXT 作为槽位被消费（不再作为独立 TextBlock，也不进入「未映射组件内部文本」隔离）；
     // 壳内子控件由 apply-container-containment.js 按坐标完全包含关系重挂（childPolicy=nested-page-templates）。
     const headerText = firstText(inst.ref);
-    // 内容区原点必须来自"显式登记的 Style"：不写 Style 会落到隐式 ContentGroupBoxStyle（5px + 标题行高，随字号变化），
-    // 子控件相对坐标无法机械换算。这里 fail-closed，禁止容器变体 style=null 或未登记 styleInsets。
+    // Style 发射值与"内容区原点查表键"是两个字段：
+    //   spec.style             —— 发射到 XML 的 Style 值。当前项目框架口径：GroupBox 的 Style 恒为空串。
+    //   spec.contentInsetStyle —— 只用于查 styleInsets 的内部键，不发射。
+    // 子控件的相对坐标原点必须能机械换算，因此这里仍 fail-closed：contentInsetStyle 未登记对应
+    // styleInsets 时直接报错，不猜原点。
     const styleInsets = templateMap.infoGroupTemplates?.styleInsets || {};
-    const contentInset = spec.style ? styleInsets[spec.style] : null;
+    const insetStyle = spec.contentInsetStyle || spec.style;
+    const contentInset = insetStyle ? styleInsets[insetStyle] : null;
     if (!contentInset) {
       throw new Error("容器变体缺少可换算的内容区原点: template=" + match.family +
         " componentSet=" + (match.componentSet || spec.componentSet || "") +
-        " style=" + JSON.stringify(spec.style ?? null) +
-        "；请在映射表 infoGroupTemplates.styleInsets 登记该 Style（内容区边框 + 标题条高）");
+        " contentInsetStyle=" + JSON.stringify(insetStyle ?? null) +
+        "；请在映射表 infoGroupTemplates.styleInsets 登记该内容区原点键（内容区边框 + 标题条高）");
     }
     const attrs = {};
-    if (spec.style) attrs.Style = spec.style;
+    // Style 是 GroupBox 的必写字段：按变体登记原样发射（当前为空串，由框架落默认样式）。
+    attrs.Style = spec.style === undefined || spec.style === null ? "" : spec.style;
     if (headerText) attrs.Header = headerText.text;
     addNode(inst.ref, spec.controlType || "GroupBox", attrs,
       headerText ? { valueSourceRef: headerText.ref, contentInset: contentInset }

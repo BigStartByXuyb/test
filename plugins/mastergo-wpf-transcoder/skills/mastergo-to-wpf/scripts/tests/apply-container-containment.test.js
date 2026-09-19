@@ -92,7 +92,8 @@ assert.strictEqual(report.containers.length, 2, '只有 childPolicy=nested-page-
 assert.strictEqual(byRef('inside-a').layoutParent, 'group', '多容器包含时挂到面积最小者');
 assert.strictEqual(byRef('inside-b').layoutParent, 'group');
 assert.strictEqual(byRef('inside-a').parent, 'group', 'parent 与 layoutParent 必须同时写');
-// 子坐标从"内容区原点"量：abs − 容器左上角 − inset（Info 分组 Style=IOGroupBoxSecondary → {1,35}）
+// 子坐标从"内容区原点"量：abs − 容器左上角 − inset
+// （容器 Style 恒为空串，原点由变体的 contentInsetStyle=IOGroupBoxSecondary 查表得 {1,35}）
 assert.strictEqual(byRef('inside-a').expectedLeft, 19, '嵌套坐标按父容器内容区原点相对');
 assert.strictEqual(byRef('inside-a').expectedTop, 65);
 assert.strictEqual(byRef('group').layoutParent, 'popup', '内层容器应挂到外层容器');

@@ -421,11 +421,11 @@ for (const [label, target] of [['信息分组-模块化', groupNode], ['信息�
   assert.strictEqual(target.sourceText, label === '信息分组-模块化' ? '周期名称' : '单轴控制');
   assert.strictEqual(target.expectedWidth, label === '信息分组-模块化' ? 252 : 564, 'Width 取实例 bbox');
   assert.strictEqual(target.expectedTop, (label === '信息分组-模块化' ? 204 : 700) - 192, '根级 Top 仍扣 192');
-  // 容器必须显式登记 Style，并携带内容区原点（边框 + 标题条高）：子控件相对坐标靠它换算。
-  assert.strictEqual(target.attrs.Style, 'IOGroupBoxSecondary',
-    label + ' 必须显式登记 Style（空 Style 会落到不可换算的隐式模板）');
+  // Style 是必写字段，按当前框架口径恒发射空串；内容区原点另由 contentInsetStyle 查表携带，
+  // 子控件相对坐标靠 contentInset 换算。
+  assert.strictEqual(target.attrs.Style, '', label + ' 的 Style 必须发射空串');
   assert.deepStrictEqual(target.contentInset, { left: 1, top: 35 },
-    label + ' 必须携带 IOGroupBoxSecondary 的内容区原点 {left:1, top:35}');
+    label + ' 必须按 contentInsetStyle=IOGroupBoxSecondary 携带内容区原点 {left:1, top:35}');
 }
 assert.ok(!infoGroup.nodes.some(item => item.sourceRef === 'page:root/group/title'),
   '组内标题文本不得再作为独立 TextBlock 发射');
