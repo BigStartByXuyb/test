@@ -16,6 +16,9 @@
  *   - 多容器同时包含 → 取**面积最小**者（= 最内层）；面积并列 → 记为冲突、保持原状；
  *   - 部分相交/越界 → 记为冲突、保持原状；
  *   - 宿主壳（顶部栏 / 底部 / 常驻信息）内的节点、容器自身不参与；会形成输出环的容器记为冲突；
+ *   - 归属守卫：已经挂在「非容器的已发射节点」下的子节点不参与重挂（例：DataGrid 的列定义已属于该
+ *     DataGrid，DataGrid 不是容器候选，只按坐标判断会把列抢到外层容器）；记为
+ *     report.skipped[].reason = "already-owned-by-non-container-node"；挂在容器下的节点照旧参与（幂等）；
  *   - 改写字段：parent 与 layoutParent 同时写为容器 ref，并重算 expectedLeft/expectedTop
  *     （根级父容器扣一次 192；嵌套父容器按"内容区原点"换算：expectedLeft = 子绝对X − 容器绝对X − inset.left，
  *     expectedTop = 子绝对Y − 容器绝对Y − inset.top，inset 来自容器变体登记的 Style 对应的

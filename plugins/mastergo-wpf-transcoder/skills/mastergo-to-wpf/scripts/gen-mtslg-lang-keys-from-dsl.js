@@ -530,6 +530,49 @@ function deriveLangSpec(options) {
   let fallbackSeq = 0;
   for (const node of nodes) {
     if (!node || typeof node !== "object") continue;
+    // 3.-1 组件级固定语言键（映射表登记 langPolicy=fixed）：key 由变体登记、不从设计文本派生，
+    //      也**不要求设计文本存在**（设计稿只提供几何时同样必须产键）——因此必须放在
+    //      valueSource=dsl.text 与非空文本两道门禁之前。缺该 locale 的文案时退回设计原文。
+    const fixedLang = node.fixedLang;
+    if (fixedLang && typeof fixedLang.keyTemplate === "string" && fixedLang.keyTemplate !== "") {
+      const fixedRef = typeof node.sourceRef === "string" && node.sourceRef
+        ? node.sourceRef
+        : (typeof node.ref === "string" ? node.ref : "");
+      if (fixedRef) {
+        const fixedKey = fixedLang.keyTemplate.split("{page}").join(pageName);
+        if (!KEY_RE.test(fixedKey)) {
+          fail("组件级固定语言键不是合法标识符: " + fixedKey + "（节点 " + fixedRef + "）");
+        }
+        const fixedText = fixedLang.text && typeof fixedLang.text === "object" && !Array.isArray(fixedLang.text)
+          ? fixedLang.text
+          : {};
+        const sourceFallback = normalizeNewlines(toText(node.sourceText));
+        const existingFixed = fixedKeyByKey.get(fixedKey);
+        if (existingFixed) {
+          if (existingFixed.sourceRefs.indexOf(fixedRef) === -1) existingFixed.sourceRefs.push(fixedRef);
+        } else {
+          const localized = {};
+          for (const locale of locales) {
+            const value = fixedText[locale];
+            localized[locale] = typeof value === "string" && value !== "" ? value : sourceFallback;
+          }
+          const entry = {
+            key: fixedKey,
+            group: CONTENT_GROUP,
+            text: localized,
+            sourceRef: fixedRef,
+            sourceRefs: [fixedRef],
+            comment: "组件级固定键（映射表登记，不由设计文本派生）"
+          };
+          usedKeys.add(fixedKey);
+          fixedKeyByKey.set(fixedKey, entry);
+          keys.push(entry);
+          if (!Array.isArray(report.fixedKeys)) report.fixedKeys = [];
+          report.fixedKeys.push({ key: fixedKey, sourceRef: fixedRef, text: fixedText });
+        }
+      }
+      continue;
+    }
     if (node.valueSource !== "dsl.text") continue;
     // rawText 保留换行（写进字典值）；text 是压平值（派生键名 / 判动态文本 / 报告）。
     const rawText = normalizeNewlines(toText(node.sourceText));
@@ -538,42 +581,6 @@ function deriveLangSpec(options) {
       ? node.sourceRef
       : (typeof node.ref === "string" ? node.ref : "");
     if (!text || !ref) continue;
-    // 3.-1 组件级固定语言键（映射表登记 langPolicy=fixed）：key 由变体给出、不从设计文本派生，
-    //      文案取登记值（缺该 locale 时退回设计原文），{page} 按当前页面名替换。
-    const fixedLang = node.fixedLang;
-    if (fixedLang && typeof fixedLang.keyTemplate === "string" && fixedLang.keyTemplate !== "") {
-      const fixedKey = fixedLang.keyTemplate.split("{page}").join(pageName);
-      if (!KEY_RE.test(fixedKey)) {
-        fail("组件级固定语言键不是合法标识符: " + fixedKey + "（节点 " + ref + "）");
-      }
-      const fixedText = fixedLang.text && typeof fixedLang.text === "object" && !Array.isArray(fixedLang.text)
-        ? fixedLang.text
-        : {};
-      const existingFixed = fixedKeyByKey.get(fixedKey);
-      if (existingFixed) {
-        if (existingFixed.sourceRefs.indexOf(ref) === -1) existingFixed.sourceRefs.push(ref);
-      } else {
-        const localized = {};
-        for (const locale of locales) {
-          const value = fixedText[locale];
-          localized[locale] = typeof value === "string" && value !== "" ? value : rawText;
-        }
-        const entry = {
-          key: fixedKey,
-          group: CONTENT_GROUP,
-          text: localized,
-          sourceRef: ref,
-          sourceRefs: [ref],
-          comment: "组件级固定键（映射表登记，不由设计文本派生）"
-        };
-        usedKeys.add(fixedKey);
-        fixedKeyByKey.set(fixedKey, entry);
-        keys.push(entry);
-        if (!Array.isArray(report.fixedKeys)) report.fixedKeys = [];
-        report.fixedKeys.push({ key: fixedKey, sourceRef: ref, text: fixedText });
-      }
-      continue;
-    }
     const dynamic = isDynamicText(text);
     const isButtonFamilyNode = buttonControlTypes.has(String(node.controlType || ""));
     if (dynamic.dynamic && !isButtonFamilyNode) {

@@ -249,7 +249,8 @@ function assertButtonFamilyIconSize(node) {
   if (!isButtonFamily(node)) return;
   if (hasIconAttr(node) && !iconSizeOf(node)) {
     throw new Error('映射门禁失败: 按钮族节点 ' + node.ref +
-      ' 带 Icon 但缺少 iconSize（台账命中条目节点 bbox）；请重新生成 mapping，禁止猜图标尺寸');
+      ' 带 Icon 但缺少 iconSize（台账命中条目节点 bbox；iconPolicy=runtime 的变体取实例子树唯一 PATH 的 bbox）；' +
+      '请重新生成 mapping，禁止猜图标尺寸');
   }
 }
 

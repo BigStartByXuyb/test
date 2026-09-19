@@ -74,7 +74,16 @@ const mapping = {
     { sourceRef: "p/tb-pct", controlType: "TextBlock", sourceText: "9.0%", valueSource: "dsl.text", attrs: { Value: "9.0%" } },
     { sourceRef: "p/tb-hotkey", controlType: "TextBlock", sourceText: "F1", valueSource: "dsl.text", attrs: { Value: "F1" } },
     // 非 dsl.text 的节点不参与语言键派生。
-    { sourceRef: "p/cam", controlType: "Camera", sourceText: "相机", valueSource: "dsl.name", attrs: {} }
+    { sourceRef: "p/cam", controlType: "Camera", sourceText: "相机", valueSource: "dsl.name", attrs: {} },
+    // 组件级固定语言键（映射表 langPolicy=fixed）：key 与文案都来自映射表登记。
+    { sourceRef: "p/btn-enter", controlType: "IconButton", sourceText: "ENTER", valueSource: "dsl.text",
+      attrs: { Value: "ENTER", Icon: "EnterGeometry" },
+      fixedLang: { keyTemplate: "{page}Enter", text: { CN: "ENTER", EN: "ENTER" } } },
+    // 同一个固定变体在设计文本缺失时（valueSource 非 dsl.text、无 sourceText）仍必须产键——
+    // 固定键不依赖设计文本，这正是「设计稿只提供几何」场景。
+    { sourceRef: "p/btn-exit", controlType: "IconButton", valueSource: null,
+      attrs: { Value: "", Icon: "ExitGeometry" },
+      fixedLang: { keyTemplate: "{page}Exit", text: { CN: "EXIT", EN: "EXIT" } } }
   ]
 };
 const mappingPath = write("mapping.json", mapping);
@@ -274,5 +283,16 @@ assert.strictEqual(KEYS.asciiSuffix("工件边缘录入"), "");
 
 // 11) 页面名必须是英文标识符，否则直接失败。
 assert.throws(() => KEYS.deriveLangSpec({ pageName: "配方", mapping }), /页面名必须是英文标识符/);
+
+// 12) 组件级固定语言键（映射表 langPolicy=fixed）：{page} 按页面名替换、文案取登记值、
+//     且**不依赖设计文本存在**（设计文本缺失时同样必须产键并绑定到该节点）。
+assert.strictEqual(keyByRef.get("p/btn-enter"), "DemoRecipeEnter", "固定键必须按 langKeyTemplate 产键");
+assert.strictEqual(keys.get("DemoRecipeEnter").text.CN, "ENTER");
+assert.strictEqual(keys.get("DemoRecipeEnter").text.EN, "ENTER");
+assert.strictEqual(keyByRef.get("p/btn-exit"), "DemoRecipeExit",
+  "设计文本缺失时固定键仍必须产出（不得因 valueSource 非 dsl.text 被静默跳过）");
+assert.strictEqual(keys.get("DemoRecipeExit").text.CN, "EXIT");
+assert.ok((report.fixedKeys || []).some(item => item.key === "DemoRecipeExit"),
+  "固定键必须登记进 report.fixedKeys 供交付说明引用");
 
 console.log("PASS MTSLG page language key derivation regression test");
