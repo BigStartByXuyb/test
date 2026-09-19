@@ -692,14 +692,32 @@ assert.ok(modeDoc.includes("压成空格会让两行文案退化成一行"),
   const metaNotes = (map._meta && Array.isArray(map._meta.note) ? map._meta.note : []).join("\n");
   assert.ok(/内容区原点|contentInsetStyle|styleInsets/.test(metaNotes),
     "map._meta.note 的容器坐标说明必须带容器内容区原点例外（不能只说「相对父容器左上角」）");
-  assert.ok(/内容区原点|contentInsetStyle/.test(feishuMapping),
-    "feishu 组件库文档的父子相对坐标小节必须带容器内容区原点例外");
-  // 作业 A 的框架手册必须标明"不作为作业 B 运行期口径依据"，避免与本节口径互斥。
+  // 飞书文档的守门要**按小节断言**：整份文件里本来就有 contentInsetStyle（信息分组固定模板小节），
+  // 对全文匹配等于空转，防不住「父子相对坐标」小节被改回去。这里先切小节再匹配。
+  const feishuSection = (() => {
+    const start = feishuMapping.indexOf("## 组件父子相对坐标");
+    if (start < 0) return "";
+    const rest = feishuMapping.slice(start);
+    const next = rest.indexOf("\n## ", 1);
+    return next < 0 ? rest : rest.slice(0, next);
+  })();
+  assert.ok(feishuSection.length > 0, "feishu 组件库文档必须保留「组件父子相对坐标」小节");
+  assert.ok(/内容区原点/.test(feishuSection) && /contentInsetStyle/.test(feishuSection),
+    "「组件父子相对坐标」小节必须带容器内容区原点例外（且写明 contentInsetStyle 查表键）");
+  // 作业 A 的框架手册必须标明"不作为作业 B 运行期口径依据"、指向正确小节，并登记待确认项。
   for (const manual of ["io/io-group-box.md", "native/group-box.md"]) {
     const text = fs.readFileSync(path.join(__dirname, "..", "..", "references", "adapters", "mw-wpf", "framework-manual", "02-controls", manual), "utf8");
     assert.ok(/不作为作业 B/.test(text),
       "framework-manual/02-controls/" + manual + " 必须标明不作为作业 B 运行期口径依据");
+    assert.ok(/第 3 节（坐标规则）/.test(text),
+      "framework-manual/02-controls/" + manual + " 必须指向 mtslg-mode.md 第 3 节（坐标规则）");
+    assert.ok(/TD-065/.test(text),
+      "framework-manual/02-controls/" + manual + " 必须登记 TD-065（空 Style 隐式默认样式几何待确认）");
   }
+  // map._meta.note 的交叉引用同样必须指到第 3 节。
+  assert.ok(/第 3 节（坐标规则）/.test(metaNotes), "map._meta.note 的交叉引用必须指向 mtslg-mode.md 第 3 节");
+  // mtslg-mode 第 3 节必须写明口径来源与待确认项。
+  assert.ok(/TD-065/.test(modeDoc), "mtslg-mode.md 必须登记 TD-065（空 Style 隐式默认样式几何待确认）");
   // 生成器只认 contentInsetStyle：不得保留"用非空 style 当查表键"的回退。
   const mappingGenerator = fs.readFileSync(
     path.join(__dirname, "..", "gen-mtslg-mapping-from-dsl.js"), "utf8");

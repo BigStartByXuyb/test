@@ -6,7 +6,7 @@
       "通用属性对所有控件有效：ID / ControlType / IOEnable / IOVisible / Height / Width / Margin / Left / Top / Style。",
       "LangName 几乎所有控件可用（多语言键，CN/EN 成对，须命中键白名单）。",
       "geometryAttrs 由生成器按 DSL bbox 计算直传，禁止从映射输入覆盖；businessAttrs 从映射 JSON 逐节点透传，生成器不校验内容（键校验交给 mtslg-keys.json 白名单）。",
-      "容器类控件（nested=true）可包含子 IOContorl。子控件坐标一般相对父容器左上角；**例外**：`ControlType=\"GroupBox\"` 等两段式容器不是——原点 = 父容器左上角 + 内容区边框 + 标题条高度（即 `infoGroupTemplates.styleInsets`，按容器变体的 `contentInsetStyle` 查表），详见 infoGroupTemplates.styleInsetsNote 与 mtslg-mode.md 第 1 节。"
+      "容器类控件（nested=true）可包含子 IOContorl。子控件坐标一般相对父容器左上角；**例外**：`ControlType=\"GroupBox\"` 等两段式容器不是——原点 = 父容器左上角 + 内容区边框 + 标题条高度（即 `infoGroupTemplates.styleInsets`，按容器变体的 `contentInsetStyle` 查表），详见 infoGroupTemplates.styleInsetsNote 与 mtslg-mode.md 第 3 节（坐标规则）。"
     ]
   },
   "commonAttrs": [
