@@ -3,6 +3,8 @@
 
 # GroupBox（原生分组框·框架样式）
 
+> **适用范围**：本文属**作业 A（MW WPF / XAML 侧）**参考资料，描述 `TargetType=GroupBox` 的隐式 `Style` 解析，来自某次本地框架快照（版本可能过期）。**不作为作业 B（MTSLG IOContorl 页面 XML）运行期口径的依据**——作业 B 的 GroupBox `Style`（恒为空串）与内容区原点口径见 `mtslg-mode.md` 第 1 节与 `mtslg-iocontrol-map.json` 的 `infoGroupTemplates.styleInsets`；两者冲突时以后者为准。
+
 ## 1. 用途
 
 原生 `GroupBox` 的框架默认样式：**上下两段式（标题条 + 内容区）**，标题条由 `controls:TitleElement.*` 附加属性族驱动（高度/画刷/字号/对齐），内建 `IsEnabled=False` 整体与标题双重透明度 0.5。与 IOGroupBox 的基样式模板**逐行同构**（TD-023）；本文件另含**内容分组框**形态（`ContentGroupBoxStyle`，圆角 3 边框 + 左缩进内容区）——且它是隐式默认样式的 BasedOn，即框架下 GroupBox 默认形态。

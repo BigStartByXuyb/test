@@ -82,7 +82,7 @@ MasterGo 组件库已存在真实变体 `密码输入框`，但当前 MT3.0 IOCo
 
 ## 组件父子相对坐标
 
-根级或已展开为同级的 MasterGo 节点使用内容区坐标：`Left = pageAbsX - contentOriginX`、`Top = pageAbsY - 192`。保留父容器的嵌套子节点使用父节点相对坐标：`Left = pageAbsX - parentPageAbsX`、`Top = pageAbsY - parentPageAbsY`；页面偏移只在根级归一化时扣除一次。父子链必须同时用于确认真实结构、裁剪边界和来源，不能把子节点相对坐标误当作根级绝对坐标。
+根级或已展开为同级的 MasterGo 节点使用内容区坐标：`Left = pageAbsX - contentOriginX`、`Top = pageAbsY - 192`。保留父容器的嵌套子节点使用父节点相对坐标：`Left = pageAbsX - parentPageAbsX`、`Top = pageAbsY - parentPageAbsY`；页面偏移只在根级归一化时扣除一次。**例外（容器类控件）**：`ControlType="GroupBox"` 等两段式容器的子控件原点不是父容器左上角，而是父容器左上角 + 内容区边框 + 标题条高度（`infoGroupTemplates.styleInsets`，按容器变体的 `contentInsetStyle` 查表），详见本文「信息分组」一节的固定模板说明。父子链必须同时用于确认真实结构、裁剪边界和来源，不能把子节点相对坐标误当作根级绝对坐标。
 
 根组件实例的 Left/Top 先按页面公共偏移归一化；保留嵌套的子控件再按其直接父节点换算相对坐标，不重复扣除父节点坐标或页面偏移。不同组件实例必须分别读取和计算，固定模板只决定结构、ControlType 和槽位顺序，不决定实例坐标。
 

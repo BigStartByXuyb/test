@@ -3,6 +3,8 @@
 
 # IOGroupBox（IO 分组框）
 
+> **适用范围**：本文属**作业 A（MW WPF / XAML 侧）**参考资料，描述 `TargetType=controls:IOGroupBox` 的隐式 `Style` 解析，来自某次本地框架快照（版本可能过期）。**不作为作业 B（MTSLG IOContorl 页面 XML）运行期口径的依据**——作业 B 的 GroupBox `Style`（恒为空串）与内容区原点口径见 `mtslg-mode.md` 第 1 节与 `mtslg-iocontrol-map.json` 的 `infoGroupTemplates.styleInsets`；两者冲突时以后者为准。
+
 ## 1. 用途
 
 原生 GroupBox 的框架封装：**上下两段式（标题条 + 内容区）**，标题条由 `controls:TitleElement.*` 附加属性族驱动（高度/画刷/字号/对齐），内建 `IsEnabled=False` 整体与标题双重透明度 0.5。一~四级标题 + 内容分组框共 5 个样式键。

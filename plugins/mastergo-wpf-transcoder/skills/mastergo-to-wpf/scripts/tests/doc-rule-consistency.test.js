@@ -688,6 +688,18 @@ assert.ok(modeDoc.includes("压成空格会让两行文案退化成一行"),
   // styleInsets 的表头注释必须区分"发射值"与"查表键"。
   assert.ok(/contentInsetStyle/.test(infoGroup.styleInsetsNote || ""),
     "styleInsetsNote 必须说明 contentInsetStyle 是原点查表键");
+  // _meta 级的泛化句必须带容器内容区原点的例外，否则读者会按"父容器左上角"直接相减。
+  const metaNotes = (map._meta && Array.isArray(map._meta.note) ? map._meta.note : []).join("\n");
+  assert.ok(/内容区原点|contentInsetStyle|styleInsets/.test(metaNotes),
+    "map._meta.note 的容器坐标说明必须带容器内容区原点例外（不能只说「相对父容器左上角」）");
+  assert.ok(/内容区原点|contentInsetStyle/.test(feishuMapping),
+    "feishu 组件库文档的父子相对坐标小节必须带容器内容区原点例外");
+  // 作业 A 的框架手册必须标明"不作为作业 B 运行期口径依据"，避免与本节口径互斥。
+  for (const manual of ["io/io-group-box.md", "native/group-box.md"]) {
+    const text = fs.readFileSync(path.join(__dirname, "..", "..", "references", "adapters", "mw-wpf", "framework-manual", "02-controls", manual), "utf8");
+    assert.ok(/不作为作业 B/.test(text),
+      "framework-manual/02-controls/" + manual + " 必须标明不作为作业 B 运行期口径依据");
+  }
   // 生成器只认 contentInsetStyle：不得保留"用非空 style 当查表键"的回退。
   const mappingGenerator = fs.readFileSync(
     path.join(__dirname, "..", "gen-mtslg-mapping-from-dsl.js"), "utf8");
