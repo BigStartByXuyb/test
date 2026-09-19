@@ -818,6 +818,93 @@ function bundleGeneratedPaths(info) {
   }).concat(info.langPaths || []);
 }
 
+// 统一文件登记：本次运行涉及的全部文件按 kind 分类，随笔写进 bundle 审计。
+// kind 口径（详见 references/adapters/mtslg-iocontrol/bundle-manifest.md「统一文件登记」）：
+//   project —— 项目产物（页面 XML / Icon / View 三件套 / Layout / 语言文件 / csproj / framework.config.json），永不清理；
+//   audit   —— 交付证据（mapping / icon-map / nesting-report / 译文与术语表 / 本审计文件），保留；
+//   work    —— 本次运行的工作文件（<generatedRoot>/_work/** 下的输入清单、派生清单、校验脚本与日志），收尾删除；
+//   backup  —— 覆盖前的 .bak-<时间戳> 副本，由 lib/script-helpers.js 只保留最近 2 份。
+function bundleFileRegistry(info, options) {
+  const entries = [];
+  const seen = new Set();
+  function push(filePath, kind) {
+    if (!filePath) return null;
+    const relative = projectRelative(info.projectRoot, filePath);
+    if (seen.has(relative)) return null;
+    seen.add(relative);
+    const entry = { path: relative, kind: kind };
+    entries.push(entry);
+    return entry;
+  }
+  const hostPaths = info.hostPaths || [];
+  [info.pageXmlPath, info.iconPath, info.layoutPath, info.csprojPath]
+    .concat(hostPaths)
+    .concat(info.langPaths || [])
+    .concat(info.scaffold && info.frameworkConfigPath ? [info.frameworkConfigPath] : [])
+    .forEach(function (filePath) { push(filePath, "project"); });
+  // View 的 code-behind 在 .csproj 里以 <DependentUpon> 挂在同页 View.xaml 下，登记时标出该归属关系。
+  if (hostPaths[0] && hostPaths[1]) {
+    const master = projectRelative(info.projectRoot, hostPaths[0]);
+    const codeBehind = entries.find(function (entry) {
+      return entry.path === projectRelative(info.projectRoot, hostPaths[1]);
+    });
+    if (codeBehind) codeBehind.dependsOn = master;
+  }
+  [info.mappingAudit, info.iconMapAudit, info.bundleAudit,
+    info.langTranslationAudit, info.langGlossaryAudit, info.nestingAudit]
+    .forEach(function (filePath) { push(filePath, "audit"); });
+  (options.workFiles || []).forEach(function (filePath) { push(filePath, "work"); });
+  (options.backups || []).forEach(function (filePath) { push(filePath, "backup"); });
+  return entries;
+}
+
+// 扫描 <generatedRoot>/_work/**：本管线的中间工作目录（输入清单、派生清单、校验脚本与日志）。
+function scanWorkFiles(generatedDir) {
+  const collected = [];
+  (function walk(dir) {
+    let names;
+    try {
+      names = fs.readdirSync(dir);
+    } catch (error) {
+      return;
+    }
+    names.forEach(function (name) {
+      const full = path.join(dir, name);
+      let stat;
+      try {
+        stat = fs.statSync(full);
+      } catch (error) {
+        return;
+      }
+      if (stat.isDirectory()) walk(full);
+      else collected.push(full);
+    });
+  })(path.join(generatedDir, "_work"));
+  return collected;
+}
+
+// 收尾清理：只删「登记为 work、路径里确实有 _work/ 段、且解析后仍在项目内」的文件。
+// 任何一步校验不过就跳过；清理失败只记录不抛错（清理不足以中断生成）。
+function cleanupWorkFiles(entries, projectRoot) {
+  const removed = [];
+  const rootPrefix = path.resolve(projectRoot) + path.sep;
+  entries.forEach(function (entry) {
+    if (entry.kind !== "work") return;
+    const segments = String(entry.path).split("/");
+    if (segments.indexOf("_work") === -1) return;
+    const full = path.resolve(projectRoot, ...segments);
+    if (!full.startsWith(rootPrefix)) return;
+    try {
+      fs.unlinkSync(full);
+      entry.removed = true;
+      removed.push(entry.path);
+    } catch (error) {
+      // 忽略：清理失败时保留文件比中断生成更安全。
+    }
+  });
+  return removed;
+}
+
 function ensureLayoutContent(csprojPath, layoutPath) {
   let text = fs.readFileSync(csprojPath, "utf8");
   const include = projectRelative(path.dirname(csprojPath), layoutPath).replace(/\//g, "\\");
@@ -1229,12 +1316,26 @@ function main() {
       langGlossaryAudit,
       nestingAudit: nestingReport ? nestingAudit : null
     };
+    // 统一文件登记：本次运行涉及的全部文件按 kind 分类；收尾按 kind 清理 work
+    // （manifest.cleanup.work === false 可关闭，默认开启——重跑本来就要重新走一遍）。
+    const workCleanupEnabled = !(manifest.cleanup && manifest.cleanup.work === false);
+    const workFiles = scanWorkFiles(generatedDir);
+    const fileRegistry = bundleFileRegistry(bundleInfo, { workFiles: workFiles, backups: backups });
+    // 收尾清理是破坏性的：先确认审计文件可写。审计已存在且未加 --overwrite 时在这里就失败，
+    // 避免"先删掉 work、再报错退出"的顺序（那时 work 已经回不来了）。
+    if (fs.existsSync(bundleAudit) && !args.overwrite) fail("审计文件已存在，未覆盖: " + bundleAudit);
+    const removedWorkFiles = workCleanupEnabled ? cleanupWorkFiles(fileRegistry, projectRoot) : [];
     writeAuditOutput(bundleAudit, JSON.stringify({
       adapter: "mtslg-iocontrol",
       hostShell: "maxwell-wpf",
       projectMode: scaffoldInfo.scaffold ? "scaffold" : "target-project",
       contentOriginY: 192,
       generated: bundleGeneratedPaths(bundleInfo),
+      // 统一文件登记：每条带 kind（project / audit / work / backup），收尾清理按它执行。
+      files: fileRegistry,
+      // 输入快照：即使 <generatedRoot>/_work/ 被收尾删除，本次运行的输入清单也能从这里复原。
+      inputs: manifest,
+      cleanup: { work: { enabled: workCleanupEnabled, removed: removedWorkFiles } },
       verification: scaffoldInfo.scaffold
         ? { static: "passed", compile: "skipped", wpfLoad: "skipped", runtimeLoad: "skipped" }
         : { static: "passed", compile: "not-run-by-bundle", wpfLoad: "not-run-by-bundle", runtimeLoad: "not-run-by-bundle" },
@@ -1321,6 +1422,13 @@ function main() {
           ? null
           : "manifest 未提供 languages：本次未生成语言字典，页面不会挂 LangName（多语言默认开启，请检查 languages 是否被显式关闭）"),
       generated: bundleGeneratedPaths(bundleInfo),
+      files: {
+        project: fileRegistry.filter(function (entry) { return entry.kind === "project"; }).length,
+        audit: fileRegistry.filter(function (entry) { return entry.kind === "audit"; }).length,
+        work: fileRegistry.filter(function (entry) { return entry.kind === "work"; }).length,
+        backup: fileRegistry.filter(function (entry) { return entry.kind === "backup"; }).length
+      },
+      workRemoved: removedWorkFiles.length,
       backups
     }, null, 2));
   } catch (error) {

@@ -135,6 +135,13 @@ fs.writeFileSync(manifest, JSON.stringify({
   layoutEvidence: { matchedBottomBarItems: 1, unresolvedBottomBarItems: 0 }
 }, null, 2), "utf8");
 
+// 统一文件登记 + 收尾清理：<generatedRoot>/_work/ 是中间工作目录（输入清单、派生清单、校验脚本），
+// 跑完默认清空；这里先放一份探针文件，验证它被登记成 work 并在收尾时删掉。
+const workDir = path.join(project, "Generated", "_work");
+fs.mkdirSync(workDir, { recursive: true });
+const workProbe = path.join(workDir, "F2NewPage.bundle.json");
+fs.writeFileSync(workProbe, JSON.stringify({ note: "本次运行的输入清单快照" }), "utf8");
+
 let result = spawnSync(process.execPath, [script, "--manifest", manifest], { encoding: "utf8" });
 assert.strictEqual(result.status, 0, result.stderr);
 for (const relative of [
@@ -203,6 +210,27 @@ assert.ok(!fs.existsSync(path.join(project, "Generated/F2NewPage.lang-glossary.j
 const hostViewModel = fs.readFileSync(path.join(project, "UI/F2-Teach/ViewModel/F2NewPageViewModel.cs"), "utf8");
 assert.match(hostViewModel, /case "操作":/, "ViewModel 必须按底部菜单项生成 case 骨架");
 
+// 统一文件登记：审计里每条文件都带 kind（project / audit / work / backup），供人工与收尾清理共用。
+assert.ok(Array.isArray(bundleAudit.files), "审计必须带统一文件登记 files[]");
+const viewEntry = bundleAudit.files.find(function (entry) { return entry.path === "UI/F2-Teach/View/F2NewPageView.xaml"; });
+const codeBehindEntry = bundleAudit.files.find(function (entry) { return entry.path === "UI/F2-Teach/View/F2NewPageView.xaml.cs"; });
+assert.strictEqual(viewEntry.kind, "project", "View.xaml 必须登记为 project");
+assert.strictEqual(codeBehindEntry.kind, "project", "code-behind 必须登记为 project");
+assert.strictEqual(codeBehindEntry.dependsOn, "UI/F2-Teach/View/F2NewPageView.xaml",
+  "code-behind 登记必须标出它挂在哪个 View.xaml 下");
+assert.strictEqual(
+  bundleAudit.files.find(function (entry) { return entry.path === "Generated/F2NewPage.mapping.json"; }).kind,
+  "audit", "mapping 属于交付证据，登记为 audit");
+// work 类：登记 + 收尾删除；输入快照保留在审计里，所以删掉 _work 不会丢本次运行的输入。
+const workEntry = bundleAudit.files.find(function (entry) { return entry.path === "Generated/_work/F2NewPage.bundle.json"; });
+assert.ok(workEntry, "_work 下的中间文件必须登记");
+assert.strictEqual(workEntry.kind, "work");
+assert.strictEqual(workEntry.removed, true, "登记表必须标出该 work 文件已被收尾删除");
+assert.strictEqual(bundleAudit.cleanup.work.enabled, true, "work 清理默认开启");
+assert.deepStrictEqual(bundleAudit.cleanup.work.removed, ["Generated/_work/F2NewPage.bundle.json"]);
+assert.ok(!fs.existsSync(workProbe), "_work 下的中间文件必须被收尾删除");
+assert.strictEqual(bundleAudit.inputs.pageName, "F2NewPage", "审计必须内嵌本次运行的输入快照");
+
 const emptyIconMap = path.join(root, "empty-icon-map.json");
 fs.writeFileSync(emptyIconMap, JSON.stringify({ icons: [] }, null, 2), "utf8");
 const noIconManifest = JSON.parse(fs.readFileSync(manifest, "utf8"));
@@ -245,6 +273,30 @@ result = spawnSync(process.execPath, [script, "--manifest", auditCollisionPath],
 assert.notStrictEqual(result.status, 0, "已存在审计文件时不得在没有 --overwrite 的情况下覆盖");
 assert.match(result.stderr + result.stdout, /审计文件已存在|未覆盖/);
 assert.ok(!fs.existsSync(path.join(project, "Resources/Pages/AuditCollision/AuditCollisionPage.xml")));
+
+// 关闭开关：manifest.cleanup.work === false 时保留 _work 中间文件（重跑前想留着输入清单的场景）。
+const keepWorkManifest = JSON.parse(JSON.stringify(noIconManifest));
+keepWorkManifest.pageName = "WorkKeep";
+keepWorkManifest.pageTarget = "WorkKeep";
+keepWorkManifest.pageLangName = "WorkKeepPageTitle";
+keepWorkManifest.viewPath = "UI/F2-Teach/View/WorkKeepView.xaml";
+keepWorkManifest.codeBehindPath = "UI/F2-Teach/View/WorkKeepView.xaml.cs";
+keepWorkManifest.viewModelPath = "UI/F2-Teach/ViewModel/WorkKeepViewModel.cs";
+keepWorkManifest.pageXmlPath = "Resources/Pages/WorkKeep/WorkKeepPage.xml";
+keepWorkManifest.iconPath = "Resources/Pages/WorkKeep/WorkKeepIcons.xaml";
+keepWorkManifest.cleanup = { work: false };
+const keepWorkManifestPath = path.join(root, "work-keep.json");
+fs.writeFileSync(keepWorkManifestPath, JSON.stringify(keepWorkManifest, null, 2), "utf8");
+const keepProbe = path.join(workDir, "WorkKeep.bundle.json");
+fs.writeFileSync(keepProbe, JSON.stringify({ note: "关闭清理时必须保留" }), "utf8");
+result = spawnSync(process.execPath, [script, "--manifest", keepWorkManifestPath], { encoding: "utf8" });
+assert.strictEqual(result.status, 0, result.stderr);
+assert.ok(fs.existsSync(keepProbe), "cleanup.work=false 时不得删除 _work 中间文件");
+const keepAudit = JSON.parse(fs.readFileSync(path.join(project, "Generated/WorkKeep.bundle.manifest.json"), "utf8"));
+assert.strictEqual(keepAudit.cleanup.work.enabled, false);
+assert.deepStrictEqual(keepAudit.cleanup.work.removed, []);
+assert.ok(!keepAudit.files.find(function (entry) { return entry.kind === "work"; }).removed,
+  "保留模式下不得标记 removed");
 
 // 坐标门禁必须每次都执行：旧写法在"度量不是严格数字"时整段跳过核对，而审计仍写 static: passed。
 // 现在改成：先按与 provenance 相同的 Number() 口径归一化，再无条件交给坐标核对器；
