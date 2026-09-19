@@ -8,6 +8,7 @@
 // 与专属规则读取函数保留在脚本内——它们的参数、默认值与失败口径本来就不同。
 
 const fs = require("fs");
+const path = require("path");
 
 // 通用失败：抛错，由各脚本顶层 catch 转成 stderr + 退出码。
 function fail(message) {
@@ -111,13 +112,69 @@ function readJson(filePath, label) {
   }
 }
 
-// 覆盖前备份：<文件>.bak-<时间戳>，同一秒内多次备份自动加序号。
+// 同一目标文件保留的备份份数：只留最近 MAX_BACKUPS 个 .bak，更早的副本在下次备份时自动删除。
+const MAX_BACKUPS = 2;
+
+// 列出某个目标文件的全部备份，**最近的在前**。
+// 排序键：先修改时间（同一秒内的 -2/-3 序号也据此定序），时间相同再按文件名倒序。
+function listBackups(filePath) {
+  const dir = path.dirname(filePath);
+  const prefix = path.basename(filePath) + ".bak-";
+  let names;
+  try {
+    names = fs.readdirSync(dir);
+  } catch (error) {
+    return [];
+  }
+  const entries = [];
+  names.forEach(function (name) {
+    if (!name.startsWith(prefix)) return;
+    const full = path.join(dir, name);
+    try {
+      const stat = fs.statSync(full);
+      if (stat.isFile()) entries.push({ path: full, mtime: stat.mtimeMs });
+    } catch (error) {
+      // 期间被删/被占用：跳过，不作为备份参与保留判定。
+    }
+  });
+  entries.sort(function (a, b) {
+    if (b.mtime !== a.mtime) return b.mtime - a.mtime;
+    return a.path < b.path ? 1 : (a.path > b.path ? -1 : 0);
+  });
+  return entries.map(function (entry) { return entry.path; });
+}
+
+// 清理超出保留份数的旧备份；删除失败不影响生成（备份只是回滚手段）。
+// keepPath（刚创建的那份）必定保留：备份文件名在同一秒内会被复用（旧副本删掉后名字空出来），
+// 只按名字/时间排序存在把"新建的那份"判成旧副本的可能，因此这里显式钉住它。
+function pruneBackups(filePath, keepPath) {
+  const backups = listBackups(filePath);
+  const keep = [];
+  if (keepPath && backups.indexOf(keepPath) !== -1) keep.push(keepPath);
+  backups.forEach(function (candidate) {
+    if (keep.length >= MAX_BACKUPS || keep.indexOf(candidate) !== -1) return;
+    keep.push(candidate);
+  });
+  backups.forEach(function (stale) {
+    if (keep.indexOf(stale) !== -1) return;
+    try {
+      fs.unlinkSync(stale);
+    } catch (error) {
+      // 忽略：清理失败时保留旧副本比中断生成更安全。
+    }
+  });
+  return keep;
+}
+
+// 覆盖前备份：<文件>.bak-<时间戳>，同一秒内多次备份自动加序号；
+// 备份后只保留最近 MAX_BACKUPS 份（默认 2），避免项目里越攒越多副本。
 function backupFile(filePath) {
   const stamp = new Date().toISOString().replace(/[-:TZ.]/g, "").slice(0, 14);
   let backup = filePath + ".bak-" + stamp;
   let index = 2;
   while (fs.existsSync(backup)) backup = filePath + ".bak-" + stamp + "-" + index++;
   fs.copyFileSync(filePath, backup);
+  pruneBackups(filePath, backup);
   return backup;
 }
 
@@ -144,5 +201,8 @@ module.exports = {
   numberOrNull: numberOrNull,
   readJson: readJson,
   omittedAttrs: omittedAttrs,
-  backupFile: backupFile
+  backupFile: backupFile,
+  listBackups: listBackups,
+  pruneBackups: pruneBackups,
+  MAX_BACKUPS: MAX_BACKUPS
 };

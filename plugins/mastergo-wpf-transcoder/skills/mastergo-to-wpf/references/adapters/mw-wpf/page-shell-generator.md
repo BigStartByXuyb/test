@@ -132,4 +132,4 @@ public class <Page>ViewModel : IOScreen, IPage
 
     node scripts/gen-mw-wpf-page.js --manifest .\page.json --overwrite
 
-覆盖前会为已有宿主文件和被修改的 .csproj 创建 .bak-时间戳 备份。
+覆盖前会为已有宿主文件和被修改的 .csproj 创建 `.bak-<时间戳>` 备份；**同一目标文件只保留最近 2 份**，更早的副本在下次备份时自动删除（保留份数是 `lib/script-helpers.js` 的 `MAX_BACKUPS`，Bundle / Layout / 宿主壳三处共用同一实现）。

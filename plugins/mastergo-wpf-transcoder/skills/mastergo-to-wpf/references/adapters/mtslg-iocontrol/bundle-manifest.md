@@ -18,7 +18,7 @@ node scripts/gen-mastergo-page-bundle.js --manifest <bundle.json> [--overwrite]
 |---|---|---|
 | 不填 | **新建页面** | 目标文件已存在即失败（`页面目标文件已存在，未覆盖`） |
 | `modify-existing` | 修改已有页面（merge） | 允许合并，不整文件覆盖 |
-| `replace-existing` | 替换已有页面 | 需配 `--overwrite`，覆盖前逐个备份 |
+| `replace-existing` | 替换已有页面 | 需配 `--overwrite`，覆盖前逐个备份；同一目标文件只保留最近 2 份 `.bak-<时间戳>` |
 
 ## 2. 必填字段
 
