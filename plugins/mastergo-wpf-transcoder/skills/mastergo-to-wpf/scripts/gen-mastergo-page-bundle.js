@@ -847,8 +847,7 @@ function bundleFileRegistry(info, options) {
   // DSL 采集来源证据（dsl.snapshot / visibility / extractSvg）与生成目录下未显式登记的其它文件
   // （getDsl.json / coverage-report.json / manifest.json / timing.json 等）：一律按证据登记，
   // 避免出现"项目里有这个文件、登记表里却没有"的漏项。
-  // 备份先登记：它是最具体的类别，必须先占位，避免被下面的生成目录扫描当成普通证据登记。
-  // 只登记**本次运行新产生**的副本——含 Bundle 自身的 copyOutput/writeAuditOutput，以及子脚本
+  // 备份只登记**本次运行新产生**的副本——含 Bundle 自身的 copyOutput/writeAuditOutput，以及子脚本
   // gen-mtslg-layout.js / gen-mw-wpf-page.js 各自备份的文件（由 main 用运行前后差集补齐）。
   // 历史副本不入表：登记表的口径是"这一次生成产生了什么"，不是"项目里现在有什么"——
   // 同一项目后续会有很多页面，全量登记会把别的页面的历史文件全拖进来。

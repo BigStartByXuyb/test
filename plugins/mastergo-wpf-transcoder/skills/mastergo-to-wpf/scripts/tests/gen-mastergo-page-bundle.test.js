@@ -145,8 +145,8 @@ fs.writeFileSync(workProbe, JSON.stringify({ note: "本次运行的输入清单�
 // 它们不在任何输出清单里，必须由生成目录扫描兜住，否则就是"项目里有、登记表里没有"。
 const captureProbe = path.join(project, "Generated", "coverage-report.json");
 fs.writeFileSync(captureProbe, JSON.stringify({ status: "complete" }), "utf8");
-// 历史副本（本次运行之前就存在）：必须同样登记，且标成 createdThisRun=false——
-// 这样"登记表 vs 磁盘"在备份这一类上不留任何允许差异。
+// 历史副本（本次运行之前就存在）：必须**不**入表——登记表的口径是"这一次生成产生了什么"，
+// 不是"项目里现在有什么"，详见下方备份类断言与 bundle-manifest.md「登记边界」。
 const viewDir = path.join(project, "UI", "F2-Teach", "View");
 fs.mkdirSync(viewDir, { recursive: true });
 const historicalBackup = path.join(viewDir, "F2NewPageView.xaml.bak-20200101000000");
