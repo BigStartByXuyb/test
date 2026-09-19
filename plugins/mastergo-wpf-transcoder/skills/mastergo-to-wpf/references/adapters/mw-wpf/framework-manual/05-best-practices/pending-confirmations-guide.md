@@ -100,7 +100,7 @@
 | TD-045 | CalendarExtend 的 PART_CalendarPresenter 注入与 ShowConfirmButton 运行时语义；"Calender" 键名拼写（CalenderHeaderButtonBaseStyle/CalenderSelectorButtonBase）；MonthNameConverter 规则 | `{source_root}/SDC/Style/Calendar.xaml`、`CalendarExtend.xaml`（PART_CalendarPresenter 62、ShowConfirmButton 52、CalenderSelectorButtonBase 10） |
 | TD-046 | 日期联动回写（TextOfTextBlock）；DateTimePicker PART_Now/Clear/Confirm 行为 + PART_ButtonsBorder 残留 Grid.Row=1；DatePickerExtend PART_Popup 模板为空；键名 DateTimePickerBaseStyle 与 DateTimePicker 控件同名但 TargetType 为 DatePickerExtend（遮蔽风险）；硬编码色值与水印"请输入时间" | `{source_root}/SDC/Style/DateTimePicker.xaml`（PART_Popup 67）、`DateTimeSelector.xaml`（TextOfTextBlock 24）、`DatePickerExtend.xaml`（DateTimePickerBaseStyle 32、PART_Popup 52） |
 
-## 六、图表 / 附加属性 / 原生控件（TD-047~064）
+## 六、图表 / 附加属性 / 原生控件（TD-047~065）
 
 （TD-056~058 预留未启用。）
 
@@ -121,6 +121,7 @@
 | TD-062 | LazyToggleButton 三态语义（{x:Null}=Loading 旋转）与 ToggleIconButton 状态标记协议 | `{source_root}/SDC/Style/ToggleButton.xaml` |
 | TD-063 | MaterialBox 用途与 LayerList 数据源（五字段绑定契约、#AFB9C3 硬编码） | `{source_root}/SDC/Style/MaterialBox.xaml` |
 | TD-064 | 零使用实例用途类：HeaderedListBox 家族（"Headerd" 拼写疑点）、Loading Light 变体冗余、SimpleItemsControl PART_Panel 协议 | `{source_root}/SDC/Style/ListBox.xaml`、`Loading.xaml`、`SimpleItemControl.xaml` |
+| TD-065 | 作业 B（MTSLG 页面 XML）把 GroupBox 的 `Style` 恒发空串，并按 `IOGroupBoxSecondary` 的 `{left:1, top:35}` 换算容器内容区原点；但本手册记载「未显式指定 Style」的隐式默认样式 BasedOn `ContentGroupBoxStyle`（圆角 3 + 标题跨行浮于内容左上，列 5/auto/*/6），与 `{1,35}` 不是同一几何。**需框架侧确认**：空 `Style` 实际落到哪个样式、其内容区边框与标题条高是多少、是否等价于 `{left:1, top:35}` | `{source_root}/SDC/Style/IOGroupBox.xaml`（`ContentGroupBoxStyle`、隐式默认样式）、`{source_root}/SDC/Sizes.xaml`（GroupBoxSecondaryHeader=35）；另见 `mtslg-mode.md` 第 3 节（坐标规则） |
 
 ## 建议确认顺序
 

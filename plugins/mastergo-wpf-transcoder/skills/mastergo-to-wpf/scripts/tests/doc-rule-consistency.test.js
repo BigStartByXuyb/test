@@ -718,6 +718,15 @@ assert.ok(modeDoc.includes("压成空格会让两行文案退化成一行"),
   assert.ok(/第 3 节（坐标规则）/.test(metaNotes), "map._meta.note 的交叉引用必须指向 mtslg-mode.md 第 3 节");
   // mtslg-mode 第 3 节必须写明口径来源与待确认项。
   assert.ok(/TD-065/.test(modeDoc), "mtslg-mode.md 必须登记 TD-065（空 Style 隐式默认样式几何待确认）");
+  // 台账与 guide 自称"一一对应"：新增 TD-065 必须两处都在，且证据行号指向 ContentGroupBoxStyle 行。
+  const manualDir = path.join(__dirname, "..", "..", "references", "adapters", "mw-wpf", "framework-manual", "05-best-practices");
+  const ledger = fs.readFileSync(path.join(manualDir, "pending-confirmations.md"), "utf8");
+  const guide = fs.readFileSync(path.join(manualDir, "pending-confirmations-guide.md"), "utf8");
+  assert.ok(/TD-065/.test(ledger), "pending-confirmations.md 必须登记 TD-065");
+  assert.ok(/TD-065/.test(guide), "pending-confirmations-guide.md 必须与台账一一对应，补入 TD-065");
+  const td065Row = (ledger.match(/^\| TD-065 \|.*$/m) || [""])[0];
+  assert.ok(/io-group-box\.md:46\/47/.test(td065Row),
+    "TD-065 的证据行号必须指向 io-group-box.md 的 ContentGroupBoxStyle 行与隐式默认样式行（46/47）");
   // 生成器只认 contentInsetStyle：不得保留"用非空 style 当查表键"的回退。
   const mappingGenerator = fs.readFileSync(
     path.join(__dirname, "..", "gen-mtslg-mapping-from-dsl.js"), "utf8");
