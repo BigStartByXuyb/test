@@ -20,16 +20,20 @@
  *     --mapping mapping.json --confirmed icon-map.json --out icon-map.json \
  *     [--dsl dsl.snapshot.json]
  *
- * 台账提示（ledgerFields）：每条候选额外给出「写台账时可直接粘贴」的字段，ref 全部来自
- * 机器读取（本脚本不猜、不拼），人只负责填 name / comment 与语义判断：
- *   ownerRef / ownerText / ownerControlType —— 该图标属于哪个已映射控件（沿真实父子链向上找到的最近映射节点）
- *   parentRef / parentType / siblingPathCount —— 图形所在层与其同级 PATH 数（>1 时说明是多路径图标，台账应登记父层）
- *   ledgerFields.sourceId     —— extractSvg 条目 id；为 null 时以 sourceRef + fromDsl:true 合成
- *   ledgerFields.sourceRef    —— 只包住图形的 PATH 节点（从 DSL 原样复制）
+ * 台账提示（ledgerFields）：每条候选给出「写台账时照抄」的字段，值全部由机器读取（本脚本不猜、
+ * 不拼路径），人只负责填 name / comment 与语义判断（是否同一个图标、要不要合并、是否装饰）：
+ *   ownerRef / ownerText / ownerControlType —— 该图标属于哪个已映射控件（沿真实父子链找到的最近映射节点）
+ *   parentRef / parentType / siblingPathCount —— 图形所在层与其同级 PATH 数
+ *   ledgerFields.sourceId     —— extractSvg 条目 id；为 null 时用 sourceRef + fromDsl:true 从 DSL 合成
+ *   ledgerFields.sourceRef    —— 图形所在节点的事实值（该候选的 PATH）
+ *   ledgerFields.ledgerSourceRef —— **台账里写这个值**：单路径图标=PATH；多路径图标=父层（组）。
+ *                                   口径与 gen-mtslg-page-icons.js 的 synthesizeFromDsl 一致（sourceId 优先、
+ *                                   sourceRef 兜底），多路径图标登记成组才不会丢子路径。
  *   ledgerFields.fromDsl      —— extractSvg 没有该条目时为 true（生成器从 DSL 合成几何）
- *   ledgerFields.bakeAncestorTransform —— 该 PATH 到所属控件之间的祖先链上存在 rotate/flipH/flipV 时为 true；
- *                                          未传 --dsl 时输出 null（无法判断）
- *   ledgerFields.iconSize     —— 图形的 bbox（宽/高），供台账核对 IconWidth/IconHeight
+ *   ledgerFields.bakeAncestorTransform —— PATH 的祖先链上存在 rotate/flipH/flipV 时为 true；范围是**一路到页面根**，
+ *                                          与 gen-mtslg-page-icons.js 的 ancestorOrientationMatrix 同口径；
+ *                                          未传 --dsl 时输出 null（无法判断，不猜）
+ *   ledgerFields.iconSize     —— ledgerSourceRef 节点的 bbox（宽/高），供台账核对 IconWidth/IconHeight
  * 该字段只做提示：脚本仍然不按图层名/坐标/几何自动起名，也不自动写入台账。
  */
 const fs = require("fs");
@@ -117,14 +121,14 @@ function ledgerHasOrientation(node) {
   return Number.isFinite(rotate) && rotate !== 0;
 }
 
-// 从图形节点向上走到所属控件（含端点），看中间是否有旋转/翻转。
-function ledgerOrientationFlag(dslIndex, ref, stopRef) {
+// 从图形节点向上**一路走到页面根**，看是否有旋转/翻转——范围必须与
+// gen-mtslg-page-icons.js 的 ancestorOrientationMatrix 完全一致（它不在所属控件处停止）。
+function ledgerOrientationFlag(dslIndex, ref) {
   if (!dslIndex) return null;
   let current = dslIndex.parentOf.get(ref) || null;
   let guard = 0;
   while (current && guard < 128) {
     if (ledgerHasOrientation(dslIndex.byRef.get(current))) return true;
-    if (stopRef && current === stopRef) break;
     current = dslIndex.parentOf.get(current) || null;
     guard += 1;
   }
@@ -202,23 +206,29 @@ function main() {
     const parentRef = tree.parentOf(node.ref) || null;
     const parentSource = parentRef ? sourceNodeByRef.get(parentRef) : null;
     const parentDsl = parentRef && dslIndex ? dslIndex.byRef.get(parentRef) : null;
-    // 图形 bbox：优先用 mapping.sourceNodes 自带的 width/height，缺失时回退该节点自己的 layoutStyle。
-    const dslLayout = (dslIndex && dslIndex.byRef.get(node.ref) && dslIndex.byRef.get(node.ref).layoutStyle) || {};
-    const boxWidth = Number(node.width !== undefined ? node.width : dslLayout.width);
-    const boxHeight = Number(node.height !== undefined ? node.height : dslLayout.height);
+    const siblingPathCount = parentRef
+      ? tree.childrenOf(parentRef).filter(childRef => tree.isPathNode(childRef)).length
+      : 0;
+    // 台账里应登记的节点：单路径图标=PATH；多路径图标=父层（组），否则合成几何会丢子路径。
+    const ledgerSourceRef = siblingPathCount > 1 && parentRef ? parentRef : node.ref;
+    // bbox 取「台账登记节点」的尺寸（优先 mapping.sourceNodes 的 width/height，回退其 layoutStyle）。
+    const ledgerNode = sourceNodeByRef.get(ledgerSourceRef) || node;
+    const ledgerDsl = dslIndex ? dslIndex.byRef.get(ledgerSourceRef) : null;
+    const ledgerLayout = (ledgerDsl && ledgerDsl.layoutStyle) || {};
+    const boxWidth = Number(ledgerNode.width !== undefined ? ledgerNode.width : ledgerLayout.width);
+    const boxHeight = Number(ledgerNode.height !== undefined ? ledgerNode.height : ledgerLayout.height);
     candidate.ownerRef = ownerRef;
     candidate.ownerText = ownerNode ? (ownerNode.sourceText || "") : "";
     candidate.ownerControlType = ownerNode ? (ownerNode.controlType || null) : null;
     candidate.parentRef = parentRef;
     candidate.parentType = (parentSource && parentSource.type) || (parentDsl && parentDsl.type) || null;
-    candidate.siblingPathCount = parentRef
-      ? tree.childrenOf(parentRef).filter(childRef => tree.isPathNode(childRef)).length
-      : 0;
+    candidate.siblingPathCount = siblingPathCount;
     candidate.ledgerFields = {
       sourceId: sourceId || null,
       sourceRef: node.ref,
+      ledgerSourceRef,
       fromDsl: !svg,
-      bakeAncestorTransform: ledgerOrientationFlag(dslIndex, node.ref, ownerRef),
+      bakeAncestorTransform: ledgerOrientationFlag(dslIndex, node.ref),
       iconSize: Number.isFinite(boxWidth) && Number.isFinite(boxHeight)
         ? { width: boxWidth, height: boxHeight }
         : null

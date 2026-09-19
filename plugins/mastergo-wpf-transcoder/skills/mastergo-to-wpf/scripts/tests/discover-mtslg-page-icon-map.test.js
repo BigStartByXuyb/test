@@ -132,6 +132,7 @@ assert.strictEqual(upCandidate.siblingPathCount, 1);
 assert.deepStrictEqual(upCandidate.ledgerFields, {
   sourceId: upGroup,
   sourceRef: upPath,
+  ledgerSourceRef: upPath,       // 单路径图标 → 台账就登记该 PATH
   fromDsl: false,
   bakeAncestorTransform: true,   // 祖先组 flipV=true
   iconSize: { width: 26, height: 28 }
@@ -139,7 +140,8 @@ assert.deepStrictEqual(upCandidate.ledgerFields, {
 const downCandidate = hintOutput.candidates.find((candidate) => candidate.sourceRef === downPath);
 assert.strictEqual(downCandidate.sourceId, null, "无 extractSvg 条目时 sourceId 为 null");
 assert.strictEqual(downCandidate.ledgerFields.fromDsl, true, "无条目 → fromDsl:true（生成器从 DSL 合成）");
-assert.strictEqual(downCandidate.ledgerFields.bakeAncestorTransform, false, "祖先链无朝向 → 不需要烘焙");
+assert.strictEqual(downCandidate.ledgerFields.bakeAncestorTransform, false,
+  "顶层 rotate 不算数（生成器只读 layoutStyle）→ 不需要烘焙");
 assert.deepStrictEqual(downCandidate.ledgerFields.iconSize, { width: 35, height: 26 });
 assert.strictEqual(downCandidate.reason, "no-exact-extractSvg-entry");
 
@@ -151,6 +153,58 @@ const hintNoDsl = JSON.parse(fs.readFileSync(hintOutNoDsl, "utf8"));
 for (const candidate of hintNoDsl.candidates) {
   assert.strictEqual(candidate.ledgerFields.bakeAncestorTransform, null,
     "未传 --dsl 时无法判断祖先朝向 → null（不猜测）");
+}
+
+// ---- 多路径图标 + 朝向出现在「所属控件之上」：台账必须登记父层，且烘焙判据一路走到根
+//      （与 gen-mtslg-page-icons.js 的 ancestorOrientationMatrix / synthesizeFromDsl 同口径）。----
+const multiDslFile = path.join(dir, "dsl.multi.json");
+const multiMappingFile = path.join(dir, "mapping.multi.json");
+const multiOutFile = path.join(dir, "page-icon-map.multi.json");
+const multiGroup = "page/root/wrap/btn-x/icon-group";
+const multiPathA = multiGroup + "/path-a";
+const multiPathB = multiGroup + "/path-b";
+fs.writeFileSync(multiDslFile, JSON.stringify({ dsl: { nodes: [
+  { id: "page/root", type: "INSTANCE", name: "页", children: [
+    // 朝向在所属控件「之上」：生成器会一路烘焙到根，所以提示也必须是 true
+    { id: "page/root/wrap", type: "GROUP", name: "外层容器", layoutStyle: { width: 200, height: 200, rotate: 90 }, children: [
+      { id: "page/root/wrap/btn-x", type: "INSTANCE", name: "双侧箭头按钮", children: [
+        { id: multiGroup, type: "GROUP", name: "图标组", layoutStyle: { width: 40, height: 24 }, children: [
+          { id: multiPathA, type: "PATH", name: "路径 A", layoutStyle: { width: 16, height: 24 } },
+          { id: multiPathB, type: "PATH", name: "路径 B", layoutStyle: { width: 16, height: 24 } }
+        ] }
+      ] }
+    ] }
+  ] }
+] } }), "utf8");
+fs.writeFileSync(multiMappingFile, JSON.stringify({
+  sourceNodes: [
+    { ref: "page/root", type: "INSTANCE", name: "页", parentRef: null },
+    { ref: "page/root/wrap", type: "GROUP", name: "外层容器", parentRef: "page/root" },
+    { ref: "page/root/wrap/btn-x", type: "INSTANCE", name: "双侧箭头按钮", parentRef: "page/root/wrap" },
+    { ref: multiGroup, type: "GROUP", name: "图标组", parentRef: "page/root/wrap/btn-x", width: 40, height: 24 },
+    { ref: multiPathA, type: "PATH", name: "路径 A", svgName: "图标组", parentRef: multiGroup, width: 16, height: 24 },
+    { ref: multiPathB, type: "PATH", name: "路径 B", svgName: "图标组", parentRef: multiGroup, width: 16, height: 24 }
+  ],
+  nodes: [{ sourceRef: "page/root/wrap/btn-x", controlType: "IconButton", sourceText: "双侧箭头", attrs: {} }]
+}), "utf8");
+const multiResult = spawnSync(process.execPath,
+  [script, "--svg", hintSvgFile, "--mapping", multiMappingFile, "--dsl", multiDslFile, "--out", multiOutFile],
+  { encoding: "utf8" });
+assert.strictEqual(multiResult.status, 0, multiResult.stderr);
+const multiOutput = JSON.parse(fs.readFileSync(multiOutFile, "utf8"));
+assert.strictEqual(multiOutput.candidates.length, 2);
+for (const candidate of multiOutput.candidates) {
+  assert.strictEqual(candidate.siblingPathCount, 2);
+  assert.strictEqual(candidate.ledgerFields.ledgerSourceRef, multiGroup,
+    "多路径图标 → 台账必须登记父层（组），否则合成几何会丢子路径");
+  assert.strictEqual(candidate.ledgerFields.sourceRef, candidate.sourceRef,
+    "sourceRef 仍是图形 PATH 的事实值");
+  assert.strictEqual(candidate.ledgerFields.bakeAncestorTransform, true,
+    "朝向在所属控件之上时也要报 true（一路烘焙到根，与生成器同口径）");
+  assert.deepStrictEqual(candidate.ledgerFields.iconSize, { width: 40, height: 24 },
+    "iconSize 取台账登记节点（父层）的 bbox");
+  assert.strictEqual(candidate.ownerRef, "page/root/wrap/btn-x");
+  assert.strictEqual(candidate.ownerText, "双侧箭头");
 }
 
 console.log("PASS page icon discovery regression test");
