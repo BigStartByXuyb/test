@@ -1050,16 +1050,17 @@ function main() {
       templateMapPath ? ["--map", templateMapPath] : []));
     run(PROVENANCE_SCRIPT, ["--xml", tempXml, "--mapping", tempMapping].concat(
       templateMapPath ? ["--map", templateMapPath] : []));
+    // 传入 DSL 快照：extractSvg 因几何完全相同的复用而漏条目时，图标生成器可从 DSL 合成补上；
+    // discover 也用它给候选补台账提示（祖先朝向 bakeAncestorTransform）。
+    const iconDslPath = manifest.dslPath
+      ? resolveInput(manifestDir, projectRoot, manifest.dslPath, "dslPath")
+      : null;
     run(ICON_DISCOVERY_SCRIPT, [
       "--svg", svgPath,
       "--mapping", mappingPath,
       "--confirmed", iconMapPath,
       "--out", tempIconMap
-    ]);
-    // 传入 DSL 快照：extractSvg 因几何完全相同的复用而漏条目时，图标生成器可从 DSL 合成补上。
-    const iconDslPath = manifest.dslPath
-      ? resolveInput(manifestDir, projectRoot, manifest.dslPath, "dslPath")
-      : null;
+    ].concat(iconDslPath ? ["--dsl", iconDslPath] : []));
     run(ICON_SCRIPT, [svgPath, tempIconMap, tempIcon].concat(iconDslPath ? [iconDslPath] : []));
 
     const tempLang = path.join(tempRoot, "lang.json");
