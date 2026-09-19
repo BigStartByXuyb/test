@@ -167,7 +167,48 @@ result = runContainment(mappingC, outC, reportC);
 assert.strictEqual(result.status, 0, result.stderr);
 const outCJson = JSON.parse(fs.readFileSync(outC, 'utf8'));
 const reportCJson = JSON.parse(fs.readFileSync(reportC, 'utf8'));
-assert.strictEqual(outCJson.nodes.find(item => item.ref === 'wrap').layoutParent, null, '环场景不得重挂');
-assert.ok(reportCJson.conflicts.some(item => item.reason === 'container-is-descendant-of-node'), '环场景必须记冲突');
+  assert.strictEqual(outCJson.nodes.find(item => item.ref === 'wrap').layoutParent, null, '环场景不得重挂');
+  assert.ok(reportCJson.conflicts.some(item => item.reason === 'container-is-descendant-of-node'), '环场景必须记冲突');
 
-console.log('PASS container containment regression test');
+  // ---- 场景 D：表格落在信息分组里 —— DataGrid 收进容器，列定义留在 DataGrid 下不被抢走 ----
+  // 列定义是表格模板按表头派生的结构节点（nodeKind=table-column），生成时已经挂在 DataGrid 下；
+  // DataGrid 不是容器候选，只按坐标判断会把列从 DataGrid 抢到外层容器，导致 DataGrid 变空壳。
+  const mappingD = path.join(dir, 'mapping-d.json');
+  const outD = path.join(dir, 'out-d.json');
+  const reportD = path.join(dir, 'report-d.json');
+  fs.writeFileSync(mappingD, JSON.stringify({
+    rootRef: 'root',
+    contentOriginY: 192,
+    componentInstances: [
+      { template: 'infoGroupTemplates', componentSet: '信息分组-模块化', instanceRef: 'group' }
+    ],
+    sourceNodes: [
+      source('root', null, '页面', 0, 0, 1280, 1024),
+      source('group', 'root', '信息分组-模块化', 100, 200, 400, 300),
+      source('grid', 'root', '步进数据界面表格', 120, 240, 300, 200),
+      source('col1', 'grid', '1', 140, 250, 8, 16),
+      source('col2', 'grid', '2', 200, 250, 8, 16)
+    ],
+    nodes: [
+      node('group', 'MG_GROUP', 'GroupBox', SECONDARY_INSET),
+      node('grid', 'MG_GRID', 'DataGrid'),
+      Object.assign(node('col1', 'MGCOL_1', 'TextBlock'), { parent: 'grid', layoutParent: 'grid', nodeKind: 'table-column' }),
+      Object.assign(node('col2', 'MGCOL_2', 'TextBlock'), { parent: 'grid', layoutParent: 'grid', nodeKind: 'table-column' })
+    ]
+  }, null, 2), 'utf8');
+  result = runContainment(mappingD, outD, reportD);
+  assert.strictEqual(result.status, 0, result.stderr);
+  const outDJson = JSON.parse(fs.readFileSync(outD, 'utf8'));
+  const reportDJson = JSON.parse(fs.readFileSync(reportD, 'utf8'));
+  const dByRef = ref => outDJson.nodes.find(item => item.ref === ref);
+  assert.strictEqual(dByRef('grid').layoutParent, 'group', 'DataGrid 应被收进信息分组');
+  assert.strictEqual(dByRef('grid').expectedLeft, 19, 'DataGrid 坐标按容器内容区原点相对');
+  assert.strictEqual(dByRef('grid').expectedTop, 5);
+  assert.strictEqual(dByRef('col1').layoutParent, 'grid', '列定义必须留在 DataGrid 下，不得被容器抢走');
+  assert.strictEqual(dByRef('col2').layoutParent, 'grid');
+  assert.ok(!reportDJson.reparented.some(item => item.ref === 'col1'),
+    '列定义不得出现在 reparented 里');
+  assert.ok(reportDJson.skipped.some(item => item.ref === 'col1' && item.reason === 'already-owned-by-non-container-node'),
+    '已有归属（父节点为非容器的已发射节点）的列必须被守卫拦下并记 skipped');
+
+  console.log('PASS container containment regression test');

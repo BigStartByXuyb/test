@@ -334,6 +334,8 @@ function deriveLangSpec(options) {
   // 页面内“同一文案 → 同一个 LanguageKey”：文案相同的多个节点共用一个 key，
   // 其余节点登记进该 key 的 sourceRefs（运行时同一文案只维护一条翻译）。
   const contentEntryByText = new Map();
+  // 组件级固定语言键（映射表 langPolicy=fixed）：按最终 key 收口，同一 key 的多节点登记进 sourceRefs。
+  const fixedKeyByKey = new Map();
   const keys = [];
   const noLangRefs = [];
   const report = {
@@ -536,6 +538,42 @@ function deriveLangSpec(options) {
       ? node.sourceRef
       : (typeof node.ref === "string" ? node.ref : "");
     if (!text || !ref) continue;
+    // 3.-1 组件级固定语言键（映射表登记 langPolicy=fixed）：key 由变体给出、不从设计文本派生，
+    //      文案取登记值（缺该 locale 时退回设计原文），{page} 按当前页面名替换。
+    const fixedLang = node.fixedLang;
+    if (fixedLang && typeof fixedLang.keyTemplate === "string" && fixedLang.keyTemplate !== "") {
+      const fixedKey = fixedLang.keyTemplate.split("{page}").join(pageName);
+      if (!KEY_RE.test(fixedKey)) {
+        fail("组件级固定语言键不是合法标识符: " + fixedKey + "（节点 " + ref + "）");
+      }
+      const fixedText = fixedLang.text && typeof fixedLang.text === "object" && !Array.isArray(fixedLang.text)
+        ? fixedLang.text
+        : {};
+      const existingFixed = fixedKeyByKey.get(fixedKey);
+      if (existingFixed) {
+        if (existingFixed.sourceRefs.indexOf(ref) === -1) existingFixed.sourceRefs.push(ref);
+      } else {
+        const localized = {};
+        for (const locale of locales) {
+          const value = fixedText[locale];
+          localized[locale] = typeof value === "string" && value !== "" ? value : rawText;
+        }
+        const entry = {
+          key: fixedKey,
+          group: CONTENT_GROUP,
+          text: localized,
+          sourceRef: ref,
+          sourceRefs: [ref],
+          comment: "组件级固定键（映射表登记，不由设计文本派生）"
+        };
+        usedKeys.add(fixedKey);
+        fixedKeyByKey.set(fixedKey, entry);
+        keys.push(entry);
+        if (!Array.isArray(report.fixedKeys)) report.fixedKeys = [];
+        report.fixedKeys.push({ key: fixedKey, sourceRef: ref, text: fixedText });
+      }
+      continue;
+    }
     const dynamic = isDynamicText(text);
     const isButtonFamilyNode = buttonControlTypes.has(String(node.controlType || ""));
     if (dynamic.dynamic && !isButtonFamilyNode) {

@@ -151,6 +151,19 @@ if (containerSpecs.length > 0) {
     const bbox = bboxOf(ref);
     if (!bbox) { report.skipped.push({ ref: ref, xmlId: node.xmlId || ref, reason: 'missing-bbox' }); continue; }
     if (isInHostShell(ref)) continue;                     // 宿主壳节点直接不参与（背景层 1280×1024 也在此列）
+    // 归属守卫：已经挂在「非容器的已发射节点」下的子节点不参与容器归位。
+    // 例：DataGrid 的列定义是表格模板按表头派生的结构节点，生成时已经挂在那个 DataGrid 下；
+    // 只按坐标判断"谁包住了我"会把它从 DataGrid 里抢到外层容器（DataGrid 不是容器候选，故外层容器胜出），
+    // 导致 DataGrid 变成空壳、列散落在容器里。容器体系内（父节点本身就是容器）的节点仍照常参与，
+    // 这样"已挂对位置"的节点仍计入 unchanged、重复执行保持幂等。
+    const currentParent = node.layoutParent !== undefined ? node.layoutParent : (node.parent || null);
+    if (currentParent && currentParent !== mapping.rootRef && !containerRefs.has(currentParent)) {
+      report.skipped.push({
+        ref: ref, xmlId: node.xmlId || ref,
+        reason: 'already-owned-by-non-container-node', parent: currentParent
+      });
+      continue;
+    }
 
     const fully = [];
     const partial = [];

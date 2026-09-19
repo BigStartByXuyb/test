@@ -254,6 +254,26 @@ function iconSizeFor(ref) {
   }
   return null;
 }
+// 运行时图标（映射表登记 iconPolicy=runtime）：图标资源由目标项目提供，台账里没有条目，
+// 但 IconWidth/IconHeight 仍必须来自设计稿的图标槽位——取该实例子树里的 PATH bbox。
+// 多个 PATH 时尺寸来源不唯一，直接失败并要求在台账登记，禁止猜尺寸。
+function runtimeIconSizeFor(ref) {
+  const sizes = [];
+  for (const pathRef of pathDescendants(ref)) {
+    const item = nodeByRef.get(pathRef);
+    const s = item && item.source;
+    if (!s) continue;
+    const width = Number(s.width);
+    const height = Number(s.height);
+    if (Number.isFinite(width) && Number.isFinite(height)) sizes.push({ width, height, sourceRef: pathRef });
+  }
+  if (sizes.length === 0) return null;
+  if (sizes.length > 1) {
+    throw new Error("运行时图标的尺寸来源不唯一（实例 " + ref + " 子树有 " + sizes.length +
+      " 个 PATH）：请在页面图标台账登记该图标");
+  }
+  return sizes[0];
+}
 
 // 变体内部实例的组件名（= 独立组件集/组件的名称，用于右栏等族的交叉核对）。
 function innerComponentName(n) {
@@ -843,9 +863,12 @@ for (const { item: inst, match } of matched) {
     const attrs = {};
     if (spec.style) attrs.Style = spec.style;
     if (valueText) attrs.Value = valueText.text;
-    const icon = spec.iconPolicy !== "none" ? iconFor(inst.ref) : null;
+    // 运行时图标：Icon 名由映射表登记（目标项目已有的资源键），台账里没有条目；
+    // 其余情况仍从台账取图标名。两者都要求 IconWidth/IconHeight 来自设计稿 bbox。
+    const runtimeIcon = spec.iconPolicy === "runtime" ? spec.runtimeIcon : null;
+    const icon = runtimeIcon || (spec.iconPolicy !== "none" ? iconFor(inst.ref) : null);
     if (icon) attrs.Icon = icon;
-    const iconSize = icon ? iconSizeFor(inst.ref) : null;
+    const iconSize = runtimeIcon ? runtimeIconSizeFor(inst.ref) : (icon ? iconSizeFor(inst.ref) : null);
     const fText = firstText(inst.ref, s => /^F\d+$/.test(s.text));
     if (fText && inst.properties["显示F"] !== false) attrs.TopLeftContent = fText.text;
     const sourceSlotRefs = [valueText?.ref, fText?.ref].filter(Boolean);

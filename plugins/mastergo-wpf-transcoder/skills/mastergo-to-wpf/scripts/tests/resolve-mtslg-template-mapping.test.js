@@ -140,9 +140,32 @@ assert.strictEqual(templateMap.rightSidebarTemplates.variants["上下结构-icon
 for (const variant of ["F+文案", "文案 大button", "删除料盒-1", "删除料盒-2", "文案-小button"]) {
   assert.strictEqual(templateMap.rightSidebarTemplates.variants[variant].style, null, "默认右侧栏变体不得带 Style: " + variant);
 }
-for (const variant of ["enter", "exit", "start", "恢复切割", "stop", "左右结构-icon+文案"]) {
+for (const variant of ["start", "恢复切割", "stop", "左右结构-icon+文案"]) {
   assert.strictEqual(templateMap.rightSidebarTemplates.variants[variant].style, "RightButtonStyle", "左右结构变体必须使用 RightButtonStyle: " + variant);
 }
+// enter / exit：组件级固定变体（Style 逐变体固定、图标与语言键由运行时/映射表提供）。
+// 这两个变体是唯一使用 iconPolicy=runtime 与 langPolicy=fixed 的登记；其余右栏变体保持原口径。
+for (const [variant, style, icon] of [
+  ["enter", "EnterButtonStyle", "EnterGeometry"],
+  ["exit", "ExitButtonStyle", "ExitGeometry"],
+]) {
+  const entry = templateMap.rightSidebarTemplates.variants[variant];
+  assert.strictEqual(entry.style, style, "固定变体 Style 必须是自身的运行时 Style: " + variant);
+  assert.strictEqual(entry.iconPolicy, "runtime", "固定变体图标必须由运行时提供: " + variant);
+  assert.strictEqual(entry.runtimeIcon, icon, "固定变体必须登记运行时图标键: " + variant);
+  assert.strictEqual(entry.langPolicy, "fixed", "固定变体语言键必须由映射表登记: " + variant);
+  assert.strictEqual(entry.langKeyTemplate, "{page}" + (variant === "enter" ? "Enter" : "Exit"),
+    "固定变体必须登记页面级语言键模板: " + variant);
+  assert.ok(entry.langText && entry.langText.CN && entry.langText.EN, "固定变体必须登记 CN/EN 文案: " + variant);
+  assert.ok(entry.fixedAttrs && typeof entry.fixedAttrs === "object", "固定变体必须登记逐变体固定属性: " + variant);
+  assert.strictEqual(entry.slots[0].style, style, "固定变体槽位 Style 必须与变体一致: " + variant);
+  assert.strictEqual(entry.slots[0].iconPolicy, "runtime", "固定变体槽位 iconPolicy 必须与变体一致: " + variant);
+  assert.strictEqual(entry.slots[0].runtimeIcon, icon, "固定变体槽位 runtimeIcon 必须与变体一致: " + variant);
+}
+assert.strictEqual(templateMap.rightSidebarTemplates.variants.enter.fixedAttrs.IsSave, "true",
+  "enter 固定属性必须登记 IsSave");
+assert.strictEqual(templateMap.rightSidebarTemplates.variants.exit.fixedAttrs.PageName, "GoBack",
+  "exit 固定属性必须登记 PageName");
 // 独立组件族（可直接放置的右栏按钮）：按组件名（componentSet）命中，Style 与同名聚合变体一致。
 assert.ok(templateMap.rightSidebarComponentTemplates, "缺少右栏独立组件模板族");
 assert.deepStrictEqual(templateMap.rightSidebarComponentTemplates.match, { componentSet: true },
@@ -323,8 +346,33 @@ const resolvedRightIcon = resolveTemplateMapping(
   makeRightSidebarMapping("exit", "right/exit", "EXIT", "ExitGeometry"),
   templateMap
 );
-assert.strictEqual(resolvedRightIcon.nodes[0].attrs.Style, "RightButtonStyle");
+assert.strictEqual(resolvedRightIcon.nodes[0].attrs.Style, "ExitButtonStyle");
 assert.strictEqual(resolvedRightIcon.nodes[0].attrs.Icon, "ExitGeometry");
+// 组件级固定变体：固定属性逐字发射、图标由运行时提供、语言键由映射表登记（不按设计文本派生）。
+assert.strictEqual(resolvedRightIcon.nodes[0].attrs.PageName, "GoBack");
+assert.strictEqual(resolvedRightIcon.nodes[0].runtimeIcon, "ExitGeometry");
+assert.deepStrictEqual(resolvedRightIcon.nodes[0].fixedLang,
+  { keyTemplate: "{page}Exit", text: { CN: "EXIT", EN: "EXIT" } });
+
+const resolvedRightEnter = resolveTemplateMapping(
+  // 故意传入与映射表不同的图标名：运行时图标必须以映射表登记为准，不能被台账值改写。
+  makeRightSidebarMapping("enter", "right/enter", "ENTER", "SomeLedgerGeometry"),
+  templateMap
+);
+assert.strictEqual(resolvedRightEnter.nodes[0].attrs.Style, "EnterButtonStyle");
+assert.strictEqual(resolvedRightEnter.nodes[0].attrs.IsSave, "true");
+assert.strictEqual(resolvedRightEnter.nodes[0].attrs.Icon, "EnterGeometry");
+assert.strictEqual(resolvedRightEnter.nodes[0].runtimeIcon, "EnterGeometry");
+assert.strictEqual(resolvedRightEnter.nodes[0].fixedLang.keyTemplate, "{page}Enter");
+
+// 运行时图标变体不得要求台账里有图标来源：页面台账本来就不该有这两条（由目标项目提供），
+// iconRequired 只对「从 DSL/台账取图标」的变体生效。
+const noLedgerIcon = makeRightSidebarMapping("enter", "right/enter-noledger", "ENTER");
+delete noLedgerIcon.nodes.find(item => item.sourceRef === "right/enter-noledger").attrs.Icon;
+const resolvedNoLedgerIcon = resolveTemplateMapping(noLedgerIcon, templateMap);
+assert.strictEqual(resolvedNoLedgerIcon.nodes[0].attrs.Icon, "EnterGeometry",
+  "iconPolicy=runtime 的变体必须能在台账无图标时用映射表登记键补齐");
+assert.strictEqual(resolvedNoLedgerIcon.nodes[0].runtimeIcon, "EnterGeometry");
 
 const resolvedRightTextIcon = resolveTemplateMapping(
   makeRightSidebarMapping("上下结构-icon+文案", "right/text-icon", "文案"),

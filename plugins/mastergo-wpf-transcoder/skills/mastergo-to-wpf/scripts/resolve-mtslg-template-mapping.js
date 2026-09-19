@@ -116,7 +116,9 @@ function validateSlot(spec, slot, sourceMap, nodeMap, variant, usedSources) {
     // 生成器/校验器以不同判据解释的「有尺寸无 Icon」映射。
     delete nodeMap.get(slot.sourceRef).iconSize;
   }
-  if (spec.iconRequired && typeof attrs.Icon !== "string") {
+  // iconPolicy=runtime 的槽位由变体级固定图标提供（见 validateInstance 的 applyVariantFixedFields），
+  // 页面台账里本来就不该有这两条（它们由目标项目提供），因此不在这里要求 DSL 图标来源。
+  if (spec.iconRequired && spec.iconPolicy !== "runtime" && typeof attrs.Icon !== "string") {
     fail("固定模板槽位缺少 DSL 图标来源: " + variant + "/" + slot.slot);
   }
   const valueSourceRef = slot.valueSourceRef;
@@ -167,6 +169,32 @@ function validateOmittedSlot(slot, sourceMap, nodeMap, variant, usedSources) {
 }
 
 function validateInstance(instance, spec, mapping, sourceMap, nodeMap, usedSources, variant) {
+  // 组件级固定字段（变体级登记、不在槽位重复）：运行时图标 / 逐变体固定属性 / 固定语言键。
+  // 只有变体显式登记了对应字段时才生效；未登记的变体行为与改动前完全一致。
+  const applyVariantFixedFields = function (node) {
+    if (!node) return;
+    const targetAttrs = node.attrs || (node.attrs = {});
+    if (spec.iconPolicy === "runtime") {
+      // Icon 是目标项目已存在的资源键，本页不生成该图标资源；iconSize 仍保留，供 IconWidth/IconHeight 发射。
+      if (typeof spec.runtimeIcon !== "string" || spec.runtimeIcon === "") {
+        fail("固定变体 iconPolicy=runtime 缺少 runtimeIcon: " + variant);
+      }
+      targetAttrs.Icon = spec.runtimeIcon;
+      node.runtimeIcon = spec.runtimeIcon;
+    }
+    if (spec.fixedAttrs && typeof spec.fixedAttrs === "object" && !Array.isArray(spec.fixedAttrs)) {
+      for (const [attrName, attrValue] of Object.entries(spec.fixedAttrs)) targetAttrs[attrName] = attrValue;
+    }
+    if (spec.langPolicy === "fixed") {
+      if (typeof spec.langKeyTemplate !== "string" || spec.langKeyTemplate === "") {
+        fail("固定变体 langPolicy=fixed 缺少 langKeyTemplate: " + variant);
+      }
+      node.fixedLang = {
+        keyTemplate: spec.langKeyTemplate,
+        text: spec.langText && typeof spec.langText === "object" ? spec.langText : {}
+      };
+    }
+  };
   const supplied = instance.requiredSlots || instance.slots || [];
   if (!Array.isArray(supplied)) fail("固定模板实例缺少 requiredSlots: " + variant);
   const expected = spec.slots || [];
@@ -190,6 +218,7 @@ function validateInstance(instance, spec, mapping, sourceMap, nodeMap, usedSourc
   const requiredSlots = visibleExpected
     .filter(expectedSlot => suppliedByName.has(expectedSlot.slot))
     .map(expectedSlot => validateSlot(expectedSlot, suppliedByName.get(expectedSlot.slot), sourceMap, nodeMap, variant, usedSources));
+  for (const slot of requiredSlots) applyVariantFixedFields(nodeMap.get(slot.sourceRef));
   const omittedSlots = omitted.map(slot => {
     if (!expected.some(expectedSlot => expectedSlot.slot === slot.slot)) {
       fail("省略槽位未在固定模板登记: " + variant + "/" + slot.slot);

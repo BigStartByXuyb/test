@@ -223,8 +223,8 @@ Style 与内部组件对照（只对下表列出的真实值成立）：
 |-|-|-|
 | 左右结构-icon+文案 | RightButtonStyle | 右侧栏-左右结构-icon+文案 |
 | start | RightButtonStyle | start |
-| enter | RightButtonStyle | enter |
-| exit | RightButtonStyle | exit |
+| enter | EnterButtonStyle（组件级固定，见下） | enter |
+| exit | ExitButtonStyle（组件级固定，见下） | exit |
 | stop | RightButtonStyle | 待组件库登记 |
 | 恢复切割 | RightButtonStyle | 待组件库登记 |
 | 上下结构-icon+文案 | UpDownRightButtonStyle | 右侧栏-上下结构-icon+文案 |
@@ -236,6 +236,20 @@ Style 与内部组件对照（只对下表列出的真实值成立）：
 | 文案-小button | null（不写 Style） | 待组件库登记 |
 
 文案→Value；业务字段/动作→IOName/IOCommand；PageName/IOVisible/IOCommand 按“按钮族固定参数”一节恒写；图标→Icon，图标尺寸→IconWidth/IconHeight（取台账命中条目节点 bbox）；独立组件没有 F 键槽位，不生成 TopLeftContent。Icon 键可使用目标项目已确认键或当前页面唯一的临时 Geometry 键。
+
+### 组件级固定变体：enter / exit
+
+`enter` / `exit` 是右栏聚合集合里两个**组件级固定**变体：Style、固定属性、运行时图标键和语言键全部由映射表登记（组件级通用，不分页面），设计稿只提供几何（`Left`/`Top`/`Width`/`Height` 与图标区域 bbox）。
+
+| 按钮类型变体值 | Style | 固定属性（`fixedAttrs`） | 图标（`iconPolicy=runtime`） | 语言键（`langKeyTemplate`） |
+|-|-|-|-|-|
+| enter | EnterButtonStyle | IsSave="true" | EnterGeometry | {page}Enter |
+| exit | ExitButtonStyle | PageName="GoBack" | ExitGeometry | {page}Exit |
+
+- **`iconPolicy: "runtime"` + `runtimeIcon`**：`Icon` 是目标项目已存在的资源键，**本页 Icon 文件不生成该 Geometry**；`IconWidth`/`IconHeight` 仍取台账命中条目节点的 bbox（即设计稿图标区域尺寸）。引用运行时图标的节点不判为“引用了未生成的 Geometry”，被剔除的台账条目记在 bundle 审计 `runtimeIcons`。
+- **`fixedAttrs`**：逐变体固定属性，生成时逐字发射；设计稿不覆盖这些属性，也不参与它们的取值。
+- **`langPolicy: "fixed"` + `langKeyTemplate` + `langText`**：语言键由映射表登记，`{page}` 由语言派生器按当前页面名替换，**不从设计文本派生**；词典 CN/EN 取 `langText`。多页共用同一条登记，key 各自带页面名前缀。
+- **作用范围**：只有登记了上述字段的变体才走固定路径；未登记的右栏变体，其 `Style`、图标生成和语言键派生行为与登记前完全一致。
 
 ### 固定模板：独立组件=右侧栏-左右结构-icon+文案 / 右侧栏-上下结构-icon+文案 / start
 

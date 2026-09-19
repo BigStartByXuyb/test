@@ -759,15 +759,26 @@
       "enter": {
         "componentSet": "enter",
         "controlType": "IconButton",
-        "style": "RightButtonStyle",
-        "iconPolicy": "single-path",
+        "style": "EnterButtonStyle",
+        "iconPolicy": "runtime",
+        "runtimeIcon": "EnterGeometry",
         "iconRequired": true,
+        "fixedAttrs": {
+          "IsSave": "true"
+        },
+        "langPolicy": "fixed",
+        "langKeyTemplate": "{page}Enter",
+        "langText": {
+          "CN": "ENTER",
+          "EN": "ENTER"
+        },
         "slots": [
           {
             "slot": "button",
             "controlType": "IconButton",
-            "style": "RightButtonStyle",
-            "iconPolicy": "single-path",
+            "style": "EnterButtonStyle",
+            "iconPolicy": "runtime",
+            "runtimeIcon": "EnterGeometry",
             "iconRequired": true
           }
         ]
@@ -775,15 +786,26 @@
       "exit": {
         "componentSet": "exit",
         "controlType": "IconButton",
-        "style": "RightButtonStyle",
-        "iconPolicy": "single-path",
+        "style": "ExitButtonStyle",
+        "iconPolicy": "runtime",
+        "runtimeIcon": "ExitGeometry",
         "iconRequired": true,
+        "fixedAttrs": {
+          "PageName": "GoBack"
+        },
+        "langPolicy": "fixed",
+        "langKeyTemplate": "{page}Exit",
+        "langText": {
+          "CN": "EXIT",
+          "EN": "EXIT"
+        },
         "slots": [
           {
             "slot": "button",
             "controlType": "IconButton",
-            "style": "RightButtonStyle",
-            "iconPolicy": "single-path",
+            "style": "ExitButtonStyle",
+            "iconPolicy": "runtime",
+            "runtimeIcon": "ExitGeometry",
             "iconRequired": true
           }
         ]

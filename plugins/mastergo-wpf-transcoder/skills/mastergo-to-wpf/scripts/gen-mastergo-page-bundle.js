@@ -301,6 +301,18 @@ function collectIconReferences(mapping, layoutMenuItems) {
   return references;
 }
 
+// 组件级「运行时提供图标」（映射表 iconPolicy=runtime）：Icon 是目标项目已存在的资源键，
+// 本页不生成该 Geometry；引用它们不算缺失，剔除明细记在 bundle 审计 runtimeIcons。
+function collectRuntimeIconKeys(mapping) {
+  const keys = new Set();
+  (mapping && Array.isArray(mapping.nodes) ? mapping.nodes : []).forEach(function (node) {
+    if (node && typeof node.runtimeIcon === "string" && node.runtimeIcon.trim()) {
+      keys.add(node.runtimeIcon.trim());
+    }
+  });
+  return keys;
+}
+
 // 右下角“右侧底部-常驻button”分组内的实例不生成 MenuItem（见 feishu-layout-mapping.md）。
 // 只匹配常驻分组本身（“右侧底部-常驻button”这类名字）；页面上的“背景常驻信息”等不在此列。
 const RESIDENT_GROUP_PATTERN = /常驻(button|按钮|分组)/i;
@@ -649,8 +661,9 @@ function validateBundleOutputs(info) {
     fail("页面 Icon 存在重复 Geometry 资源键: " + [...geometryInfo.duplicateKeys].join(", "));
   }
   const iconReferences = collectIconReferences(info.mapping, info.layoutMenuItems);
+  const runtimeIconKeys = collectRuntimeIconKeys(info.mapping);
   const missingReferences = [...iconReferences].filter(function (key) {
-    return !geometryInfo.keys.has(key);
+    return !geometryInfo.keys.has(key) && !runtimeIconKeys.has(key);
   });
   if (missingReferences.length > 0) {
     fail("页面实际引用了未生成的 Geometry: " + missingReferences.join(", "));
@@ -978,6 +991,8 @@ function main() {
   const created = [];
   const backups = [];
   let langBindings = [];
+  // 组件级「运行时提供图标」的剔除审计（无此类登记时为 null，不进审计文件）。
+  let runtimeIconAudit = null;
   const originalCsproj = fs.readFileSync(csprojPath, "utf8");
   const snapshots = snapshotFiles(outputTargets.concat(langTargets).concat([layoutPath, mappingAudit, iconMapAudit, bundleAudit, csprojPath])
     .concat([nestingAudit])
@@ -1061,6 +1076,40 @@ function main() {
       "--confirmed", iconMapPath,
       "--out", tempIconMap
     ].concat(iconDslPath ? ["--dsl", iconDslPath] : []));
+    // 组件级「运行时提供图标」（映射表 iconPolicy=runtime）：Icon 是目标项目已存在的资源键，
+    // 本页不生成该 Geometry —— 把这些节点的台账条目从三个桶里剔除并单独记审计；未登记的图标不动。
+    const runtimeIconOwners = new Set();
+    for (const node of (Array.isArray(mapping.nodes) ? mapping.nodes : [])) {
+      if (node && typeof node.runtimeIcon === "string" && node.runtimeIcon !== "" &&
+          typeof node.sourceRef === "string" && node.sourceRef !== "") {
+        runtimeIconOwners.add(node.sourceRef);
+      }
+    }
+    if (runtimeIconOwners.size > 0) {
+      const ledger = readJson(tempIconMap);
+      const ownedByRuntime = function (entry) {
+        if (!entry || typeof entry !== "object") return false;
+        for (const ref of runtimeIconOwners) {
+          if (entry.ownerRef === ref) return true;
+          if (typeof entry.sourceId === "string" && entry.sourceId.indexOf(ref + "/") === 0) return true;
+          if (typeof entry.sourceRef === "string" && entry.sourceRef.indexOf(ref + "/") === 0) return true;
+        }
+        return false;
+      };
+      const runtimeIcons = [];
+      for (const bucket of ["icons", "candidates", "unmapped"]) {
+        if (!Array.isArray(ledger[bucket])) continue;
+        const kept = [];
+        for (const entry of ledger[bucket]) {
+          if (ownedByRuntime(entry)) runtimeIcons.push({ bucket, icon: entry.name || null, ownerRef: entry.ownerRef || null });
+          else kept.push(entry);
+        }
+        ledger[bucket] = kept;
+      }
+      ledger.runtimeIcons = runtimeIcons;
+      fs.writeFileSync(tempIconMap, JSON.stringify(ledger, null, 2) + "\n", "utf8");
+      runtimeIconAudit = { owners: [...runtimeIconOwners], removed: runtimeIcons.length };
+    }
     run(ICON_SCRIPT, [svgPath, tempIconMap, tempIcon].concat(iconDslPath ? [iconDslPath] : []));
 
     const tempLang = path.join(tempRoot, "lang.json");
@@ -1213,6 +1262,8 @@ function main() {
           ? null
           : "manifest 未提供 languages：本次未生成语言字典，页面不会挂 LangName（多语言默认开启，请检查 languages 是否被显式关闭）"),
       excludedInstances: excludeInstances,
+      // 组件级「运行时提供图标」：被剔除的页面 Icon 条目（Icon 由目标项目提供，本页不生成）。
+      runtimeIcons: runtimeIconAudit,
       // 容器嵌套：默认开启；记录容器数/重挂数/冲突数（明细见 Generated/<Page>.nesting-report.json）。
       nesting: {
         enabled: nestingEnabled,
