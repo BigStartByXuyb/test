@@ -848,18 +848,11 @@ function bundleFileRegistry(info, options) {
   // （getDsl.json / coverage-report.json / manifest.json / timing.json 等）：一律按证据登记，
   // 避免出现"项目里有这个文件、登记表里却没有"的漏项。
   // 备份先登记：它是最具体的类别，必须先占位，避免被下面的生成目录扫描当成普通证据登记。
-  // 本次运行产生的（含 Bundle 自身的 copyOutput/writeAuditOutput/备份，以及子脚本 gen-mtslg-layout.js、
-  // gen-mw-wpf-page.js 各自备份的文件）标 createdThisRun=true。
-  (options.backups || []).forEach(function (filePath) {
-    const entry = push(filePath, "backup");
-    if (entry) entry.createdThisRun = true;
-  });
-  // 再补扫项目内其余 .bak-<时间戳>：历史副本同样登记（createdThisRun=false），
-  // 这样"登记表 vs 磁盘"在备份这一类上不再有允许差异。
-  (options.existingBackups || []).forEach(function (relativePath) {
-    const entry = pushRelative(relativePath, "backup");
-    if (entry) entry.createdThisRun = false;
-  });
+  // 只登记**本次运行新产生**的副本——含 Bundle 自身的 copyOutput/writeAuditOutput，以及子脚本
+  // gen-mtslg-layout.js / gen-mw-wpf-page.js 各自备份的文件（由 main 用运行前后差集补齐）。
+  // 历史副本不入表：登记表的口径是"这一次生成产生了什么"，不是"项目里现在有什么"——
+  // 同一项目后续会有很多页面，全量登记会把别的页面的历史文件全拖进来。
+  (options.backups || []).forEach(function (filePath) { push(filePath, "backup"); });
   (options.sourceFiles || []).forEach(function (filePath) { push(filePath, "audit"); });
   (options.generatedFiles || []).forEach(function (filePath) { push(filePath, "audit"); });
   (options.workFiles || []).forEach(function (filePath) { push(filePath, "work"); });
@@ -1037,6 +1030,9 @@ function main() {
   const existingMode = ["modify-existing", "replace-existing"].includes(manifest.operation);
   const scaffoldInfo = ensureScaffold(manifest);
   const projectRoot = scaffoldInfo.projectRoot;
+  // 运行开始时的既有 .bak 快照：只用于事后算"本次运行新产生了哪些副本"。
+  // 它不影响登记表内容——登记表仍然只记本次运行的文件。
+  const backupsAtStart = new Set(scanProjectBackups(projectRoot));
   // 译文清单与术语表属于**本页生成产物**（每次生成来自当前页面的输入），不是插件固定资产：
   // 生成时同步落到该页审计目录 Generated/<Page>.lang-translations.json / .lang-glossary.json。
   const langTranslationsInput = resolveLangTranslations(manifestDir, projectRoot, manifest);
@@ -1395,10 +1391,10 @@ function main() {
       sourceFiles: [dslInputPath, visibilityInputPath, svgPath].filter(Boolean),
       generatedFiles: scanGeneratedFiles(generatedDir),
       workFiles: workFiles,
-      backups: backups,
-      existingBackups: scanProjectBackups(projectRoot).map(function (filePath) {
-        return path.relative(projectRoot, filePath).replace(/\\/g, "/");
-      })
+      // 本次运行新产生的副本 = Bundle 自己记录的 ∪ 运行前后差集（差集覆盖子脚本产生的那些）。
+      backups: backups.concat(scanProjectBackups(projectRoot).filter(function (filePath) {
+        return !backupsAtStart.has(filePath);
+      }))
     });
     const removedWorkFiles = workCleanupEnabled ? cleanupWorkFiles(fileRegistry, projectRoot) : [];
     writeAuditOutput(bundleAudit, JSON.stringify({

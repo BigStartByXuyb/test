@@ -246,13 +246,11 @@ const auditPaths = bundleAudit.files.filter(function (entry) { return entry.kind
   .map(function (entry) { return entry.path; });
 assert.ok(auditPaths.includes("Generated/coverage-report.json"),
   "生成目录下的采集产物必须登记为 audit");
-// 备份类：历史副本同样登记并标 createdThisRun=false；本次产生的副本标 true。
-const historicalEntry = bundleAudit.files.find(function (entry) {
-  return entry.path === "UI/F2-Teach/View/F2NewPageView.xaml.bak-20200101000000";
-});
-assert.ok(historicalEntry, "历史备份必须登记进 files[]");
-assert.strictEqual(historicalEntry.kind, "backup");
-assert.strictEqual(historicalEntry.createdThisRun, false, "历史备份必须标 createdThisRun=false");
+// 备份类只登记本次运行新产生的副本：运行前就存在的历史副本不得入表
+// （登记表口径是"这一次生成产生了什么"，不是"项目里现在有什么"）。
+assert.ok(
+  !bundleAudit.files.some(function (entry) { return /\.bak-20200101000000$/.test(entry.path); }),
+  "历史副本不得登记进 files[]");
 // work 类：登记 + 收尾删除；输入快照保留在审计里，所以删掉 _work 不会丢本次运行的输入。
 const workEntry = bundleAudit.files.find(function (entry) { return entry.path === "Generated/_work/F2NewPage.bundle.json"; });
 assert.ok(workEntry, "_work 下的中间文件必须登记");
@@ -370,15 +368,16 @@ assert.ok(generatedBackups.length > 0, "生成目录下的备份必须登记进 
 generatedBackups.forEach(function (entry) {
   assert.strictEqual(entry.kind, "backup", "生成目录下的 .bak 必须登记为 backup: " + entry.path);
 });
-// 备份类必须能区分"本次运行产生的"与"历史保留的"：
-// 本次为 true，历史为 false。子脚本（gen-mtslg-layout.js / gen-mw-wpf-page.js）产生的 .bak
-// 不经过 Bundle 的 backups 数组，但会被 scanProjectBackups 扫到并入表。
+// 子脚本产生的备份也必须入表：View.xaml.cs 由 gen-mw-wpf-page.js 备份，不经过 Bundle 的
+// backups 数组，只能靠"运行前后差集"兜住；历史副本仍不得入表。
 assert.ok(
-  rerunAudit.files.some(function (entry) { return entry.kind === "backup" && entry.createdThisRun === true; }),
-  "本次运行产生的备份必须标 createdThisRun=true");
+  rerunAudit.files.some(function (entry) {
+    return entry.kind === "backup" && /^UI\/F2-Teach\/View\/F2NewPageView\.xaml\.bak-\d{8,}$/.test(entry.path);
+  }),
+  "子脚本产生的备份必须登记进 files[]");
 assert.ok(
-  rerunAudit.files.some(function (entry) { return entry.kind === "backup" && entry.createdThisRun === false; }),
-  "历史备份必须标 createdThisRun=false");
+  !rerunAudit.files.some(function (entry) { return /\.bak-20200101000000$/.test(entry.path); }),
+  "历史副本仍不得登记进 files[]");
 // 审计文件自己的旧版本也必须登记成 backup（否则就是"登记表写完之后才产生的备份"这个漏项）。
 assert.ok(
   rerunAudit.files.some(function (entry) {
