@@ -710,22 +710,17 @@ assert.ok(modeDoc.includes("压成空格会让两行文案退化成一行"),
   assert.ok(feishuSection.length > 0, "feishu 组件库文档必须保留「组件父子相对坐标」小节");
   assert.ok(/内容区原点/.test(feishuSection) && /contentInsetStyle/.test(feishuSection),
     "「组件父子相对坐标」小节必须带容器内容区原点例外（且写明 contentInsetStyle 查表键）");
-  // 作业 A 的框架手册必须标明"不作为作业 B 运行期口径依据"并指向正确小节，且不得把它写成待确认项。
+  // 作业 A 的框架手册只需两句：本文是作业 A 参考；作业 B 的 GroupBox 是空 Style（+ 指向第 3 节）。
   for (const manual of ["io/io-group-box.md", "native/group-box.md"]) {
     const text = fs.readFileSync(path.join(__dirname, "..", "..", "references", "adapters", "mw-wpf", "framework-manual", "02-controls", manual), "utf8");
-    assert.ok(/不作为作业 B/.test(text),
-      "framework-manual/02-controls/" + manual + " 必须标明不作为作业 B 运行期口径依据");
+    assert.ok(/作业 B（MTSLG IOContorl 页面 XML）的 GroupBox \*\*`Style` 是空串\*\*/.test(text),
+      "framework-manual/02-controls/" + manual + " 的适用范围横幅必须直说作业 B 的 GroupBox Style 是空串");
     assert.ok(/第 3 节（坐标规则）/.test(text),
       "framework-manual/02-controls/" + manual + " 必须指向 mtslg-mode.md 第 3 节（坐标规则）");
     assert.ok(!/TD-065/.test(text),
       "framework-manual/02-controls/" + manual + " 不得把该确定口径挂成待确认项");
-    // 两个承载点分别断言，不做整文件匹配：样式族表的默认样式行、写法示例里的「默认（不写 Style）」句。
-    const defaultRow = (text.match(/^\| （(?:无键默认样式|隐式默认样式)） \|.*$/m) || [""])[0];
-    assert.ok(/作业 B 优先级/.test(defaultRow),
-      "framework-manual/02-controls/" + manual + " 的样式族表默认样式行必须带「作业 B 优先级」说明");
-    const exampleLine = (text.match(/^- 默认（不写 Style）.*$/m) || [""])[0];
-    assert.ok(/注意适用范围/.test(exampleLine),
-      "framework-manual/02-controls/" + manual + " 的写法示例「默认（不写 Style）」句必须带「注意适用范围」说明");
+    assert.ok(!/作业 B 优先级|注意适用范围/.test(text),
+      "framework-manual/02-controls/" + manual + " 不得再引入「优先级/适用范围」之类的包装说法");
   }
   // map._meta.note 的交叉引用同样必须指到第 3 节。
   assert.ok(/第 3 节（坐标规则）/.test(metaNotes), "map._meta.note 的交叉引用必须指向 mtslg-mode.md 第 3 节");

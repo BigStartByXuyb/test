@@ -3,7 +3,7 @@
 
 # IOGroupBox（IO 分组框）
 
-> **适用范围**：本文属**作业 A（MW WPF / XAML 侧）**参考资料，描述 `TargetType=controls:IOGroupBox` 的隐式 `Style` 解析，来自某次本地框架快照（版本可能过期）。**不作为作业 B（MTSLG IOContorl 页面 XML）运行期口径的依据**——作业 B 的 GroupBox `Style`（恒为空串）与内容区原点口径见 `mtslg-mode.md` **第 3 节（坐标规则）**与 `mtslg-iocontrol-map.json` 的 `infoGroupTemplates.styleInsets`；两者冲突时以后者为准（该口径是项目框架侧的确定事实：空 `Style` 的内容区原点就是 `IOGroupBoxSecondary` 的 `{left:1, top:35}`）。
+> **适用范围**：本文属**作业 A（MW WPF / XAML 侧）**参考资料，描述 `TargetType=controls:IOGroupBox` 的隐式 `Style` 解析，来自某次本地框架快照。作业 B（MTSLG IOContorl 页面 XML）的 GroupBox **`Style` 是空串**（`Style=""`），其内容区原点为 `IOGroupBoxSecondary` 的 `{left:1, top:35}`——见 `mtslg-mode.md` 第 3 节（坐标规则）与 `mtslg-iocontrol-map.json` 的 `infoGroupTemplates.styleInsets`。
 
 ## 1. 用途
 
@@ -44,7 +44,7 @@ TargetType = `controls:IOGroupBox`（MaxwellControl.Controls，私有程序集�
 | IOGroupBoxThirdly | IOGroupBoxBaseStyle | `ThirdGroupBox_*` 画刷组；头高 25、字号 14；模板 `GroupBoxThirdlyTemplate`（白底 + 图标+文字标题头：`GroupBoxHeaderGeometry` 20×12 + `ThirdGroupBox_IconBrush`） | 三级标题容器 |
 | IOGroupBoxFour | IOGroupBoxBaseStyle | `FourGroupBox_*` 画刷组；头高 35、字号 14、TitleAlignment=Left；复用 `IOGroupBoxSecondaryTemplate` | 四级标题容器 |
 | ContentGroupBoxStyle | 无（独立内联模板） | 圆角 3 边框 + 内容区左缩进布局（列 5/auto/*/6）；`PrimaryControlToolBrush` 边框、#EAEDF2 底、标题 FontWeight=Normal 字号 14 | 内容分组容器 |
-| （无键默认样式） | ContentGroupBoxStyle | TargetType 隐式默认样式，全局兜底。**作业 B 优先级**：MTSLG 页面 XML 下「空 `Style`」的内容区原点按项目框架侧确认的 `IOGroupBoxSecondary` `{left:1, top:35}`，本行仅记录 XAML 侧快照的样式解析 | 未显式指定 Style 时（XAML 侧） |
+| （无键默认样式） | ContentGroupBoxStyle | TargetType 隐式默认样式，全局兜底 | 未显式指定 Style 时 |
 
 配套画刷：`{source_root}/SDC/Brushes/GroupBoxBrushes.xaml`（`GroupBox_*`/`SecondGroupBox_*`/`ThirdGroupBox_*`/`FourGroupBox_*`/`ContentGroupBox_*`，命名模式 `XxxGroupBox_HeaderBackBrush/BorderBrush/HeaderTextBrush/BackBrush`）。
 
@@ -62,7 +62,7 @@ TargetType = `controls:IOGroupBox`（MaxwellControl.Controls，私有程序集�
 </s:IOGroupBox>
 ```
 
-- 默认（不写 Style）走 `ContentGroupBoxStyle`（圆角 3 内容分组形态）；要换形态显式 `Style="…"` 即可；**注意适用范围**：这是 **XAML 侧**的样式解析结论，作业 B（MTSLG 页面 XML）的空 `Style` 内容区原点按项目框架侧确认的 `IOGroupBoxSecondary` `{left:1, top:35}`，以 `mtslg-mode.md` 第 3 节为准；
+- 默认（不写 Style）走 `ContentGroupBoxStyle`（圆角 3 内容分组形态）；要换形态显式 `Style="…"` 即可；
 - 标题一律用 `Header="{DynamicResource …}"` 本地化键；分组框本身为纯容器，不承载 IOEnable 表达式。
 
 ## 6. 禁止写法对照
