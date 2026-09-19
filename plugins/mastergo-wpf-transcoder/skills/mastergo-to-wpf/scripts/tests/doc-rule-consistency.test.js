@@ -53,6 +53,28 @@ for (const [type, attrs] of Object.entries(required)) {
 assert.ok(!JSON.stringify(map).includes("无图标槽位时不发射"),
   "映射表描述不得保留「无图标槽位时不发射」——与 controlTypeRequiredAttrs 的空字符串占位口径相反");
 
+// 变体级必写字段收窄（omitRequiredAttrs）：映射表登记 + 两份 Skill + 两份人读参考 + 生成器/校验器同口径。
+// 背景：该字段先只落在飞书映射文档一处，CI 语义审计以 BLOCK 报「其余权威文档仍写恒写、LangName 是唯一例外」。
+const omitVariants = [map.rightSidebarTemplates.variants.enter, map.rightSidebarTemplates.variants.exit];
+for (const variant of omitVariants) {
+  assert.deepStrictEqual(variant.omitRequiredAttrs, ["IOVisible", "IOEnable", "IsShowStatus", "IsNeedRedMark"],
+    "右栏固定变体必须登记收窄掉的必写字段: " + variant.style);
+}
+for (const [label, text] of [
+  ["SKILL.md", mainSkill],
+  ["mtslg-mode.md", modeDoc],
+  ["feishu-component-library-mapping.md", feishuMapping],
+  ["mastergo-iocontrol-document-format/SKILL.md", docFormat],
+  ["gen-iocontrol-xml.js 头部注释", generator],
+]) {
+  assert.ok(text.includes("omitRequiredAttrs"),
+    label + " 必须写明按钮族必写字段可被变体登记 omitRequiredAttrs 收窄（不得只写「恒写 + LangName 是唯一例外」）");
+}
+assert.ok(!/`LangName` 是唯一例外/.test(mainSkill + modeDoc + feishuMapping),
+  "按钮族必写字段已有 omitRequiredAttrs 例外，正文不得再写「LangName 是唯一例外」");
+assert.ok(generator.includes("omittedAttrs(") && validator.includes("omittedAttrs("),
+  "生成器与校验器必须共用 scripts/lib/script-helpers.js 的 omittedAttrs() 判据");
+
 // ---------- TextBlock FontWeight：映射表是唯一真值源，正文只引用不另立枚举 ----------
 // 背景：该规则曾在「映射表 note + 两份正文（SKILL.md / mtslg-mode.md）+ 生成器内置默认」四处
 // 各写一份 normal 名单，2026-09-15 的 CI 语义审计连续两轮以 REVIEW 报出「正文枚举漏项 / 口径两读」。

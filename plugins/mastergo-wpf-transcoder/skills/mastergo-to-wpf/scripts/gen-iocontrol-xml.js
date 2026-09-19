@@ -29,7 +29,7 @@
  * 坐标规则：Left = absX - parentAbsX，Top = normalizedY(absY) - parentAbsY，设计稿像素 1:1 直传。
  * 页面坐标固定扣除顶部公共栏 126px，再扣除被剥离的示例标题 66px；总偏移 192px。
  *
- * 按钮族固定参数（IconButton / Button / StatusButton 无差别发射）：
+ * 按钮族固定参数（IconButton / Button / StatusButton 无差别发射；变体登记 omitRequiredAttrs 时按节点 omitAttrs 做减法）：
  *   PageName / IOVisible / IOCommand / IOEnable —— 无差别恒写；映射没有可靠来源时写空字符串占位，
  *   映射提供真实值时按真实值发射（merge 时保留现有真实值）。
  *   Icon / IconWidth / IconHeight —— 属 ControlType 固定必写字段：模板含图标字段的 IconButton 恒写，
