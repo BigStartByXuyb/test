@@ -144,7 +144,17 @@ for (const [label, text] of [
 ]) {
   assert.ok(!/第 ?\d+ ?条/.test(text),
     label + " 不得引用 SKILL.md 专有的条号（「第 N 条」），必须自洽地展开规则本身");
+  // 枚举只在 SKILL.md 那一处维护：其余权威文档只描述「中英文写法完全相同的文本」，
+  // 不得再抄一份列举（抄了就会漏项——v1.0.206 的审计就是这么报的「漏掉序列号」）。
+  assert.ok(text.includes("中英文写法完全相同的文本"),
+    label + " 必须以「中英文写法完全相同的文本」描述 noLangRefs 的覆盖面，不得另抄枚举");
+  for (const token of ["版本号", "序列号", "日期时间", "功能键", "百分比", "正负步进标签"]) {
+    assert.ok(!text.includes(token),
+      label + " 不得再列举 noLangRefs 的具体 token（" + token + "）——该枚举只在 SKILL.md 维护一份");
+  }
 }
+assert.ok(["版本号", "序列号", "日期时间", "功能键", "百分比", "正负步进标签"].every((token) => mainSkill.includes(token)),
+  "SKILL.md 的 noLangRefs 枚举止损源必须完整列全（含序列号/IP/功能键等）");
 assert.ok(/`languages\.keys\[\]` 显式提供的条目优先级最高[^\n]*唯一例外/.test(mainSkill),
   "显式 keys[] 的「优先级最高」必须就地写明槽位豁免这一例外，不能只在别处另立一句相反口径");
 assert.ok(!/`LangName` 是唯一例外/.test(JSON.stringify(map)),
