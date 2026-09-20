@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 "use strict";
 /*
- * 页面节点 ID 口径的**唯一实现**（生成器与查询工具共用；禁止各写一份）。
+ * 页面节点 ID 口径的**唯一实现**（禁止各写一份）。
  *
  *   ID = "MX_" + sha256(页面键 + "\n" + 节点 ref) 前 32 位小写十六进制
  *      页面键 = DSL 快照根节点自己的 id（= 设计帧 layerId，如 "79:162125"）
@@ -9,7 +9,7 @@
  *
  * 口径全文见 references/adapters/mtslg-iocontrol/mtslg-mode.md 第 2 节「页面节点 ID 口径」。
  * 本模块是 ID 公式的**唯一真值源**：生成器 `gen-mtslg-mapping-from-dsl.js` 的 `allocateId` 只是它的调用点
- * （先查重再转调本模块）；任何后续取 ID 的脚本/工具都必须 require 本模块，不得另行实现同一公式。
+ * （先查重再转调本模块）；需要使用该公式的脚本一律 require 本模块，不得另行实现同一公式。
  */
 const crypto = require("crypto");
 
