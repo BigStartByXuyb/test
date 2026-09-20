@@ -125,8 +125,16 @@ assert.ok(mainSkill.includes("valueLangExempt"),
   "SKILL.md 必须把 valueLangExempt 列入交付说明的枚举");
 assert.ok(mainSkill.includes("不需要翻译的文本自动豁免"),
   "SKILL.md 描述 autoNoLangRefs 覆盖面时必须用中性表述（中英文一致文本 + 运行时动态值）");
-assert.ok(!mainSkill.includes("`noLangRefs` 只用于运行时动态值"),
-  "SKILL.md 不得把 noLangRefs 限定为「运行时动态值」——第 5 条的中英文一致文本也走这条通道");
+// noLangRefs 的覆盖面必须在全部权威文档里同口径：不得把它限定为「运行时动态值」
+// （第 5 条的中英文一致文本——F1/版本号/序列号/日期时间/纯数字符号——也走这条通道）。
+for (const [label, text] of [
+  ["SKILL.md", mainSkill],
+  ["mtslg-mode.md", modeDoc],
+  ["feishu-component-library-mapping.md", feishuMapping],
+]) {
+  assert.ok(!text.includes("只用于运行时动态值") && !text.includes("豁免的运行时动态值"),
+    label + " 不得把 noLangRefs 限定为「运行时动态值」——第 5 条的中英文一致文本也走这条通道");
+}
 assert.ok(/`languages\.keys\[\]` 显式提供的条目优先级最高[^\n]*唯一例外/.test(mainSkill),
   "显式 keys[] 的「优先级最高」必须就地写明槽位豁免这一例外，不能只在别处另立一句相反口径");
 assert.ok(!/`LangName` 是唯一例外/.test(JSON.stringify(map)),

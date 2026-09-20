@@ -54,7 +54,8 @@ function textOf(node) {
 const dslSnapshot = readJson(required("--dsl"), "DSL snapshot");
 const visibility = readJson(required("--visibility"), "visibility");
 const templateMap = readJson(required("--template-map"), "template map");
-// 按钮族清单的唯一真值源是映射表 buttonFamily.controlTypes（不在生成器里再抄一份名单）。
+// 按钮族清单的真值来源是映射表 buttonFamily.controlTypes；表中缺字段时退回内置默认（与表内容一致），
+// 与 gen-iocontrol-xml.js 的 loadButtonFamilyRules() 同口径。Bundle 也会把表里的清单传给语言键派生器。
 const buttonFamilyControlTypes = new Set(
   templateMap.buttonFamily && Array.isArray(templateMap.buttonFamily.controlTypes) &&
     templateMap.buttonFamily.controlTypes.length

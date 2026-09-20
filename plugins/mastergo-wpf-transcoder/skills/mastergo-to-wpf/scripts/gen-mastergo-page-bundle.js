@@ -1209,7 +1209,13 @@ function main() {
         glossary: resolveLangGlossary(manifestDir, projectRoot, manifest),
         translations: resolveLangTranslations(manifestDir, projectRoot, manifest),
         titleText: manifestTitleText || auditTitleText,
-        locales: langLocales
+        locales: langLocales,
+        // 按钮族清单的唯一真值源是模板表 buttonFamily.controlTypes：这里按表传入，
+        // 派生器只在没拿到该参数时才退回自己的内置默认（与表内容一致）。
+        buttonControlTypes: (function () {
+          const buttonFamily = readJson(templateMapPath, "template map").buttonFamily;
+          return buttonFamily && Array.isArray(buttonFamily.controlTypes) ? buttonFamily.controlTypes : null;
+        })()
       });
       manifest.languages = mergeAutoLangKeys(derived.languages, manifest.languages);
       autoLangReport = derived.report;
