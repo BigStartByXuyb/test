@@ -222,7 +222,7 @@ for (const ref of ["p/tb-sn", "p/tb-ver2", "p/tb-model", "p/tb-pct", "p/tb-hotke
 }
 
 // 7.1) 按钮族例外：带文案的 IconButton / Button / StatusButton 一律挂 LangName，
-//      数值 / 符号按钮（+5、-5）也产键，键名走 Plus5 / Minus1；产键结果额外记入 buttonFamilyKeys。
+//      数值 / 符号按钮（+5、-5）也产键，键名走 Plus5 / Minus5；产键结果额外记入 buttonFamilyKeys。
 for (const ref of ["p/btn-plus5", "p/btn-minus5"]) {
   assert.ok(!languages.noLangRefs.includes(ref), ref + " 作为按钮族文案不得进入 noLangRefs");
   assert.ok(keyByRef.has(ref), ref + "（按钮族带文案）必须生成语言键");
