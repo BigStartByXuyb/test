@@ -217,6 +217,9 @@ const residentGroups = barChildren.filter(function (child) {
 // 与 Bundle 的 validateResidentGroupEvidence 同一口径（映射 sourceNodes 里所有常驻分组的 INSTANCE 子节点）。
 // 设计稿可能在页面根级额外复制一份常驻分组，此时底栏内只有一组、整页有两组：
 // 若这里只数底栏内那一组，Bundle 会因数量不一致硬失败（并要求人工改清单），所以按 DSL 事实登记。
+// 由此带来的口径：matchedBottomBarItems = menuItems.length + residentGroupItems 也会把底栏外那份
+// 副本算进去（与 feishu-layout-mapping.md 的换算式一致）；差异在 note 里写明（"DSL 里共 N 组，底栏内 M 项"），
+// 需要"只统计底栏内"的数量时应以 note 里的底栏内数字为准。
 const allResidentGroups = [];
 (function collectResidentGroups(node) {
   for (const child of childrenOf(node)) {

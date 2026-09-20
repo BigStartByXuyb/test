@@ -8,7 +8,7 @@
 
 const fs = require("fs");
 const path = require("path");
-// 页面节点 ID 口径的唯一实现（生成器与查询工具/GUI 共用；禁止各写一份）。
+// 页面节点 ID 口径的唯一真值源在 lib/page-node-id.js；本文件的 allocateId 只是它的调用点（先查重再转调）。
 const PAGE_NODE_ID = require(path.join(__dirname, "lib", "page-node-id.js"));
 // 跨脚本共用工具的唯一实现（见 scripts/lib/script-helpers.js；禁止在本脚本再抄一份）。
 const { readJson, normalizeToken: normalize, normalizeNewlines } = require(path.join(__dirname, "lib", "script-helpers.js"));

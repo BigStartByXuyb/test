@@ -22,7 +22,7 @@
 
 一个页面底部栏对应一个 Page 下的一个 Menu；只有底部栏横排的命中变体实例生成 MenuItem。底部栏容器、右下角常驻分组（`右侧底部-常驻button`）以及分组内的全部子实例都不生成 MenuItem。
 
-常驻分组内的实例数量登记在 `layoutEvidence.residentGroupItems`，与 `matchedBottomBarItems` 的换算关系为 `matchedBottomBarItems = menuItems.length + residentGroupItems`；生成脚本会按此校验并在 `menuItems` 里出现常驻分组实例时直接失败。**Index 只按菜单项编号**：右下角常驻分组由框架单独处理，既不生成 MenuItem、也不占用 Index，`Index` 从 1 起、按底部栏视觉排列顺序连续编号（`1..menuItems.length`），不留空档、不跳号。**未命中变体的实例**（既非装饰、又不在常驻分组、也没按 `layoutRules.bottomBar.match` 命中变体）计入 `layoutEvidence.unresolvedBottomBarItems`，非 0 时拒绝生成——不允许静默丢按钮。
+常驻分组内的实例数量登记在 `layoutEvidence.residentGroupItems`，与 `matchedBottomBarItems` 的换算关系为 `matchedBottomBarItems = menuItems.length + residentGroupItems`；生成脚本会按此校验并在 `menuItems` 里出现常驻分组实例时直接失败。**口径范围**：`residentGroupItems` 按**整页 DSL** 统计（与 Bundle 的 `validateResidentGroupEvidence` 同口径）；若设计稿在底栏之外还复制了一份常驻分组，那份副本也会计入 `residentGroupItems` 与 `matchedBottomBarItems`——差异在 `layoutEvidence.note` 里写明（"DSL 里共 N 组，底栏内 M 项"），需要"只统计底栏内"的数量时以 note 里的底栏内数字为准。**Index 只按菜单项编号**：右下角常驻分组由框架单独处理，既不生成 MenuItem、也不占用 Index，`Index` 从 1 起、按底部栏视觉排列顺序连续编号（`1..menuItems.length`），不留空档、不跳号。**未命中变体的实例**（既非装饰、又不在常驻分组、也没按 `layoutRules.bottomBar.match` 命中变体）计入 `layoutEvidence.unresolvedBottomBarItems`，非 0 时拒绝生成——不允许静默丢按钮。
 
 ```xml
 <Page Target="{target}" LangName="{page_lang_name}">

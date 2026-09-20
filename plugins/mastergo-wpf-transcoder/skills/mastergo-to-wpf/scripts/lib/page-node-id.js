@@ -8,8 +8,8 @@
  *      节点 ref = 快照里的全路径 ref（父链 + 自身 id，页内唯一，兄弟增删不影响）
  *
  * 口径全文见 references/adapters/mtslg-iocontrol/mtslg-mode.md 第 2 节「页面节点 ID 口径」。
- * C# 侧 `tools/page-node-id/PageNodeId.cs` 是同一公式的独立实现，供不装 Node 的开发使用；
- * 两者一致性由 tests/resolve-page-node-id.test.js 比对（exe 存在时）。
+ * 本模块是 ID 公式的**唯一真值源**：生成器 `gen-mtslg-mapping-from-dsl.js` 的 `allocateId` 只是它的调用点
+ * （先查重再转调本模块）；任何后续取 ID 的脚本/工具都必须 require 本模块，不得另行实现同一公式。
  */
 const crypto = require("crypto");
 

@@ -57,11 +57,11 @@
 
 `ID` 会赋给 WPF 控件的 `.Name`（见 `MT3.0界面设计器` 的「通用属性」），并被 `pageDesign.GetValueByID` / `GetControlByID` / `SetValueByID` / `SetFocus` / `ReLoadedByID` 等 API 当作**控件句柄**，所以它必须**页内唯一**且**跨版本稳定**——工程师的代码就是拿这个字符串引用控件的。
 
-- **生成口径**（唯一实现：`scripts/gen-mtslg-mapping-from-dsl.js` 的 `allocateId`）：
+- **生成口径**（公式的唯一真值源：`scripts/lib/page-node-id.js`；`gen-mtslg-mapping-from-dsl.js` 的 `allocateId` 只是它的调用点：先查重再转调）：
   `ID = "MX_" + sha256(页面键 + "\n" + 节点 ref)` 的前 32 位小写十六进制；
   页面键 = DSL 快照根节点自己的 `id`（= 设计帧的 layerId，如 `79:162125`），节点 `ref` = 快照里的全路径 ref（父链 + 自身 id，已由 Capture 校验页内唯一）。
 - **性质**：页内唯一（同页两个节点派生出同一 ID 时生成器直接失败）；**同一设计节点在任何机器、任何时间、第几次重跑都得到同一个 ID**；兄弟节点增删不改变 `ref`，因此不会像遍历序号那样整体位移；只有把节点移到别的父容器下（`ref` 的父链变化）才换 ID。
-- **形态**：`MX_` + 32 位小写十六进制，与设计器/人工产出的 GUID **同形**。前缀不可省：WPF `.Name` 要求首字符是字母或下划线（实测 `9abc…` / `has-dash` / `has.dot` 非法，`MX_9abc…` / `MG_0001` 合法），而 `Guid.NewGuid().ToString("N")` 可能以数字开头。运行时不校验 GUID 版本位（生产页面里存在 `MX_SSD_1` 这类非 v4 的 ID）。
+- **形态**：**我们自己生成的 ID 一律是 `MX_` + 32 位小写十六进制**，与设计器产出的 GUID 同形。前缀不可省：WPF `.Name` 要求首字符是字母或下划线（实测 `9abc…` / `has-dash` / `has.dot` 非法，`MX_9abc…` / `MG_0001` 合法），而 `Guid.NewGuid().ToString("N")` 可能以数字开头。**历史/人工的 ID 不保证同形**（生产页面里存在 `MX_SSD_1` 这类非 v4、非 32 位的写法）：运行时只把 ID 当字符串、不校验形态，merge / provenance 也不按形态判定（判定只依据"这个 ref 在不在本次 mapping 里"）。
 - **禁止**用遍历序号（`MG_0001` / `MGText_0008` / `MGCol_0001`）当节点身份：前面增删一个节点会让后面所有编号位移，于是 merge 配不上、工程师代码里的 `GetValueByID("…")` 会静默指向别的控件。
 - **人工维护约定**：人工新增/手改的节点，ID 沿用原有 GUID 写法（`MX_` + 32 位十六进制），唯一性由人工保证；**"这个节点是不是我们生成的"不靠名字判断**，而靠 mapping（有没有设计来源）判断（见第 5 节的人工/外部节点条目）。人工若要改动文案，需回灌设计稿——文案与 `LangName` 都是设计侧派生的。
 - **溯源资料缺失时**（例如从代码仓库新拉下来的项目只有页面 XML）：`id-map` / `mapping` 都不是必需品——ID 可由设计稿随时重算（重取 DSL → 重推 mapping → 以现有 XML 作 merge 输入）。前提是能拿到设计稿（`fileId + layerId`）。
