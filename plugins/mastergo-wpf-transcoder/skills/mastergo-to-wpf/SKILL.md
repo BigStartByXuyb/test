@@ -166,7 +166,7 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
    6. DSL 图层英文名（过滤 `Dir`/`F1`/`CH1` 之类的结构噪音）。
    7. 兜底 `{页面名}Text{NN}`：页面内唯一、稳定，标记 `provisional`，必须列入待改名清单。
 4. 名称冲突由生成器按稳定数字后缀处理（`HomeStart`、`HomeStart2`），不静默覆盖。
-5. **中英文写法相同的文本不编造语言键**：纯数字、符号、正负步进标签（`+5`/`-1`/`±0.5`）、百分比、版本号、序列号、IP、日期时间、功能键 `F1` 这类**在 CN 与 EN 里写法完全相同**的文本（逐类判据见派生器 `isDynamicText()`，本节列举是唯一权威列表）一律自动进入 `noLangRefs`，并在审计里逐条给出豁免原因；这类节点只写 `Value`，不挂 `LangName`。例外两条：Layout `MenuItem` 必须挂 `LangName`（菜单名仍会派生 key）；**按钮族（`IconButton`/`Button`/`StatusButton`）带文案的节点一律必须挂 `LangName`，因此 `+5`/`-1` 这类数值按钮也要产键**（CN/EN 文案一致），派生结果记入审计 `buttonFamilyKeys`，不进入 `noLangRefs`。
+5. **CN 与 EN 写法完全相同的文本不编造语言键**：纯数字、符号、正负步进标签（`+5`/`-1`/`±0.5`）、百分比、版本号、序列号、IP、日期时间、功能键 `F1` —— 这些文本在中英文界面里写法完全一样，一律自动进入 `noLangRefs`（逐类判据见派生器 `isDynamicText()`，本条的列举与它必须一致），并在审计里逐条给出豁免原因；这类节点只写 `Value`，不挂 `LangName`。例外两条：Layout `MenuItem` 必须挂 `LangName`（菜单名仍会派生 key）；**按钮族（`IconButton`/`Button`/`StatusButton`）带文案的节点一律必须挂 `LangName`，因此 `+5`/`-1` 这类数值按钮也要产键**（CN/EN 文案一致），派生结果记入审计 `buttonFamilyKeys`，不进入 `noLangRefs`。
 
 自动派生结果的交付要求：
 
@@ -177,7 +177,7 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 - **页面标题文案来源必须逐页核对**：审计 `languages.titleSource` = `mapping.textAudit` 表示标题取自设计稿原文（默认、可信）；= `manifest.pageTitleText` 表示工程师显式覆盖值，交付前必须与 `textAudit` 的 `sourceText` 逐字比对（含空格与标点，不得自行归一化）；= `dslRoot` 表示既没有覆盖值也没有 textAudit 标题，退回的是**设计画板框名**（可能带前缀点、空格差异、版本后缀），交付说明必须单列并要求人工确认。
 - 确实没能翻译的条目会保留中文占位并逐条记入 `languages.derivation.pendingTranslations`；交付说明必须单列这份“待翻译清单”，不得把中文占位当已完成翻译交付。
 - 数字、符号、编号等中英文一致的文本已在第 5 条豁免，不出现在待翻译清单里。
-- `provisionalKeys`（临时键）、`autoNoLangRefs`（不需要翻译的文本自动豁免：第 5 条那类 CN/EN 写法完全相同的文本，加运行时动态值）与 `valueLangExempt`（槽位级豁免的选择框 `Value`）必须在交付说明里列全，供工程师改名与确认；三条清单互不重叠，不得因为门禁通过就隐去，也不得把某一条的内容并进另一条。
+- `provisionalKeys`（临时键）、`autoNoLangRefs`（不需要翻译的文本自动豁免：第 5 条那类 CN 与 EN 写法完全相同的文本，加运行时动态值）与 `valueLangExempt`（槽位级豁免的选择框 `Value`）必须在交付说明里列全，供工程师改名与确认；三条清单互不重叠，不得因为门禁通过就隐去，也不得把某一条的内容并进另一条。
 - `languages.keys[]` 显式提供的条目优先级最高：按 `key`、`sourceRef`/`sourceRefs`、`menuIndex` 覆盖机械派生结果。**唯一例外**：目标节点所在槽位登记了 `langRefPolicy: "none"`（见下）时，该显式条目直接被判为矛盾输入并导致生成失败。
 - 需要人工指定语义名时，优先补 `langGlossary`（文案级复用）或显式 `keys[]`，不要靠改生成器。
 

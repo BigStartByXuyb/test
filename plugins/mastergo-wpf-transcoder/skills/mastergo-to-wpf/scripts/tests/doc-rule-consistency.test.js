@@ -144,10 +144,10 @@ for (const [label, text] of [
 ]) {
   assert.ok(!/第 ?\d+ ?条/.test(text),
     label + " 不得引用 SKILL.md 专有的条号（「第 N 条」），必须自洽地展开规则本身");
-  // 枚举只在 SKILL.md 那一处维护：其余权威文档只描述「中英文写法完全相同的固定文本 + 判据见 isDynamicText()」，
+  // 枚举只在 SKILL.md 那一处维护：其余权威文档只描述「CN 与 EN 写法完全相同的文本 + 判据见 isDynamicText()」，
   // 不得再抄一份列举（抄了就会漏项——v1.0.206 的审计就是这么报的「漏掉序列号」）。
-  assert.ok(text.includes("中英文写法完全相同的固定文本") && text.includes("isDynamicText"),
-    label + " 必须以「中英文写法完全相同的固定文本 + 逐类判据见 isDynamicText()」描述 noLangRefs 的覆盖面，不得只用宽泛说法、也不得另抄枚举");
+  assert.ok(text.includes("CN 与 EN 写法完全相同的文本") && text.includes("isDynamicText"),
+    label + " 必须以「CN 与 EN 写法完全相同的文本 + 逐类判据见 isDynamicText()」描述 noLangRefs 的覆盖面，不得只用宽泛说法、也不得另抄枚举");
   for (const token of ["版本号", "序列号", "日期时间", "功能键", "百分比", "正负步进标签"]) {
     assert.ok(!text.includes(token),
       label + " 不得再列举 noLangRefs 的具体 token（" + token + "）——该枚举只在 SKILL.md 维护一份");
@@ -155,17 +155,20 @@ for (const [label, text] of [
 }
 assert.ok(["版本号", "序列号", "日期时间", "功能键", "百分比", "正负步进标签"].every((token) => mainSkill.includes(token)),
   "SKILL.md 的 noLangRefs 枚举止损源必须完整列全（含序列号/IP/功能键等）");
-// 旧判据（与「功能键 F1」自相矛盾的那条）不得留在插件任何一处：它会被审计当成相反口径。
-const legacyCriterion = "不含中文" + "且不含英文字母";
-const pluginRootDir = path.join(__dirname, "..", "..");
+// 与实现相矛盾的 noLangRefs 表述不得出现在插件任何一处（「不含英文字母」会把功能键 F1 排除在外，
+// 与派生器 isDynamicText() 的实现相反）——全插件扫描，扫描范围就是注释声明的范围。
+const contradictingCriterion = "不含中文" + "且不含英文字母";
+const pluginRootDir = path.join(__dirname, "..", "..", "..", "..");
+assert.ok(fs.existsSync(path.join(pluginRootDir, ".claude-plugin", "plugin.json")),
+  "扫描根必须是插件根目录（含 .claude-plugin/plugin.json）: " + pluginRootDir);
 const sweep = (dir) => {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const target = path.join(dir, entry.name);
     if (entry.isDirectory()) { if (entry.name !== "node_modules") sweep(target); continue; }
     if (!/\.(md|json|js|mjs)$/.test(entry.name)) continue;
     if (path.resolve(target) === path.resolve(__filename)) continue;
-    assert.ok(!fs.readFileSync(target, "utf8").includes(legacyCriterion),
-      path.relative(pluginRootDir, target) + " 仍留有已作废的 noLangRefs 判据「" + legacyCriterion + "」");
+    assert.ok(!fs.readFileSync(target, "utf8").includes(contradictingCriterion),
+      path.relative(pluginRootDir, target) + " 含有与派生器实现相矛盾的表述「" + contradictingCriterion + "」");
   }
 };
 sweep(pluginRootDir);
