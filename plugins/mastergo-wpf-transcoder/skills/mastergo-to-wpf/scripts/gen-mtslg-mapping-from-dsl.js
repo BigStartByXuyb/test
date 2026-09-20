@@ -17,8 +17,11 @@ const ICON_OWNERSHIP = require(path.join(__dirname, "lib", "icon-ownership.js"))
 const MAP_RULES = require(path.join(__dirname, "lib", "iocontrol-map-rules.js"));
 
 // 槽位级多语言策略（langRefPolicy）的**唯一**登记点：值槽位（各族 slots[0]）——即该族
-// 用来充当控件 Value 的那个槽位。只有下面这些族的分支会消费它；其它族、或同一族第 2 个
-// 及以后槽位上的登记既不会生效也不该被静默放过，因此在这里 fail-closed。
+// 用来充当控件 Value 的那个槽位，且只允许登记在下面这些会被消费的族上。
+// 两条不开放的边界（都 fail-closed，不静默放过）：
+//   1) 同一族第 2 个及以后槽位、或生成分支不消费该字段的族；
+//   2) **按钮族**（IconButton / Button / StatusButton）——按钮文案按语言规则一律产键挂 LangName，
+//      没有槽位豁免这一说（否则右栏/主菜单这类"值槽位就是按钮"的族一登记就会静默改写按钮契约）。
 const LANG_REF_POLICY_FAMILIES = new Set([
   "rightSidebarTemplates",
   "rightSidebarComponentTemplates",
@@ -51,8 +54,15 @@ function textOf(node) {
 const dslSnapshot = readJson(required("--dsl"), "DSL snapshot");
 const visibility = readJson(required("--visibility"), "visibility");
 const templateMap = readJson(required("--template-map"), "template map");
+// 按钮族清单的唯一真值源是映射表 buttonFamily.controlTypes（不在生成器里再抄一份名单）。
+const buttonFamilyControlTypes = new Set(
+  templateMap.buttonFamily && Array.isArray(templateMap.buttonFamily.controlTypes) &&
+    templateMap.buttonFamily.controlTypes.length
+    ? templateMap.buttonFamily.controlTypes.map(String)
+    : ["IconButton", "Button", "StatusButton"]
+);
 // 槽位级多语言策略登记点校验：仅「值槽位（slots[0]）」且仅下面这些族会被消费，
-// 其它位置的登记一律 fail-closed，避免"登记了却不生效、也不报错"。
+// 其它位置的登记、以及按钮族值槽位上的登记一律 fail-closed，避免"登记了却不生效、也不报错"。
 for (const [family, spec] of Object.entries(templateMap)) {
   if (!family.endsWith("Templates") || !spec || !spec.variants) continue;
   for (const [variant, entry] of Object.entries(spec.variants)) {
@@ -70,6 +80,11 @@ for (const [family, spec] of Object.entries(templateMap)) {
       if (index !== 0) {
         throw new Error("映射表 " + family + "." + variant + " 在 slots[" + index + "]（" + slotSpec.slot +
           "）登记了 langRefPolicy：该字段只支持值槽位 slots[0]，其余槽位登记不会生效");
+      }
+      if (buttonFamilyControlTypes.has(String(slotSpec.controlType || ""))) {
+        throw new Error("映射表 " + family + "." + variant + " 的值槽位 " + slotSpec.slot +
+          " 控件类型是按钮族（" + slotSpec.controlType +
+          "）：按钮族带文案一律产键挂 LangName，不开放槽位豁免——请撤销该登记");
       }
     });
   }

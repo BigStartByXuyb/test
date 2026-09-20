@@ -94,6 +94,19 @@ assert.ok(langRefSlots.every((item) => item.endsWith("=none")),
   "langRefPolicy 只允许 none: " + langRefSlots.join(", "));
 assert.ok(langRefSlots.every((item) => item.includes("#slots[0]")),
   "langRefPolicy 只允许登记在值槽位 slots[0]: " + langRefSlots.join(", "));
+// 按钮族不开放槽位豁免：登记的槽位控件类型不得属于 buttonFamily.controlTypes（否则按钮文案会静默不产键）。
+const buttonTypes = new Set((map.buttonFamily && map.buttonFamily.controlTypes) || []);
+for (const [familyName, spec] of Object.entries(map)) {
+  if (!familyName.endsWith("Templates") || !spec || !spec.variants) continue;
+  for (const [variantName, entry] of Object.entries(spec.variants)) {
+    for (const slotSpec of (entry && entry.slots) || []) {
+      if (!slotSpec || slotSpec.langRefPolicy === undefined) continue;
+      assert.ok(!buttonTypes.has(String(slotSpec.controlType || "")),
+        familyName + "." + variantName + " 的值槽位是按钮族（" + slotSpec.controlType +
+        "），不得登记 langRefPolicy —— 按钮文案一律产键挂 LangName");
+    }
+  }
+}
 assert.ok(langRefSlots.some((item) => item.startsWith("selectBoxTemplates.")),
   "选择框四个变体的值槽位必须全部登记该策略: " + langRefSlots.join(", "));
 assert.strictEqual(langRefSlots.filter((item) => item.startsWith("selectBoxTemplates.")).length, 4,
@@ -110,6 +123,12 @@ for (const [label, text] of [
 // 交付侧的枚举必须包含槽位豁免清单，否则照旧文书写交付说明会漏列 valueLangExempt。
 assert.ok(mainSkill.includes("valueLangExempt"),
   "SKILL.md 必须把 valueLangExempt 列入交付说明的枚举");
+assert.ok(mainSkill.includes("不需要翻译的文本自动豁免"),
+  "SKILL.md 描述 autoNoLangRefs 覆盖面时必须用中性表述（中英文一致文本 + 运行时动态值）");
+assert.ok(!mainSkill.includes("`noLangRefs` 只用于运行时动态值"),
+  "SKILL.md 不得把 noLangRefs 限定为「运行时动态值」——第 5 条的中英文一致文本也走这条通道");
+assert.ok(/`languages\.keys\[\]` 显式提供的条目优先级最高[^\n]*唯一例外/.test(mainSkill),
+  "显式 keys[] 的「优先级最高」必须就地写明槽位豁免这一例外，不能只在别处另立一句相反口径");
 assert.ok(!/`LangName` 是唯一例外/.test(JSON.stringify(map)),
   "映射表必须与两份正文同口径：不得再写「LangName 是唯一例外」");
 

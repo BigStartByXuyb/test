@@ -761,6 +761,16 @@ const nonValueResult = runMappingCaseExpectFailure('langref-non-value-slot', non
 assert.notStrictEqual(nonValueResult.status, 0, '非值槽位上的 langRefPolicy 必须失败，不得静默忽略');
 assert.match(nonValueResult.stderr + nonValueResult.stdout, /只支持值槽位 slots\[0\]/);
 
+// 按钮族的值槽位（右栏/主菜单等）不开放槽位豁免：按钮文案一律产键挂 LangName，登记必须失败。
+const buttonFamilySlot = JSON.parse(JSON.stringify(templateMapDoc));
+const rightSidebarVariant = buttonFamilySlot.rightSidebarTemplates.variants['F+文案'];
+assert.strictEqual(rightSidebarVariant.slots[0].controlType, 'IconButton',
+  '右栏族的值槽位就是 IconButton —— 正是这条边界要挡住的情况');
+rightSidebarVariant.slots[0].langRefPolicy = 'none';
+const buttonFamilyResult = runMappingCaseExpectFailure('langref-button-family', buttonFamilySlot);
+assert.notStrictEqual(buttonFamilyResult.status, 0, '按钮族值槽位不得登记槽位豁免');
+assert.match(buttonFamilyResult.stderr + buttonFamilyResult.stdout, /按钮族带文案一律产键挂 LangName，不开放槽位豁免/);
+
 const badPolicyValue = JSON.parse(JSON.stringify(templateMapDoc));
 badPolicyValue.selectBoxTemplates.variants['选择框-40'].slots[0].langRefPolicy = 'optional';
 const badPolicyResult = runMappingCaseExpectFailure('langref-bad-value', badPolicyValue);
