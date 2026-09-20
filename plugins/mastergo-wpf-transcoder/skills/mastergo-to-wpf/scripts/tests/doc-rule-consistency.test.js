@@ -146,8 +146,8 @@ for (const [label, text] of [
     label + " 不得引用 SKILL.md 专有的条号（「第 N 条」），必须自洽地展开规则本身");
   // 枚举只在 SKILL.md 那一处维护：其余权威文档只描述「中英文写法完全相同的文本」，
   // 不得再抄一份列举（抄了就会漏项——v1.0.206 的审计就是这么报的「漏掉序列号」）。
-  assert.ok(text.includes("不含中文且不含英文字母的文本"),
-    label + " 必须以判定口径「不含中文且不含英文字母的文本」描述 noLangRefs 的覆盖面，不得只用宽泛说法、也不得另抄枚举");
+  assert.ok(text.includes("中英文写法完全相同的固定文本") && text.includes("isDynamicText"),
+    label + " 必须以「中英文写法完全相同的固定文本 + 逐类判据见 isDynamicText()」描述 noLangRefs 的覆盖面，不得只用宽泛说法、也不得另抄枚举");
   for (const token of ["版本号", "序列号", "日期时间", "功能键", "百分比", "正负步进标签"]) {
     assert.ok(!text.includes(token),
       label + " 不得再列举 noLangRefs 的具体 token（" + token + "）——该枚举只在 SKILL.md 维护一份");

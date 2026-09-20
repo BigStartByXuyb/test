@@ -166,7 +166,7 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
    6. DSL 图层英文名（过滤 `Dir`/`F1`/`CH1` 之类的结构噪音）。
    7. 兜底 `{页面名}Text{NN}`：页面内唯一、稳定，标记 `provisional`，必须列入待改名清单。
 4. 名称冲突由生成器按稳定数字后缀处理（`HomeStart`、`HomeStart2`），不静默覆盖。
-5. **中英文一致的文本不编造语言键**：不含中文且不含英文字母的文本 —— 纯数字、符号、正负步进标签（`+5`/`-1`/`±0.5`）、百分比、版本号、序列号、IP、日期时间、功能键 `F1` —— 在 CN 与 EN 里写法完全相同，一律自动进入 `noLangRefs`，并在审计里逐条给出豁免原因；这类节点只写 `Value`，不挂 `LangName`。例外两条：Layout `MenuItem` 必须挂 `LangName`（菜单名仍会派生 key）；**按钮族（`IconButton`/`Button`/`StatusButton`）带文案的节点一律必须挂 `LangName`，因此 `+5`/`-1` 这类数值按钮也要产键**（CN/EN 文案一致），派生结果记入审计 `buttonFamilyKeys`，不进入 `noLangRefs`。
+5. **中英文写法相同的文本不编造语言键**：纯数字、符号、正负步进标签（`+5`/`-1`/`±0.5`）、百分比、版本号、序列号、IP、日期时间、功能键 `F1` 这类**在 CN 与 EN 里写法完全相同**的文本（逐类判据见派生器 `isDynamicText()`，本节列举是唯一权威列表）一律自动进入 `noLangRefs`，并在审计里逐条给出豁免原因；这类节点只写 `Value`，不挂 `LangName`。例外两条：Layout `MenuItem` 必须挂 `LangName`（菜单名仍会派生 key）；**按钮族（`IconButton`/`Button`/`StatusButton`）带文案的节点一律必须挂 `LangName`，因此 `+5`/`-1` 这类数值按钮也要产键**（CN/EN 文案一致），派生结果记入审计 `buttonFamilyKeys`，不进入 `noLangRefs`。
 
 自动派生结果的交付要求：
 

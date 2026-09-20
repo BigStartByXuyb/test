@@ -31,7 +31,7 @@
  *
  * 【不需要翻译的文本】判定口径是「不含中文且不含英文字母」的文本：不生成语言键，自动进入
  * noLangRefs 并在报告里逐条列出原因（逐类判据见下方 isDynamicText()）。
- * 该枚举的权威表述只维护在 SKILL.md「语言与多语言」一节，本文件不再抄一份。
+ * 该枚举的权威表述只维护在 SKILL.md「页面多语言文件（当前 MTSLG 路线）」一节，本文件不再抄一份。
  * 例外：Layout 的 MenuItem 必须挂 LangName，所以菜单名仍会派生 key（命名也优先用 Icon 资源名）。
  *      按钮族（IconButton / Button / StatusButton）带文案的节点同样必须挂 LangName，
  *      因此数值/符号按钮（+5 / -1）也产键，结果记入报告 buttonFamilyKeys；
