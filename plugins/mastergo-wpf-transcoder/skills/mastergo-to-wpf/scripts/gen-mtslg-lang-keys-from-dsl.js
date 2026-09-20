@@ -355,7 +355,7 @@ function deriveLangSpec(options) {
   const catalog = opts.keyCatalog instanceof Map ? opts.keyCatalog : new Map();
   const refNames = buildRefNameIndex(opts.dsl);
   // 按钮族：带文案的按钮一律挂 LangName（SKILL 语言规则），数值/符号按钮也不例外，
-  // 因此这一类节点不参与 isDynamicText 的自动豁免。
+  // 全量多语言下按钮族与其他文本一样产键，这里只是给数值/符号按钮多留一条审计记录。
   const buttonControlTypes = new Set(
     Array.isArray(opts.buttonControlTypes) && opts.buttonControlTypes.length
       ? opts.buttonControlTypes.map(String)
@@ -766,7 +766,7 @@ function deriveLangSpec(options) {
     report.sources[source] += 1;
   }
 
-  // 4) 显式豁免（opts.noLangRefs）与自动豁免合并。
+  // 4) 只合并调用方显式传入的 noLangRefs；生成器不自动往这个通道写任何条目。
   const explicitNoLangRefs = Array.isArray(opts.noLangRefs) ? opts.noLangRefs.map(String).filter(Boolean) : [];
   report.explicitNoLangRefs = [];
   for (const ref of explicitNoLangRefs) {

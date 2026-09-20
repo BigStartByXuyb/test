@@ -234,7 +234,7 @@ assert.ok(report.buttonFamilyKeys.some((item) => item.sourceRef === "p/btn-plus5
 
 // 7.2) 选择框（ComboBox）的 Value 是「默认选中的名称」（运行时由 IOName 数据决定，不是固定文案）：
 //      映射表槽位登记 langRefPolicy=none → 不产键、不挂 LangName，
-//      也**不占用** noLangRefs（那条通道只留给运行时动态值，见 7）。
+//      也**不占用** noLangRefs（该通道只收调用方显式写入的条目，见 7）。
 for (const ref of ["p/cb-direction", "p/cb-mode"]) {
   assert.ok(!keyByRef.has(ref), ref + "（选择框 Value）不得生成语言键");
   assert.ok(!languages.noLangRefs.includes(ref),
@@ -289,7 +289,7 @@ assert.match(fs.readFileSync(path.join(langOutDir, "DemoRecipe_EN.xaml"), "utf8"
   /<sys:String x:Key="PCHeaderSoftwareVersion">Software Version<\/sys:String>/);
 
 // 10) 单元级判定：动态值 vs 真实文案。
-assert.strictEqual(KEYS.isDynamicText("+5").dynamic, true, "数字/符号中英文一致，不需要语言键");
+assert.strictEqual(KEYS.isDynamicText("+5").dynamic, true, "数字/符号中英文写法一致（分类留档；全量多语言下照样产键）");
 assert.strictEqual(KEYS.isDynamicText("-1").dynamic, true);
 assert.strictEqual(KEYS.isDynamicText("±0.5").dynamic, true);
 assert.strictEqual(KEYS.isDynamicText("9.0%").dynamic, true);

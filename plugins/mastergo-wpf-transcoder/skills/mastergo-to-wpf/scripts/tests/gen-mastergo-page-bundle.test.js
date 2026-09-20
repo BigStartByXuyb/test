@@ -766,7 +766,7 @@ assert.strictEqual(autoAudit.languages.derivation.translatedFromInput, 2,
 assert.strictEqual(autoAudit.languages.derivation.pendingTranslations.length, 0,
   "该页中文文案已全部给出译文，不应再有待翻译项");
 assert.ok(autoAudit.languages.derivation.identicalTextKeys.some((item) => item.text === "9.0%"),
-  "动态值必须自动进入 noLangRefs 并记录原因");
+  "中英文写法相同的文本必须产键，并在审计 identicalTextKeys 里逐条留档");
 assert.ok(autoAudit.languages.derivation.buttonFamilyKeys.some((item) => item.text === "+5"),
   "按钮族数值文案必须产键并在审计里记录原因");
 // 译文清单必须作为本页产物落盘（不是插件里固定的共享文件）。
