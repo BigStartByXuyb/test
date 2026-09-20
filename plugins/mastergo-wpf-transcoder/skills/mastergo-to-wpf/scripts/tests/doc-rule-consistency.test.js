@@ -131,9 +131,19 @@ for (const [label, text] of [
   ["SKILL.md", mainSkill],
   ["mtslg-mode.md", modeDoc],
   ["feishu-component-library-mapping.md", feishuMapping],
+  ["mtslg-iocontrol-map.json（controlTypeRequiredAttrs._note）", JSON.stringify(map)],
 ]) {
   assert.ok(!text.includes("只用于运行时动态值") && !text.includes("豁免的运行时动态值"),
     label + " 不得把 noLangRefs 限定为「运行时动态值」——第 5 条的中英文一致文本也走这条通道");
+}
+// 「第 5 条」是 SKILL.md 专有的条号：两份独立参考文档不得原样复制这个出处（它们没有编号条款）。
+for (const [label, text] of [
+  ["mtslg-mode.md", modeDoc],
+  ["feishu-component-library-mapping.md", feishuMapping],
+  ["mtslg-iocontrol-map.json（controlTypeRequiredAttrs._note）", JSON.stringify(map)],
+]) {
+  assert.ok(!/第 ?\d+ ?条/.test(text),
+    label + " 不得引用 SKILL.md 专有的条号（「第 N 条」），必须自洽地展开规则本身");
 }
 assert.ok(/`languages\.keys\[\]` 显式提供的条目优先级最高[^\n]*唯一例外/.test(mainSkill),
   "显式 keys[] 的「优先级最高」必须就地写明槽位豁免这一例外，不能只在别处另立一句相反口径");
