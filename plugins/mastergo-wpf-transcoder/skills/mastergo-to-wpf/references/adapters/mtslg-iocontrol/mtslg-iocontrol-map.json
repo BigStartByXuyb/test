@@ -1072,6 +1072,7 @@
     "match": {
       "property": "属性 1"
     },
+    "langRefPolicyNote": "选择框的 `Value` 是「**默认选中的名称**」（MT3.0 界面设计器文档：`Value | string | Y | 默认选中的名称`；`IOName` 才是把选中值写入/读出的数据绑定）——运行时由数据决定，不是要翻译的固定文案，因此本族槽位登记 `langRefPolicy: \"none\"`：**不产语言键、不挂 LangName**。需要多语言的是**选项文字**：设计器文档里选项是 ComboBox 的子 `TextBlock`（各自带 `Value`），或由 `ItemsSourceFile` 数据文件提供；设计稿只画关闭态、没有选项列表时，选项数据属运行时待绑定，不得编造。",
     "variants": {
       "选择框-40": {
         "controlType": "ComboBox",
@@ -1083,7 +1084,8 @@
             "slot": "select",
             "controlType": "ComboBox",
             "iconPolicy": "none",
-            "valueSource": "dsl.text"
+            "valueSource": "dsl.text",
+            "langRefPolicy": "none"
           }
         ]
       },
@@ -1097,7 +1099,8 @@
             "slot": "select",
             "controlType": "ComboBox",
             "iconPolicy": "none",
-            "valueSource": "dsl.text"
+            "valueSource": "dsl.text",
+            "langRefPolicy": "none"
           }
         ]
       },
@@ -1111,7 +1114,8 @@
             "slot": "select",
             "controlType": "ComboBox",
             "iconPolicy": "none",
-            "valueSource": "dsl.text"
+            "valueSource": "dsl.text",
+            "langRefPolicy": "none"
           }
         ]
       },
@@ -1125,7 +1129,8 @@
             "slot": "select",
             "controlType": "ComboBox",
             "iconPolicy": "none",
-            "valueSource": "dsl.text"
+            "valueSource": "dsl.text",
+            "langRefPolicy": "none"
           }
         ]
       }

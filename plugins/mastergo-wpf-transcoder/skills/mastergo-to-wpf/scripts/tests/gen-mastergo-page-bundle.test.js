@@ -773,6 +773,58 @@ const autoTranslationAudit = path.join(project, "Generated/LangAuto.lang-transla
 assert.ok(fs.existsSync(autoTranslationAudit), "译文清单必须随本页生成落盘");
 assert.deepStrictEqual(JSON.parse(fs.readFileSync(autoTranslationAudit, "utf8")), autoManifest.languages.translations);
 
+// 选择框（ComboBox）的 Value 是「默认选中的名称」（MT3.0 界面设计器文档：运行时由 IOName 数据决定），
+// 映射表槽位登记 langRefPolicy=none → Bundle 不得给它派生语言键、不得给它挂 LangName
+// （requireLangName 门禁必须跳过该槽位），也不得占用 noLangRefs 通道。
+const comboMapping = JSON.parse(fs.readFileSync(path.join(project, "Generated/F2NewPage.mapping.json"), "utf8"));
+for (const item of comboMapping.nodes || []) {
+  if (item.attrs) delete item.attrs.LangName;
+}
+comboMapping.nodes.push({
+  ref: "body-text/select-direction",
+  xmlId: "body-text/select-direction",
+  id: "body-text/select-direction",
+  sourceRef: "body-text/select-direction",
+  sourceParent: "body-text",
+  sourceText: "后向",
+  valueSource: "dsl.text",
+  langRefPolicy: "none",
+  controlType: "ComboBox",
+  absX: 300, absY: 292, w: 80, h: 32,
+  expectedLeft: 300, expectedTop: 100, expectedWidth: 80, expectedHeight: 32,
+  heightSource: "dsl.bbox",
+  attrs: { Value: "后向", ControlType: "ComboBox", Style: "", IOName: "" }
+});
+comboMapping.sourceNodes.push({
+  ref: "body-text/select-direction", parentRef: "body-text",
+  pageAbsX: 300, pageAbsY: 292, relativeX: 300, relativeY: 292, width: 80, height: 32, text: "后向"
+});
+const comboMappingPath = path.join(root, "lang-combo-mapping.json");
+fs.writeFileSync(comboMappingPath, JSON.stringify(comboMapping, null, 2), "utf8");
+const comboManifest = langManifestFor("LangCombo", { auto: true, locales: ["CN", "EN"], keyCatalog: autoCatalog });
+comboManifest.operation = "replace-existing";
+comboManifest.mappingPath = comboMappingPath;
+delete comboManifest.dslPath;
+delete comboManifest.visibilityPath;
+const comboManifestPath = path.join(root, "lang-combo.json");
+fs.writeFileSync(comboManifestPath, JSON.stringify(comboManifest, null, 2), "utf8");
+result = spawnSync(process.execPath, [script, "--manifest", comboManifestPath], { encoding: "utf8" });
+assert.strictEqual(result.status, 0,
+  "选择框 Value 由槽位豁免后不得再触发「必须挂 LangName」门禁: " + result.stderr + result.stdout);
+const comboDir = path.join(project, "Resources", "Pages", "LangCombo");
+const comboXml = fs.readFileSync(path.join(comboDir, "LangComboPage.xml"), "utf8");
+const comboBlock = comboXml.split("<IOContorl").slice(1).find((block) => /Value="后向"/.test(block));
+assert.ok(comboBlock, "选择框必须出现在页面 XML 里");
+assert.match(comboBlock, /ControlType="ComboBox"/);
+assert.doesNotMatch(comboBlock, /LangName="/, "选择框的「默认选中的名称」不得挂 LangName");
+assert.doesNotMatch(fs.readFileSync(path.join(comboDir, "LangCombo_CN.xaml"), "utf8"), />后向</,
+  "选择框 Value 的文案不得进入语言字典");
+const comboAudit = JSON.parse(fs.readFileSync(path.join(project, "Generated/LangCombo.bundle.manifest.json"), "utf8"));
+assert.ok(comboAudit.languages.derivation.valueLangExempt.some((item) => item.sourceRef === "body-text/select-direction"),
+  "槽位豁免必须登记进 derivation.valueLangExempt");
+assert.ok(!comboAudit.languages.derivation.autoNoLangRefs.some((item) => item.sourceRef === "body-text/select-direction"),
+  "槽位豁免不得占用 noLangRefs 通道（那条通道只留给运行时动态值）");
+
 // 显式关闭多语言：必须给出 reason，审计记录 languageDisabled，且不生成字典、不挂 LangName。
 const langOffManifest = langManifestFor("LangOff", { disabled: true, reason: "该页确认不做多语言" });
 const langOffPath = path.join(root, "lang-off.json");

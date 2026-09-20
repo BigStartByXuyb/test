@@ -83,7 +83,13 @@ const mapping = {
     // 固定键不依赖设计文本，这正是「设计稿只提供几何」场景。
     { sourceRef: "p/btn-exit", controlType: "IconButton", valueSource: null,
       attrs: { Value: "", Icon: "ExitGeometry" },
-      fixedLang: { keyTemplate: "{page}Exit", text: { CN: "EXIT", EN: "EXIT" } } }
+      fixedLang: { keyTemplate: "{page}Exit", text: { CN: "EXIT", EN: "EXIT" } } },
+    // 选择框（ComboBox）：映射表槽位登记 langRefPolicy=none —— Value 是「默认选中的名称」，
+    // 运行时由 IOName 数据决定，不是要翻译的固定文案：既不产语言键，也不占用 noLangRefs 通道。
+    { sourceRef: "p/cb-direction", controlType: "ComboBox", sourceText: "后向", valueSource: "dsl.text",
+      langRefPolicy: "none", attrs: { Value: "后向", ControlType: "ComboBox" } },
+    { sourceRef: "p/cb-mode", controlType: "ComboBox", sourceText: "AUTO", valueSource: "dsl.text",
+      langRefPolicy: "none", attrs: { Value: "AUTO", ControlType: "ComboBox" } }
   ]
 };
 const mappingPath = write("mapping.json", mapping);
@@ -222,6 +228,20 @@ for (const ref of ["p/btn-plus5", "p/btn-minus5"]) {
 }
 assert.ok(report.buttonFamilyKeys.some((item) => item.sourceRef === "p/btn-plus5"),
   "报告里必须记录按钮族数值键及其原因");
+
+// 7.2) 选择框（ComboBox）的 Value 是「默认选中的名称」（运行时由 IOName 数据决定，不是固定文案）：
+//      映射表槽位登记 langRefPolicy=none → 不产键、不挂 LangName，
+//      也**不占用** noLangRefs（那条通道只留给运行时动态值，见 7）。
+for (const ref of ["p/cb-direction", "p/cb-mode"]) {
+  assert.ok(!keyByRef.has(ref), ref + "（选择框 Value）不得生成语言键");
+  assert.ok(!languages.noLangRefs.includes(ref),
+    ref + " 由槽位 langRefPolicy 豁免，不应占用 noLangRefs 通道");
+  assert.ok(report.valueLangExempt.some((item) => item.sourceRef === ref && item.text),
+    ref + " 必须登记进报告 valueLangExempt，供交付说明逐条列出");
+}
+assert.strictEqual(report.valueLangExempt.length, 2, "valueLangExempt 只登记槽位豁免的选择框 Value");
+assert.ok(!languages.keys.some((entry) => entry.text.CN === "后向" || entry.text.CN === "AUTO"),
+  "选择框 Value 的文案（后向 / AUTO）不得进入语言字典");
 
 // 8) 语言文件里的文案不允许缺语言；没有译文来源的必须标记待翻译。
 for (const entry of languages.keys) {

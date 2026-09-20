@@ -558,6 +558,8 @@ function addNode(sourceRef, controlType, attrs, options = {}) {
     attrs: Object.assign({}, attrs),
     ...(options.iconSize ? { iconSize: options.iconSize } : {}),
     // 容器类节点：内容区原点（边框 + 标题条高）。重挂子控件时必须按它换算相对坐标。
+    // 槽位级多语言策略：langRefPolicy=none 表示该值不参与多语言（不产语言键、不挂 LangName）。
+    ...(options.langRefPolicy ? { langRefPolicy: options.langRefPolicy } : {}),
     ...(options.contentInset ? { contentInset: options.contentInset } : {})
   };
   outputNodes.push(out);
@@ -872,9 +874,13 @@ for (const { item: inst, match } of matched) {
     const fText = firstText(inst.ref, s => /^F\d+$/.test(s.text));
     if (fText && inst.properties["显示F"] !== false) attrs.TopLeftContent = fText.text;
     const sourceSlotRefs = [valueText?.ref, fText?.ref].filter(Boolean);
+    // 槽位登记 langRefPolicy=none 时（当前是选择框的「默认选中的名称」）：该值运行时由 IOName 数据决定，
+    // 不是要翻译的固定文案 → 标记为不参与多语言，后续不产键、不挂 LangName。
+    const langRefPolicy = spec.slots && spec.slots[0] && spec.slots[0].langRefPolicy === "none" ? "none" : undefined;
     const owner = addNode(inst.ref, spec.controlType, attrs, {
       ...(valueText ? { valueSourceRef: valueText.ref } : {}),
       ...(iconSize ? { iconSize } : {}),
+      ...(langRefPolicy ? { langRefPolicy } : {}),
       sourceSlotRefs,
       sourceSlotTexts: Object.fromEntries([valueText, fText].filter(Boolean).map(text => [text.ref, text.text]))
     });

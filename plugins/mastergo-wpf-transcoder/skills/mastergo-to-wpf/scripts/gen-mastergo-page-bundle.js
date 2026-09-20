@@ -538,6 +538,8 @@ function applyLangBindings(mapping, manifest, langSpec) {
       }
     };
     for (const node of nodes) {
+      // 槽位级 langRefPolicy=none：该值不参与多语言（例：选择框的"默认选中名"，运行时由数据决定）。
+      if (node.langRefPolicy === "none") continue;
       if (node.valueSource !== "dsl.text" || typeof node.sourceText !== "string") continue;
       if (node.attrs && typeof node.attrs.LangName === "string" && node.attrs.LangName !== "") continue;
       const ref = node.sourceRef || node.ref;
@@ -572,6 +574,8 @@ function applyLangBindings(mapping, manifest, langSpec) {
     const exempt = new Set(langSpec.noLangRefs);
     const missing = [];
     for (const node of nodes) {
+      // 同上：槽位登记 langRefPolicy=none 的值不要求 LangName。
+      if (node.langRefPolicy === "none") continue;
       if (node.valueSource !== "dsl.text") continue;
       if (node.attrs && typeof node.attrs.LangName === "string" && node.attrs.LangName !== "") continue;
       const ref = node.sourceRef || node.ref;

@@ -689,3 +689,36 @@ assert.ok(tableNameMismatch.pending.some(item => item.sourceRef === 'tbl:root/ta
   '图层名后缀不符的候选表格必须登记 pending 说明原因');
 
 console.log('PASS MTSLG DSL-to-mapping table (tableTemplates structural) regression test');
+
+// ---- 选择框（selectBoxTemplates）：Value 是「默认选中的名称」（运行时由 IOName 数据决定），
+//      映射表槽位登记 langRefPolicy=none → 必须机械透传到节点，后续不产语言键、不挂 LangName。
+const selectBoxDsl = {
+  styles: {},
+  nodes: [{
+    type: 'INSTANCE', id: 'sel:root', name: '参数设置',
+    layoutStyle: { width: 1280, height: 1024, relativeX: 0, relativeY: 0 },
+    componentInfo: {},
+    children: [{
+      type: 'INSTANCE', id: 'sel:root/select', name: '选择框',
+      layoutStyle: { width: 120, height: 40, relativeX: 40, relativeY: 300 },
+      componentInfo: { properties: { '属性 1': '选择框-40' } },
+      children: [textNode('sel:root/select/value', 'sel:root/select', '后向', 12, 10)]
+    }]
+  }]
+};
+const selectBox = runMappingCase('select-box-value-slot', selectBoxDsl, []);
+const selectNode = selectBox.nodes.find(node => node.controlType === 'ComboBox');
+assert.ok(selectNode, '选择框实例必须命中 selectBoxTemplates 并发 ComboBox');
+assert.strictEqual(selectNode.sourceRef, 'sel:root/select');
+assert.strictEqual(selectNode.attrs.Value, '后向', 'Value 取设计稿的选择框文字');
+assert.strictEqual(selectNode.valueSource, 'dsl.text');
+assert.strictEqual(selectNode.langRefPolicy, 'none',
+  '映射表槽位的 langRefPolicy=none 必须透传到映射节点（否则 Value 会被当成待翻译文案产键）');
+assert.ok(!selectBox.nodes.some(node => node.sourceRef === 'sel:root/select/value'),
+  '选择框文字作为槽位值被消费，不得再发射成独立 TextBlock');
+const selectValueAudit = selectBox.textAudit.find(item => item.sourceRef === 'sel:root/select/value');
+assert.ok(selectValueAudit, '选择框文字必须进入 textAudit（provenance 要求）');
+assert.strictEqual(selectValueAudit.role, 'component-value');
+assert.strictEqual(selectBox.pending.length, 0, '命中模板的选择框不得进入 pending');
+
+console.log('PASS MTSLG DSL-to-mapping select-box langRefPolicy regression test');

@@ -59,6 +59,7 @@ MasterGo 组件库已存在真实变体 `密码输入框`，但当前 MT3.0 IOCo
 - MasterGo 真实变体为 `选择框-40`、`选择框-36`、`选择框-32`、`选择框-28`。
 - 四个变体均生成一个 `ComboBox` IOContorl；变体后缀只决定自身 `Height`。
 - 选择框内部的下拉箭头 PATH 属于 ComboBox 内部视觉结构，不拆成独立 IOContorl；若目标控件需要图标，应由 ComboBox 样式提供。
+- **`Value` 不参与多语言（槽位登记 `langRefPolicy: "none"`）**：`Value` 的语义是「**默认选中的名称**」（MT3.0 界面设计器文档：`Value | string | Y | 默认选中的名称`；把选中值写入/读出的是 `IOName`）——运行时由数据决定，不是要翻译的固定文案，因此**不产语言键、不挂 `LangName`**。需要多语言的是**选项文字**：设计器文档里选项是 ComboBox 的子 `TextBlock`（各自带 `Value`，TextBlock 支持 `LangName`），或由 `ItemsSourceFile` + `DisplayMemberPath` / `SelectedValuePath` 从数据文件提供；设计稿只画关闭态、没有选项列表时，**选项数据属运行时待绑定**，不得编造。
 
 ### 固定模板：组件集=选择框，变体=选择框-40/选择框-36/选择框-32/选择框-28
 

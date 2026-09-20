@@ -353,6 +353,8 @@ function deriveLangSpec(options) {
     translatedFromInput: 0,
     sharedKeys: [],
     autoNoLangRefs: [],
+    // 槽位级 langRefPolicy=none 的值（如选择框的「默认选中的名称」）：不产键、不挂 LangName。
+    valueLangExempt: [],
     duplicateKeys: [],
     reusedTextKeys: [],
     warnings: []
@@ -581,6 +583,12 @@ function deriveLangSpec(options) {
       ? node.sourceRef
       : (typeof node.ref === "string" ? node.ref : "");
     if (!text || !ref) continue;
+    // 槽位登记 langRefPolicy=none：该值不参与多语言——运行时由数据决定（例：选择框的默认选中名），
+    // 不产语言键、不挂 LangName；单独登记进报告，供交付说明逐条列出。
+    if (node.langRefPolicy === "none") {
+      report.valueLangExempt.push({ sourceRef: ref, controlType: node.controlType || null, text });
+      continue;
+    }
     const dynamic = isDynamicText(text);
     const isButtonFamilyNode = buttonControlTypes.has(String(node.controlType || ""));
     if (dynamic.dynamic && !isButtonFamilyNode) {
