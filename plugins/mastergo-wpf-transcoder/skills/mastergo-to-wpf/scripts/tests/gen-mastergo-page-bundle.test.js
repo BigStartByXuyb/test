@@ -825,6 +825,27 @@ assert.ok(comboAudit.languages.derivation.valueLangExempt.some((item) => item.so
 assert.ok(!comboAudit.languages.derivation.autoNoLangRefs.some((item) => item.sourceRef === "body-text/select-direction"),
   "槽位豁免不得占用 noLangRefs 通道（那条通道只留给运行时动态值）");
 
+// 反例：给槽位豁免的节点登记显式 keys[] 是自相矛盾的输入 → 必须失败，不静默忽略、也不静默挂 LangName。
+const comboForcedManifest = JSON.parse(JSON.stringify(comboManifest));
+comboForcedManifest.pageName = "LangComboForced";
+comboForcedManifest.pageTarget = "LangComboForced";
+comboForcedManifest.pageLangName = "LangComboForcedPageTitle";
+comboForcedManifest.viewPath = "UI/F2-Teach/View/LangComboForcedView.xaml";
+comboForcedManifest.codeBehindPath = "UI/F2-Teach/View/LangComboForcedView.xaml.cs";
+comboForcedManifest.viewModelPath = "UI/F2-Teach/ViewModel/LangComboForcedViewModel.cs";
+comboForcedManifest.pageXmlPath = "Resources/Pages/LangComboForced/LangComboForcedPage.xml";
+comboForcedManifest.iconPath = "Resources/Pages/LangComboForced/LangComboForcedIcons.xaml";
+comboForcedManifest.languages = Object.assign({}, comboManifest.languages, {
+  keys: [{ key: "LangComboForcedBackward", text: { CN: "后向", EN: "Backward" }, sourceRef: "body-text/select-direction" }]
+});
+const comboForcedPath = path.join(root, "lang-combo-forced.json");
+fs.writeFileSync(comboForcedPath, JSON.stringify(comboForcedManifest, null, 2), "utf8");
+result = spawnSync(process.execPath, [script, "--manifest", comboForcedPath], { encoding: "utf8" });
+assert.notStrictEqual(result.status, 0, "给槽位豁免节点登记显式语言键时必须失败");
+assert.match(result.stderr + result.stdout, /指向槽位豁免的节点（langRefPolicy=none/);
+assert.ok(!fs.existsSync(path.join(project, "Resources/Pages/LangComboForced/LangComboForcedPage.xml")),
+  "该门禁失败后不得留下页面产物");
+
 // 显式关闭多语言：必须给出 reason，审计记录 languageDisabled，且不生成字典、不挂 LangName。
 const langOffManifest = langManifestFor("LangOff", { disabled: true, reason: "该页确认不做多语言" });
 const langOffPath = path.join(root, "lang-off.json");

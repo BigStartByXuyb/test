@@ -73,7 +73,45 @@ for (const [label, text] of [
 assert.ok(!/`LangName` 是唯一例外/.test(mainSkill + modeDoc + feishuMapping),
   "按钮族必写字段已有 omitRequiredAttrs 例外，正文不得再写「LangName 是唯一例外」");
 assert.ok(generator.includes("omittedAttrs(") && validator.includes("omittedAttrs("),
-  "生成器与校验器必须共用 scripts/lib/script-helpers.js 的 omittedAttrs() 判据");
+ "生成器与校验器必须共用 scripts/lib/script-helpers.js 的 omittedAttrs() 判据");
+
+// ---------- 槽位级多语言豁免（langRefPolicy=none）：映射表登记点 + 四份人读文档同口径 ----------
+// 背景：该策略只在选择框的值槽位上生效，2026-09-20 的 CI 语义审计以 REVIEW 报出
+// 「文档把它写成通用机制，而实现只在四个族读 slots[0]」与「既有枚举未同步 valueLangExempt」。
+const langRefSlots = [];
+for (const [familyName, spec] of Object.entries(map)) {
+  if (!familyName.endsWith("Templates") || !spec || !spec.variants) continue;
+  for (const [variantName, entry] of Object.entries(spec.variants)) {
+    const slots = entry && Array.isArray(entry.slots) ? entry.slots : [];
+    slots.forEach((slotSpec, index) => {
+      if (!slotSpec || slotSpec.langRefPolicy === undefined) return;
+      langRefSlots.push(`${familyName}.${variantName}#slots[${index}].${slotSpec.slot}=${slotSpec.langRefPolicy}`);
+    });
+  }
+}
+assert.ok(langRefSlots.length > 0, "映射表必须登记选择框 Value 的槽位级多语言豁免");
+assert.ok(langRefSlots.every((item) => item.endsWith("=none")),
+  "langRefPolicy 只允许 none: " + langRefSlots.join(", "));
+assert.ok(langRefSlots.every((item) => item.includes("#slots[0]")),
+  "langRefPolicy 只允许登记在值槽位 slots[0]: " + langRefSlots.join(", "));
+assert.ok(langRefSlots.some((item) => item.startsWith("selectBoxTemplates.")),
+  "选择框四个变体的值槽位必须全部登记该策略: " + langRefSlots.join(", "));
+assert.strictEqual(langRefSlots.filter((item) => item.startsWith("selectBoxTemplates.")).length, 4,
+  "选择框-40/36/32/28 四个变体都要登记，缺一个就会又给 Value 产键");
+for (const [label, text] of [
+  ["映射表 selectBoxTemplates.langRefPolicyNote", String(map.selectBoxTemplates.langRefPolicyNote || "")],
+  ["SKILL.md", mainSkill],
+  ["mtslg-mode.md", modeDoc],
+  ["feishu-component-library-mapping.md", feishuMapping],
+]) {
+  assert.ok(text.includes("langRefPolicy"),
+    label + " 必须写明槽位级多语言豁免（登记在映射表的变体槽位上）");
+}
+// 交付侧的枚举必须包含槽位豁免清单，否则照旧文书写交付说明会漏列 valueLangExempt。
+assert.ok(mainSkill.includes("valueLangExempt"),
+  "SKILL.md 必须把 valueLangExempt 列入交付说明的枚举");
+assert.ok(!/`LangName` 是唯一例外/.test(JSON.stringify(map)),
+  "映射表必须与两份正文同口径：不得再写「LangName 是唯一例外」");
 
 // ---------- TextBlock FontWeight：映射表是唯一真值源，正文只引用不另立枚举 ----------
 // 背景：该规则曾在「映射表 note + 两份正文（SKILL.md / mtslg-mode.md）+ 生成器内置默认」四处

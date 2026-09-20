@@ -495,6 +495,12 @@ function applyLangBindings(mapping, manifest, langSpec) {
       const node = nodes.find(function (n) { return (n.sourceRef || n.ref) === ref; });
       if (!node) {
         problems.push("LanguageKey " + entry.key + " 的 sourceRef 未命中页面节点：" + ref);
+      } else if (node.langRefPolicy === "none") {
+        // 槽位级豁免（例：选择框的「默认选中的名称」）优先于显式 keys[]：该值不参与多语言，
+        // 给它登记语言键是自相矛盾的输入，直接失败，不静默忽略、也不静默挂上 LangName。
+        problems.push("LanguageKey " + entry.key + " 的 sourceRef " + ref +
+          " 指向槽位豁免的节点（langRefPolicy=none：该值运行时由数据决定，不参与多语言）——" +
+          "请删除该显式键，或先撤销映射表里该槽位的 langRefPolicy");
       } else {
         const current = node.attrs && node.attrs.LangName;
         if (typeof current === "string" && current !== "" && current !== entry.key) {
@@ -556,7 +562,8 @@ function applyLangBindings(mapping, manifest, langSpec) {
     }
   }
 
-  // 强制门禁：生成页面里所有设计文本都必须挂 LangName，除非显式列入 noLangRefs。
+  // 强制门禁：生成页面里所有设计文本都必须挂 LangName，除非显式列入 noLangRefs，
+  // 或该节点所在的槽位登记了 langRefPolicy=none（槽位豁免，见 SKILL 多语言一节）。
   if (langSpec.requireLangName) {
     // 命名约定复核：所有最终 LangName 都必须落在 页面标题/菜单项/页面内容 三类里，
     // 包括 mapping 自带或 merge 保留下来的 LangName。

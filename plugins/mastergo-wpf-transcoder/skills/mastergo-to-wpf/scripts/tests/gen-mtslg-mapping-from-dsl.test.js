@@ -722,3 +722,49 @@ assert.strictEqual(selectValueAudit.role, 'component-value');
 assert.strictEqual(selectBox.pending.length, 0, '命中模板的选择框不得进入 pending');
 
 console.log('PASS MTSLG DSL-to-mapping select-box langRefPolicy regression test');
+
+// ---- 槽位级多语言策略的登记点必须 fail-closed：登记在没有消费方的族、挂在非值槽位、或取值非法，
+//      都必须当场失败，而不是"登记了却不生效、也不报错"。----
+function runMappingCaseExpectFailure(name, templateMapDoc) {
+  const caseDir = path.join(dir, name);
+  fs.mkdirSync(caseDir, { recursive: true });
+  const caseDsl = path.join(caseDir, 'dsl.snapshot.json');
+  const caseVisibility = path.join(caseDir, 'visibility.json');
+  const caseIconMap = path.join(caseDir, 'icon-map.json');
+  const caseMap = path.join(caseDir, 'template-map.json');
+  fs.writeFileSync(caseDsl, JSON.stringify({
+    schemaVersion: 'mastergo-dsl-capture/1', fileId: 'test-file', layerId: 'sel:root',
+    pageName: name, ui: 'test', dsl: selectBoxDsl, componentDocumentLinks: [], rules: []
+  }, null, 2));
+  fs.writeFileSync(caseVisibility, JSON.stringify({ nodes: [] }, null, 2));
+  fs.writeFileSync(caseIconMap, JSON.stringify({ icons: [] }, null, 2));
+  fs.writeFileSync(caseMap, JSON.stringify(templateMapDoc, null, 2));
+  return spawnSync(process.execPath, [script,
+    '--dsl', caseDsl, '--visibility', caseVisibility, '--template-map', caseMap,
+    '--icon-map', caseIconMap, '--out', path.join(caseDir, 'mapping.json')
+  ], { encoding: 'utf8' });
+}
+
+const templateMapDoc = JSON.parse(fs.readFileSync(templateMap, 'utf8'));
+const unsupportedFamily = JSON.parse(JSON.stringify(templateMapDoc));
+unsupportedFamily.componentTemplates.variants[Object.keys(unsupportedFamily.componentTemplates.variants)[0]]
+  .slots[0].langRefPolicy = 'none';
+const unsupportedResult = runMappingCaseExpectFailure('langref-unsupported-family', unsupportedFamily);
+assert.notStrictEqual(unsupportedResult.status, 0,
+  '在没有消费方的族上登记 langRefPolicy 必须失败，不得静默忽略');
+assert.match(unsupportedResult.stderr + unsupportedResult.stdout, /该族的生成分支不消费该字段/);
+
+const nonValueSlot = JSON.parse(JSON.stringify(templateMapDoc));
+nonValueSlot.selectBoxTemplates.variants['选择框-40'].slots
+  .push({ slot: 'extra', controlType: 'TextBlock', valueSource: 'dsl.text', langRefPolicy: 'none' });
+const nonValueResult = runMappingCaseExpectFailure('langref-non-value-slot', nonValueSlot);
+assert.notStrictEqual(nonValueResult.status, 0, '非值槽位上的 langRefPolicy 必须失败，不得静默忽略');
+assert.match(nonValueResult.stderr + nonValueResult.stdout, /只支持值槽位 slots\[0\]/);
+
+const badPolicyValue = JSON.parse(JSON.stringify(templateMapDoc));
+badPolicyValue.selectBoxTemplates.variants['选择框-40'].slots[0].langRefPolicy = 'optional';
+const badPolicyResult = runMappingCaseExpectFailure('langref-bad-value', badPolicyValue);
+assert.notStrictEqual(badPolicyResult.status, 0, 'langRefPolicy 取值非法时必须失败');
+assert.match(badPolicyResult.stderr + badPolicyResult.stdout, /langRefPolicy 取值非法/);
+
+console.log('PASS MTSLG DSL-to-mapping langRefPolicy placement fail-closed regression test');

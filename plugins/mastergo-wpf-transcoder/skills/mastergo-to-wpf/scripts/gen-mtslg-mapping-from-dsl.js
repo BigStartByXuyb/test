@@ -16,6 +16,21 @@ const ICON_OWNERSHIP = require(path.join(__dirname, "lib", "icon-ownership.js"))
 // 模板表规则块的解析唯一实现（见 scripts/lib/iocontrol-map-rules.js；禁止在本脚本再抄一份）。
 const MAP_RULES = require(path.join(__dirname, "lib", "iocontrol-map-rules.js"));
 
+// 槽位级多语言策略（langRefPolicy）的**唯一**登记点：值槽位（各族 slots[0]）——即该族
+// 用来充当控件 Value 的那个槽位。只有下面这些族的分支会消费它；其它族、或同一族第 2 个
+// 及以后槽位上的登记既不会生效也不该被静默放过，因此在这里 fail-closed。
+const LANG_REF_POLICY_FAMILIES = new Set([
+  "rightSidebarTemplates",
+  "rightSidebarComponentTemplates",
+  "selectBoxTemplates",
+  "mainMenuTemplates",
+  "inputTemplates"
+]);
+function valueSlotLangRefPolicy(spec) {
+  const first = spec && Array.isArray(spec.slots) ? spec.slots[0] : null;
+  return first && first.langRefPolicy === "none" ? "none" : undefined;
+}
+
 function arg(name) {
   const i = process.argv.indexOf(name);
   return i >= 0 ? process.argv[i + 1] : null;
@@ -36,6 +51,29 @@ function textOf(node) {
 const dslSnapshot = readJson(required("--dsl"), "DSL snapshot");
 const visibility = readJson(required("--visibility"), "visibility");
 const templateMap = readJson(required("--template-map"), "template map");
+// 槽位级多语言策略登记点校验：仅「值槽位（slots[0]）」且仅下面这些族会被消费，
+// 其它位置的登记一律 fail-closed，避免"登记了却不生效、也不报错"。
+for (const [family, spec] of Object.entries(templateMap)) {
+  if (!family.endsWith("Templates") || !spec || !spec.variants) continue;
+  for (const [variant, entry] of Object.entries(spec.variants)) {
+    const slots = entry && Array.isArray(entry.slots) ? entry.slots : [];
+    slots.forEach(function (slotSpec, index) {
+      if (!slotSpec || slotSpec.langRefPolicy === undefined) return;
+      if (slotSpec.langRefPolicy !== "none") {
+        throw new Error("映射表 " + family + "." + variant + " 槽位 " + slotSpec.slot +
+          " 的 langRefPolicy 取值非法: " + slotSpec.langRefPolicy + "（目前只支持 \"none\"）");
+      }
+      if (!LANG_REF_POLICY_FAMILIES.has(family)) {
+        throw new Error("映射表 " + family + "." + variant + " 槽位 " + slotSpec.slot +
+          " 登记了 langRefPolicy，但该族的生成分支不消费该字段——请撤销登记，或先让生成器支持该族的 Value 槽位");
+      }
+      if (index !== 0) {
+        throw new Error("映射表 " + family + "." + variant + " 在 slots[" + index + "]（" + slotSpec.slot +
+          "）登记了 langRefPolicy：该字段只支持值槽位 slots[0]，其余槽位登记不会生效");
+      }
+    });
+  }
+}
 const iconMap = arg("--icon-map") ? readJson(arg("--icon-map"), "icon map") : { icons: [] };
 // 明确隔离的组件实例：正式模板与设计结构不匹配时按 SKILL 规则只隔离该组件，
 // 保留其 DSL 来源并进入 pending，不强行套用模板，也不阻塞其他已命中组件。
@@ -557,9 +595,9 @@ function addNode(sourceRef, controlType, attrs, options = {}) {
     xmlId,
     attrs: Object.assign({}, attrs),
     ...(options.iconSize ? { iconSize: options.iconSize } : {}),
-    // 容器类节点：内容区原点（边框 + 标题条高）。重挂子控件时必须按它换算相对坐标。
     // 槽位级多语言策略：langRefPolicy=none 表示该值不参与多语言（不产语言键、不挂 LangName）。
     ...(options.langRefPolicy ? { langRefPolicy: options.langRefPolicy } : {}),
+    // 容器类节点：内容区原点（边框 + 标题条高）。重挂子控件时必须按它换算相对坐标。
     ...(options.contentInset ? { contentInset: options.contentInset } : {})
   };
   outputNodes.push(out);
@@ -874,9 +912,9 @@ for (const { item: inst, match } of matched) {
     const fText = firstText(inst.ref, s => /^F\d+$/.test(s.text));
     if (fText && inst.properties["显示F"] !== false) attrs.TopLeftContent = fText.text;
     const sourceSlotRefs = [valueText?.ref, fText?.ref].filter(Boolean);
-    // 槽位登记 langRefPolicy=none 时（当前是选择框的「默认选中的名称」）：该值运行时由 IOName 数据决定，
+    // 值槽位登记 langRefPolicy=none 时（当前是选择框的「默认选中的名称」）：该值运行时由 IOName 数据决定，
     // 不是要翻译的固定文案 → 标记为不参与多语言，后续不产键、不挂 LangName。
-    const langRefPolicy = spec.slots && spec.slots[0] && spec.slots[0].langRefPolicy === "none" ? "none" : undefined;
+    const langRefPolicy = valueSlotLangRefPolicy(spec);
     const owner = addNode(inst.ref, spec.controlType, attrs, {
       ...(valueText ? { valueSourceRef: valueText.ref } : {}),
       ...(iconSize ? { iconSize } : {}),
@@ -892,7 +930,11 @@ for (const { item: inst, match } of matched) {
   if (match.family === "inputTemplates") {
     const valueText = firstText(inst.ref);
     const attrs = valueText ? { Value: valueText.text } : {};
-    addNode(inst.ref, spec.controlType, attrs, valueText ? { valueSourceRef: valueText.ref } : {});
+    const langRefPolicy = valueSlotLangRefPolicy(spec);
+    addNode(inst.ref, spec.controlType, attrs, Object.assign(
+      valueText ? { valueSourceRef: valueText.ref } : {},
+      langRefPolicy ? { langRefPolicy } : {}
+    ));
     if (valueText) addValueAudit(valueText.ref, inst.ref);
     addInstance(match, inst.ref, [slot("input", inst.ref, valueText?.ref)]);
     continue;
