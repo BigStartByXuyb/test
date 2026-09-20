@@ -733,22 +733,23 @@ assert.match(autoEn, /<sys:String x:Key="MenuItemAction">Operation<\/sys:String>
   "菜单项必须使用 translations 里的真实英文");
 assert.match(autoCn, /<sys:String x:Key="LangAutoPageTitle">标题演示<\/sys:String>/,
   "页面标题 CN 必须取设计稿 textAudit 的 page-title 原文（不是画板框名）");
-assert.match(autoCn, /<sys:String x:Key="LangAutoText\d+">\+5<\/sys:String>/,
-  "按钮族数值文案（+5）必须产键（CN/EN 文案一致）");
+assert.match(autoCn, /<sys:String x:Key="LangAutoPlus5">\+5<\/sys:String>/,
+  "按钮族正负数值文案（+5）必须产键，键名用语义名 Plus5（CN/EN 文案一致）");
+assert.match(autoCn, /<sys:String x:Key="LangAutoMinus1">-1<\/sys:String>/,
+  "按钮族正负数值文案（-1）必须产键，键名用语义名 Minus1");
+assert.match(autoCn, /<sys:String x:Key="LangAutoNum9Dot0Pct">9\.0%<\/sys:String>/,
+  "数值+单位文本（9.0%）同样产键，键名走值字面编码 Num9Dot0Pct（不落临时键）");
 assert.match(autoCn, /<sys:String x:Key="CommonDir">Dir<\/sys:String>/,
   "必须复用目标项目已登记的语言键");
 const autoXml = fs.readFileSync(path.join(autoDir, "LangAutoPage.xml"), "utf8");
 const autoBlocks = autoXml.split("<IOContorl").slice(1).filter((block) => /Value="/.test(block));
 assert.ok(autoBlocks.length >= 5, "自动产键示例页应包含多个带文案的控件");
 const autoBlocksWithoutLang = autoBlocks.filter((block) => !/LangName="/.test(block));
-assert.ok(autoBlocksWithoutLang.length >= 1, "动态值节点（如 9.0%）仍不挂 LangName");
-autoBlocksWithoutLang.forEach((block) => {
-  const value = /Value="([^"]*)"/.exec(block)[1];
-  assert.ok(!/[\u4e00-\u9fa5]/.test(value),
-    "没有 LangName 的必须是中英文一致的数字/符号文本，实际: " + value);
-  assert.ok(!/ControlType="(IconButton|Button|StatusButton)"/.test(block),
-    "按钮族带文案一律挂 LangName，实际未挂: " + value);
-});
+const noLangValues = autoBlocksWithoutLang.map((block) => /Value="([^"]*)"/.exec(block)[1]);
+assert.ok(noLangValues.every((value) => value === ""),
+  "全量多语言：带 Value 的节点都必须挂 LangName，未挂的只允许是空占位 Value，实际: " + JSON.stringify(noLangValues));
+const percentBlock = autoXml.split("<IOContorl").slice(1).find((block) => /Value="9\.0%"/.test(block));
+assert.match(percentBlock, /LangName="[^"]+"/, "数字/符号文本（如 9.0%）也必须产键挂 LangName");
 const plus5Block = autoXml.split("<IOContorl").slice(1).find((block) => /Value="\+5"/.test(block));
 assert.match(plus5Block, /LangName="/, "按钮族数值文案（+5）必须挂 LangName");
 assert.match(autoXml, /LangName="CommonDir"/, "复用已登记键的节点必须挂上该 key");
@@ -764,7 +765,7 @@ assert.strictEqual(autoAudit.languages.derivation.translatedFromInput, 2,
   "标题与菜单的英文必须来自 translations");
 assert.strictEqual(autoAudit.languages.derivation.pendingTranslations.length, 0,
   "该页中文文案已全部给出译文，不应再有待翻译项");
-assert.ok(autoAudit.languages.derivation.autoNoLangRefs.some((item) => item.text === "9.0%"),
+assert.ok(autoAudit.languages.derivation.identicalTextKeys.some((item) => item.text === "9.0%"),
   "动态值必须自动进入 noLangRefs 并记录原因");
 assert.ok(autoAudit.languages.derivation.buttonFamilyKeys.some((item) => item.text === "+5"),
   "按钮族数值文案必须产键并在审计里记录原因");
@@ -822,8 +823,8 @@ assert.doesNotMatch(fs.readFileSync(path.join(comboDir, "LangCombo_CN.xaml"), "u
 const comboAudit = JSON.parse(fs.readFileSync(path.join(project, "Generated/LangCombo.bundle.manifest.json"), "utf8"));
 assert.ok(comboAudit.languages.derivation.valueLangExempt.some((item) => item.sourceRef === "body-text/select-direction"),
   "槽位豁免必须登记进 derivation.valueLangExempt");
-assert.ok(!comboAudit.languages.derivation.autoNoLangRefs.some((item) => item.sourceRef === "body-text/select-direction"),
-  "槽位豁免不得占用 noLangRefs 通道（那条通道只留给运行时动态值）");
+assert.ok(!comboAudit.languages.derivation.identicalTextKeys.some((item) => item.sourceRef === "body-text/select-direction"),
+  "槽位豁免既不产键也不占用 identicalTextKeys 留档");
 
 // 反例：给槽位豁免的节点登记显式 keys[] 是自相矛盾的输入 → 必须失败，不静默忽略、也不静默挂 LangName。
 const comboForcedManifest = JSON.parse(JSON.stringify(comboManifest));

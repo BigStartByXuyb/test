@@ -123,38 +123,22 @@ for (const [label, text] of [
 // 交付侧的枚举必须包含槽位豁免清单，否则照旧文书写交付说明会漏列 valueLangExempt。
 assert.ok(mainSkill.includes("valueLangExempt"),
   "SKILL.md 必须把 valueLangExempt 列入交付说明的枚举");
-assert.ok(mainSkill.includes("不需要翻译的文本自动豁免"),
-  "SKILL.md 描述 autoNoLangRefs 覆盖面时必须用中性表述（中英文一致文本 + 运行时动态值）");
-// noLangRefs 的覆盖面必须在全部权威文档里同口径：不得把它限定为「运行时动态值」
-// （第 5 条的中英文一致文本——F1/版本号/序列号/日期时间/纯数字符号——也走这条通道）。
+// 全量多语言口径：五处权威来源必须同口径（每个设计文本 Value 都产键挂 LangName，
+// 唯一不产键的是槽位登记 langRefPolicy=none 的值），不得再出现"中英文一致就不产键"的旧说法。
 for (const [label, text] of [
   ["SKILL.md", mainSkill],
   ["mtslg-mode.md", modeDoc],
   ["feishu-component-library-mapping.md", feishuMapping],
   ["mtslg-iocontrol-map.json（controlTypeRequiredAttrs._note）", JSON.stringify(map)],
+  ["gen-mtslg-lang-keys-from-dsl.js 头注释", fs.readFileSync(path.join(__dirname, "..", "gen-mtslg-lang-keys-from-dsl.js"), "utf8")],
 ]) {
-  assert.ok(!text.includes("只用于运行时动态值") && !text.includes("豁免的运行时动态值"),
-    label + " 不得把 noLangRefs 限定为「运行时动态值」——第 5 条的中英文一致文本也走这条通道");
+  assert.ok(text.includes("产键挂") || text.includes("都产键"),
+    label + " 必须写明全量多语言口径（每个设计文本 Value 都产键挂 LangName）");
+  assert.ok(!/中英文一致的文本不编造语言键|不需要语言键/.test(text),
+    label + " 不得再保留『中英文一致就不产键』的旧说法——全量口径下这类文本照样产键，只是 EN 值等于原文");
 }
-// 「第 5 条」是 SKILL.md 专有的条号：两份独立参考文档不得原样复制这个出处（它们没有编号条款）。
-for (const [label, text] of [
-  ["mtslg-mode.md", modeDoc],
-  ["feishu-component-library-mapping.md", feishuMapping],
-  ["mtslg-iocontrol-map.json（controlTypeRequiredAttrs._note）", JSON.stringify(map)],
-]) {
-  assert.ok(!/第 ?\d+ ?条/.test(text),
-    label + " 不得引用 SKILL.md 专有的条号（「第 N 条」），必须自洽地展开规则本身");
-  // 枚举只在 SKILL.md 那一处维护：其余权威文档只描述「CN 与 EN 写法完全相同的文本 + 判据见 isDynamicText()」，
-  // 不得再抄一份列举（抄了就会漏项——v1.0.206 的审计就是这么报的「漏掉序列号」）。
-  assert.ok(text.includes("CN 与 EN 写法完全相同的文本") && text.includes("isDynamicText"),
-    label + " 必须以「CN 与 EN 写法完全相同的文本 + 逐类判据见 isDynamicText()」描述 noLangRefs 的覆盖面，不得只用宽泛说法、也不得另抄枚举");
-  for (const token of ["版本号", "序列号", "日期时间", "功能键", "百分比", "正负步进标签"]) {
-    assert.ok(!text.includes(token),
-      label + " 不得再列举 noLangRefs 的具体 token（" + token + "）——该枚举只在 SKILL.md 维护一份");
-  }
-}
-assert.ok(["版本号", "序列号", "日期时间", "功能键", "百分比", "正负步进标签"].every((token) => mainSkill.includes(token)),
-  "SKILL.md 的 noLangRefs 枚举止损源必须完整列全（含序列号/IP/功能键等）");
+assert.ok(mainSkill.includes("identicalTextKeys"),
+  "SKILL.md 必须把 identicalTextKeys 列入交付说明的枚举");
 // 与实现相矛盾的 noLangRefs 表述不得出现在插件任何一处（「不含英文字母」会把功能键 F1 排除在外，
 // 与派生器 isDynamicText() 的实现相反）——全插件扫描，扫描范围就是注释声明的范围。
 const contradictingCriterion = "不含中文" + "且不含英文字母";
@@ -172,13 +156,7 @@ const sweep = (dir) => {
   }
 };
 sweep(pluginRootDir);
-// 派生器的头注释也不得再抄一份枚举（同一枚举只维护在 SKILL.md）。
-const langKeysHeader = fs.readFileSync(path.join(__dirname, "..", "gen-mtslg-lang-keys-from-dsl.js"), "utf8")
-  .split(/\r?\n/).slice(0, 60).join("\n");
-for (const token of ["版本号", "序列号", "日期时间", "功能键", "百分比"]) {
-  assert.ok(!langKeysHeader.includes(token),
-    "gen-mtslg-lang-keys-from-dsl.js 头注释不得再列举 noLangRefs 的 token（" + token + "）");
-}
+// 派生器头注释同样必须写全量口径（不再是「枚举只在 SKILL.md 维护」那套豁免口径）。
 assert.ok(/`languages\.keys\[\]` 显式提供的条目优先级最高[^\n]*唯一例外/.test(mainSkill),
   "显式 keys[] 的「优先级最高」必须就地写明槽位豁免这一例外，不能只在别处另立一句相反口径");
 assert.ok(!/`LangName` 是唯一例外/.test(JSON.stringify(map)),

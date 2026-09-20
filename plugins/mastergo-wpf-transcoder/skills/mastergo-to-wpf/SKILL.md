@@ -156,17 +156,19 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 `languages.auto=true` 时，Bundle 在 XML/Layout 生成前调用 `gen-mtslg-lang-keys-from-dsl.js`，从当前页 DSL/mapping/Layout 菜单项**机械派生** LanguageKey，不再要求调用方逐条登记。派生规则固定、可复现：
 
 1. 页面标题 → `{页面名}PageTitle`，文案取值链固定为：`manifest.pageTitleText`（**可选**的显式覆盖）→ `mapping.textAudit` 里 `role=page-title` 的 `sourceText`（**默认来源**，DSL 机械产物）→ DSL 根节点名 → 页面名。Bundle 与单脚本 CLI 走同一条链，不允许两边不一致；本次实际用到的来源写入审计 `languages.titleSource`（`manifest.pageTitleText` / `mapping.textAudit` / `dslRoot`），不得静默回退后无人知晓。
-2. Layout 菜单项 → `MenuItem{名称}`；语义名取值顺序：菜单 `Icon` 资源名去掉 `Geometry` 后缀 → `langGlossary` 术语表 → **该菜单文案的英文译文转 PascalCase**（`工件边缘录入` → `Workpiece Edge Teaching` → `WorkpieceEdgeTeaching`）→ 符号+数字（`+5` → `Plus5`）→ 纯 ASCII 文案 → DSL 图层英文名 → 兜底 `MenuItemIndex{Index}`（provisional，必须列入待改名清单）。
+2. Layout 菜单项 → `MenuItem{名称}`；语义名取值顺序：菜单 `Icon` 资源名去掉 `Geometry` 后缀 → `langGlossary` 术语表 → **该菜单文案的英文译文转 PascalCase**（`工件边缘录入` → `Workpiece Edge Teaching` → `WorkpieceEdgeTeaching`）→ 符号+数字（`+5` → `Plus5`）→ 纯 ASCII 文案 → 值字面编码（`0.000` → `Num0Dot000`）→ DSL 图层英文名 → 兜底 `MenuItemIndex{Index}`（provisional，必须列入待改名清单）。
 3. 页面内容节点（`valueSource=dsl.text`）→ `{页面名}{名称}`。**同一页面内文案完全相同的节点共用一个 key**（第一个节点派生键名，其余节点登记进该 key 的 `sourceRefs`），不再产生 `Xxx2` / `XxxText02` 这类重复键——同一页面里重复文案直接复用同一个 LanguageKey；只有“不同文案撞出相同语义名”时才用稳定数字后缀。语义名按以下优先级回退：
    1. （**仅当显式配置 `keyCatalog` 时**）目标项目已登记语言字典里**同文案**的既有 key → 直接复用并记为 `scope=shared`；`MenuItem*` 命名空间的键不给页面内容节点复用。默认不配置，页面 key 全部页面内自产。
    2. 节点 `Icon` 资源名去掉 `Geometry` 后缀（IconButton / 带图标按钮天然带英文语义名）。
    3. `langGlossary` 术语表（`{ "中文文案": "EnglishIdentifier" }`，可内联或给 JSON 文件路径）。
    4. **该文案的英文译文转 PascalCase**（`languages.translations` 里 AI/工程师已给出的译文，如 `光源调整` → `Light Source Adjust` → `LightSourceAdjust`）。算法固定：按非字母数字字符切词 → 每个词首字母大写、其余字符原样保留 → 连接；结果必须**以字母或下划线开头、其余字符为字母/数字/下划线，且长度 ≥ 3**（即派生器里的标识符规则 `^[A-Za-z_][A-Za-z0-9_]*$`），否则本条不成立、继续往下。脚本仍不翻译，只把已有译文机械转成标识符。
-   5. 纯 ASCII 文案（`AUX.` → `AUX`）。
-   6. DSL 图层英文名（过滤 `Dir`/`F1`/`CH1` 之类的结构噪音）。
-   7. 兜底 `{页面名}Text{NN}`：页面内唯一、稳定，标记 `provisional`，必须列入待改名清单。
+   5. 正负步进标签（`+5` → `Plus5`、`-1` → `Minus1`）。
+   6. 纯 ASCII 文案（`AUX.` → `AUX`）。
+   7. **值字面编码**：数值/符号型文本用值本身编码成稳定标识符（设计稿上它们是示例值，没有业务语义名，硬起语义名等于猜）——`0.000` → `Num0Dot000`、`4321` → `Num4321`、`9.0%` → `Num9Dot0Pct`、`～` → `SymWave`、`θ：` → `SymThetaColon`、`°` → `SymDeg`；词表外的符号不猜，继续往下。
+   8. DSL 图层英文名（过滤 `Dir`/`F1`/`CH1` 之类的结构噪音）。
+   9. 兜底 `{页面名}Text{NN}`：页面内唯一、稳定，标记 `provisional`，必须列入待改名清单。
 4. 名称冲突由生成器按稳定数字后缀处理（`HomeStart`、`HomeStart2`），不静默覆盖。
-5. **CN 与 EN 写法完全相同的文本不编造语言键**：纯数字、符号、正负步进标签（`+5`/`-1`/`±0.5`）、百分比、版本号、序列号、IP、日期时间、功能键 `F1` —— 这些文本在中英文界面里写法完全一样，一律自动进入 `noLangRefs`（逐类判据见派生器 `isDynamicText()`，本条的列举与它必须一致），并在审计里逐条给出豁免原因；这类节点只写 `Value`，不挂 `LangName`。例外两条：Layout `MenuItem` 必须挂 `LangName`（菜单名仍会派生 key）；**按钮族（`IconButton`/`Button`/`StatusButton`）带文案的节点一律必须挂 `LangName`，因此 `+5`/`-1` 这类数值按钮也要产键**（CN/EN 文案一致），派生结果记入审计 `buttonFamilyKeys`，不进入 `noLangRefs`。
+5. **全量多语言：设计稿给出的每个 `Value` 都产键挂 `LangName`**，不按文本形态做豁免——纯数字、符号、正负步进标签（`+5`/`-1`/`±0.5`）、百分比、版本号、序列号、IP、日期时间、功能键 `F1`、型号/编号标识符照样产键；中英文写法完全相同的文本只是 EN 值等于原文（不记 `pendingTranslations`），逐条留档在审计 `languages.derivation.identicalTextKeys` 里供交付说明核对。键名派生见第 3 条（正负步进标签 `+5`/`-1` → `Plus5`/`Minus1`；数值/符号型文本走**值字面编码**：`0.000` → `Num0Dot000`、`9.0%` → `Num9Dot0Pct`、`～` → `SymWave`，因此这类键**不落临时键**）。**唯一不产键的内容值**是映射表在值槽位登记 `langRefPolicy: "none"` 的节点（当前只有选择框 `Value`，见下），它们记入 `languages.derivation.valueLangExempt`。Layout `MenuItem` 一直都必须挂 `LangName`；按钮族（`IconButton`/`Button`/`StatusButton`）带文案的节点同样必须挂 `LangName`，数值/符号按钮的产键结果额外记入审计 `buttonFamilyKeys`。
 
 自动派生结果的交付要求：
 
@@ -176,8 +178,8 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 - 英文取值优先级：**目标项目已登记字典同 key 的英文（工程已确认）> `translations` 译文 > 中文占位**。前两者命中数分别记在 `languages.derivation.translatedFromCatalog` 与 `translatedFromInput`。
 - **页面标题文案来源必须逐页核对**：审计 `languages.titleSource` = `mapping.textAudit` 表示标题取自设计稿原文（默认、可信）；= `manifest.pageTitleText` 表示工程师显式覆盖值，交付前必须与 `textAudit` 的 `sourceText` 逐字比对（含空格与标点，不得自行归一化）；= `dslRoot` 表示既没有覆盖值也没有 textAudit 标题，退回的是**设计画板框名**（可能带前缀点、空格差异、版本后缀），交付说明必须单列并要求人工确认。
 - 确实没能翻译的条目会保留中文占位并逐条记入 `languages.derivation.pendingTranslations`；交付说明必须单列这份“待翻译清单”，不得把中文占位当已完成翻译交付。
-- 数字、符号、编号等中英文一致的文本已在第 5 条豁免，不出现在待翻译清单里。
-- `provisionalKeys`（临时键）、`autoNoLangRefs`（不需要翻译的文本自动豁免：第 5 条那类 CN 与 EN 写法完全相同的文本，加运行时动态值）与 `valueLangExempt`（槽位级豁免的选择框 `Value`）必须在交付说明里列全，供工程师改名与确认；三条清单互不重叠，不得因为门禁通过就隐去，也不得把某一条的内容并进另一条。
+- 数字、符号、编号等中英文写法相同的文本（按第 5 条同样产键）不出现在待翻译清单里：EN 值等于原文。
+- `provisionalKeys`（临时键）、`identicalTextKeys`（中英文写法相同、EN 值等于原文的键）与 `valueLangExempt`（槽位级豁免的选择框 `Value`）必须在交付说明里列全，供工程师改名与确认；三条清单互不重叠，不得因为门禁通过就隐去，也不得把某一条的内容并进另一条。
 - `languages.keys[]` 显式提供的条目优先级最高：按 `key`、`sourceRef`/`sourceRefs`、`menuIndex` 覆盖机械派生结果。**唯一例外**：目标节点所在槽位登记了 `langRefPolicy: "none"`（见下）时，该显式条目直接被判为矛盾输入并导致生成失败。
 - 需要人工指定语义名时，优先补 `langGlossary`（文案级复用）或显式 `keys[]`，不要靠改生成器。
 

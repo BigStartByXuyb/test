@@ -1219,6 +1219,14 @@ function main() {
       });
       manifest.languages = mergeAutoLangKeys(derived.languages, manifest.languages);
       autoLangReport = derived.report;
+      // 报告与最终语言清单必须一致：显式 keys[] 覆盖掉的临时键已不在最终清单里，
+      // 不能再留在"待工程师改名"的 provisionalKeys 清单里（否则交付说明会列出不存在的键）。
+      if (autoLangReport && Array.isArray(autoLangReport.provisionalKeys)) {
+        const finalKeys = new Set(manifest.languages.keys.map(function (entry) { return entry.key; }));
+        autoLangReport.provisionalKeys = autoLangReport.provisionalKeys.filter(function (item) {
+          return finalKeys.has(item.key);
+        });
+      }
       langSpec = LANG.normalizeSpec(manifest.languages, manifest.name);
     }
     // 多语言绑定必须发生在 XML/Layout 生成之前：LangName 是页面节点与 MenuItem 的业务属性。
@@ -1499,7 +1507,7 @@ function main() {
           : null,
         provisionalKeys: autoLangReport ? autoLangReport.provisionalKeys.length : 0,
         pendingTranslations: autoLangReport ? autoLangReport.pendingTranslations.length : 0,
-        autoNoLangRefs: autoLangReport ? autoLangReport.autoNoLangRefs.length : 0
+    identicalTextKeys: autoLangReport ? autoLangReport.identicalTextKeys.length : 0
       } : null,
       languagesDefaulted: langDefaulted,
       languageDisabled: langDisabled,

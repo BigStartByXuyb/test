@@ -21,21 +21,22 @@
  *      脚本仍不翻译，只把 AI/工程师已给出的译文机械转成标识符；译文是数字/符号或
  *      首位不是字母时本条不成立，继续往下（菜单项在这一步与页面内容节点同规则）。
  *   5. 纯 ASCII 文案（AUX. / Diode）归一化成标识符后缀
- *   6. DSL 图层英文名（过滤 Dir / F1 / CH1 之类的结构噪音）
- *   7. 兜底 {页面名}Text{序号}：页面内唯一、稳定，标记 provisional，报告里列出待改名
+ *   6. 值字面编码：数值/符号型文本（0.000 / 4321 / 9.0% / ～ / θ： / °）用值本身编码
+ *      （Num0Dot000 / Num4321 / Num9Dot0Pct / SymWave / SymThetaColon / SymDeg）——这类值在
+ *      设计稿上是示例值、没有业务语义名，按字面编码最稳定，也避免落临时键；词表外符号不猜
+ *   7. DSL 图层英文名（过滤 Dir / F1 / CH1 之类的结构噪音）
+ *   8. 兜底 {页面名}Text{序号}：页面内唯一、稳定，标记 provisional，报告里列出待改名
  *
  * 【同页同文案复用】同一页面内文案完全相同的页面内容节点共用一个 LanguageKey：
  * 第一个节点派生键名，其余节点登记进该键的 sourceRefs（运行时同一文案只维护一条翻译），
  * 不再产生 XxxText02 / Xxx2 这类重复键；复用结果记入报告 reusedTextKeys 与
  * sources.reusedByText。只有“不同文案撞出相同语义名”时才使用稳定数字后缀。
  *
- * 【不需要翻译的文本】判定口径是「CN 与 EN 写法完全相同」的固定文本：不生成语言键，自动进入
- * noLangRefs 并在报告里逐条列出原因（逐类判据见下方 isDynamicText()）。
- * 该枚举的权威表述只维护在 SKILL.md「页面多语言文件（当前 MTSLG 路线）」一节，本文件不再抄一份。
- * 例外：Layout 的 MenuItem 必须挂 LangName，所以菜单名仍会派生 key（命名也优先用 Icon 资源名）。
- *      按钮族（IconButton / Button / StatusButton）带文案的节点同样必须挂 LangName，
- *      因此数值/符号按钮（+5 / -1）也产键，结果记入报告 buttonFamilyKeys；
- *      按钮族清单可用 --button-control-types 覆盖（默认 IconButton,Button,StatusButton）。
+ * 【全量多语言】设计稿给出的**每个 Value 都产键挂 LangName**，不按文本形态（数字 / 符号 / 版本号 /
+ * 日期时间 / 型号…）做豁免。中英文写法完全相同的文本只是 EN 值等于原文，不会记入 pendingTranslations；
+ * 逐条列在报告 identicalTextKeys 里供交付说明核对。唯一的例外是映射表在值槽位登记 langRefPolicy=none
+ * 的节点（当前只有选择框 Value，运行时由数据决定），它们不产键、不挂 LangName，记入 valueLangExempt。
+ * 例外：Layout 的 MenuItem 必须挂 LangName，所以菜单名仍会派生 key（命名优先用 Icon 资源名）。
  *
  * 【英文文案】取值优先级：
  *   1. 目标项目已登记字典里同 key 的英文（工程已确认，优先）
@@ -90,9 +91,8 @@ function normalizeText(value) {
   return toText(value).replace(/\s+/g, " ").trim();
 }
 
-// 不可翻译文本判定。核心原则：中英文一致的文本不需要语言键。
-// 数字、符号、编号、版本、日期时间以及“只有数字+符号”的组合（+5 / -1 / ±0.5 / 9.0%）
-// 在 CN 与 EN 里写法完全相同，一律不生成语言键，只记入 noLangRefs。
+// 文本形态分类：只用于**留档**（报告 identicalTextKeys / buttonFamilyKeys 里的原因），
+// 不再决定是否产键——全量多语言下每个 Value 都产键，中英文写法相同的文本 EN 值等于原文。
 function isDynamicText(value) {
   const text = normalizeText(value);
   if (!text) return { dynamic: true, reason: "空文本" };
@@ -151,6 +151,39 @@ function asciiSuffix(value) {
   if (cleaned.length < 2) return "";
   if (!/^[A-Za-z_]/.test(cleaned)) return "";
   return KEY_RE.test(cleaned) ? cleaned : "";
+}
+
+// 值字面编码：数值/符号类文本用**值本身**编码成稳定标识符后缀（全量多语言下这类文本同样产键，
+// 但设计稿上它们是示例值、没有业务语义名，硬起语义名等于猜——所以按字面编码，稳定、可复现）：
+//   0.000 → Num0Dot000   4321 → Num4321   9.0% → Num9Dot0Pct
+//   ～ → SymWave         θ： → SymThetaColon   ° → SymDeg
+// 含中文的文案不在这里处理（走译文 / 术语表 / 图层名那条语义名链）；
+// 出现词表里没有的符号时返回空串，继续走后面的来源，不猜。
+const LITERAL_SYMBOL_WORDS = {
+  ".": "Dot", ",": "Comma", "，": "Comma", "、": "Enum",
+  "%": "Pct", "‰": "Permille", "+": "Plus", "-": "Minus", "±": "PlusMinus",
+  "°": "Deg", "℃": "Celsius", ":": "Colon", "：": "Colon",
+  "~": "Wave", "～": "Wave", "θ": "Theta", "Θ": "Theta",
+  "/": "Slash", "\\": "Backslash", "(": "LParen", ")": "RParen",
+  "#": "Sharp", "*": "Star", "×": "Times", "≤": "Le", "≥": "Ge",
+  "∞": "Inf", "→": "Arrow", "α": "Alpha", "β": "Beta", "μ": "Mu", "Δ": "Delta"
+};
+function valueLiteralSuffix(value) {
+  const text = normalizeText(value);
+  if (!text || /[\u4e00-\u9fa5]/.test(text)) return "";
+  // 纯 ASCII 且以字母开头的文案已由 asciiSuffix 处理，这里只收「数字/符号型」字面值。
+  if (/^[A-Za-z][A-Za-z0-9_]*$/.test(text)) return "";
+  let encoded = "";
+  for (const ch of Array.from(text)) {
+    if (/[A-Za-z0-9]/.test(ch)) { encoded += ch; continue; }
+    if (ch === " ") continue;
+    const word = LITERAL_SYMBOL_WORDS[ch];
+    if (!word) return "";
+    encoded += word;
+  }
+  if (!encoded) return "";
+  const suffix = (/\d/.test(text) ? "Num" : "Sym") + encoded;
+  return KEY_RE.test(suffix) && suffix.length >= 4 ? suffix : "";
 }
 
 // 译文派生语义名：用该页已产出的英文译文做机械 PascalCase，中文文案 → 英文标识符。
@@ -344,7 +377,7 @@ function deriveLangSpec(options) {
     titleKey: pageName + TITLE_SUFFIX,
     sources: {
       title: 0, menu: 0, catalog: 0, icon: 0, glossary: 0,
-      translated: 0, signNumber: 0, asciiText: 0, dslLayerName: 0, fallback: 0, reusedByText: 0
+      translated: 0, signNumber: 0, asciiText: 0, valueLiteral: 0, dslLayerName: 0, fallback: 0, reusedByText: 0
     },
     provisionalKeys: [],
     pendingTranslations: [],
@@ -352,7 +385,9 @@ function deriveLangSpec(options) {
     translatedFromCatalog: 0,
     translatedFromInput: 0,
     sharedKeys: [],
-    autoNoLangRefs: [],
+    // 中英文写法完全相同、EN 值等于 CN 的键（数字 / 符号 / 版本号 / 日期时间 / 功能键 / 型号…）：
+    // 全量多语言下照样产键，这里逐条留档，供交付说明与复核对照。
+    identicalTextKeys: [],
     // 槽位级 langRefPolicy=none 的值（如选择框的「默认选中的名称」）：不产键、不挂 LangName。
     valueLangExempt: [],
     duplicateKeys: [],
@@ -523,6 +558,7 @@ function deriveLangSpec(options) {
     if (source === "translated") report.sources.translated += 1;
     if (source === "signNumber") report.sources.signNumber += 1;
     if (source === "asciiText") report.sources.asciiText += 1;
+    if (source === "valueLiteral") report.sources.valueLiteral += 1;
     if (source === "dslLayerName") report.sources.dslLayerName += 1;
     if (source === "fallback") report.sources.fallback += 1;
   }
@@ -589,22 +625,21 @@ function deriveLangSpec(options) {
       report.valueLangExempt.push({ sourceRef: ref, controlType: node.controlType || null, text });
       continue;
     }
+    // 全量多语言：设计稿给出的**每个 Value 都产键挂 LangName**，不按文本形态（数字/符号/版本号/
+    // 日期时间/型号…）做豁免——中英文写法一致的文本只是 EN 值等于原文，不记待翻译。
+    // 唯一的例外是上面已经 continue 掉的槽位豁免（映射表登记 langRefPolicy=none，如选择框 Value）。
+    // 原本会被"中英文一致"规则挡下的节点在这里改记 identicalTextKeys，供交付说明逐条核对。
     const dynamic = isDynamicText(text);
-    const isButtonFamilyNode = buttonControlTypes.has(String(node.controlType || ""));
-    if (dynamic.dynamic && !isButtonFamilyNode) {
-      if (noLangRefs.indexOf(ref) === -1) noLangRefs.push(ref);
-      report.autoNoLangRefs.push({ sourceRef: ref, text, reason: dynamic.reason });
-      continue;
-    }
-    if (dynamic.dynamic && isButtonFamilyNode) {
-      // 按钮族例外：带文案的 IconButton / Button / StatusButton 一律产键挂 LangName，
-      // 数值/符号文案（+5 / -1 / 9.0%）在 CN 与 EN 里写法一致，但仍按运行时约定发键。
-      report.buttonFamilyKeys.push({
-        sourceRef: ref,
-        text,
-        controlType: node.controlType,
-        reason: "按钮族带文案一律挂 LangName（数值/符号按钮也产键）：" + dynamic.reason
-      });
+    if (dynamic.dynamic) {
+      report.identicalTextKeys.push({ sourceRef: ref, text, reason: dynamic.reason });
+      if (buttonControlTypes.has(String(node.controlType || ""))) {
+        report.buttonFamilyKeys.push({
+          sourceRef: ref,
+          text,
+          controlType: node.controlType,
+          reason: "按钮族带文案一律挂 LangName（数值/符号按钮也产键）：" + dynamic.reason
+        });
+      }
     }
 
     // 3.0 页面内同文案复用：同一页面里文案完全相同的节点直接共用一个 LanguageKey，
@@ -678,11 +713,19 @@ function deriveLangSpec(options) {
       suffix = translatedSuffix(text, translations);
       source = "translated";
     } else {
-      // 数字/符号类文本已在 isDynamicText 里豁免，这里只可能是需要语义名的真实文案。
+      // 正负步进标签（+5 / -1 / +0.5）用稳定语义名 Plus5 / Minus1 / Plus0Dot5；
+      // 其余数字/符号类文本走 ASCII / 图层名，仍取不到时落兜底临时键 TextNN。
+      const signed = signNumberSuffix(text);
       const ascii = asciiSuffix(text);
-      if (ascii) {
+      if (signed) {
+        suffix = signed;
+        source = "signNumber";
+      } else if (ascii) {
         suffix = ascii;
         source = "asciiText";
+      } else if (valueLiteralSuffix(text)) {
+        suffix = valueLiteralSuffix(text);
+        source = "valueLiteral";
       } else {
         const layerName = layerNameToSuffix(refNames.get(ref));
         if (layerName) {
@@ -801,7 +844,7 @@ function main() {
     keyCount: derived.report.keyCount,
     sources: derived.report.sources,
     provisionalKeys: derived.report.provisionalKeys.length,
-    autoNoLangRefs: derived.report.autoNoLangRefs.length,
+    identicalTextKeys: derived.report.identicalTextKeys.length,
     translatedFromCatalog: derived.report.translatedFromCatalog,
     translatedFromInput: derived.report.translatedFromInput,
     pendingTranslations: derived.report.pendingTranslations.length,
@@ -849,6 +892,7 @@ module.exports = {
   semanticFromIcon,
   signNumberSuffix,
   asciiSuffix,
+  valueLiteralSuffix,
   parseDictionary,
   buildKeyCatalog,
   buildKeyCatalogFromFiles,

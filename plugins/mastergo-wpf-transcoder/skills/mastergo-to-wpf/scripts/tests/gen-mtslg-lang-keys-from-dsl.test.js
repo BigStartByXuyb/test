@@ -209,13 +209,16 @@ assert.ok(!keyByRef.has("DemoRecipeDeviceMaintenance2"), "同文案不得再派�
 assert.strictEqual(keyByRef.get("p/btn-collide"), "DemoRecipeDeviceMaintenance2");
 assert.ok(report.duplicateKeys.some((item) => item.key === "DemoRecipeDeviceMaintenance2"));
 
-// 7) 不需要翻译的文本：全部进 noLangRefs 并带原因，绝不编造语言键。
-//    数字与符号在 CN/EN 里写法一致，同样不生成语言键。
+// 7) 全量多语言：数字 / 符号 / 版本号 / 型号 / 功能键这类中英文写法相同的文本**同样产键挂 LangName**，
+//    只是 EN 值等于原文（不记待翻译）；逐条登记进报告 identicalTextKeys 供交付说明核对。
 for (const ref of ["p/tb-sn", "p/tb-ver2", "p/tb-model", "p/tb-pct", "p/tb-hotkey"]) {
-  assert.ok(languages.noLangRefs.includes(ref), ref + " 必须进入 noLangRefs");
-  assert.ok(!keyByRef.has(ref), ref + " 不得生成语言键");
-  assert.ok(report.autoNoLangRefs.some((item) => item.sourceRef === ref && item.reason),
-    ref + " 必须在报告里给出豁免原因");
+  assert.ok(keyByRef.has(ref), ref + "（全量多语言）必须生成语言键");
+  const entry = keys.get(keyByRef.get(ref));
+  assert.strictEqual(entry.text.EN, entry.text.CN, ref + " 的 CN/EN 写法相同，EN 值等于原文");
+  assert.ok(report.identicalTextKeys.some((item) => item.sourceRef === ref && item.reason),
+    ref + " 必须在报告 identicalTextKeys 里登记分类原因");
+  assert.ok(!languages.noLangRefs.includes(ref),
+    ref + " 全量多语言下不得再进 noLangRefs（该通道只留给显式放行的节点）");
 }
 
 // 7.1) 按钮族例外：带文案的 IconButton / Button / StatusButton 一律挂 LangName，
@@ -298,6 +301,16 @@ assert.strictEqual(KEYS.isDynamicText("AUX.").dynamic, false);
 assert.strictEqual(KEYS.semanticFromIcon("AutoOperationGeometry"), "AutoOperation");
 assert.strictEqual(KEYS.semanticFromIcon(""), "");
 assert.strictEqual(KEYS.signNumberSuffix("+0.5"), "Plus0Dot5");
+// 值字面编码：数值/符号型文本用值本身编码，稳定且不落临时键。
+assert.strictEqual(KEYS.valueLiteralSuffix("0.000"), "Num0Dot000");
+assert.strictEqual(KEYS.valueLiteralSuffix("4321"), "Num4321");
+assert.strictEqual(KEYS.valueLiteralSuffix("9.0%"), "Num9Dot0Pct");
+assert.strictEqual(KEYS.valueLiteralSuffix("～"), "SymWave");
+assert.strictEqual(KEYS.valueLiteralSuffix("θ："), "SymThetaColon");
+assert.strictEqual(KEYS.valueLiteralSuffix("°"), "SymDeg");
+assert.strictEqual(KEYS.valueLiteralSuffix("DFL7362"), "", "字母开头的 ASCII 文案走 asciiSuffix，不做字面编码");
+assert.strictEqual(KEYS.valueLiteralSuffix("切割方向"), "", "含中文文案不做字面编码（走语义名链）");
+assert.strictEqual(KEYS.valueLiteralSuffix("⌀⌀"), "", "词表外的符号不猜，返回空串让后续来源兜底");
 assert.strictEqual(KEYS.asciiSuffix("AUX."), "AUX");
 assert.strictEqual(KEYS.asciiSuffix("工件边缘录入"), "");
 
