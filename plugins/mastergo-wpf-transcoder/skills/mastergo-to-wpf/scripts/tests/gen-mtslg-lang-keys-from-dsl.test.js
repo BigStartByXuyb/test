@@ -67,7 +67,7 @@ const mapping = {
     { sourceRef: "p/tb-aux", controlType: "TextBlock", sourceText: "AUX.", valueSource: "dsl.text", attrs: { Value: "AUX." } },
     // 兜底：中文 + 无 Icon + 图层名不可用。
     { sourceRef: "p/tb-unknown", controlType: "TextBlock", sourceText: "工件边缘录入", valueSource: "dsl.text", attrs: { Value: "工件边缘录入" } },
-    // 动态值：不得编造语言键。
+    // 数值/型号类文本：全量多语言下照常产键（EN 值等于原文），并逐条留档在 identicalTextKeys。
     { sourceRef: "p/tb-sn", controlType: "TextBlock", sourceText: "4830259438956554", valueSource: "dsl.text", attrs: { Value: "4830259438956554" } },
     { sourceRef: "p/tb-ver2", controlType: "TextBlock", sourceText: "1.0.11.2222222", valueSource: "dsl.text", attrs: { Value: "1.0.11.2222222" } },
     { sourceRef: "p/tb-model", controlType: "TextBlock", sourceText: "DFL7362", valueSource: "dsl.text", attrs: { Value: "DFL7362" } },
@@ -166,7 +166,7 @@ assert.strictEqual(keys.get("MenuItemParamMaintain").text.EN, "Parameter", "复�
 assert.ok(keys.has("MenuItemAUX"), "没有 Icon 的菜单项应回退到 ASCII 文案");
 assert.ok(!languages.keys.some((entry) => entry.menuIndex === 3), "空名称菜单项不产键");
 
-// 3) 内容节点：Icon 派生、ASCII 派生、兜底临时键；数字/符号类不产键。
+// 3) 内容节点：Icon 派生、ASCII 派生、值字面编码（数值/符号）、兜底临时键——全量多语言下都要产键。
 assert.strictEqual(keyByRef.get("p/btn-auto"), "DemoRecipeAutoOperation");
 assert.strictEqual(keyByRef.get("p/tb-aux"), "DemoRecipeAUX");
 // 「工件边缘录入」没有图标、没有术语表项，但有英文译文 → 用译文转 PascalCase 当语义名。
@@ -222,7 +222,7 @@ for (const ref of ["p/tb-sn", "p/tb-ver2", "p/tb-model", "p/tb-pct", "p/tb-hotke
 }
 
 // 7.1) 按钮族例外：带文案的 IconButton / Button / StatusButton 一律挂 LangName，
-//      数值 / 符号按钮（+5、-5）也产键，不受“中英文一致文本不编造键”的豁免影响。
+//      数值 / 符号按钮（+5、-5）也产键，键名走 Plus5 / Minus1；产键结果额外记入 buttonFamilyKeys。
 for (const ref of ["p/btn-plus5", "p/btn-minus5"]) {
   assert.ok(!languages.noLangRefs.includes(ref), ref + " 作为按钮族文案不得进入 noLangRefs");
   assert.ok(keyByRef.has(ref), ref + "（按钮族带文案）必须生成语言键");
