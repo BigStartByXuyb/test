@@ -68,7 +68,7 @@
     "note": "TextBlock 的 FontWeight 只在设计稿字重不是 normal 时发射：命中才写、不写空串、不参与恒写集合。判定顺序固定为「样式名优先」：先取设计稿自己的字体样式名（styles[...].value.style 里的 fontStyle，例如 \"Bold\"；带字体族档位数字的前缀去掉，\"75 SemiBold\" → \"SemiBold\"、\"55 Regular\" → Regular），样式名命中 normalStyleNames 即为 normal、不写该属性；只有**样式名取不到**（style 缺失/非法 JSON/没有 fontStyle 字段）时，才用 weight 数值按 normalValues 判定，非 normal 时回退写数值。FontSize 仍按 controlTypeRequiredAttrs 恒写。"
   },
   "controlTypeRequiredAttrs": {
-    "_note": "每个 ControlType 的固定必写字段集（属性恒写，取不到来源时写空字符串）。ID/ControlType 恒由节点身份发射，Left/Top/Width/Height 恒由 DSL bbox 发射（TextBlock 为 Width=NaN、Height=40），因此不重复登记在这里。LangName 是另一个例外：只在多语言绑定层给出真实 key 时发射——noLangRefs 豁免的不需要翻译文本（中英文写法完全相同的文本，以及运行时动态值）、以及槽位登记 langRefPolicy=none 的值（选择框 Value）都不写空占位。真值来源：设计方给定的 IOContorl 字段模板。",
+    "_note": "每个 ControlType 的固定必写字段集（属性恒写，取不到来源时写空字符串）。ID/ControlType 恒由节点身份发射，Left/Top/Width/Height 恒由 DSL bbox 发射（TextBlock 为 Width=NaN、Height=40），因此不重复登记在这里。LangName 是另一个例外：只在多语言绑定层给出真实 key 时发射——noLangRefs 豁免的不需要翻译文本（不含中文且不含英文字母的文本，以及运行时动态值）、以及槽位登记 langRefPolicy=none 的值（选择框 Value）都不写空占位。真值来源：设计方给定的 IOContorl 字段模板。",
     "GroupBox": ["Style", "Header", "LangName", "IOName", "IOEnable", "IOVisible", "MinValue", "MaxValue"],
     "Border": ["Style", "Value", "IOEnable", "IOVisible"],
     "TextBlock": ["Style", "Value", "LangName", "IOName", "IOEnable", "IOVisible", "IsAutoRead", "Foreground", "FontSize"],
