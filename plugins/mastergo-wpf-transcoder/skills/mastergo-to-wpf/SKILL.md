@@ -177,7 +177,7 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 - **页面标题文案来源必须逐页核对**：审计 `languages.titleSource` = `mapping.textAudit` 表示标题取自设计稿原文（默认、可信）；= `manifest.pageTitleText` 表示工程师显式覆盖值，交付前必须与 `textAudit` 的 `sourceText` 逐字比对（含空格与标点，不得自行归一化）；= `dslRoot` 表示既没有覆盖值也没有 textAudit 标题，退回的是**设计画板框名**（可能带前缀点、空格差异、版本后缀），交付说明必须单列并要求人工确认。
 - 确实没能翻译的条目会保留中文占位并逐条记入 `languages.derivation.pendingTranslations`；交付说明必须单列这份“待翻译清单”，不得把中文占位当已完成翻译交付。
 - 数字、符号、编号等中英文一致的文本已在第 5 条豁免，不出现在待翻译清单里。
-- `provisionalKeys`（临时键）、`autoNoLangRefs`（不需要翻译的文本自动豁免：第 5 条的中英文一致文本——纯数字/符号/功能键/版本号/序列号/日期时间等——加运行时动态值）与 `valueLangExempt`（槽位级豁免的选择框 `Value`）必须在交付说明里列全，供工程师改名与确认；三条清单互不重叠，不得因为门禁通过就隐去，也不得把某一条的内容并进另一条。
+- `provisionalKeys`（临时键）、`autoNoLangRefs`（不需要翻译的文本自动豁免：第 5 条那类 CN/EN 写法完全相同的文本，加运行时动态值）与 `valueLangExempt`（槽位级豁免的选择框 `Value`）必须在交付说明里列全，供工程师改名与确认；三条清单互不重叠，不得因为门禁通过就隐去，也不得把某一条的内容并进另一条。
 - `languages.keys[]` 显式提供的条目优先级最高：按 `key`、`sourceRef`/`sourceRefs`、`menuIndex` 覆盖机械派生结果。**唯一例外**：目标节点所在槽位登记了 `langRefPolicy: "none"`（见下）时，该显式条目直接被判为矛盾输入并导致生成失败。
 - 需要人工指定语义名时，优先补 `langGlossary`（文案级复用）或显式 `keys[]`，不要靠改生成器。
 

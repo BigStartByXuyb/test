@@ -144,7 +144,7 @@ for (const [label, text] of [
 ]) {
   assert.ok(!/第 ?\d+ ?条/.test(text),
     label + " 不得引用 SKILL.md 专有的条号（「第 N 条」），必须自洽地展开规则本身");
-  // 枚举只在 SKILL.md 那一处维护：其余权威文档只描述「中英文写法完全相同的文本」，
+  // 枚举只在 SKILL.md 那一处维护：其余权威文档只描述「中英文写法完全相同的固定文本 + 判据见 isDynamicText()」，
   // 不得再抄一份列举（抄了就会漏项——v1.0.206 的审计就是这么报的「漏掉序列号」）。
   assert.ok(text.includes("中英文写法完全相同的固定文本") && text.includes("isDynamicText"),
     label + " 必须以「中英文写法完全相同的固定文本 + 逐类判据见 isDynamicText()」描述 noLangRefs 的覆盖面，不得只用宽泛说法、也不得另抄枚举");
@@ -155,6 +155,20 @@ for (const [label, text] of [
 }
 assert.ok(["版本号", "序列号", "日期时间", "功能键", "百分比", "正负步进标签"].every((token) => mainSkill.includes(token)),
   "SKILL.md 的 noLangRefs 枚举止损源必须完整列全（含序列号/IP/功能键等）");
+// 旧判据（与「功能键 F1」自相矛盾的那条）不得留在插件任何一处：它会被审计当成相反口径。
+const legacyCriterion = "不含中文" + "且不含英文字母";
+const pluginRootDir = path.join(__dirname, "..", "..");
+const sweep = (dir) => {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const target = path.join(dir, entry.name);
+    if (entry.isDirectory()) { if (entry.name !== "node_modules") sweep(target); continue; }
+    if (!/\.(md|json|js|mjs)$/.test(entry.name)) continue;
+    if (path.resolve(target) === path.resolve(__filename)) continue;
+    assert.ok(!fs.readFileSync(target, "utf8").includes(legacyCriterion),
+      path.relative(pluginRootDir, target) + " 仍留有已作废的 noLangRefs 判据「" + legacyCriterion + "」");
+  }
+};
+sweep(pluginRootDir);
 // 派生器的头注释也不得再抄一份枚举（同一枚举只维护在 SKILL.md）。
 const langKeysHeader = fs.readFileSync(path.join(__dirname, "..", "gen-mtslg-lang-keys-from-dsl.js"), "utf8")
   .split(/\r?\n/).slice(0, 60).join("\n");
