@@ -523,6 +523,11 @@ function deriveLangSpec(options) {
       const ascii = asciiSuffix(name);
       if (ascii) { suffix = ascii; source = "asciiText"; }
     }
+    // 值字面编码：菜单名是数值/符号型文本时（如 "0.000"）同样按值本身编码，与页面内容节点同口径。
+    if (!suffix) {
+      const literal = valueLiteralSuffix(name);
+      if (literal) { suffix = literal; source = "valueLiteral"; }
+    }
     if (!suffix) {
       const layerName = layerNameToSuffix(refNames.get(item.sourceRef));
       if (layerName) { suffix = layerName; source = "dslLayerName"; }
