@@ -615,6 +615,12 @@ function parseXmlText(text) {
 
 function mergeMode() {
   const existingText = fs.readFileSync(existingPath, 'utf8');
+  // 唯一性硬门（读入时）：非空 ID 必须全页唯一——ID 是 WPF 控件的 .Name / GetValueByID 的句柄，
+  // 一个 ID 指向两个控件就会取错对象。人工复制节点忘了改 ID 是最常见的来源，这里直接拦下要求先修。
+  const inputDupIds = duplicateXmlIds(existingText);
+  if (inputDupIds.length > 0) {
+    throw new Error('现有页面存在重复 ID（同一 ID 指向多个控件），请先修好再 merge: ' + inputDupIds.join(', '));
+  }
   const { tokens, openClose } = parseXmlText(existingText);
 
   const invalidUntyped = [];
@@ -633,7 +639,7 @@ function mergeMode() {
     throw new Error('现有 IOContorl 页面包含无 ControlType 的非根节点，禁止继续生成: ' + invalidUntyped.join(', '));
   }
 
-  const report = { conflicts: [], added: [], updated: [], textOverrides: [], newNodes: [], unmapped: [] };
+  const report = { conflicts: [], added: [], updated: [], textOverrides: [], langOverrides: [], newNodes: [], unmapped: [] };
   const matchedOpenIdx = new Set();
 
   // 现有节点索引：ID → tokenIdx
@@ -748,9 +754,13 @@ function mergeMode() {
         const sameValue = normalizeForCompare(finalAttrs.get(k)) === normalizeForCompare(v);
         // dsl.text 来源的文案承载属性是设计文本，provenance 要求它与 sourceText 一致，必须按映射覆盖。
         const forcedByDslText = dslTextCarrier !== null && k === dslTextCarrier && n.valueSource === 'dsl.text';
-        if (forcedByDslText) {
+        // LangName 是 Value 的多语言载体（键名由设计文本派生），口径与文案一致：映射里登记了就按映射覆盖，
+        // 被覆盖的旧值写进报告由人确认；映射里没有该属性时不动现有值（人工自己挂的键保留）。
+        const forcedByLangName = k === 'LangName';
+        if (forcedByDslText || forcedByLangName) {
           if (!sameValue) {
-            report.textOverrides.push(`[${n.ref}] ${k}: 现有 "${finalAttrs.get(k)}" -> 设计文本 "${v}"（dsl.text 强制一致）`);
+            (forcedByLangName ? report.langOverrides : report.textOverrides).push(`[${n.ref}] ${k}: 现有 "${finalAttrs.get(k)}" -> ` +
+              (forcedByLangName ? `设计派生 "${v}"（LangName 跟随设计稿）` : `设计文本 "${v}"（dsl.text 强制一致）`));
           }
           finalAttrs.set(k, v);
         } else if (n.force && n.force.includes(k)) {
@@ -912,6 +922,19 @@ function mergeMode() {
   return { text: out.join(''), report };
 }
 
+// 非空 ID 的全页唯一性检查（fresh / merge 共用；新节点与现有节点撞号也会在这里被拦下）。
+function duplicateXmlIds(text) {
+  const seen = new Set();
+  const dup = new Set();
+  for (const match of text.matchAll(/<IOContorl\b[^>]*?\bID="([^"]*)"/g)) {
+    const id = match[1];
+    if (!id) continue;
+    if (seen.has(id)) dup.add(id);
+    seen.add(id);
+  }
+  return [...dup];
+}
+
 // ---------- 主流程 ----------
 let outText, report = null;
 if (mode === 'fresh') {
@@ -921,6 +944,12 @@ if (mode === 'fresh') {
   const r = mergeMode();
   outText = r.text;
   report = r.report;
+}
+
+// 输出唯一性硬门：无论是新插入的节点与现有节点撞号，还是人工文件本身有重复，都不允许写出交付物。
+const outputDupIds = duplicateXmlIds(outText);
+if (outputDupIds.length > 0) {
+  throw new Error('生成结果存在重复 ID（同一 ID 指向多个控件），已拒绝输出: ' + outputDupIds.join(', '));
 }
 
 if (outPath) {
@@ -940,8 +969,9 @@ if (report) {
   console.error('\n--- merge 报告 ---');
   list('冲突（保留现有值）', report.conflicts);
   list('设计文本覆盖（dsl.text）', report.textOverrides);
+  list('语言键覆盖（LangName 跟随设计稿）', report.langOverrides);
   list('新增属性', report.added);
   list('几何/类型更新', report.updated);
   list('新增节点', report.newNodes);
-  list('现有但设计稿无（原样保留）', report.unmapped);
+  list('现有但设计稿无（原样保留：人工/外部节点，或设计稿已删除）', report.unmapped);
 }

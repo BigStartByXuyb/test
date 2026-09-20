@@ -8,6 +8,8 @@
 
 const fs = require("fs");
 const path = require("path");
+// 页面节点 ID 口径的唯一实现（生成器与查询工具/GUI 共用；禁止各写一份）。
+const PAGE_NODE_ID = require(path.join(__dirname, "lib", "page-node-id.js"));
 // 跨脚本共用工具的唯一实现（见 scripts/lib/script-helpers.js；禁止在本脚本再抄一份）。
 const { readJson, normalizeToken: normalize, normalizeNewlines } = require(path.join(__dirname, "lib", "script-helpers.js"));
 const { isHostShellName } = require(path.join(__dirname, "lib", "mastergo-rules.js"));
@@ -426,10 +428,12 @@ function formalMatches(n) {
   return byProperty;
 }
 // ---------- 表格族：结构签名命中 ----------
-// 表格在团队组件库里没有组件集，设计稿里只是一个 GROUP，因此按「结构签名 + 图层名后缀」命中：
-// 节点类型 ∈ nodeTypes + 图层名以 nameSuffix 结尾 + 孩子里含表头群组 + ≥minRows 个行群组
-// + 表头至少有 minHeaderTexts 条可见文本。签名与名字必须同时成立——只成立一半时登记 pending，
-// 既不静默套模板，也不静默按平铺发射。
+// 表格在团队组件库里没有组件集，设计稿里只是一个 GROUP，因此按**结构身份**命中：
+// 节点类型 ∈ nodeTypes + 孩子里含表头群组 + ≥minRows 个行群组 + 表头至少有 minHeaderTexts 条可见文本。
+// **图层名不参与匹配**（与「图层名称只用于核对」同一原则，见映射表 structuralPolicy），
+// 图层重命名或带序号都不改变命中结果。
+// 「表头 + item 行」结构身份成立、但表头没有足够可见文本时，列标题无处取值：
+// 登记 pending（既不静默套模板，也不静默丢表）；结构身份不成立则不属于本族候选。
 function tableStructuralStatus(n) {
   const structural = tableTemplate && tableTemplate.structural;
   if (!structural || !n) return null;
@@ -438,28 +442,25 @@ function tableStructuralStatus(n) {
   const header = children.find(c => c && structural.headerGroupNames.includes(String(c.name || "")));
   const rows = children.filter(c => c && structural.rowGroupNames.includes(String(c.name || "")));
   const headerTextCount = header ? textDescendants(header.id).filter(visible).length : 0;
-  const nameOk = !structural.nameSuffix || String(n.name || "").endsWith(structural.nameSuffix);
-  const signatureOk = Boolean(header) && rows.length >= structural.minRows &&
-    headerTextCount >= structural.minHeaderTexts;
-  if (!nameOk && !signatureOk) return null; // 与表格无关的普通 GROUP，不参与本族判定
+  if (!header || rows.length < structural.minRows) return null; // 没有表格结构身份：不是本族候选
   return {
-    nameOk,
-    signatureOk,
-    headerRef: header ? header.id : null,
-    rowRefs: rows.map(row => row.id)
+    signatureOk: headerTextCount >= structural.minHeaderTexts,
+    headerRef: header.id,
+    rowRefs: rows.map(row => row.id),
+    headerTextCount
   };
 }
 
 function structuralTableMatches(n) {
   const status = tableStructuralStatus(n);
   if (!status) return [];
-  if (!status.nameOk || !status.signatureOk) {
+  if (!status.signatureOk) {
     pending.push({
       sourceRef: n.id,
-      reason: "表格结构签名与图层名没有同时成立，未按 Table 模板发射（保留 DSL 来源待确认）: " +
-        "图层名" + (status.nameOk ? "以「" + tableTemplate.structural.nameSuffix + "」结尾" : "不以「" +
-          tableTemplate.structural.nameSuffix + "」结尾") +
-        "，结构签名" + (status.signatureOk ? "成立" : "不成立（缺表头群组、缺行群组，或表头没有可见文本）")
+      reason: "表格结构身份成立（含「" + tableTemplate.structural.headerGroupNames.join("/") +
+        "」群组与 " + status.rowRefs.length + " 个「" + tableTemplate.structural.rowGroupNames.join("/") +
+        "」行群组），但表头可见文本只有 " + status.headerTextCount + " 条（要求至少 " +
+        tableTemplate.structural.minHeaderTexts + " 条），列标题无处取值；未按 Table 模板发射（保留 DSL 来源待确认）"
     });
     return [];
   }
@@ -555,6 +556,25 @@ function selectButtonGroups(buttonGroups, buttonSlots, variant) {
 function firstInner(ref) {
   return directChildren(ref).map(x => source(x)).find(s => s.type === "INSTANCE")?.ref || ref;
 }
+// ---------- 页面节点 ID 口径：由设计稿节点身份派生（禁止用遍历序号） ----------
+// ID = "MX_" + sha256(页面键 + "\n" + 节点 ref) 前 32 位小写十六进制。
+//   · 页面键 = DSL 根节点自己的 id（= 设计帧的 layerId，如 "79:162125"）：同一份设计稿恒定，
+//     不同设计帧天然不同；不需要 fileId，也不依赖页面名（页面改名不会让 ID 变）。
+//   · 节点 ref = 快照里该节点的全路径 ref（父链 + 自身 id），已由 Capture 校验页内唯一。
+// 这样得到的 ID：页内唯一、形态与设计器/人工的 GUID 一致（MX_ + 32 位十六进制，WPF .Name 合法），
+// 且**同一设计节点在任何机器、任何时间、任何次重跑都得到同一个 ID**——这是 merge 能精确对齐
+// （以及工程师代码 GetValueByID 能长期引用）的前提。兄弟节点增删不改变 ref，所以不会像遍历序号
+// 那样整体位移；只有把节点移到别的父容器下（ref 的父链变化）才会换 ID。
+const ID_PAGE_KEY = PAGE_NODE_ID.pageKeyOf(dslSnapshot);
+const usedXmlIds = new Set();
+function allocateId(ref) {
+  const id = PAGE_NODE_ID.derivePageNodeId(ID_PAGE_KEY, ref);
+  // fail-closed：理论上不会冲突（ref 页内唯一），一旦冲突说明输入有问题，直接报错而不是静默复用。
+  if (usedXmlIds.has(id)) throw new Error("页面节点 ID 冲突（两个节点派生出同一个 ID）: " + id + " <- " + ref);
+  usedXmlIds.add(id);
+  return id;
+}
+
 function addNode(sourceRef, controlType, attrs, options = {}) {
   const s = source(sourceRef);
   const valueSourceRef = options.valueSourceRef || null;
@@ -563,7 +583,7 @@ function addNode(sourceRef, controlType, attrs, options = {}) {
   if (valueSourceRef && typeof valueSource.text === "string") sourceSlotTexts[valueSourceRef] = valueSource.text;
   if (![s.pageAbsX, s.pageAbsY, s.width, s.height].every(v => typeof v === "number" && Number.isFinite(v))) throw new Error("incomplete bbox " + sourceRef);
   if (outputRefBySource.has(sourceRef)) return outputRefBySource.get(sourceRef);
-  const xmlId = options.xmlId || `MG_${String(outputNodes.length + 1).padStart(4, "0")}`;
+  const xmlId = options.xmlId || allocateId(sourceRef);
   const parentRef = options.layoutParent || null;
   const parentSource = parentRef ? source(parentRef) : null;
   // 几何覆盖：登记在映射表模板里的固定几何（目前只有 DataGrid 的列定义节点走这条路）。
@@ -636,7 +656,7 @@ function addText(ref) {
   } else if (styleName === undefined && weight !== undefined && !fontWeightNormalValues.has(weight.toLowerCase())) {
     attrs[fontWeightAttr] = weight;
   }
-  const xmlId = addNode(ref, "TextBlock", attrs, { xmlId: `MGText_${String(textAudit.length + 1).padStart(4, "0")}` });
+  const xmlId = addNode(ref, "TextBlock", attrs, { xmlId: allocateId(ref) });
   textAudit.push({ sourceRef: ref, sourceText: s.text, visibility: true, role: "content", decision: "emit", outputRefs: [xmlId] });
   return xmlId;
 }
@@ -749,7 +769,7 @@ function emitTable(inst, spec, match, columnTemplate) {
     for (const attr of columnTemplate.alwaysWrittenAttrs) columnAttrs[attr] = "";
     const xmlId = addNode(text.ref, columnControlTypes[index], columnAttrs, {
       layoutParent: tableRef,
-      xmlId: `MGCol_${String(index + 1).padStart(4, "0")}`,
+      xmlId: allocateId(text.ref),
       valueSourceRef: text.ref,
       nodeKind: "table-column",
       geometryOverride: {

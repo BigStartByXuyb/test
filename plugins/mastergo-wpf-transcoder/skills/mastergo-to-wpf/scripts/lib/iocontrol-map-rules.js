@@ -89,7 +89,6 @@ function parseTableTemplate(templateMap) {
     result.structural = {
       nodeTypes: Array.isArray(structural.nodeTypes) && structural.nodeTypes.length
         ? structural.nodeTypes.map(String) : ["GROUP"],
-      nameSuffix: typeof structural.nameSuffix === "string" ? structural.nameSuffix : "",
       variant: structural.variant,
       headerGroupNames: headerNames,
       rowGroupNames: rowNames,

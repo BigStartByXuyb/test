@@ -155,6 +155,9 @@ function validateTextAudit(manifest, entries) {
 }
 
 // options.templateMapPath：显式给定时按该表重载规则块（按钮族 / 必写字段 / 表格列模板）。
+// options.allowExternalNodes：合并人工维护过的页面时用（CLI: --allow-external-nodes）。
+//   没有设计来源的节点（人工新增/外部工具写的）不再判死，改为登记进 externalNodes 由人复核；
+//   我们从头生成的页面（fresh）不要开这个开关，保持"每个节点都必须有来源"的硬门。
 // CLI 用 --map 走同一条路径；单测可以直接传路径，避免再写一份规则。
 function validate(xmlPath, manifestPath, options) {
   if (options && options.templateMapPath) {
@@ -403,10 +406,18 @@ function validate(xmlPath, manifestPath, options) {
     }
   }
 
+  // 没有设计来源的节点：fresh 模式下是我们自己的 bug（硬失败）；merge 模式下多为人工/外部节点，
+  // 由 --allow-external-nodes 放行并登记，交给人工复核（重复 ID 仍由 merge 的唯一性硬门拦住）。
+  const externalNodes = [];
   for (const x of actual.filter(a => a.ControlType === 'TextBlock')) {
-    if (!mappedIds.has(x.ID)) errors.push('TextBlock 未建立来源映射: xmlId="' + (x.ID || '') + '"');
+    if (mappedIds.has(x.ID)) continue;
+    if (options && options.allowExternalNodes) {
+      externalNodes.push(x.ID || '(无 ID)');
+      continue;
+    }
+    errors.push('TextBlock 未建立来源映射: xmlId="' + (x.ID || '') + '"');
   }
-  return { ok: errors.length === 0, errors };
+  return { ok: errors.length === 0, errors, externalNodes };
 }
 
 if (require.main === module) {
@@ -414,7 +425,7 @@ if (require.main === module) {
   const get = flag => { const i = args.indexOf(flag); return i >= 0 ? args[i + 1] : null; };
   const xml = get('--xml');
   const manifest = get('--mapping');
-  if (!xml || !manifest) { console.error('用法: node validate-iocontrol-provenance.js --xml <page.xml> --mapping <mapping.json> [--map mtslg-iocontrol-map.json]'); process.exit(2); }
+  if (!xml || !manifest) { console.error('用法: node validate-iocontrol-provenance.js --xml <page.xml> --mapping <mapping.json> [--map mtslg-iocontrol-map.json] [--allow-external-nodes]'); process.exit(2); }
   const mapPath = get('--map');
   if (mapPath) {
     BUTTON_FAMILY_RULES = loadButtonFamilyRules(mapPath);
@@ -423,8 +434,13 @@ if (require.main === module) {
     REQUIRED_ATTRS_BY_CONTROL_TYPE = loadControlTypeRequiredAttrs(mapPath);
     TABLE_TEMPLATE = loadTableTemplate(mapPath);
   }
-  const result = validate(xml, manifest);
+  // --allow-external-nodes：只用于"人工维护过的页面"（merge 流程）；从头生成的页面不要带这个开关。
+  const result = validate(xml, manifest, { allowExternalNodes: args.includes('--allow-external-nodes') });
   if (!result.ok) { console.error(result.errors.join('\n')); process.exit(1); }
+  if (result.externalNodes && result.externalNodes.length) {
+    console.log('外部/人工节点（无设计来源，已放行，请人工复核） (' + result.externalNodes.length + '): ' +
+      result.externalNodes.join(', '));
+  }
   console.log('PASS: provenance and geometry validation');
 }
 

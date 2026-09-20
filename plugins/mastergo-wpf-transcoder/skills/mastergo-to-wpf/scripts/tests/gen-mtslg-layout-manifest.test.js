@@ -265,4 +265,76 @@ const unknownLayoutRun = spawnSync(process.execPath, [layoutScript, "--manifest"
 assert.notStrictEqual(unknownLayoutRun.status, 0, "存在未决底部栏组件时必须拒绝生成 Layout");
 assert.match(unknownLayoutRun.stderr + unknownLayoutRun.stdout, /未决底部栏组件/, "失败信息必须指出未决底部栏组件");
 
+// ---- 页面根级多出一份常驻分组副本时：底部栏容器必须取树深度最深的候选 ----
+// 背景（2026-09-20 实测）：设计稿把「右侧底部-常驻button」在底栏内与页面根级各放一份
+// （组件与按钮完全相同，仅整体相差 4px，并把根节点 bbox 撑成 1028）。
+// 只按「直接子节点里含常驻分组、取最先命中」会把页面根当成底栏，
+// 把信息分组 / 输入框 / 选择框 / 右侧栏全部误报成 unresolvedBottomBarItems（实测 33 项）。
+function residentAt(id, y) {
+  return {
+    type: "INSTANCE", id: id, name: "右侧底部-常驻button",
+    layoutStyle: { width: 194, height: 202, relativeX: 1070, relativeY: y },
+    children: [
+      { type: "GROUP", id: id + "/line", name: "分割线", layoutStyle: { width: 2, height: 202, relativeX: 0, relativeY: 0 } },
+      { type: "INSTANCE", id: id + "/a", name: "方-icon", layoutStyle: { width: 84, height: 84, relativeX: 16, relativeY: 12 }, componentInfo: {}, children: [] },
+      { type: "INSTANCE", id: id + "/b", name: "方-icon+文案", layoutStyle: { width: 84, height: 84, relativeX: 16, relativeY: 106 }, componentInfo: {}, children: [] }
+    ]
+  };
+}
+const duplicateResidentDsl = {
+  dsl: {
+    nodes: [{
+      type: "INSTANCE", id: "42:7", name: "连续运行数据（3.1.8.NS）",
+      layoutStyle: { width: 1280, height: 1028, relativeX: 0, relativeY: 0 },
+      children: [
+        residentAt("42:7/stray-resident", 826),
+        { type: "INSTANCE", id: "42:7/group", name: "信息分组-模块化", layoutStyle: { width: 480, height: 224, relativeX: 32, relativeY: 206 }, componentInfo: {}, children: [] },
+        { type: "INSTANCE", id: "42:7/input", name: "输入框", layoutStyle: { width: 100, height: 28, relativeX: 695, relativeY: 234 }, componentInfo: {}, children: [] },
+        {
+          type: "FRAME", id: "42:7/bar", name: "底部button",
+          layoutStyle: { width: 1280, height: 202, relativeX: 0, relativeY: 822 },
+          children: [
+            { type: "LAYER", id: "42:7/bar/bg", name: "矩形 108", layoutStyle: { width: 1280, height: 202, relativeX: 0, relativeY: 0 } },
+            residentAt("42:7/bar/resident", 0),
+            menuItemButton("42:7/bar/1", 28, 12, "程序控制", "F6")
+          ]
+        }
+      ]
+    }],
+    styles: {}, components: []
+  }
+};
+fs.writeFileSync(path.join(root, "duplicate-resident-dsl.json"), JSON.stringify(duplicateResidentDsl, null, 2), "utf8");
+const duplicateOut = path.join(root, "duplicate-resident-layout-manifest.json");
+const duplicateReport = path.join(root, "duplicate-resident-report.json");
+const duplicateResult = spawnSync(process.execPath, [script,
+  "--dsl", path.join(root, "duplicate-resident-dsl.json"),
+  "--icon-map", path.join(root, "flag-icon-map.json"),
+  "--map", path.join(root, "map.json"),
+  "--page-target", "DuplicateResidentPage",
+  "--page-lang-name", "",
+  "--layout-path", path.join(root, "DuplicateLayout.xml"),
+  "--out", duplicateOut,
+  "--report", duplicateReport,
+], { encoding: "utf8" });
+assert.strictEqual(duplicateResult.status, 0, duplicateResult.stderr);
+const duplicateManifest = JSON.parse(fs.readFileSync(duplicateOut, "utf8"));
+const duplicateReportJson = JSON.parse(fs.readFileSync(duplicateReport, "utf8"));
+assert.strictEqual(duplicateReportJson.bottomBarRef, "42:7/bar",
+  "根级存在常驻分组副本时，底部栏容器必须取树深度最深的候选（真实底栏），不得取页面根");
+assert.strictEqual(duplicateManifest.layoutEvidence.unresolvedBottomBarItems, 0,
+  "页面业务控件不得因为根级副本被误报成未命中的底栏按钮");
+assert.deepStrictEqual(duplicateManifest.menuItems.map((item) => item.sourceRef), ["42:7/bar/1"]);
+assert.strictEqual(duplicateManifest.layoutEvidence.residentGroupItems, 4,
+  "两份常驻分组内的实例数都要登记（按 DSL 事实，口径与 Bundle 的 validateResidentGroupEvidence 一致）");
+assert.strictEqual(duplicateManifest.layoutEvidence.matchedBottomBarItems, 5,
+  "matchedBottomBarItems = 菜单项 + 常驻项");
+assert.match(duplicateManifest.layoutEvidence.note, /DSL 里共 2 组/,
+  "存在常驻分组副本时，证据说明必须写清组数，便于人工复核");
+assert.strictEqual(duplicateReportJson.barCandidates.length, 2, "报告必须列出全部底栏容器候选");
+assert.deepStrictEqual(duplicateReportJson.barCandidates.map((item) => item.selected), [true, false],
+  "候选按深度排序，只有最深的那个被选中");
+assert.ok(duplicateReportJson.barCandidates.some((item) => item.ref === "42:7" && item.selected === false),
+  "页面根必须作为未选中的候选留档");
+
 console.log("PASS MTSLG Layout manifest derivation regression test");

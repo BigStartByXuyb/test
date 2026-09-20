@@ -64,7 +64,7 @@ flowchart LR
 | 采集 | `call-mastergo-mcp.js`、`mastergo-dsl-pipeline.ps1` | 调 MCP、落盘快照、校验根/父子链/唯一 ref、产出覆盖报告 |
 | 事实提取 | `resolve-mastergo-visibility.js` | 机械输出可见性与 TEXT/PATH 索引，不判控件类型 |
 | 图标 | `discover-mtslg-page-icon-map.js`、`gen-mtslg-page-icons.js` | 发现候选、生成页面 Icon（XAML Geometry） |
-| 映射 | `gen-mtslg-mapping-from-dsl.js`、`resolve-mtslg-template-mapping.js` | 从 DSL 建立 mapping、按模板解析槽位与固定字段；表格族（`tableTemplates`）按「结构签名（GROUP + 图层名以「表格」结尾 + 表头群组 + item 行群组）+ 表头文本」发射 DataGrid 根节点与列定义子节点，行数据只登记进 `mapping.tableAudits[].rows` 不发射控件，`tableAudits[].valuePending` 标记待绑定的数据源 |
+| 映射 | `gen-mtslg-mapping-from-dsl.js`、`resolve-mtslg-template-mapping.js` | 从 DSL 建立 mapping、按模板解析槽位与固定字段；表格族（`tableTemplates`）按「结构签名（GROUP + 表头群组 + item 行群组 + 表头可见文本，图层名不参与匹配）」发射 DataGrid 根节点与列定义子节点，行数据只登记进 `mapping.tableAudits[].rows` 不发射控件，`tableAudits[].valuePending` 标记待绑定的数据源 |
 | 容器嵌套 | `apply-container-containment.js` | **Bundle 默认自动调用**（在模板解析之后、语言键派生之前）：把命中 `childPolicy=nested-page-templates` 的容器按「坐标完全包含」重挂子控件、改写 `parent`/`layoutParent` 并重算 `expectedLeft/expectedTop`；报告 `Generated/<页面名>.nesting-report.json`；`manifest.nesting.enabled=false` 可关闭 |
 | Layout | `gen-mtslg-layout-manifest.js`、`gen-mtslg-layout.js` | 机械推导 `menuItems` 清单、发射/增量更新 Layout.xml |
 | 页面发射 | `gen-iocontrol-xml.js` | 发射页面 IOContorl XML（fresh / merge） |

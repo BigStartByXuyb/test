@@ -537,9 +537,10 @@ assert.strictEqual(innerAudit.role, 'camera-viewport-internal', '相机内部文
 console.log('PASS MTSLG DSL-to-mapping camera viewport regression test');
 
 // ---- 表格（tableTemplates 结构签名命中）：GROUP → DataGrid + 表头派生的列定义 ----
-// 表格在组件库里没有组件集（设计稿里只是 GROUP），命中口径是「结构签名 + 图层名后缀」；
+// 表格在组件库里没有组件集（设计稿里只是 GROUP），命中口径是结构身份
+// （GROUP + 表头群组 + item 行群组 + 表头可见文本），**图层名不参与匹配**；
 // 列 = 表头可见文本；行 = 数据（不发射控件，只登记进 tableAudits）。
-function tableFixture(rootName) {
+function tableFixture(rootName, options) {
   const tableRef = 'tbl:root/table';
   const headerRef = tableRef + '/header';
   const cell = (id, props, rx) => ({
@@ -591,7 +592,7 @@ function tableFixture(rootName) {
           {
             type: 'GROUP', id: headerRef, name: '表头',
             layoutStyle: { width: 504, height: 32, relativeX: 125, relativeY: 0 },
-            children: [
+            children: options && options.emptyHeader ? [] : [
               textNode(headerRef + '/macro', headerRef, 'Macro', 28, 8),
               textNode(headerRef + '/ch1', headerRef, 'CH1', 120, 8),
               textNode(headerRef + '/ch2', headerRef, 'CH2', 212, 8)
@@ -676,17 +677,75 @@ assert.ok(tableInstance, '表格必须登记进 componentInstances');
 assert.strictEqual(tableInstance.variant, 'Table');
 assert.strictEqual(tableInstance.requiredSlots[0].sourceRef, 'tbl:root/table');
 
-// 结构签名成立但图层名不带「表格」后缀 → 不命中、登记 pending（不静默套模板，也不假装已识别）。
-const tableNameMismatch = runMappingCase(
-  'table-name-mismatch',
-  tableFixture('校准参数（3.1.3）'),
+// 图层名不带「表格」后缀也照样命中：表格的身份是结构（表头 + item 行 + 表头文本），不是图层名。
+const tableNameFree = runMappingCase('table-name-free', tableFixture('校准参数（3.1.3）'), []);
+const nameFreeGrid = tableNameFree.nodes.find(node => node.controlType === 'DataGrid');
+assert.ok(nameFreeGrid, '图层名不含「表格」时仍必须按结构身份发射 DataGrid');
+assert.strictEqual(nameFreeGrid.attrs.Value, '', 'Value 固定空串口径不受图层名影响');
+assert.deepStrictEqual(
+  tableNameFree.nodes.filter(node => node.nodeKind === 'table-column').map(node => node.attrs.Value),
+  ['Macro', 'CH1', 'CH2'],
+  '图层名不同也不影响列定义按表头文本从左到右展开');
+assert.strictEqual(tableNameFree.pending.filter(item => item.sourceRef === 'tbl:root/table').length, 0,
+  '按结构身份命中的表格不得再进入 pending');
+
+// 结构身份成立（表头群组 + item 行）但表头没有可见文本：列标题无处取值 → pending，不发射控件。
+const tableHeaderless = runMappingCase(
+  'table-header-without-text',
+  tableFixture('校准参数（3.1.3）表格', { emptyHeader: true }),
   []
 );
-assert.strictEqual(tableNameMismatch.nodes.filter(node => node.controlType === 'DataGrid').length, 0,
-  '图层名后缀不符时不得发射 DataGrid');
-assert.ok(tableNameMismatch.pending.some(item => item.sourceRef === 'tbl:root/table' &&
-  /表格结构签名与图层名没有同时成立/.test(item.reason)),
-  '图层名后缀不符的候选表格必须登记 pending 说明原因');
+assert.strictEqual(tableHeaderless.nodes.filter(node => node.controlType === 'DataGrid').length, 0,
+  '表头没有可见文本时不得发射 DataGrid');
+assert.ok(tableHeaderless.pending.some(item => item.sourceRef === 'tbl:root/table' &&
+  /表头可见文本/.test(item.reason)),
+  '表头没有可见文本时必须登记 pending 说明原因');
+
+// ---- 同一页两张表：列定义 xmlId 必须**全页唯一** ----
+// 背景（2026-09-20 实测）：列 ID 原先按「每张表内从 1 开始」编号，同页第二张表会撞出同名 MGCol_0001，
+// 发射器在 validateFreshMapping 直接失败（映射门禁失败: XML ID 必须唯一: MGCol_0001）。
+function twoTableFixture() {
+  const table = (prefix) => ({
+    type: 'GROUP', id: prefix, name: '切缝检测数据表格',
+    layoutStyle: { width: 412, height: 208, relativeX: 72, relativeY: 598 },
+    children: [
+      {
+        type: 'GROUP', id: prefix + '/header', name: '表头',
+        layoutStyle: { width: 312, height: 32, relativeX: 100, relativeY: 0 },
+        children: [textNode(prefix + '/header/ch1', prefix + '/header', 'Ch1', 36, 6)]
+      },
+      {
+        type: 'GROUP', id: prefix + '/item1', name: 'item',
+        layoutStyle: { width: 412, height: 36, relativeX: 0, relativeY: 28 },
+        children: [textNode(prefix + '/item1/title', prefix + '/item1', 'Q-等级 (%)', 0, 9)]
+      }
+    ]
+  });
+  return {
+    styles: {},
+    nodes: [{
+      type: 'INSTANCE', id: 'multi:root', name: '连续运行数据（3.1.8.NS）',
+      layoutStyle: { width: 1280, height: 1024, relativeX: 0, relativeY: 0 },
+      componentInfo: {},
+      children: [table('multi:root/t1'), table('multi:root/t2')]
+    }]
+  };
+}
+const multiTable = runMappingCase('table-multi', twoTableFixture(), []);
+assert.strictEqual(multiTable.nodes.filter(node => node.controlType === 'DataGrid').length, 2,
+  '同页两张表都要发射 DataGrid');
+const multiColumns = multiTable.nodes.filter(node => node.nodeKind === 'table-column');
+const multiColumnIds = multiColumns.map(node => node.xmlId);
+assert.strictEqual(new Set(multiColumnIds).size, multiColumnIds.length,
+  '同页多张表的列定义 xmlId 必须全页唯一');
+for (const id of multiColumnIds) {
+  assert.match(id, /^MX_[0-9a-f]{32}$/, '列定义 ID 必须是 MX_ + 32 位小写十六进制: ' + id);
+}
+// 幂等：同一份 DSL 再跑一次，必须得到完全一样的 ID 集合（否则 merge 与工程师代码引用都会失效）
+const multiTableAgain = runMappingCase('table-multi-again', twoTableFixture(), []);
+assert.deepStrictEqual(multiTableAgain.nodes.map(node => node.xmlId), multiTable.nodes.map(node => node.xmlId),
+  '同一份 DSL 两次推导必须得到同一套页面节点 ID');
+assert.strictEqual(multiTable.tableAudits.length, 2, '两张表各自登记一条表审计');
 
 console.log('PASS MTSLG DSL-to-mapping table (tableTemplates structural) regression test');
 

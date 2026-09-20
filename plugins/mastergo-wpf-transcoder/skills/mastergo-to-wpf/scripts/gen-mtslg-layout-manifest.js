@@ -192,26 +192,49 @@ function visualOrder(entries) {
   }, []);
 }
 
-// 底部栏容器 = 直接子节点里含"右下角常驻分组"的那个容器
-let bar = null;
-(function findBar(node) {
-  if (bar) return;
+// 底部栏容器 = 直接子节点里含"右下角常驻分组"的那个容器。
+// 候选守卫：设计稿可能在页面根级**额外复制**一份常驻分组（与底栏内那份同组件、不同节点 id），
+// 此时页面根节点也满足"直接子节点里含常驻分组"，只取深度最先命中的候选会把整个页面当成底栏，
+// 把真实页面控件（信息分组 / 输入框 / 单选多选 / 选择框 / 右侧栏）全部记成 unresolvedBottomBarItems。
+// 因此与 icon-ownership 同一判据：**多条命中取树深度最深（最专属）的候选**，全部候选写进 report 供复核。
+const barCandidates = [];
+(function collectBarCandidates(node, depth) {
   if (childrenOf(node).some(function (child) {
     return child.type === "INSTANCE" && typeof child.name === "string" && residentPattern.test(child.name);
-  })) { bar = node; return; }
-  for (const child of childrenOf(node)) findBar(child);
-})(root);
-if (!bar) fail("未找到底部栏容器（子节点里没有常驻分组）: " + args["page-target"]);
+  })) barCandidates.push({ node: node, depth: depth });
+  for (const child of childrenOf(node)) collectBarCandidates(child, depth + 1);
+})(root, 0);
+if (!barCandidates.length) fail("未找到底部栏容器（子节点里没有常驻分组）: " + args["page-target"]);
+barCandidates.sort(function (a, b) { return b.depth - a.depth; });
+const bar = barCandidates[0].node;
 
 const barChildren = childrenOf(bar);
+// 底栏内的常驻分组：用于菜单推导与 unresolved 判定（常驻分组内的实例既不是菜单项、也不计入 unresolved）。
 const residentGroups = barChildren.filter(function (child) {
   return child.type === "INSTANCE" && typeof child.name === "string" && residentPattern.test(child.name);
 });
-const residentGroupItems = residentGroups.reduce(function (sum, group) {
-  return sum + childrenOf(group).filter(function (child) {
-    return child.type === "INSTANCE" && !decorPattern.test(child.name || "");
-  }).length;
-}, 0);
+// 审计口径：residentGroupItems 统计**整个页面 DSL** 里的常驻分组实例，
+// 与 Bundle 的 validateResidentGroupEvidence 同一口径（映射 sourceNodes 里所有常驻分组的 INSTANCE 子节点）。
+// 设计稿可能在页面根级额外复制一份常驻分组，此时底栏内只有一组、整页有两组：
+// 若这里只数底栏内那一组，Bundle 会因数量不一致硬失败（并要求人工改清单），所以按 DSL 事实登记。
+const allResidentGroups = [];
+(function collectResidentGroups(node) {
+  for (const child of childrenOf(node)) {
+    if (child.type === "INSTANCE" && typeof child.name === "string" && residentPattern.test(child.name)) {
+      allResidentGroups.push(child);
+    }
+    collectResidentGroups(child);
+  }
+})(root);
+const countResidentItems = function (groups) {
+  return groups.reduce(function (sum, group) {
+    return sum + childrenOf(group).filter(function (child) {
+      return child.type === "INSTANCE" && !decorPattern.test(child.name || "");
+    }).length;
+  }, 0);
+};
+const residentGroupItems = countResidentItems(allResidentGroups);
+const residentGroupItemsInBar = countResidentItems(residentGroups);
 
 // 唯一的底部栏变体解析入口：按登记的键取值，命中 variants 才返回（与组件模板族同一套机制）。
 function resolveBottomBarVariant(node) {
@@ -354,8 +377,12 @@ const manifest = {
     unresolvedBottomBarItems: unresolvedNodes.length,
     residentGroupItems: residentGroupItems,
     note: "由 gen-mtslg-layout-manifest.js 从 DSL 机械推导：底部栏 " + bar.id +
-      "，菜单项 " + menuItems.length + " 项，右下角常驻分组 " + residentGroupItems +
-      " 项不生成 MenuItem、不占 Index（框架单独处理），Index 按菜单项从 1 连续编号，文本按设计稿原样写入；" +
+      "，菜单项 " + menuItems.length + " 项，" +
+      (allResidentGroups.length > 1
+        ? "右下角常驻分组 " + residentGroupItems + " 项（DSL 里共 " + allResidentGroups.length +
+          " 组，底栏内 " + residentGroupItemsInBar + " 项）"
+        : "右下角常驻分组 " + residentGroupItems + " 项") +
+      "不生成 MenuItem、不占 Index（框架单独处理），Index 按菜单项从 1 连续编号，文本按设计稿原样写入；" +
       "未命中变体的实例 " + unresolvedNodes.length + " 个" +
       (unresolvedNodes.length
         ? "（" + unresolvedNodes.map(function (node) { return node.id + " " + JSON.stringify(node.name); }).join("、") + "）"
@@ -370,6 +397,14 @@ if (args.report) {
   fs.writeFileSync(path.resolve(args.report), JSON.stringify({
     pageTarget: args["page-target"],
     bottomBarRef: bar.id,
+    barCandidates: barCandidates.map(function (candidate) {
+      return {
+        ref: candidate.node.id,
+        name: candidate.node.name || "",
+        depth: candidate.depth,
+        selected: candidate.node === bar,
+      };
+    }),
     residentGroups: residentGroups.map(function (node) { return { ref: node.id, name: node.name }; }),
     residentGroupItems: residentGroupItems,
     menuItems: menuItems.map(function (item) {

@@ -677,3 +677,58 @@ assert.match(omitTag, /IconWidth="35"/, '图标尺寸仍按 bbox 四舍五入发
 assert.match(omitTag, /IconHeight="33"/);
 
 console.log('PASS variant omitRequiredAttrs narrowing regression test');
+
+// ---- merge 唯一性硬门：现有文件里同一个 ID 指向两个控件（人工复制节点忘改 ID 的典型场景）
+//      → 必须先修再 merge，禁止把重复 ID 静默带进交付物 ----
+const dupExisting = path.join(dir, 'existing-duplicate-id.xml');
+const dupMergedOut = path.join(dir, 'merged-duplicate-id.xml');
+fs.writeFileSync(dupExisting, [
+  '<?xml version="1.0" encoding="utf-8"?>',
+  '<IOContorl ID="" Left="NaN" Top="NaN" Width="NaN" Height="NaN">',
+  '    <IOContorl ID="TXT_1" ControlType="TextBlock" Value="旧标签" Left="200" Top="100" Width="80" Height="40" />',
+  '    <IOContorl ID="TXT_1" ControlType="TextBlock" Value="复制出来的副本" Left="400" Top="100" Width="80" Height="40" />',
+  '</IOContorl>',
+  ''
+].join('\n'));
+const dupRun = spawnSync(process.execPath,
+  [path.join(__dirname, '..', 'gen-iocontrol-xml.js'), '--merge', dupExisting, buttonMapping, '--out', dupMergedOut],
+  { encoding: 'utf8' });
+assert.notStrictEqual(dupRun.status, 0, '现有文件存在重复 ID 时必须拒绝 merge');
+assert.match(dupRun.stderr + dupRun.stdout, /重复 ID/, '失败信息必须指出重复 ID');
+
+// ---- merge：LangName 跟随设计稿覆盖（它是 Value 的多语言载体），人工的业务属性保留 ----
+const langExisting = path.join(dir, 'existing-langname.xml');
+const langMergedOut = path.join(dir, 'merged-langname.xml');
+const langMappingPath = path.join(dir, 'langname-mapping.json');
+fs.writeFileSync(langExisting, [
+  '<?xml version="1.0" encoding="utf-8"?>',
+  '<IOContorl ID="" Left="NaN" Top="NaN" Width="NaN" Height="NaN">',
+  '    <IOContorl ID="TXT_1" ControlType="TextBlock" Value="旧标签" LangName="OldKey" IOName="KeepMe" Left="200" Top="100" Width="NaN" Height="40" />',
+  '</IOContorl>',
+  ''
+].join('\n'));
+fs.writeFileSync(langMappingPath, JSON.stringify({
+  contentOriginY: 192,
+  rootRef: 'root',
+  sourceNodes: [
+    { ref: 'root', parentRef: null, pageAbsX: 0, pageAbsY: 0, relativeX: 0, relativeY: 0, width: 1280, height: 1024 }
+  ],
+  nodes: [{
+    ref: 'txt1', xmlId: 'TXT_1', id: 'TXT_1', controlType: 'TextBlock', parent: null, layoutParent: null,
+    absX: 200, absY: 292, w: 80, h: 16, expectedLeft: 200, expectedTop: 100,
+    expectedWidth: 'NaN', expectedHeight: 40, dslWidth: 80, sourceRef: 'txt1',
+    sourceText: '新标签', valueSource: 'dsl.text',
+    attrs: { Value: '新标签', LangName: 'F2DemoNewLabel', ControlType: 'TextBlock' }
+  }]
+}, null, 2));
+const langRun = spawnSync(process.execPath,
+  [path.join(__dirname, '..', 'gen-iocontrol-xml.js'), '--merge', langExisting, langMappingPath, '--out', langMergedOut],
+  { encoding: 'utf8' });
+assert.strictEqual(langRun.status, 0, 'LangName 覆盖用例必须能跑通: ' + langRun.stderr);
+const langTag = (fs.readFileSync(langMergedOut, 'utf8').match(/<IOContorl[^>]*ID="TXT_1"[\s\S]*?\/>/) || [''])[0];
+assert.match(langTag, /LangName="F2DemoNewLabel"/, 'LangName 必须跟随设计稿覆盖');
+assert.match(langTag, /Value="新标签"/, '文案（dsl.text）按设计稿覆盖');
+assert.match(langTag, /IOName="KeepMe"/, '人工的业务属性必须保留');
+assert.match(langRun.stderr + langRun.stdout, /语言键覆盖/, '语言键被覆盖时必须写进报告');
+
+console.log('PASS merge 唯一性硬门 + LangName 跟随设计稿回归测试');

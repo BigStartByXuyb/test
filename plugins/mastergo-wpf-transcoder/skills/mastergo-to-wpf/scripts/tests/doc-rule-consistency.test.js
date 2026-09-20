@@ -471,7 +471,8 @@ const tableStructural = tableFamily.match && tableFamily.match.structural;
 assert.ok(tableStructural, "映射表必须登记 tableTemplates.match.structural（表格没有组件集，按结构签名命中）");
 assert.deepStrictEqual(tableStructural.nodeTypes, ["GROUP"],
   "表格结构签名只作用于 GROUP（表格在设计稿里就是一个组）");
-assert.strictEqual(tableStructural.nameSuffix, "表格", "结构签名必须登记图层名后缀");
+assert.ok(!Object.prototype.hasOwnProperty.call(tableStructural, "nameSuffix"),
+  "表格命中不得登记图层名后缀——图层名不参与匹配（与设计侧约定的结构身份口径）");
 assert.strictEqual(tableStructural.variant, "Table", "结构签名必须指向已登记的变体名");
 assert.ok(tableFamily.variants[tableStructural.variant], "结构签名指向的变体必须在 variants 里登记");
 assert.strictEqual(tableFamily.variants[tableStructural.variant].controlType, "DataGrid", "表格族必须发射 DataGrid");
@@ -481,7 +482,7 @@ assert.ok(Array.isArray(tableStructural.signature.rowGroupNames) && tableStructu
   "结构签名必须登记行群组名");
 assert.ok(Number(tableStructural.signature.minRows) >= 1, "结构签名必须登记最小行数");
 assert.ok(typeof tableFamily.structuralPolicy === "string" && tableFamily.structuralPolicy,
-  "必须登记 structuralPolicy（为什么表格可以按图层名交叉核对）");
+  "必须登记 structuralPolicy（为什么表格可以按结构身份命中、图层名为何不参与匹配）");
 
 const columnTemplate = tableFamily.columnTemplate;
 assert.ok(columnTemplate && columnTemplate.geometry, "必须登记 columnTemplate.geometry（列定义固定几何）");
@@ -511,7 +512,7 @@ for (const token of ["columnTemplate", "innerTextPolicy", "tableAudits", "neares
   assert.ok(mappingGenerator.includes(token), "映射生成器必须消费 " + token);
 }
 assert.ok(mappingGenerator.includes("tableStructuralStatus"),
-  "结构签名只成立一半时必须登记 pending（tableStructuralStatus）");
+  "表头结构身份成立但没有可见文本时必须登记 pending（tableStructuralStatus）");
 assert.ok(generator.includes("table-column") && generator.includes("isTableColumnNode") &&
   generator.includes("applyNodeGeometry") && generator.includes("applyTemplateAttrs"),
   "发射器必须按 nodeKind=table-column 走列定义模板几何与字段集");
@@ -570,10 +571,12 @@ assert.ok(!Object.prototype.hasOwnProperty.call(dataGridSpec, "requiredNonEmptyA
   "映射表不得再登记 requiredNonEmptyAttrs（没有消费者，且与 tableTemplates.valuePolicy 的现阶段口径相反（固定空串 + 待绑定提示））");
 assert.ok(dataGridSpec.description.includes("tableTemplates.valuePolicy"),
   "映射表 DataGrid 描述必须把 Value 的来源与占位口径指向 tableTemplates.valuePolicy");
-assert.ok(tableFamily.structuralPolicy.includes("五项同时成立"),
-  "structuralPolicy 必须写「五项同时成立」（条件条数要与 signature 一一对应）");
+assert.ok(tableFamily.structuralPolicy.includes("四项同时成立"),
+  "structuralPolicy 必须写「四项同时成立」（条件条数要与 signature 一一对应：nodeTypes + 表头群组 + 行群组 + 表头可见文本）");
 assert.ok(tableFamily.structuralPolicy.includes("部分命中"),
   "structuralPolicy 必须写清 pending 的范围是「部分命中」（REVIEW-007）");
+assert.ok(tableFamily.structuralPolicy.includes("图层名不参与匹配"),
+  "structuralPolicy 必须写明图层名不参与表格命中");
 // 当前阶段口径：DataGrid 根 Value 固定空串 + valuePending 作为待绑定提示（提示性，不是交付门禁）。
 assert.strictEqual(tableFamily.valuePolicy.decision, "fixed-empty",
   "valuePolicy.decision 必须是当前阶段口径 fixed-empty（Value 固定空串）");
@@ -589,19 +592,23 @@ for (const [label, text] of [
   ["mtslg-mode.md", modeDoc],
   ["feishu-component-library-mapping.md", feishuMapping],
 ]) {
-  assert.ok(text.includes("五项同时成立"),
-    label + " 必须与映射表同口径写「五项同时成立」（不得留「四项同时成立」）");
-  assert.ok(!text.includes("四项同时成立"),
-    label + " 不得保留「四项同时成立」（REVIEW-001）");
+  assert.ok(text.includes("四项同时成立"),
+    label + " 必须与映射表同口径写「四项同时成立」（图层名不再是命中条件）");
+  assert.ok(!text.includes("五项同时成立"),
+    label + " 不得保留「五项同时成立」（图层名后缀已不参与匹配）");
   assert.ok(text.includes("固定写空串"),
     label + " 必须写明 DataGrid 根 Value 当前阶段固定写空串（数据源由工程师后续绑定）");
 }
-// 图层名例外清单：SKILL.md 与 mtslg-mode.md 必须把「底部栏 + 表格族」两条例外并列登记。
+// 图层名例外清单：表格族按结构身份命中、与图层名无关，因此只剩「底部栏」一条例外。
 for (const [label, text] of [["SKILL.md", mainSkill], ["mtslg-mode.md", modeDoc]]) {
-  assert.ok(text.includes("例外只有两条"),
-    label + " 的图层名例外清单必须并列登记两条例外（底部栏 + 表格族结构签名；REVIEW-003）");
+  assert.ok(text.includes("例外只有一条"),
+    label + " 的图层名例外清单只能登记一条例外（底部栏按组件名匹配）");
+  assert.ok(!text.includes("例外只有两条"),
+    label + " 不得再登记两条例外（表格族不再依赖图层名后缀）");
   assert.ok(text.includes("tableTemplates.match.structural") || text.includes("match.structural"),
-    label + " 的例外清单必须点名表格族的结构签名登记位置");
+    label + " 必须点名表格族的结构签名登记位置");
+  assert.ok(text.includes("图层名不参与匹配") || text.includes("与图层名无关"),
+    label + " 必须写明表格族命中与图层名无关");
 }
 // 旧表述不得残留。
 assert.ok(!feishuMapping.includes("其 `Value` 属性必填且最终值必须非空"),
@@ -844,3 +851,27 @@ assert.ok(modeDoc.includes("压成空格会让两行文案退化成一行"),
 }
 
 console.log("PASS 文本换行口径（textNewlinePolicy）一致性回归测试");
+
+// ---------- 页面节点 ID 口径（派生 + 页内唯一 + 跨版本稳定） ----------
+// 背景：ID 是 WPF 控件的 .Name 与框架 GetValueByID/GetControlByID 的句柄，也是 merge 对齐
+// 「同一个控件」的唯一钥匙。用遍历序号当身份会随兄弟增删整体位移，随机 GUID 则每次重跑都变，
+// 两者都会让 merge 静默配错、让工程师代码引用失效。真值源是生成器的 allocateId。
+{
+  const idGen = fs.readFileSync(path.join(__dirname, "..", "gen-mtslg-mapping-from-dsl.js"), "utf8");
+  assert.ok(idGen.includes("allocateId") && idGen.includes("ID_PAGE_KEY"),
+    "映射生成器必须用 allocateId + 页面键派生页面节点 ID");
+  assert.ok(!/`MG_\$\{String\(outputNodes\.length/.test(idGen) && !/`MGText_\$\{String\(textAudit\.length/.test(idGen),
+    "映射生成器不得再用遍历序号（MG_/MGText_）当节点身份");
+  for (const [label, text] of [["SKILL.md", mainSkill], ["mtslg-mode.md", modeDoc]]) {
+    assert.ok(text.includes("MX_"), label + " 必须写明页面节点 ID 前缀 MX_");
+    assert.ok(text.includes("sha256"), label + " 必须写明 ID 由设计稿节点 ref 派生（sha256）");
+    assert.ok(/禁止.*遍历序号|遍历序号.*禁止/.test(text), label + " 必须写明禁止用遍历序号当节点身份");
+    assert.ok(text.includes("人工维护约定"), label + " 必须写明人工维护约定");
+  }
+  assert.ok(modeDoc.includes("--allow-external-nodes"),
+    "mtslg-mode.md 必须写明人工/外部节点的校验放行开关");
+  assert.ok(modeDoc.includes("唯一性硬门"), "mtslg-mode.md 必须写明 merge 的 ID 唯一性硬门");
+  assert.ok(/`LangName`\s*跟随设计稿|LangName 跟随设计稿/.test(modeDoc),
+    "mtslg-mode.md 必须写明 LangName 跟随设计稿覆盖");
+}
+console.log("PASS 页面节点 ID 口径（派生 + 唯一 + 稳定）一致性回归测试");

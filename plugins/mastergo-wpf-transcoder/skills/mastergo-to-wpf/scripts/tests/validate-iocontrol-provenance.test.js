@@ -44,6 +44,26 @@ fs.writeFileSync(flatManifestPath, JSON.stringify({ contentOriginY: 192, rootRef
 }] }));
 const flatResult = validate(flatXmlPath, flatManifestPath);
 if (!flatResult.ok) throw new Error('展平模板节点应按 layoutParent=null 使用页面绝对坐标: ' + flatResult.errors.join('; '));
+
+// ---- 人工/外部节点：默认硬失败（保证我们自己的生成物没有漏源）；merge 流程用
+//      allowExternalNodes / --allow-external-nodes 登记放行，交由人工复核 ----
+const externalXmlPath = path.join(dir, 'external.xml');
+fs.writeFileSync(externalXmlPath,
+  '<IOContorl ID="" Left="NaN" Top="NaN" Width="NaN" Height="NaN">' +
+  '<IOContorl ID="FlatChild" ControlType="TextBlock" Value="SCAN" Left="150" Top="158" Width="NaN" Height="40" />' +
+  '<IOContorl ID="MX_HANDMADE_1" ControlType="TextBlock" Value="人工加的说明" Left="600" Top="700" Width="NaN" Height="40" />' +
+  '</IOContorl>');
+const externalStrict = validate(externalXmlPath, flatManifestPath);
+if (externalStrict.ok) throw new Error('默认口径下，无设计来源的 TextBlock 必须被拒绝');
+if (!externalStrict.errors.some(x => /未建立来源映射/.test(x) && /MX_HANDMADE_1/.test(x))) {
+  throw new Error('缺少「未建立来源映射」错误: ' + externalStrict.errors.join('; '));
+}
+const externalAllowed = validate(externalXmlPath, flatManifestPath, { allowExternalNodes: true });
+if (!externalAllowed.ok) throw new Error('allowExternalNodes 下人工节点必须放行: ' + externalAllowed.errors.join('; '));
+if (!(externalAllowed.externalNodes || []).includes('MX_HANDMADE_1')) {
+  throw new Error('放行的外部节点必须登记进 externalNodes');
+}
+console.log('PASS 人工/外部节点（allowExternalNodes）口径回归测试');
 const fixed40XmlPath = path.join(dir, 'fixed40.xml');
 const fixed40ManifestPath = path.join(dir, 'fixed40.json');
 fs.writeFileSync(fixed40XmlPath, '<IOContorl ID="" Left="NaN" Top="NaN" Width="NaN" Height="NaN"><IOContorl ID="FixedText" ControlType="TextBlock" Value="标题" FontSize="16" Left="10" Top="20" Width="NaN" Height="40" /></IOContorl>');
