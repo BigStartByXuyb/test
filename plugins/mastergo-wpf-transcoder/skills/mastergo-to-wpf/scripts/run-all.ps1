@@ -269,6 +269,19 @@ function Invoke-Registry {
     return $output
 }
 
+# 逐阶段输入复校：每一步在消费前，把它**实际消费的、且本次运行已登记的**产物按登记表复校 sha256。
+# 只在"已登记"时校验——新开运行的早期步骤尚未登记，不受影响；而手工改过中间产物再续跑会被当场拒掉
+# （与"消费只按登记取"是同一条契约，见 bundle-manifest.md 第 7 节）。
+function Assert-RegisteredInput {
+    param([string] $Key)
+    if (-not (Test-Path -LiteralPath $RunJson)) { return }
+    $doc = Get-Content -LiteralPath $RunJson -Raw -Encoding UTF8 | ConvertFrom-Json
+    $artifacts = Get-Prop $doc 'artifacts'
+    if ($null -eq $artifacts) { return }
+    if (-not $artifacts.PSObject.Properties[$Key]) { return }
+    Invoke-Registry @('check', '--run', $RunJson, '--key', $Key, '--quiet') | Out-Null
+}
+
 # 本步产出的文件 → 登记表键（键名是消费端唯一认的入口，见 lib/run-registry.js 的 ARTIFACT_KEYS）
 function Register-StepArtifacts {
     param([string] $StepName, [int] $StepId)
@@ -313,6 +326,7 @@ $env:MASTERGO_MCP_TOKEN = $Token
 $UiSource = $null
 # 命令行显式给的取值：与"从项目登记表解析出来的值"区分开——续跑回放冻结身份要用它判断
 # 调用方是否在要求改身份（显式给不同值 = 要改，省略 = 沿用）。
+$cliTarget = $Target
 $cliFileId = $FileId
 $cliLayerId = $LayerId
 $cliUi = $Ui
@@ -327,6 +341,18 @@ if ($Registry) {
     if (-not $DesignPageName) { $DesignPageName = $Registry.Design }
     # 区域前缀：命令行没给就先看项目登记表（docs/page-registry.json）里的 pages[].ui / derivation 的 F<n>。
     if (-not $Ui -and $Registry.Ui) { $Ui = $Registry.Ui; $UiSource = '项目登记表 docs/page-registry.json' }
+}
+
+# 身份混搭守卫：-Target 与 -LayerId 同时显式给出时，它们必须落在项目登记表的同一页。
+# 否则会出现"Target 取自 A 页、layerId 取自 B 页"的混合身份，登记表一落盘就自相矛盾
+# （后续续跑还会把它当成冻结身份回放）。
+if ($Registry -and $cliTarget -and $cliLayerId) {
+    $registryTarget = Get-Prop $Registry 'Target'
+    $registryLayerId = Get-Prop $Registry 'LayerId'
+    if ($registryTarget -and $registryLayerId -and
+        ($registryTarget -ne $cliTarget -or $registryLayerId -ne $cliLayerId)) {
+        throw "命令行同时给了 -Target '$cliTarget' 与 -LayerId '$cliLayerId'，但项目登记表里两者不属于同一页（-Target '$cliTarget' 对应 layerId '$registryLayerId'）：请确认要转换的页面——只给 -Target（让登记表补 layerId），或先按登记表登记本次页面的 designSource。"
+    }
 }
 # 区域前缀（`ui`）决定两件事：① capture 快照里的 `ui` 字段；② 宿主壳输出目录 `UI/<区域>/View|ViewModel`。
 # 取值顺序固定（不再写死 F2、也不静默兜底）：
@@ -469,18 +495,30 @@ foreach ($step in $Steps) {
 
     # 前置检查：断点续跑时，前面跳过但仍需存在的产物在这里兜底
     switch ($step.Name) {
-        'capture'    { Assert-File $GetDslJson   "缺少 $GetDslJson：请先跑 -Progress fetch" }
-        'visibility' { Assert-File $SnapshotJson "缺少 $SnapshotJson：请先跑 -Progress capture" }
+        'capture'    { Assert-File $GetDslJson   "缺少 $GetDslJson：请先跑 -Progress fetch"
+                       Assert-RegisteredInput 'getDsl' }
+        'visibility' { Assert-File $SnapshotJson "缺少 $SnapshotJson：请先跑 -Progress capture"
+                       Assert-RegisteredInput 'snapshot' }
         'mapping'    { Assert-File $SnapshotJson "缺少 $SnapshotJson：请先跑 -Progress capture"
-                       Assert-File $VisibilityJson "缺少 $VisibilityJson：请先跑 -Progress visibility" }
+                       Assert-File $VisibilityJson "缺少 $VisibilityJson：请先跑 -Progress visibility"
+                       Assert-RegisteredInput 'snapshot'
+                       Assert-RegisteredInput 'visibility' }
         'discover'   { Assert-File $SvgJson "缺少 $SvgJson：请先跑 -Progress svg"
                        $mappingForDiscover = if (Test-Path -LiteralPath $DraftMappingJson) { $DraftMappingJson } else { $MappingAuditJson }
-                       Assert-File $mappingForDiscover "缺少 mapping（$DraftMappingJson 或 $MappingAuditJson）：请先跑 -Progress mapping" }
-        'layout'     { if (-not $AllowEmptyLedger) { Assert-File $LedgerJson "缺少图标台账 $LedgerJson（人工/AI 定名后的输入）" } }
+                       Assert-File $mappingForDiscover "缺少 mapping（$DraftMappingJson 或 $MappingAuditJson）：请先跑 -Progress mapping"
+                       Assert-RegisteredInput 'extractSvg'
+                       Assert-RegisteredInput 'mappingDraft' }
+        'ledger'     { Assert-RegisteredInput 'iconCandidates' }
+        'layout'     { if (-not $AllowEmptyLedger) { Assert-File $LedgerJson "缺少图标台账 $LedgerJson（人工/AI 定名后的输入）" }
+                       Assert-RegisteredInput 'snapshot'
+                       Assert-RegisteredInput 'iconMap' }
         'inputs'     { if (-not $AllowEmptyLedger) { Assert-File $LedgerJson "缺少图标台账 $LedgerJson" }
-                       Assert-File $TranslationsJson "缺少译文清单 $TranslationsJson（页面文案的英文译文必须显式落盘）" }
+                       Assert-File $TranslationsJson "缺少译文清单 $TranslationsJson（页面文案的英文译文必须显式落盘）"
+                       Assert-RegisteredInput 'layoutManifest' }
         'bundle'     { Assert-File $BundleJson "缺少 Bundle 清单 $BundleJson：请先跑 -Progress inputs"
-                       Assert-File $SvgJson "缺少 $SvgJson：请先跑 -Progress svg" }
+                       Assert-File $SvgJson "缺少 $SvgJson：请先跑 -Progress svg"
+                       Assert-RegisteredInput 'bundleManifest'
+                       Assert-RegisteredInput 'extractSvg' }
         'gates'      { Assert-File $BundleAuditJson "缺少 Bundle 审计 $BundleAuditJson：请先跑 -Progress bundle" }
         'verify'     { Assert-File $PageXml "缺少页面 XML $PageXml：请先跑 -Progress bundle" }
     }

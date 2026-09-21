@@ -62,8 +62,8 @@ function New-Fixture {
 # 续跑：-Progress gates（步骤 11 > 1 → --keep）。身份解析通过后会在第 11 步因缺少 Bundle 审计失败，
 # 以此区分"身份被接受"与"被身份守卫拒绝"两类结果。
 function Invoke-Resume {
-    param([string] $Project, [string[]] $Extra = @())
-    $arguments = @('-ProjectRoot', $Project, '-Target', 'Demo', '-Progress', 'gates') + $Extra
+    param([string] $Project, [string[]] $Extra = @(), [string] $Progress = 'gates')
+    $arguments = @('-ProjectRoot', $Project, '-Target', 'Demo', '-Progress', $Progress) + $Extra
     $output = & pwsh -NoProfile -File $runAll @arguments 2>&1 | Out-String
     return $output
 }
@@ -114,6 +114,29 @@ try {
     # 7) 同一情形下显式传回身份 → 可以续跑（这是 §7 给出的处置）。
     $out7 = Invoke-Resume -Project $case6 -Extra @('-FileId', 'file-A', '-LayerId', 'layer-A', '-Ui', 'F8', '-DesignPageName', '设计页 A')
     Assert-True ($out7 -match '缺少 Bundle 审计') '显式传回身份后应能续跑'
+
+    # 8) 身份混搭：-Target 与 -LayerId 同时显式给出但不属于同一页 → 必须拒绝（不许落成混合身份的登记表）。
+    $case8 = New-Fixture -Name 'mixed-identity'
+    $out8 = Invoke-Resume -Project $case8 -Extra @('-LayerId', 'layer-B')
+    Assert-True ($out8 -match '不属于同一页') '混合身份（-Target 与 -LayerId 来自不同页）必须被拒绝'
+    Assert-True ($out8 -notmatch '缺少 Bundle 审计') '混合身份必须在消费前置检查之前就拦下'
+
+    # 9) 逐阶段输入复校：已登记的采集产物被改过 → 续跑当场拒绝（不再静默消费）
+    $case9 = New-Fixture -Name 'tampered-input'
+    $capturePath = Join-Path $case9 'Generated\runs\Demo\getDsl.json'
+    Set-Content -LiteralPath $capturePath -Value '{"dsl":"tampered"}' -Encoding UTF8
+    $runFile = Join-Path $case9 'Generated\runs\Demo\run.json'
+    $doc = Get-Content -LiteralPath $runFile -Raw | ConvertFrom-Json
+    $doc.artifacts | Add-Member -NotePropertyName 'getDsl' -Force -NotePropertyValue ([pscustomobject]@{
+        path   = 'Generated/runs/Demo/getDsl.json'
+        sha256 = ('0' * 64)
+        size   = 21
+        mtime  = '2026-01-01T00:00:00.000Z'
+        step   = 1
+    })
+    ($doc | ConvertTo-Json -Depth 10) | Set-Content -LiteralPath $runFile -Encoding UTF8
+    $out9 = Invoke-Resume -Project $case9 -Progress 'capture'
+    Assert-True ($out9 -match '与磁盘不一致') '被改过的已登记采集产物必须在消费前被拒'
 
     Write-Output 'PASS MasterGo run-all 续跑身份回放测试'
 }
