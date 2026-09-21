@@ -162,7 +162,9 @@ function shutdown(exitCode) {
   try { child.stdout.destroy(); } catch (error) { /* ignore */ }
   try { child.stderr.destroy(); } catch (error) { /* ignore */ }
   try { child.kill(); } catch (error) { /* ignore */ }
-  setTimeout(function () { process.exit(exitCode); }, 120).unref();
+  // 不能 unref：unref 的定时器不阻止事件循环退出，进程会在定时器触发前以 0 退出，
+  // 于是 isError / payloadError 的失败码被吞掉（run-all 会把"取数失败"当成成功）。
+  setTimeout(function () { process.exit(exitCode); }, 120);
 }
 
 (async function main() {
@@ -211,6 +213,19 @@ function shutdown(exitCode) {
   fs.writeFileSync(absolute, text, "utf8");
 
   const isError = Boolean(response.result && response.result.isError);
+  // 工具把业务错误也当作正常结果返回（`result.isError` 为假），例如伪造 fileId 时
+  // getDsl 返回 {"code":"20001","message":"…获取文件key异常"}。这类响应必须在这里就失败，
+  // 否则第 1 步会报 ok、错误要到下一步才暴露（"取数成功"的假象）。
+  const payloadError = (function () {
+    let parsed;
+    try { parsed = JSON.parse(text); } catch (error) { return null; }
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+    if (parsed.code === undefined || parsed.code === null) return null;
+    const code = String(parsed.code).trim();
+    if (code === "" || code === "0" || code === "200") return null;
+    return "MCP 返回错误码 " + code + (parsed.message ? "：" + String(parsed.message).slice(0, 200) : "");
+  })();
+  if (payloadError) console.error(payloadError + "（响应已落盘: " + absolute + "）");
   // 只输出摘要：内容是整页 DSL / SVG，绝不进上下文
   console.log(JSON.stringify({
     tool: args.tool,
@@ -218,8 +233,9 @@ function shutdown(exitCode) {
     out: absolute,
     bytes: Buffer.byteLength(text, "utf8"),
     isError: isError,
+    payloadError: payloadError || null,
   }));
-  shutdown(isError ? 5 : 0);
+  shutdown(isError || payloadError ? 5 : 0);
 })().catch(function (error) {
   console.error(error && error.message ? error.message : String(error));
   if (stderrText) console.error("服务端 stderr: " + stderrText.slice(-400));

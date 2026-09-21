@@ -79,6 +79,32 @@ assert.ok(run.stdout.indexOf(PAYLOAD_MARKER) < 0, "响应内容不得出现在 s
 assert.ok(run.stderr.indexOf(PAYLOAD_MARKER) < 0, "响应内容不得出现在 stderr");
 assert.ok(JSON.stringify(summary).indexOf(PAYLOAD_MARKER) < 0, "摘要里不得夹带响应内容");
 
+// 业务错误也必须失败：工具把错误当正常结果返回（无 result.isError），
+// 例如伪造 fileId 时 getDsl 返回 {"code":"20001","message":"…"}。
+// 这类响应如果按成功退出，run-all 第 1 步会报 ok、错误要到下一步才暴露。
+const errorPayload = JSON.stringify({ code: "20001", message: "❌ 获取文件key异常" });
+const errorPayloadPath = path.join(root, "error-payload.json");
+fs.writeFileSync(errorPayloadPath, errorPayload, "utf8");
+const errorStubPath = path.join(root, "stub-error-mcp.js");
+fs.writeFileSync(errorStubPath,
+  stubLines.join("\n").replace(JSON.stringify(payloadPath), JSON.stringify(errorPayloadPath)), "utf8");
+const errorOutPath = path.join(root, "run", "error-getDsl.json");
+const errorRun = spawnSync(process.execPath, [script,
+  "--tool", "getDsl",
+  "--fileId", "999999999999999",
+  "--layerId", "9:000009",
+  "--format", "json",
+  "--out", errorOutPath,
+  "--token", "fake-token",
+  "--mcp", process.execPath,
+  "--mcp-arg", errorStubPath,
+], { encoding: "utf8" });
+assert.notStrictEqual(errorRun.status, 0, "业务错误响应必须以非零退出码结束");
+assert.match(errorRun.stderr, /20001/, "stderr 必须点名错误码");
+const errorSummary = JSON.parse(errorRun.stdout.trim().split("\n").filter(Boolean).pop());
+assert.match(String(errorSummary.payloadError || ""), /20001/,
+  "摘要必须带 payloadError，供 run-all 定位失败原因");
+
 // 缺 --out / 缺 token 必须拒绝
 const noOut = spawnSync(process.execPath, [script, "--tool", "getDsl", "--fileId", "f", "--layerId", "l", "--token", "t"], { encoding: "utf8" });
 assert.notStrictEqual(noOut.status, 0, "缺少 --out 必须失败");

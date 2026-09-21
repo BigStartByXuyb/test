@@ -173,11 +173,30 @@ function Get-Step {
 }
 
 function Get-ProjectTarget {
-    param([string] $Root)
+    param([string] $Root, [string] $Target, [string] $LayerId)
     $registry = Join-Path $Root 'docs\page-registry.json'
     if (-not (Test-Path -LiteralPath $registry)) { return $null }
     $doc = Get-Content -LiteralPath $registry -Raw -Encoding UTF8 | ConvertFrom-Json
-    $page = @($doc.pages)[0]
+    $pages = @(@($doc.pages) | Where-Object { $_ })
+    if (-not $pages.Count) { return $null }
+    # 选页：-Target 命中优先 → -LayerId 命中 → 登记表只有一页时用它。
+    # 多页登记表且都没命中时返回 $null（本次页面不在登记表里，目标信息必须由命令行显式给出），
+    # 绝不静默取第一页——那会把别的页面的 fileId/layerId/ui 当成这一页的来源。
+    $pageTarget = {
+        param($item)
+        if ($item.PSObject.Properties['target']) { return [string] $item.target } else { return '' }
+    }
+    $pageLayerId = {
+        param($item)
+        if (-not $item.PSObject.Properties['designSource']) { return '' }
+        $design = $item.designSource
+        if ($design -and $design.PSObject.Properties['layerId']) { return [string] $design.layerId } else { return '' }
+    }
+    $page = $null
+    if ($Target) { $page = $pages | Where-Object { (& $pageTarget $_) -eq $Target } | Select-Object -First 1 }
+    if (-not $page -and $LayerId) { $page = $pages | Where-Object { (& $pageLayerId $_) -eq $LayerId } | Select-Object -First 1 }
+    if (-not $page -and $pages.Count -eq 1) { $page = $pages[0] }
+    if (-not $page) { return $null }
     # 逐字段读 designSource：不能直写 `$page.designSource.fileId`——登记表缺该字段时
     # Set-StrictMode 会抛出"property cannot be found"，掩盖真正的原因（登记表缺 fileId/layerId）。
     # 这里取成 $null，由下面的显式门禁给出可执行的报错。
@@ -186,7 +205,7 @@ function Get-ProjectTarget {
     $fileId = if ($design -and $design.PSObject.Properties['fileId']) { $design.fileId } else { $null }
     $designPageName = if ($design -and $design.PSObject.Properties['designPageName']) { $design.designPageName } else { $null }
     return [pscustomobject]@{
-        Target  = $page.target
+        Target  = (& $pageTarget $page)
         LayerId = $layerId
         FileId  = $fileId
         # 区域前缀（area）：① 登记表显式 `pages[].ui`；② `derivation` 里第一个 `F<数字>`。
@@ -292,7 +311,7 @@ $env:MASTERGO_MCP_TOKEN = $Token
 
 # 区域前缀的来源（只用于回显，便于复核"这个 ui 是谁给的"）；取值链见下方注释。
 $UiSource = $null
-$Registry = Get-ProjectTarget -Root $ProjectRoot
+$Registry = Get-ProjectTarget -Root $ProjectRoot -Target $Target -LayerId $LayerId
 if ($Registry) {
     if (-not $Target) { $Target = $Registry.Target }
     if (-not $LayerId) { $LayerId = $Registry.LayerId }
@@ -325,10 +344,10 @@ if (-not $Ui) {
 # 这里 fail-closed 而不是给默认值：插件是通用发布物，内置任何项目的文件 id 都会让别的项目
 # 在没传参数时静默取到另一个项目的设计稿（取数看着"成功"，产物却来自别的页面）。
 if (-not $FileId) {
-    throw "缺少 MasterGo 文件 id：请显式传 -FileId，或在项目登记表 docs/page-registry.json 的 pages[].designSource.fileId 登记。脚本不内置任何项目的文件 id"
+    throw "缺少 MasterGo 文件 id：请显式传 -FileId，或在项目登记表 docs/page-registry.json 里登记本次页面（-Target/-LayerId 命中该页）的 pages[].designSource.fileId。登记表有多页时必须先选中本次页面；脚本不内置任何项目的文件 id"
 }
 if (-not $LayerId) {
-    throw "缺少 MasterGo 图层 id：请显式传 -LayerId，或在项目登记表 docs/page-registry.json 的 pages[].designSource.layerId 登记。"
+    throw "缺少 MasterGo 图层 id：请显式传 -LayerId，或在项目登记表 docs/page-registry.json 里登记本次页面（-Target/-LayerId 命中该页）的 pages[].designSource.layerId。登记表有多页时必须先选中本次页面。"
 }
 
 foreach ($required in @('Target', 'LayerId')) {

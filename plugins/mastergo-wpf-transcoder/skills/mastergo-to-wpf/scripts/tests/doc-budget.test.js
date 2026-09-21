@@ -65,6 +65,8 @@ assert.ok(text.includes("一次调用跑完全部 12 步"),
   "SKILL.md 必须写明一键流水线是一次调用跑完 12 步");
 assert.ok(text.includes("不要为每一步单独起一次"),
   "SKILL.md 必须写明不要为每一步单独起一次 run-all");
+assert.ok(text.includes("登记表有多页时必须用 `-Target` 或 `-LayerId` 选中本次页面"),
+  "SKILL.md 必须写明多页登记表下要先选中本次页面（不得取第一页顶上）");
 for (const input of ["icon-naming.json", "lang-translations.json", "lang-glossary.json"]) {
   assert.ok(text.includes(input), "SKILL.md 必须写明模型要提供的页面级输入: " + input);
 }

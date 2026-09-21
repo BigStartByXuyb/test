@@ -78,7 +78,7 @@ function render(steps) {
   lines.push("**一条命令跑完全部 12 步**，不需要逐个手工调用，也不要为每一步单独起一次 `run-all`：");
   lines.push("");
   lines.push("```powershell");
-  lines.push("pwsh -NoProfile -File <skill>\\scripts\\run-all.ps1 -ProjectRoot <项目> -Target <Target> -Overwrite");
+  lines.push("pwsh -NoProfile -File <skill>\\scripts\\run-all.ps1 -ProjectRoot <项目> -Target <Target>   # 首次生成：不加 -Overwrite");
   lines.push("```");
   lines.push("");
   lines.push("默认区间是第 1 步 → 第 12 步。下面的 12 个阶段用于**定位失败**与**断点续跑**：失败后从该步继续 `-Progress <步骤名>`；需要人工补语义输入时先跑到 `-StopAfter discover`。");
@@ -105,9 +105,10 @@ function render(steps) {
   lines.push("## 运行方式");
   lines.push("");
   lines.push("```powershell");
-  lines.push("pwsh -NoProfile -File <skill>\\scripts\\run-all.ps1 -ProjectRoot <项目> -Target <Target> -Overwrite   # 一次跑完 12 步");
-  lines.push("pwsh -NoProfile -File <skill>\\scripts\\run-all.ps1 -ProjectRoot <项目> -Progress <步骤名>            # 失败后从该步继续");
-  lines.push("pwsh -NoProfile -File <skill>\\scripts\\run-all.ps1 -List -Format json                             # 本文件的机器可读来源");
+  lines.push("pwsh -NoProfile -File <skill>\\scripts\\run-all.ps1 -ProjectRoot <项目> -Target <Target>              # 一次跑完 12 步");
+  lines.push("pwsh -NoProfile -File <skill>\\scripts\\run-all.ps1 -ProjectRoot <项目> -Progress <步骤名>           # 失败后从该步继续");
+  lines.push("pwsh -NoProfile -File <skill>\\scripts\\run-all.ps1 -ProjectRoot <项目> -Target <Target> -Overwrite # 仅用户明确要求替换时");
+  lines.push("pwsh -NoProfile -File <skill>\\scripts\\run-all.ps1 -List -Format json                            # 本文件的机器可读来源");
   lines.push("```");
   lines.push("");
   return lines.join("\n");

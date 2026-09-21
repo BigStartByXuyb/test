@@ -56,5 +56,10 @@ assert.ok(contractDoc.includes("真值源是脚本"),
   "契约文档必须写明真值源是 run-all.ps1，而不是文档本身");
 assert.ok(contractDoc.includes("一条命令跑完全部 12 步"),
   "契约文档必须写明一条命令跑完全部 12 步（12 个阶段用于定位失败与续跑，不是逐步手工调用）");
+// 示例命令与「同名目标默认停止」的替换口径必须一致：主示例不带 -Overwrite。
+assert.ok(contractDoc.includes("首次生成：不加 -Overwrite"),
+  "契约文档的主示例必须标明「首次生成不加 -Overwrite」");
+assert.ok(contractDoc.includes("仅用户明确要求替换时"),
+  "契约文档必须把 -Overwrite 单列为「仅用户明确要求替换时」");
 
 console.log("PASS 一键流水线契约（run-all.ps1 $Steps ↔ pipeline-contract.md）一致性回归测试");
