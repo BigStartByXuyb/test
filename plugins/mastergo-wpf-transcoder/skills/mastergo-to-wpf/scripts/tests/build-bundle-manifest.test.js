@@ -85,13 +85,11 @@ assert.notStrictEqual(result.status, 0, "存在未登记的旧同名文件时必
 assert.match(result.stderr, /未登记的旧同名文件/);
 fs.rmSync(path.join(root, "Generated/dsl.snapshot.json"));
 
-// 5) 不给 --run-json：退回旧顶层路径，但必须给出明确警告
+// 5) 不给 --run-json：采集输入没有来源，必须失败（不再回落顶层 Generated/*.json）
 result = run([layoutManifest, path.join(root, "Generated/_inputs/F2Demo.legacy.json"), root, "F2"]);
-assert.strictEqual(result.status, 0, result.stderr);
-const legacy = JSON.parse(fs.readFileSync(path.join(root, "Generated/_inputs/F2Demo.legacy.json"), "utf8"));
-assert.strictEqual(legacy.dslPath, "Generated/dsl.snapshot.json");
-assert.match(result.stderr, /未提供 --run-json/);
-assert.match(result.stderr, /未提供页面标题/);
+assert.notStrictEqual(result.status, 0, "缺少 --run-json 时必须失败（禁止回落顶层旧路径）");
+assert.match(result.stderr, /缺少 --run-json/);
+assert.ok(!fs.existsSync(path.join(root, "Generated/_inputs/F2Demo.legacy.json")), "失败时不得写出清单");
 
 // 6) area 缺失必须报错，且不能被带值开关的取值顶掉（`… <projectRoot> --run-json X` 不能把 X 当 area）
 result = run([layoutManifest, path.join(root, "Generated/_inputs/F2Demo.no-area.json"), root]);

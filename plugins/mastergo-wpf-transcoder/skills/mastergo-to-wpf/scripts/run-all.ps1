@@ -100,7 +100,8 @@ function Get-ProjectTarget {
         # 任何情况下都不静默退回 F2（否则非 F2 页面的 UI/<区域>/View 输出目录会被悄悄写错）。
         # 匹配不用 `\b`：Target 形状是 `{区域前缀}{英文语义名}`，`F3ManualAlign`、`F3区域`
         # 这类连写里 F3 后面紧跟单词字符，词边界匹配不到。
-        Ui      = if ($page.PSObject.Properties['ui']) { $page.ui }
+        # 空串/空白等同"没登记"：显式空值要能继续走向 `derivation`（与文档的取值链读法一致）。
+        Ui      = if ($page.PSObject.Properties['ui'] -and -not [string]::IsNullOrWhiteSpace($page.ui)) { $page.ui }
                   elseif ($page.PSObject.Properties['derivation'] -and ($page.derivation -match 'F\d+')) { $Matches[0] }
                   else { $null }
         Design  = $page.designSource.designPageName

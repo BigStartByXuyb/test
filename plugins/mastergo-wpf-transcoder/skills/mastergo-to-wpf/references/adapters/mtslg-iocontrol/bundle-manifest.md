@@ -133,7 +133,7 @@ Bundle **不会**把新页面的文件写进 `.csproj`（实测 `csprojChanged=F
 **硬规则**
 
 1. **产出即登记**：`run-all.ps1` 每一步成功后就登记该步产物（`run-registry.mjs artifact`）；中途失败也把该步状态写进 `steps`。
-2. **消费只按登记**：`build-bundle-manifest.mjs --run-json <run.json>` 从登记表取 `snapshot` / `visibility` / `extractSvg`，并把 `sha256` 写进清单 `runRegistry.digests`；Bundle 读清单时**复校**：路径按登记表解析、`sha256` 与 `digests` 一致、`runId` 一致。
+2. **消费只按登记**：`build-bundle-manifest.mjs <…> <area> --run-json <run.json>` 从登记表取 `snapshot` / `visibility` / `extractSvg`，并把 `sha256` 写进清单 `runRegistry.digests`；Bundle 读清单时**复校**：路径按登记表解析、`sha256` 与 `digests` 一致、`runId` 一致。**`--run-json` 是必填**——缺了直接报错，不再回落到顶层 `Generated/*.json`（`area` 同理必填，推导只在 run-all.ps1 里做一次）。
 3. **拒绝旧同名影子文件**：Bundle 直接失败并点名的，是它**实际消费的三个采集输入**——`Generated/dsl.snapshot.json`、`Generated/visibility.json`、`Generated/extractSvg.json`（内容与本次登记恰好一致时只提示可清理）。其余旧布局文件（`Generated/coverage-report.json`、`Generated/manifest.json`、`Generated/timing.json`、`Generated/getDsl.json`）不参与输入解析，由 `run-registry.mjs check` 按同一张 `LEGACY_SHADOWS` 表列出，供迁移时一并清理；迁移老项目时把这类文件移出项目（或删掉）即可。
 4. **断点续跑**：`run-all.ps1 -Progress <步骤>` 用 `run-registry.mjs init --keep` 沿用同一份登记表；重新从第 1 步跑则新开一次运行（新 `runId`，产物登记清空）。
 5. **手工调用**：`node scripts/run-registry.mjs init|artifact|step|path|check|outputs|show`；`check` 会校验所有已登记产物的 sha256 并列出可清理的影子文件。
