@@ -5,410 +5,107 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 
 # MasterGo 转 MW 代码
 
-本 Skill 文档保留 `mw-wpf` 和 `mtslg-iocontrol` 两套适配器资料，但当前版本只启用 `mtslg-iocontrol` 路线。作业 A（MW WPF）暂不进入触发、分流或生成流程；除非后续明确重新启用作业 A，否则任何当前任务都只按作业 B 处理。当前启用路线没有目标项目时创建 MTSLG IOContorl 项目脚手架；有真实目标项目时直接读取其 `framework.config.json`、`.csproj`、现有页面、资源、Layout 和项目本地索引，完成正式接入和运行时交付。缺少目标项目事实时可以继续静态映射和脚手架生成，但必须停止运行时交付验证并明确标记未完成。
+当前版本只启用 `mtslg-iocontrol`（作业 B）：把 MasterGo 设计稿转成 MTSLG IOContorl 页面，并按目标项目规范生成完整页面。作业 A（`mw-wpf`）资料保留在 `references/adapters/mw-wpf/` 但**停用**——不进入触发、分流或生成流程；用户要求 WPF 或目标配置声明 `mw-wpf` 时停止并报告，不得改走其他路线、不得生成混合产物。
+
+本文件只写**模型必须做的判断**和**每条规则的唯一入口**。脚本已 fail-closed 强制的规则不在这里复述（复述只会与脚本漂移），完整口径一律在 reference 与脚本里。
+
+### 读取纪律（避免把"照步骤执行"变成"通读实现"）
+
+- 整页转换按 `scripts/run-all.ps1` 跑，步骤、输入、产物、失败处理看 `references/adapters/mtslg-iocontrol/pipeline-contract.md`；**不需要**读 `scripts/*.js`、`scripts/*.ps1` 源码来复述规则。
+- 只在下面三种情况读 reference：① 本文件明确写「读 X」；② 脚本报错，按 `pipeline-contract.md` 的「怎么修」定位到该 reference 的对应小节；③ 要写/改 Bundle 清单、图标命名表、译文清单，需要字段口径。
+- 未在「参考文件读取条件」里点名、且当前任务没触发的文件不要读；`references/adapters/mw-wpf/**` 属停用资料，不读。
 
 ## 触发边界
 
 必须同时满足：
 
-1. 有 MasterGo 设计来源：链接、`fileId + layerId`、设计稿截图或结构化节点；
+1. 有 MasterGo 设计来源：链接、`fileId + layerId` 或结构化节点；
 2. 用户明确要求转换/生成 MTSLG IOContorl XML 或完整 MTSLG 页面。
 
-仅出现以下内容时不要触发：单独修改已有 XML、单独排查 `Ctrl+R`、普通 WPF 调试、单独讨论 MTSLG/IOContorl API、单独维护组件库或代码索引。
+仅出现以下内容时不触发：单独修改已有 XML、单独排查 `Ctrl+R`、普通 WPF 调试、单独讨论 MTSLG/IOContorl API、单独维护组件库或代码索引。
 
 ## 开始前门禁
 
-### MasterGo MCP 一次性读取门禁（强制）
+1. **只认一次 `getDsl`**：用 `scripts/call-mastergo-mcp.js` 调 `getDsl(fileId, layerId, format=json)` 读当前图层完整 DSL，**响应只落盘**（`<runDir>/getDsl.json`）不进上下文；不得分段读取，不得用浏览器、截图或视觉猜测替代。MCP 不可调用或 `getDsl` 报错时**停止本次转换并报告原因**，不得换成其他设计数据来源继续。`extractSvg` 是 `getDsl` 成功后的独立图标步骤（`<runDir>/extractSvg.json`），不参与页面结构。
+2. **不读图**：不得打开、渲染或裁剪设计稿截图/图标位图做判断题；图形形状与朝向一律由 DSL 的 `rotate` / `flipH` / `flipV` 机械烘焙得出。宿主运行截图只属「项目运行时交付」门禁，与设计稿判断无关。
+3. **不降级、不伪造**：没有正式映射的组件只进来源清单与待确认，不得改成 `Button`、`Border`、无类型容器或近似控件；存在未映射组件时不得宣称「完整可运行页面」。
 
-凡触发本 Skill 的 MasterGo 转换任务，第一步必须检查当前会话已暴露的工具和已配置的 MCP，并强制使用 MasterGo MCP 的一次性 `getDsl` 读取当前 `layerId` 下的完整页面或容器。如果Mcp不存在，则需要强制去优先安装MasterGo对应Mcp，随后读取优先级固定如下：
+## 入口分流（先判断）
 
-1. 首选 MasterGo MCP 的 `getDsl`，传入当前任务的 `fileId`、`layerId` 和 `format=json`，一次返回完整 DSL；不同客户端可能为工具增加服务前缀，必须按当前会话实际暴露的完整工具名调用。
-2. 完整页面或容器转换只允许使用这一次 `getDsl` 响应作为设计数据源；不得调用分段总览接口，不得拆分请求，不得用多个局部响应拼接页面。
-3. 只要 MasterGo MCP 可调用，DSL、图标路径、字体、样式、元数据和节点层级都必须从这次完整响应中读取；不得先用浏览器页面、截图、网页搜索、Accessibility Tree 或视觉猜测替代 MCP。
-4. 如果当前会话没有可调用的 `getDsl`，只检查已配置的官方 MasterGo MCP 服务（包括 `@mastergo/magic-mcp`）是否暴露该接口；仍不可调用时停止本次转换并报告原因。
-5. 如果一次性 `getDsl` 返回错误，停止本次转换并报告原因；不得改用其他设计数据接口、浏览器或截图继续生成。
-6. `extractSvg` 只能作为一次 `getDsl` 成功后的独立图标资源解析步骤，用于生成页面 Icon；它不得读取、替代或补充页面结构。页面生成必须继续走本 Skill 的单响应 DSL capture 和适配器 Bundle 流程。
-7. **调用方式固定（防止整页 DSL 进入上下文）**：必须通过 `scripts/call-mastergo-mcp.js` 调用 `getDsl`、`extractSvg` 及其他 MasterGo MCP 工具，响应**只落盘**（约定 `<runDir>/getDsl.json`、`<runDir>/extractSvg.json`），脚本 stdout 只保留一行摘要（工具名、路径、字节数）。**禁止**把整页 DSL/SVG 原文放进模型上下文、回复正文或日志；引用设计数据时只允许给条数、字节数、哈希等摘要信息。在会话里直接调用 MCP 工具导致整页 DSL 进入上下文，视为违反本门禁。
-8. **转换链路不得读图（强制）**：页面生成（DSL capture → mapping → XML / Icon / Layout）全程只以 DSL、`extractSvg` 和脚本的计算结果为事实源。**不得**打开、渲染或裁剪**设计稿图片/截图/图标位图**来做判断题，**不得**用像素采样、ASCII/字符画粗渲染、栅格化预览、图像识别或任何“看一眼像不像”的方式确认图形外观、图形含义或朝向。本条约束的是**人与模型读图做判断**，不约束脚本内部用于数值比较的机械栅格化（例如 `gen-mtslg-page-icons.js` 比较 EvenOdd 与 Nonzero 填充规则渲染差异），该脚本照常运行。图标朝向只由 DSL 的 `rotate` / `flipH` / `flipV` 按树序机械烘焙得出，**脚本算出什么就是什么**；发现同一组图标几何完全一致（设计侧缺图）时，照常出图并登记待确认交设计侧处理，不自行镜像、旋转、转正或否决结果。**宿主运行截图不属设计稿读图**：它只在「项目运行时交付」门禁中使用，用途仅限 ① 建立宿主边界（公共栏边界表 / `ContentRect`）② 确认页面能加载、关键控件位置与页面稳定性——与 `mtslg-mode.md` 第 8 节同一口径；不得用来判断设计稿图形、图标含义或朝向。
-
-先判断交付目标：
-
-- **结构映射稿**：当前只接受 MTSLG IOContorl 结构映射；用户要求 WPF/XAML 时，作业 A 尚未启用，必须先报告当前版本不执行该路线。当前 MTSLG 结构映射未提供目标项目时，按正式映射表生成结构、节点、槽位、来源和坐标；运行时绑定与资源键写入待确认清单，不得用猜测值补齐。
-- **项目运行时交付**：用户要求替换/部署/加载页面，或要求报告可运行、Ctrl+R、视觉一致时，才执行以下目标项目门禁：
-  1. 读取并确认目标项目 `framework.config.json`、`.csproj`、项目本地索引和已确认的路径绑定/框架 Profile；不得依赖某个未安装的专用扫描工具。
-   2. 当前版本固定选择 `mtslg-iocontrol`；作业 A `mw-wpf` 暂不触发。目标项目 `framework.config.json` 若声明 `mw-wpf`，停止并报告当前路线未启用，不得改执行 WPF，也不得生成混合产物。
-  3. 确认框架源码、索引、组件库、真实页面样例和输出目录。
-   4. 按 MTSLG 页面宿主确认公共外壳边界。顶部栏/底部栏默认不写入页面 XML；设计稿包含页面壳层且目标项目需要页面注册或菜单时，已有 `Layout.xml` 按其真实结构增量注册；目标项目声明了 `layout_file` 但文件不存在时，按 `feishu-layout-mapping.md` 的正式模板新建该文件。不得因缺少既有 Layout 阻塞已确认页面生成，也不得从其他项目复制 Layout 结构或运行时字段。
-
-当前 MTSLG 交付中，组件只要命中正式映射，就必须按映射生成。未命中的组件不得降级为通用控件或近似控件；应将该组件的真实 DSL、坐标和 provenance 保留在待绑定清单中，并继续生成其他已命中映射的页面节点、Icon 文件和 Layout 注册。只要存在未映射组件，就不得宣称完整可运行页面；交付报告必须明确列出未映射组件和运行时未完成项。
-
-## 映射表优先级与适配层级
-
-正式组件映射表是“组件结构”的最高优先级。匹配键为“独立组件集名称 + MasterGo 公开变体/属性名 + 真实属性值”（映射表里每个模板族登记一个键：公开属性名、`componentSet` 或 `structural`）；**“完整父节点语义”不作为匹配键**——父节点链用于定位实例、读取证据与回溯，也用于确认真实结构、裁剪边界与来源，但映射表里没有按父节点分流的字段。组件集 ID、实例 ID、图层名称和截图外观只用于追踪或辅助读取，不能替代匹配键。例外只有一条，登记在映射表里、不是“按图层名兜底”：底部栏变体没有可用的公开属性，按 `layoutRules.bottomBar.match` 登记的**组件名**匹配（见 `feishu-layout-mapping.md`）。表格族（`tableTemplates`）在设计稿里没有组件集，按 `tableTemplates.match.structural` 登记的**结构签名**命中（表头群组 + `item` 行群组 + 表头可见文本），**图层名不参与匹配**（见本文件「表格族（`tableTemplates`）」一节与 `feishu-component-library-mapping.md`）。
-
-按以下层级执行：
-
-1. **正式映射表**决定 `ControlType`、`Style` 槽位/语义类别、节点数量、父子关系、槽位顺序和固定属性；不据此虚构具体资源键。
-2. **目标项目源码/真实页面/键索引**决定已登记的 `Style`/`Icon` 资源键和其他运行时字段；固定模板中存在的 `IOName`、`IOCommand`、`LangName`、`IOEnable`、`IOState`、`PageName` 等字段没有可靠来源时保留对应 XML 属性并输出空字符串值；不在固定模板中的属性不新增，不填猜测值。
-3. **MasterGo DSL**为映射槽位提供真实文本、实例属性、图标来源、尺寸和逐级坐标。
-4. 图层名称、组件名称和视觉外观不得触发额外推断；没有映射的组件不得静默改成 `Button`、`Border`、无类型容器或其他近似控件。
-
-当前 MTSLG 结构映射稿与运行时交付使用同一条生成链路：目标项目缺失时仍必须创建完整 IOContorl 脚手架，并生成与正式运行结构一致的 `.csproj`、`framework.config.json`、页面 XML、页面 Icon、Layout 壳层和 mapping/provenance。固定模板中已经声明的可选运行时属性，映射清单缺少来源时必须显式写成空字符串值，并在 mapping/manifest 中标记待配置；不在当前固定模板中的属性不新增：`ControlType` 的模板不含图标字段时不写 `Icon`/`IconWidth`/`IconHeight`，模板含图标字段的 `IconButton` 没有图标槽位时仍按必写字段发射空字符串占位。只有项目引用、真实运行时资源、可编译宿主和加载验证都通过后，才能称为“完整可运行页面”。
-
-### 空项目脚手架模式
-
-没有目标项目时，当前只创建 MTSLG IOContorl 项目脚手架，沿用 DSL、可见性、组件映射、文本审计、XML、Icon、Layout 和 provenance 生成链路；必须创建 `.csproj`、`framework.config.json`、页面 XML、页面 Icon、Layout 和 mapping/provenance 目录。脚手架中的运行时程序集、业务字段、资源键和目标绑定只能留空或标记待配置，不得猜写。该模式生成完整文件结构，但不执行编译、宿主加载或真实运行时验证；有真实目标项目后再复用同一结构补齐运行时资料并验证。
-
-## 适配器选择门禁（必须先完成）
-
-在读取任一适配器专用参考、样例或脚本前，必须确认当前版本只执行作业 B；作业 A 资料仅保留供未来启用，不得进入当前任务。当前分流固定为：
-
-1. 当前任务统一记录 `Adapter: mtslg-iocontrol`；用户要求 `mw-wpf` 或目标配置声明 `mw-wpf` 时，停止并报告作业 A 尚未启用，不得改执行其他路线。
-2. 当前 MTSLG 任务不根据“WPF”、图层名称、目录名、截图或控件外观改写适配器；不得同时执行两条作业或生成混合产物。
-3. 目标项目配置路径无效、模式不明或运行时事实不足时，按 MTSLG 静态映射规则标记待确认；不得借用 WPF 规则补齐。
-
-当前启用的 `mtslg-iocontrol` 是完整项目路线：页面 XML、Icon、Layout、mapping/provenance、项目配置、正式输出目录和该项目要求的宿主壳共同构成完整交付；不得把它描述成“只生成 XML”或“依赖未来 WPF 路线的附属产物”。
-
-## 作业 A：MW 框架 WPF（`Adapter: mw-wpf`，当前暂不启用）
-
-本节保留未来 MW WPF 路线的参考内容，但当前版本的全局门禁不会进入本节，也不会因为用户提供 WPF 目标而自动启用本节。重新启用作业 A 前，必须单独完成适配器分流、输出目录、页面壳、Icon 和验证流程的全篇复核；其中 Icon 一项的验收以「页面 Icon 文件（按路线区分）」一节的路线条目为唯一口径。
-
-新增独立 MW WPF 页面时，先按本作业读取项目适配与 MW WPF 参考文档，形成页面清单，再使用 scripts/gen-mw-wpf-page.js 生成固定的 View、View.xaml.cs、ViewModel 和 csproj 注册（code-behind 以 `<DependentUpon>View.xaml</DependentUpon>` 挂在同页 View.xaml 下，与 Visual Studio 里把 `.xaml.cs` 拖到 `.xaml` 上等价，不需要人工拖拽；形态与幂等规则见 `references/adapters/mw-wpf/page-shell-generator.md`）。清单可显式提供 `viewPath`、`codeBehindPath`、`viewModelPath`；未提供时按 `.csproj` 同区域 View/ViewModel 声明、项目目录证据、最后的 `Pages/` 兜底顺序解析，绝不为同一页面生成两套目录。若 MaxWell SSD 页面需要一个负责加载 MTSLG 页面 XML 的 WPF 宿主壳，必须改用作业 B 的 bundle 入口；作业 A 单独生成的 WPF 页面不得猜写 IOContorl 控件。页面控件、文本、坐标、Style、协议绑定、页面 XML 和 Icon 仍必须分别依据项目事实源、MasterGo DSL 与对应生成器完成。
-
-1. 核对真实 MW 控件源码、现有 WPF 页面、Style/Resource 键、Geometry 资源和页面宿主。
-2. 先读 `references/adapters/mw-wpf/mw-wpf-framework.md`；再按命中的控件、资源或协议按需读 `references/adapters/mw-wpf/framework-manual/` 下对应的 controls、resources、protocols 或 scenarios 文档。不得预读 MTSLG 映射或 XML 文档。页面壳生成器的清单字段、View/ViewModel 固定形状与覆盖/备份规则见 `references/adapters/mw-wpf/page-shell-generator.md`。
-3. 生成目标项目约定的 XAML、C# UserControl/ViewModel 与资源；直接使用项目真实的 MW 控件和协议，例如 `s:IconButton`、`MainButtonStyle`、`PageName`、`s:Action`、`IOEnable`。
-4. 验证命名空间、资源键、绑定、编译和 WPF 页面加载。禁止以普通 WPF 控件替代已有 MW 能力；先用 `scripts/discover-mtslg-page-icon-map.js` 从当前页真实 PATH/SVG 生成页面级候选及未映射审计，再由 `scripts/gen-mtslg-page-icons.js` 发射已确认或页面内唯一的临时 Geometry 键，页面只引用自己的 Geometry 键。
-
-本作业不得生成 MTSLG `IOContorl` XML、MTSLG `Layout.xml` 注册或调用 MTSLG provenance 校验器。
-
-## 作业 B：MTSLG IOContorl（`Adapter: mtslg-iocontrol`）
-
-`mtslg-iocontrol` 路线需要生成完整页面项目时，使用 `scripts/gen-mastergo-page-bundle.js` 作为总入口；适配器仍记录为 `mtslg-iocontrol`。**它的输入清单契约（字段、必填、缺省、前置条件）见 `references/adapters/mtslg-iocontrol/bundle-manifest.md`**——不要照抄上一页的 `bundle.json` 反推字段。Bundle 生成的项目文件、页面 XML、Icon、Layout、mapping/provenance 和目标项目要求的 WPF 宿主壳共同组成这条完整路线的交付物。宿主壳只负责加载 MTSLG 页面 XML，不是第二套 WPF 业务页面适配器，也不得在其中猜写 WPF 业务控件或把 WPF 私有协议写入 IOContorl XML。
-
-### MTSLG 页面入口分流（必须先判断）
-
-- **修改现有页面**：读取目标项目实际生效的 XML，使用 `gen-iocontrol-xml.js --merge <existing.xml> <mapping.json> --out <confirmed-output.xml>`；保留工程师已有的 IOName、IOCommand、IOEnable 等业务属性，并处理 merge 报告中的冲突。映射节点 `valueSource=dsl.text` 时，**文案承载属性**属设计文本，merge 会强制按映射覆盖（否则 provenance 校验必然失败），这类覆盖单独列在“设计文本覆盖（dsl.text）”报告里，需逐条确认。文案承载属性与 provenance 校验同口径：有 `Value` 比 `Value`；容器类控件（如 `GroupBox`）由 `Header` 承载标题文案，此时比 `Header`。不得对现有页面使用 `--fresh`。
-- **新建页面**：使用 `gen-iocontrol-xml.js --fresh <mapping.json> --out <new-page.xml>`，随后按已确认的 Layout、语言键、Icon 和宿主路径完成注册。不得把不存在的页面伪装成 merge。
-- `gen-mastergo-page-bundle.js` 是页面项目生成的唯一正常入口；它的页面 XML 步骤是 `--fresh`，新建页面目标文件已存在时默认停止并报告冲突。只有用户明确要求替换已有页面、manifest 设置 `operation=replace-existing` 且显式传入 `--overwrite` 时，才允许整套替换并备份。现有页面的业务修改仍必须优先走 `--merge` 主路径；只有 Bundle 被错误或环境阻塞时，才可按阻塞步骤单独调用子脚本。
-- Bundle manifest 必须提供 `svgPath`，并指向 `getDsl` 成功后按需执行 `extractSvg` 保存的 JSON；没有运行时 Icon 时也提供合法的 `{ "svgs": [] }` 文件。
-- 新建页面的 mapping 必须由当前 DSL 在本次生成中创建，并带有中文 Tag `新页面完整DSL映射`；该 mapping 是当前页面的专属产物，不作为跨页面共享参考。修改已有页面仍按 `merge` 流程保留运行时业务属性。
-
-1. 读 `references/adapters/mtslg-iocontrol/mtslg-mode.md`。`feishu-component-library-mapping.md` 与 `mtslg-iocontrol-map.json` **默认不预读**：组件匹配、`ControlType`、槽位、属性白名单与必写字段由 `resolve-mtslg-template-mapping.js` / `gen-mtslg-mapping-from-dsl.js` 按映射表执行，文档与映射表的一致性由 `audit-mtslg-feishu-map.js` 强制。**不预读 ≠ 不参与生成**：映射表由脚本在生成期读取（Bundle 恒以 `--map` 传入 `mtslg-iocontrol-map.json`），只是不需要模型把它读进上下文。**只有**当脚本报出 `pending` / `unmappedComponents` / `templateConflicts` 时，才按 ref **定点查**对应小节（关键词检索，不通读整份）。设计稿包含顶部栏、底部栏或快捷键，或本次需要创建/修改 Layout 注册时，必须再读 `feishu-layout-mapping.md`；未触发页面壳层或 Layout 注册时不读取该文件。不得读取 MW WPF 控件协议作为 XML 事实源。
-2. 生成真实 `IOContorl` XML、逐节点 mapping/provenance 和必要的 Layout 注册；`ControlType`、固定组件层级和槽位首先使用正式映射表。目标项目已确认的字段按事实填写；固定模板中存在但缺少可靠来源的 `IOName`、`IOCommand`、`LangName`、`IOEnable`、`IOState`、`PageName`、`UserRightId` 等保留属性并输出空字符串值，不删除整个节点；不在模板中的属性不新增。使用 `scripts/gen-iocontrol-xml.js` 发射 XML；先发现当前页面 PATH/SVG 候选，再由 `scripts/gen-mtslg-page-icons.js` 生成当前页面的 Icon 文件。Icon 资源名优先使用中文语义对应的英文键；无法形成可靠语义名时才使用当前页面内唯一的临时键。临时键必须写入 mapping/manifest，不能使用 `MGIcon_<layer-id>`，并必须保持页面内唯一。Layout 只引用该页面 Icon 文件中已生成的键。
-   - 新页面默认禁止覆盖页面 XML、Icon、View、ViewModel 或审计文件；同名目标存在时停止并要求确认。用户明确要求替换时，必须使用 `operation=replace-existing` + `--overwrite`，并为所有被替换文件保留备份。Layout 仍由 `gen-mtslg-layout.js` 负责增量追加；已有同名 `Page Target` 默认停止，用户明确要求替换并传入 `--overwrite` 时才定点更新并备份。
-   - 页面可以没有任何运行时 Icon。PATH/SVG 候选只是来源审计；只有 IOContorl 节点或 Layout 菜单实际引用的 Icon，才必须在当前页面 Icon 文件中存在对应 Geometry 资源键。
-    - **Layout 必须先完成映射清单，再生成 XML。** 读取完全部 MasterGo DSL 后，按 `feishu-layout-mapping.md` 生成 Layout manifest；已命中的底部栏组件必须生成对应的 `menuItems`。底部栏变体按 `layoutRules.bottomBar.match` 登记的**一个**键识别（当前是组件名——底部栏实例的属性里没有变体信息），既非装饰、又不在常驻分组、又没命中变体的实例计入 `layoutEvidence.unresolvedBottomBarItems` 并拒绝生成，不允许静默丢按钮。当前固定模板声明的运行时字段缺失时写入空字符串并标记待配置；没有声明的字段不新增，不能因此把整个 `Menu` 留空。`layoutStatus`、`layoutEvidence` 和数量一致性由 `gen-mtslg-layout.js` 强制校验；校验失败表示“清单不完整”，不是拒绝生成页面，补齐清单后重新运行即可。
-   - 顶部栏 `HeaderItem` 的运行时 `Id/Target` 仍须来自目标项目事实源；无法确认时单独标记待确认，不得用顶部文字或图标名称猜写。页面中间的 `主菜单button` 也不因存在 F 键就自动写入 Layout，只有正式 Layout 映射命中时才写入。
-3. 在 XML 结构检查前运行 `scripts/validate-iocontrol-provenance.js`；需要独立坐标检查时以节点数组调用 `scripts/check-iocontrol-coords.js`，有 Geometry 时调用 `scripts/scan-icon-coords.js`。**本步骤到此结束。** 宿主加载与截图核对属于上文的「项目运行时交付」门禁，只有用户明确要求替换/部署/加载页面或报告可运行、Ctrl+R、视觉一致时才执行；它不是每次转换的固定步骤，也不参与任何图标图形或朝向的判断。
-
-本作业不得写入 WPF 私有协议，例如 `s:Action`、WPF `PageName` 或 WPF ResourceDictionary/绑定语法；没有正式映射时不得降级为普通 Button、无类型容器或静态占位结构。未映射组件仅进入静态来源清单，不进入伪造的 IOContorl 节点。
-
-## 一键流水线（`scripts/run-all.ps1`，外层编排）
-
-在目标项目里做整页转换时，用 `scripts/run-all.ps1` 把下面 12 步**按顺序**串起来跑。步骤、顺序、口径与手工逐条执行完全一致，脚本只负责：串行调用、计时、把每步 stdout/stderr 落日志、失败即停、支持从任意一步继续。
-
-| 步骤 | 内容 | 调用的脚本 |
+| 场景 | 入口 | 口径 |
 |---|---|---|
-| 1 `fetch` | 取数（响应只落盘） | `call-mastergo-mcp.js --tool getDsl` |
-| 2 `capture` | DSL 快照 + 覆盖校验 | `mastergo-dsl-pipeline.ps1 -Action Capture` |
-| 3 `svg` | 图标几何 | `call-mastergo-mcp.js --tool extractSvg` |
-| 4 `visibility` | 显隐事实 | `resolve-mastergo-visibility.js` |
-| 5 `mapping` | mapping 草稿 | `gen-mtslg-mapping-from-dsl.js` |
-| 6 `discover` | 图标候选清单 | `discover-mtslg-page-icon-map.js` |
-| 7 `ledger` | 由命名表生成图标台账 + 图标几何来源核对 | `build-icon-ledger.mjs`、`verify-icon-source.mjs --naming` |
-| 8 `layout` | Layout 清单推导 | `gen-mtslg-layout-manifest.js` |
-| 9 `inputs` | Bundle 清单生成 | `build-bundle-manifest.mjs` |
-| 10 `bundle` | 页面 XML / Icon / Layout / 宿主壳 | `gen-mastergo-page-bundle.js` |
-| 11 `gates` | 审计逐条断言（临时语言键/待翻译/未映射组件/嵌套冲突/底栏未命中/静态校验） | — |
-| 12 `verify` | 四项独立验证 | `run-verifications.ps1` |
+| 修改现有页面 | `gen-iocontrol-xml.js --merge <现有XML> <mapping.json> --out <输出>` | 保留工程师已有的 `IOName`、`IOCommand`、`IOEnable` 等业务属性；**禁止对现有页面用 `--fresh`**；merge 逐条语义与「设计文本覆盖（dsl.text）」报告见 `mtslg-mode.md` 第 5 节 |
+| 新建页面 | `gen-mastergo-page-bundle.js --manifest <bundle.json>`（唯一正常入口） | 页面 XML 步骤是 `--fresh`；同名目标存在时默认停止；只有用户明确要求替换 + 清单 `operation=replace-existing` + `--overwrite` 才整套替换并逐个备份 |
+| Bundle 被环境阻塞 | 按阻塞步骤单独调子脚本 | 只补该步，不改变上游输入口径 |
 
-**每一步的产物都登记在运行登记表里**：`<项目>/Generated/runs/<Target>/run.json`（`scripts/lib/run-registry.js` 是唯一实现，`run-registry.mjs` 是它的 CLI）。规则固定为「**产出即登记、消费只按登记取、旧同名文件一律拒绝**」：
+- Bundle 清单的字段、必填、缺省见 `references/adapters/mtslg-iocontrol/bundle-manifest.md`；不要照抄上一页的清单反推字段。
+- `mapping` 由 Bundle 内部调用 `gen-mtslg-mapping-from-dsl.js` **机械生成**（Tag `新页面完整DSL映射`），不是人手写的中间稿；要偏离机械结果就改**输入清单**（隔离实例、标题文案、术语表、译文），不改 mapping 产物。
+- 匹配键是「独立组件集名 + 公开属性名 + 真实属性值」（或映射表登记的结构签名）；**「完整父节点语义」不作为匹配键**。图层名、组件 ID 与截图外观只用于追踪和核对。
 
-- 每步成功后就登记该步产物（`path` + `sha256` + `size` + `mtime` + 所属步骤）；失败步骤也登记状态；
-- `build-bundle-manifest.mjs --run-json <run.json>` 只从登记表取 `snapshot` / `visibility` / `extractSvg`，并把指纹写进清单 `runRegistry.digests`；Bundle 读清单时复校 `runId`、路径与 `sha256`，**并拒绝未登记的旧同名文件**（`Generated/dsl.snapshot.json` 这类上一次运行留下的文件）——历史上"顶层旧文件还在 → 静默用旧数据"就是漏了这一层；
-- 断点续跑（`-Progress`）用 `run-registry.mjs init --keep` 沿用同一份登记表；从第 1 步重跑则新开一次运行（新 `runId`、产物登记清空）；
-- 手工检查：`node scripts/run-registry.mjs check --run <run.json>`（校验全部已登记产物的 sha256，并列出可清理的旧同名文件）、`show`（看本次运行摘要）。
+## 一键流水线（12 步）
 
-- **区域前缀（`ui`）不再写死 F2**：`run-all.ps1` 按固定顺序取值——① 命令行 `-Ui`；② 项目登记表 `pages[].ui`；③ 项目登记表 `derivation` 里的 `F<n>`；④ Target 的编号前缀（`F2ManualAlign` → `F2`）；⑤ 没有编号时取 Target 的首个英文词（`HomeContent` → `Home`、`Home` → `Home`，即"外层的语义英文"）；⑥ 都取不到直接报错。这条链是**有规则、可复核的解析**：run-all 会回显命中的来源（`Ui: Home（来源: Target 首词（HomeContent））`），取不到就报错——不存在"写死某个值"的静默默认。`mastergo-dsl-pipeline.ps1` 单独调用时必须显式给 `-Ui`。
-- **页面标题必须来自项目登记表**：`run-all.ps1` 读 `docs/page-registry.json` 的 `pageTitleText` 并写进清单（`languages.titleSource=manifest.pageTitleText`）。设计页名带 `（x.y）` 编号时，登记表里必须写去掉编号的标题——否则标题会退回设计原文并触发"待翻译"门禁。
-- **空文本节点不参与多语言门禁**：设计稿里的空 `TEXT`（`Value=""`）照常发射为 `TextBlock`，但派生器不产键、门禁也不要求它挂 `LangName`，**不需要**为它登记 `noLangRefs`。
-- **页面级图标为空是合法的**：若页面引用的图标全部由映射表登记为运行时图标（`iconPolicy=runtime`），本页 `Icons.xaml` 就是空字典——第 12 步的结构校验按"引用闭环"判定（`usedIcons ⊆ 本页 Geometry ∪ runtimeIcons`），只在确实缺少本页 Geometry 时失败，纯运行时图标页给 WARN。
+整页转换用 `scripts/run-all.ps1` 串起来跑：步骤、顺序、口径与手工逐条执行完全一致；脚本负责串行调用、计时、逐步落日志、失败即停、从任意一步续跑。
+
+| 步骤 | 名称 | 内容 |
+|---|---|---|
+| 1 | `fetch` | 取数 `getDsl`（响应只落盘） |
+| 2 | `capture` | DSL 结构化快照 + 覆盖校验 |
+| 3 | `svg` | `extractSvg` 图标几何 |
+| 4 | `visibility` | 显隐事实提取 |
+| 5 | `mapping` | mapping 草稿（按当前台账） |
+| 6 | `discover` | 图标候选发现 + 打印待命名清单 |
+| 7 | `ledger` | 由命名表生成图标台账 + 图标几何来源核对 |
+| 8 | `layout` | Layout 清单机械推导（底部栏 MenuItem） |
+| 9 | `inputs` | 校验译文并生成 Bundle 清单 |
+| 10 | `bundle` | 生成页面 XML / Icon / Layout / 宿主壳 |
+| 11 | `gates` | 严格门禁（审计逐条断言） |
+| 12 | `verify` | 四项独立验证（provenance / 坐标 / Icon / 结构） |
+
+- **每一步的输入 / 产物 / 失败语义 / 怎么修：`references/adapters/mtslg-iocontrol/pipeline-contract.md`**。该文件由 `run-all.ps1` 的步骤定义生成（`node scripts/gen-pipeline-contract.mjs`），**真值源是脚本**；要改契约就改脚本再重新生成，手改文档会挂测试。
+- 运行登记表：`<项目>/Generated/runs/<Target>/run.json`，规则是「**产出即登记、消费只按登记取、未登记的旧同名文件一律拒绝**」；清单里的采集输入（`dslPath` / `visibilityPath` / `svgPath`）都从登记表解析并校验 `sha256`。断点续跑用 `-Progress <步骤名>`。
+- 区域前缀（`ui`）：取值链的唯一实现在 `run-all.ps1`（`-Ui` → 项目登记表 `pages[].ui` / `derivation` → Target 编号前缀 → Target 首词 → **报错**）；取不到就报错，不静默默认。`fileId` / `layerId` 同样按「命令行 → 项目登记表 → 报错」解析，插件不内置任何项目的设计来源。
 
 ```powershell
-pwsh -NoProfile -File <skill>/scripts/run-all.ps1 -List
-pwsh -NoProfile -File <skill>/scripts/run-all.ps1 -ProjectRoot <项目> -Target <Target> -LayerId <图层id> -StopAfter discover
-pwsh -NoProfile -File <skill>/scripts/run-all.ps1 -ProjectRoot <项目> -Progress bundle -Overwrite
+pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -List -Format json
+pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -ProjectRoot <项目> -Target <Target> -Overwrite
+pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -ProjectRoot <项目> -Progress bundle
 ```
 
-- `-Progress` / `-StopAfter` 可写步骤号或步骤名；失败时脚本打印失败步的日志路径与续跑命令，修好输入后从该步继续，不需要重跑前面。
-- 每步日志：`<项目>/Generated/_work/steps/NN-<步骤名>.log`。
-- **采集产物按页归档**：`<项目>/Generated/runs/<Target>/`（`getDsl.json` / `dsl.snapshot.json` / `coverage-report.json` / `visibility.json` / `extractSvg.json` / `manifest.json` / `timing.json`）。一个项目里可以有多张页面，写在同一层会互相覆盖，导致旧页重跑时拿错别页的 `extractSvg`/快照。
-- **语义判断不合并进脚本**，必须由人给三个页面级输入文件：`<项目>/Generated/_inputs/<Target>.icon-naming.json`（候选下标 → 英文资源名/中文注释/是否 `fromDsl`）、`<Target>.lang-translations.json`（中文→英文译文）、`<Target>.lang-glossary.json`（无英文语义或单字符文案的稳定标识符）。
-- 步骤 7 做两件事：先按命名表机械生成台账（`build-icon-ledger.mjs <候选清单> <icon-map.json> <命名表>`），再对本页登记的条目做几何来源核对（`verify-icon-source.mjs <候选清单> <dsl.snapshot.json> <extractSvg.json> --naming <命名表>`）。命中「`sourceId` 指向页面根 / 被多条共用 / 缺 extractSvg 条目且未声明 `fromDsl`」时该步直接失败——不要手写 `icon-map.json` 的 `icons[]` 绕过这一步。
-- 待翻译文案用 `list-lang-sources.mjs <mapping.json> [layout-manifest.json]` 枚举（列出本页需要多语言条目的设计文案、页面标题与 Layout 菜单名），据此产出译文清单。
-- **脚本根约定**：外层辅助脚本（`run-all.ps1` 及其同级：`build-*`、`verify-*`、`run-verifications.ps1`、`check-coords.mjs`、`inspect-*`、`list-lang-sources.mjs`）与 `run-all.ps1` **同目录**——插件里即 `skills/mastergo-to-wpf/scripts/`，项目里整组放 `<项目>/_tool/`；skill 自带脚本（`gen-*`、`validate-*`、`discover-*`、`scan-*` …）一律从 skill 的 `scripts/` 取。两种布局下 `run-all.ps1` 都能自动识别，无需手工传脚本根。
-- 覆盖已有页面产物必须显式 `-Overwrite`（Bundle 会逐个备份）。
-- 项目已在 `docs/page-registry.json` 登记时，`-Target` / `-LayerId` 可省略（从登记表读）。
-
-### 页面级 / 项目级资源边界（强制）
-
-- **页面级（互不引用，且跨页不得同名）**：`Resources/Pages/<Target>/<Target>Page.xml`、`<Target>Icons.xaml`、`<Target>_CN.xaml`、`<Target>_EN.xaml`、`UI/<区域>/View|ViewModel/<Target>*`、页面专属 mapping/审计、`Generated/_inputs/<Target>.*`。这些文件里出现别的页面 Target，或引用别的页面的 Icon/LangName 键，即为串页。
-- **项目级（一个项目里唯一、多页共享）**：`Resources/Layout/Layout.xml`（登记本项目所有页面）、`.csproj`、`framework.config.json`。Layout 里出现别的页面注册是**正常**的；本页只增量写入/更新自己的 `<Page>` 节点，不得改写其他页面的注册。
-- 校验脚本据此按页取节点：`verify-page.ps1` 只校验本页 `<Page>` 子树，绝不拿整个共享 Layout 去跟本页字典/Icon 比对；验证日志按页分目录 `Generated/_work/verification/<页面>/`。
-
-### 图标几何来源核对（`scripts/verify-icon-source.mjs`，定名前必跑）
-
-台账条目的 `sourceId` 只有在**唯一指向该图标自己的图形节点**时才能用于取几何。出现下列任一情形，必须改成 `fromDsl: true` + 该图标 PATH 节点的 ref（否则会把别的图形当成本图标，而且**静态校验不会报错**、只在运行时肉眼可见）：
-
-1. `sourceId` 指向页面根（该条目是整页几何）；
-2. 同一个 `sourceId` 被多条台账条目共用（典型：多个按钮的图标被归到同一个分组节点）；
-3. `extractSvg` 没有该条目。
-
-注意反面：**同一页里多个按钮共用同一个图形是正常的**（设计复用，几何会完全一致）。判据是「这条来源能否唯一确定这个图形」，不是「图形是否相同」——不要用"指纹相同"当失败条件。
-
-## 页面 Icon 文件（按路线区分）
-
-每个页面使用自己的 Icon 文件，文件名固定由页面 `name` 派生为 `Resources/Pages/{name}/{name}Icons.xaml`，与页面 XML 同处该页专属目录。新页面不得复用或覆盖其他页面的 Icon 文件。`gen-mtslg-page-icons.js` 只负责创建当前页面的新 ResourceDictionary，目标文件已存在时失败，不执行 Icon 合并。
-
-**View 是否合并本页 Icon 资源字典按路线区分（两条路线不能混用同一套说法）**：
-
-- **`mtslg-iocontrol`（作业 B，当前唯一启用）**：生成的 View（`<Page>View.xaml`）**不合并**本页 Icon 资源字典——宿主壳只输出 `UserControl` 头 + `PageDesign`，不写 `<UserControl.Resources><ResourceDictionary Source="…/<页面名>Icons.xaml" /></UserControl.Resources>`；页面 Icon 文件仍照常生成并按 Icon Page 注册进 `.csproj`。
-- **`mw-wpf`（作业 A，当前停用）**：该路线页面用 `{StaticResource …Geometry}` 引用图标，`StaticResource` 是加载期解析——页面自身不合并本页 Icon 字典时，键没有来源，加载即抛 `XamlParseException`（框架规则 R5）。注意 `gen-mw-wpf-page.js` 的 `renderView` **没有路线分支**，两条路线都恒不发射这段合并声明，所以作业 A 目前是缺口：**重新启用前必须给该脚本加路线分支（或由另一生成器）补上本页 Icon 字典的合并点，并做加载验证**，不能只做文档确认。
-
-`extractSvg` 只返回 PATH 自身的 `d` + `transform`，**几何完全相同的复用实例会被去重**（典型场景：同一个方向图标被旋转/翻转复用，例如「向上/向下」只差组级 `flipV`、「向左/向右」只差组级 `rotate`），因此某些方向按钮拿不到条目，页面就会出现「有图标槽位但无 Icon」的节点。补救方式：给 `gen-mtslg-page-icons.js` 传入第 4 个参数（DSL 快照路径 `dsl.snapshot.json`），并在页面图标映射里把这类条目写成 `"fromDsl": true`：
-
-- 默认只合成「PATH 原始 `d` + PATH 自身 `matrix`」并平移到原点，与 `extractSvg` 的输出等价；
-- `"bakeAncestorTransform": true` 时额外把祖先节点的 `rotate` / `flipH` / `flipV`（绕各自盒子中心）烘焙进坐标，用于区分只靠组级变换区分的方向图标；
-- **祖先朝向由脚本自动判定并烘焙（机械兜底，不靠手写字段）**：只要图标节点的 PATH 祖先链上出现 `rotate` / `flipH` / `flipV`，`gen-mtslg-page-icons.js` 就自动改用「DSL + 烘焙」——包括 `extractSvg` 恰好也有条目的情况（extractSvg 只给 PATH 自身的变换，表达不了祖先朝向）。自动烘焙的图标会在 stdout 逐条报告，供交付说明引用。台账显式写 `fromDsl` + `bakeAncestorTransform` 时结果与自动一致；祖先链上没有朝向时行为不变（仍优先 `extractSvg`）。该判定需要第 4 个参数（DSL 快照），不传快照时只保留显式声明这条路径。
-- 本模式是**机械计算**：按树序把祖先的 `rotate` / `flipH` / `flipV` 烘进坐标，**计算结果即产物**。不做视觉判断、不读图、不调用模型识别图形外观，也不以"看起来像不像"为由修改或否决结果。
-- 如果同一组图标在 DSL 里几何**完全一致**（把祖先变换一并算进去后逐字段相同，例如「向左」与「向右」），说明设计侧缺少独立图形：**照常按槽位语义命名并出图**（产物以机械结果为准），同时在 mapping 与交付说明中标记待确认、要求设计补图；**不得自行镜像、旋转或猜测朝向**。
-
-每个页面必须单独维护一个 Icon 文件。转换时先从当前页 MasterGo PATH/SVG 自动发现候选；图标映射输入逐项提供目标项目已确认或页面内生成的英文资源名、中文注释名和 DSL 来源，禁止从图层 ID、坐标或几何外观直接拼出 `MGIcon_<layer-id>` 形式的资源名。资源名必须是英文标识符且在当前页面唯一；重复名称由生成器按稳定数字后缀处理。没有目标项目键时，允许使用页面内唯一的临时 Geometry 键，状态标记为 `provisional` 并保留 sourceId/sourceRef。只有未被任何实际 Icon 槽位引用的 PATH 候选才进入 `candidates/unmapped` 而不进入 XAML。XAML 注释只写中文名称，溯源和 `keyStatus` 写入 mapping/manifest。`mw-wpf`（作业 A，暂不开放）的页面以 `StaticResource` 引用该页 Geometry（作业 A 的 Icon 合并前置条件以本节路线条目为准；作业 A 的整体启用前置条件见「作业 A：MW 框架 WPF」一节）；`mtslg-iocontrol`（作业 B，当前唯一启用）的页面 XML 与 Layout 仅引用该页 Icon 文件中已生成的键。
-
-**「approved 资源名」的判定口径（防止误读为“必须来自外部/历史权威清单”）**：图标是**页面级资源**，approved 指该名称**已登记在本页图标台账（icon-map 的 `icons[]`）**中——本页自建的语义英文键（优先中文语义对应名）与页面内唯一临时键（`status: "provisional"`）同样算 approved，**不要求跨页复用，也不依赖外部键清单**；键只要求在本页 `Icons.xaml` 内唯一并被本页（含 Layout 菜单项）引用。仍然禁止的是“由图层 ID/坐标/几何外观**自动拼名**”（如 `MGIcon_<layer-id>`），该禁令不限制有人按语义为图形起名。未被登记的图形按既有口径留空并进入 `candidates/unmapped` 审计。
-
-## 页面多语言文件（当前 MTSLG 路线）
-
-每个页面一套语言字典，落在该页自己的目录：`Resources/Pages/{name}/{name}_{LOCALE}.xaml`（默认 `CN`、`EN`，与页面 XML、页面 Icon 同目录）。由 `gen-mtslg-page-lang.js` 发射，Bundle 通过 manifest 的 `languages` 字段驱动；**多语言是默认能力，不是可选项**：manifest 未提供 `languages` 时 Bundle 自动按 `languages.auto=true` + CN/EN 生成字典、派生语言键并强制 `LangName` 引用闭环（审计记 `languagesDefaulted=true`）；只有显式声明 `languages=false` 或 `languages:{disabled:true, reason:"…"}` 才会关闭，关闭原因写入审计 `languageDisabled`/`languageDisabledReason`，不得在未声明原因的情况下生成没有 LangName 的页面。
-
-```json
-"languages": {
-  "auto": true,
-  "locales": ["CN", "EN"],
-  "translations": "Generated/Home.lang-translations.json",
-  "bindByText": true,
-  "requireLangName": true,
-  "noLangRefs": ["1:42"],
-  "keys": []
-}
-```
-
-**页面语言字典默认自包含**：每个页面的 key 全部由本页机械派生（页面标题 / MenuItem / 页面内容），不读、不复制、不引用目标项目的框架语言字典。因此默认 manifest **不要**写 `keyCatalog`。
-
-`keyCatalog` 是**可选的复用开关**，只有显式配置时才会去读目标项目已登记语言文件（同文案的既有 key 直接复用）。开启前必须确认这三件事，否则默认关闭：
-
-1. 复用的键会把目标字典里的文案**复制进本页字典**，运行时会遮蔽框架字典里的同名键；
-2. 目标字典里的既有译文（含笔误）会被原样带进页面，页面不再只反映设计稿；
-3. 复用键通常不带页面名前缀，与“一页一套自包含字典”的约定并存时需要额外说明。
-
-只有确实需要跨页面/框架共用同一句文案、并接受上述代价时，才配置 `keyCatalog`（可写顶层 `keyCatalog` 或 `languages.keyCatalog`）；`MaxwellFramework_*` 这类框架级字典默认不纳入复用范围。
-
-### 语言键自动派生（新建页面默认路径）
-
-`languages.auto=true` 时，Bundle 在 XML/Layout 生成前调用 `gen-mtslg-lang-keys-from-dsl.js`，从当前页 DSL/mapping/Layout 菜单项**机械派生** LanguageKey，不再要求调用方逐条登记。派生规则固定、可复现：
-
-1. 页面标题 → `{页面名}PageTitle`，文案取值链固定为：`manifest.pageTitleText`（**可选**的显式覆盖）→ `mapping.textAudit` 里 `role=page-title` 的 `sourceText`（**默认来源**，DSL 机械产物）→ DSL 根节点名 → 页面名。Bundle 与单脚本 CLI 走同一条链，不允许两边不一致；本次实际用到的来源写入审计 `languages.titleSource`（`manifest.pageTitleText` / `mapping.textAudit` / `dslRoot`），不得静默回退后无人知晓。
-2. Layout 菜单项 → `MenuItem{名称}`；语义名取值顺序：菜单 `Icon` 资源名去掉 `Geometry` 后缀 → `langGlossary` 术语表 → **该菜单文案的英文译文转 PascalCase**（`工件边缘录入` → `Workpiece Edge Teaching` → `WorkpieceEdgeTeaching`）→ 符号+数字（`+5` → `Plus5`）→ 纯 ASCII 文案 → 值字面编码（`0.000` → `Num0Dot000`）→ DSL 图层英文名 → 兜底 `MenuItemIndex{Index}`（provisional，必须列入待改名清单）。
-3. 页面内容节点（`valueSource=dsl.text`）→ `{页面名}{名称}`。**同一页面内文案完全相同的节点共用一个 key**（第一个节点派生键名，其余节点登记进该 key 的 `sourceRefs`），不再产生 `Xxx2` / `XxxText02` 这类重复键——同一页面里重复文案直接复用同一个 LanguageKey；只有“不同文案撞出相同语义名”时才用稳定数字后缀。语义名按以下优先级回退：
-   1. （**仅当显式配置 `keyCatalog` 时**）目标项目已登记语言字典里**同文案**的既有 key → 直接复用并记为 `scope=shared`；`MenuItem*` 命名空间的键不给页面内容节点复用。默认不配置，页面 key 全部页面内自产。
-   2. 节点 `Icon` 资源名去掉 `Geometry` 后缀（IconButton / 带图标按钮天然带英文语义名）。
-   3. `langGlossary` 术语表（`{ "中文文案": "EnglishIdentifier" }`，可内联或给 JSON 文件路径）。
-   4. **该文案的英文译文转 PascalCase**（`languages.translations` 里 AI/工程师已给出的译文，如 `光源调整` → `Light Source Adjust` → `LightSourceAdjust`）。算法固定：按非字母数字字符切词 → 每个词首字母大写、其余字符原样保留 → 连接；结果必须**以字母或下划线开头、其余字符为字母/数字/下划线，且长度 ≥ 3**（即派生器里的标识符规则 `^[A-Za-z_][A-Za-z0-9_]*$`），否则本条不成立、继续往下。脚本仍不翻译，只把已有译文机械转成标识符。
-   5. 正负步进标签（`+5` → `Plus5`、`-1` → `Minus1`）。
-   6. 纯 ASCII 文案（`AUX.` → `AUX`）。
-   7. **值字面编码**：数值/符号型文本用值本身编码成稳定标识符（设计稿上它们是示例值，没有业务语义名，硬起语义名等于猜）——`0.000` → `Num0Dot000`、`4321` → `Num4321`、`9.0%` → `Num9Dot0Pct`、`～` → `SymWave`、`θ：` → `SymThetaColon`、`°` → `SymDeg`；词表外的符号不猜，继续往下。
-   8. DSL 图层英文名（过滤 `Dir`/`F1`/`CH1` 之类的结构噪音）。
-   9. 兜底 `{页面名}Text{NN}`：页面内唯一、稳定，标记 `provisional`，必须列入待改名清单。
-4. 名称冲突由生成器按稳定数字后缀处理（`HomeStart`、`HomeStart2`），不静默覆盖。
-5. **全量多语言：设计稿给出的每个 `Value` 都产键挂 `LangName`**，不按文本形态做豁免——纯数字、符号、正负步进标签（`+5`/`-1`/`±0.5`）、百分比、版本号、序列号、IP、日期时间、功能键 `F1`、型号/编号标识符照样产键；中英文写法完全相同的文本只是 EN 值等于原文（不记 `pendingTranslations`），逐条留档在审计 `languages.derivation.identicalTextKeys` 里供交付说明核对。键名派生见第 3 条（正负步进标签 `+5`/`-1` → `Plus5`/`Minus1`；数值/符号型文本走**值字面编码**：`0.000` → `Num0Dot000`、`9.0%` → `Num9Dot0Pct`、`～` → `SymWave`，因此这类键在词表覆盖到时**不落临时键**；词表外的符号仍会走图层名/兜底 `{页面名}Text{NN}` 并列入待改名清单）。**不产键的内容值只有两类**：① 映射表在值槽位登记 `langRefPolicy: "none"` 的节点（当前只有选择框 `Value`，见下），记入 `languages.derivation.valueLangExempt`；② **空文本节点**（`Value=""`，没有可翻译的文案）——照常发射 `Value=""`、不挂 `LangName`，也不进任何豁免清单（派生器与门禁同口径跳过它）。Layout `MenuItem` 一直都必须挂 `LangName`；按钮族（`IconButton`/`Button`/`StatusButton`）带文案的节点同样必须挂 `LangName`，数值/符号按钮的产键结果额外记入审计 `buttonFamilyKeys`。
-
-自动派生结果的交付要求：
-
-- **英文文案由 AI 翻译产出，并以 `languages.translations` 显式落盘**：AI 逐条给出英文译文，写成 `{ "中文文案": "English Text" }`（内联对象或 JSON 文件路径都可）。脚本不做翻译、也不调用机翻服务，只机械套用这份清单，保证译文可追溯、可复核、可回滚。
-  **流水线顺序（闭环）**：译文清单在派生 LanguageKey 之前就要备好——本页需要翻译的中文文案集合可由 DSL/mapping/菜单项直接枚举，不依赖派生结果（第一轮枚举出来的中文就是 CN 文案）。派生时同一份译文清单同时用于两处：**键名语义名**（第 3 条第 4 级来源，中文翻译 → PascalCase 标识符）和**字典 EN 值**（`translatedFromInput` 计数）。
-- **译文清单与术语表是「页面级生成产物」，不是插件固定资产**：每次生成按当前页面的 DSL/mapping 产出，并由 Bundle 同步落盘到该页审计目录 `Generated/{页面名}.lang-translations.json` 与 `Generated/{页面名}.lang-glossary.json`（未提供对应输入时不生成）。禁止把它们做成跨页面共享的固定文件；不同页面的译文与术语各自独立、可逐页复核与回滚。
-- 英文取值优先级：**目标项目已登记字典同 key 的英文（工程已确认）> `translations` 译文 > 中文占位**。前两者命中数分别记在 `languages.derivation.translatedFromCatalog` 与 `translatedFromInput`。
-- **页面标题文案来源必须逐页核对**：审计 `languages.titleSource` = `mapping.textAudit` 表示标题取自设计稿原文（默认、可信）；= `manifest.pageTitleText` 表示工程师显式覆盖值，交付前必须与 `textAudit` 的 `sourceText` 逐字比对（含空格与标点，不得自行归一化）；= `dslRoot` 表示既没有覆盖值也没有 textAudit 标题，退回的是**设计画板框名**（可能带前缀点、空格差异、版本后缀），交付说明必须单列并要求人工确认。
-- 确实没能翻译的条目会保留中文占位并逐条记入 `languages.derivation.pendingTranslations`；交付说明必须单列这份“待翻译清单”，不得把中文占位当已完成翻译交付。
-- 数字、符号、编号等中英文写法相同的文本（按第 5 条同样产键）不出现在待翻译清单里：EN 值等于原文。
-- `provisionalKeys`（临时键，键名待改名）、`identicalTextKeys`（中英文写法相同、EN 值等于原文的键，逐条留档）与 `valueLangExempt`（槽位级豁免的选择框 `Value`）必须在交付说明里列全；三条清单口径不同、按用途分别列出（同一节点可能同时出现在 `identicalTextKeys` 与 `provisionalKeys` 里：前者说明中英文写法相同，后者说明键名仍是兜底名），不得因为门禁通过就隐去。
-- `languages.keys[]` 显式提供的条目优先级最高：按 `key`、`sourceRef`/`sourceRefs`、`menuIndex` 覆盖机械派生结果。**唯一例外**：目标节点所在槽位登记了 `langRefPolicy: "none"`（见下）时，该显式条目直接被判为矛盾输入并导致生成失败。
-- 需要人工指定语义名时，优先补 `langGlossary`（文案级复用）或显式 `keys[]`，不要靠改生成器。
-
-```json
-"languages": {
-  "locales": ["CN", "EN"],
-  "bindByText": true,
-  "requireLangName": true,
-  "noLangRefs": ["1:42"],
-  "keys": [
-    { "key": "DemoRecipePageTitle", "text": { "CN": "配方管理", "EN": "Recipe" } },
-    { "key": "MenuItemRecipe", "text": { "CN": "配方", "EN": "Recipe" } },
-    { "key": "DemoRecipeName", "text": { "CN": "配方名称", "EN": "Recipe Name" } }
-  ]
-}
-```
-
-- **LanguageKey 命名约定（强制，与目标项目现有语言文件一致）**：
-  - 页面标题 `{页面名}PageTitle`（如 `HomeContentPageTitle`），由 Layout 的 `<Page Target="HomeContent" LangName="HomeContentPageTitle">` 引用；缺少这个 key 直接失败。
-  - 菜单项 `MenuItem{名称}`（如 `MenuItemLaserSetting`），由 Layout 的 `<MenuItem LangName="...">` 引用。
-  - 页面内容 `{页面名}{名称}`（如 `HomeContentFullAutoOperation`），由页面 XML 内的控件引用。
-  - 跨页面共享字典的 key 必须显式写 `"scope": "shared"`，否则按页面内 key 校验前缀。
-  - `group` 不写时按上述三类自动推导；XAML 输出顺序固定为 页面标题 → 页面底部菜单名称 → 页面内容。
-- `languages.keys[]` 是 `LangName` 的**唯一真值源**：key 必须是英文标识符且页面内唯一；每个 locale 都必须为每个 key 提供文案，缺一个直接失败；生成后逐文件回读校验，保证**各语言文件的 `x:Key` 集合与顺序完全一致**。
-- **新生成页面必须挂全 `LangName`**（`requireLangName` 默认 `true`）：设计稿里有文案的控件（`valueSource=dsl.text` 的节点）和带 `Name` 的 `MenuItem` 都必须引用到一个已登记的 key，否则整套生成失败并回滚。错误信息会逐条列出缺 key 的节点/菜单项。
-- **按文案自动匹配**（`bindByText` 默认 `true`）：设计稿是中文，LanguageKey 的 `CN` 文案与控件设计文本**逐字相等**时自动绑定并写入 `LangName`，不需要为每个按钮手写 `sourceRef`。同一文案对应多个 key 属于歧义，脚本不猜，直接失败并要求用 `sourceRef` 显式指定。
-- 显式引用优先于自动匹配：`sourceRef` 绑定页面节点、`menuIndex` 绑定 Layout `MenuItem`；页面标题由 `{页面名}PageTitle` 直接决定，不需要在 key 上写 `role`。节点或菜单项已有不同的 `LangName` 时直接失败，不静默覆盖。`menuIndex` 的绑定判据是「数值等于 MenuItem Index」，因此 **Index 重排（Layout `MenuItem` 一律 1..N 连续编号）后，历史 `menuIndex` 必须同步重排**：按旧编号（含空档的底栏槽位号）登记的条目不得直接复用，否则旧编号若仍落在 `1..menuItems.length` 内会静默绑到另一个菜单项。
-- **全量多语言下不存在「自动豁免」这个概念**：每个设计文本都产键（见第 5 条）。`noLangRefs` 只保留为**显式放行通道**——确有某个节点确认不参与多语言时，由调用方按 DSL ref 写进 `languages.noLangRefs`，生成器只合并保留、不自动往里写任何条目，交付说明里必须列出这些显式条目。
-- **槽位级例外（`langRefPolicy: "none"`）**：当组件的正式映射在**值槽位**（该族充当控件 `Value` 的那个槽位，即 `slots[0]`）登记了 `langRefPolicy: "none"`，该槽位的值**不参与多语言**——不产语言键、不挂 `LangName`，生成器把它记入审计 `languages.derivation.valueLangExempt` 供交付说明逐条列出。**登记点只有一个**，且有两处不开放的边界：① 值槽位以外的槽位、或生成分支不消费该字段的族（如 `componentTemplates`、`infoGroupTemplates`）上一旦出现该字段，`gen-mtslg-mapping-from-dsl.js` 直接失败；② **按钮族不开放**——值槽位的控件类型属于按钮族（`buttonFamily.controlTypes`：`IconButton`/`Button`/`StatusButton`）时同样直接失败，因为按钮文案按第 5 条一律产键挂 `LangName`（右栏、主菜单这类族的「值槽位」就是按钮，因此它们不能登记）。取值只允许 `"none"`，其它值也直接失败。**该策略优先于第 5 条的不需要翻译判定**：命中槽位豁免的值只记入 `valueLangExempt`，**不进入 `noLangRefs`**（`noLangRefs` 只收调用方按 DSL ref 显式写入的条目；生成器不自动写入），因此交付说明里两条清单分开列、不互相算。**显式 `keys[]` 不再高于它**：`languages.keys[]` 的 `sourceRef`/`sourceRefs` 指向槽位豁免节点时生成直接失败（提示删除该键或撤销槽位登记），不静默忽略、也不静默挂上 `LangName`。当前登记该策略的只有**选择框**（`selectBoxTemplates`）：它的 `Value` 是「**默认选中的名称**」，运行时由 `IOName` 绑定的数据决定，不是要翻译的固定文案；需要多语言的是**选项文字**（设计器文档里选项是 ComboBox 的子 `TextBlock`，或由 `ItemsSourceFile` 数据文件提供），设计稿只画关闭态时选项数据属运行时待绑定、不得编造。该策略只影响所登记的那一个槽位，其余设计文本（TextBlock 标签、按钮文案、GroupBox 标题）照常按上面的规则产键挂 `LangName`。
-- **引用闭环硬门禁**：页面 XML、Layout `MenuItem`、`<Page LangName>` 中出现的每个 `LangName` 都必须存在于本页语言字典，否则整套生成失败并回滚。没有目标项目键目录时，禁止用未登记的 key 充当占位。
-- `LangName` 是附加属性：`TextBlock` 必须**同时**发射 `Value` 和 `LangName`（`Value` 仍按设计文本发射，provenance 要求 `Value == sourceText`），运行时以 `LangName` 为准。**按钮族同样必须有 `LangName`**：带文案的 `IconButton` / `Button` / `StatusButton` 一律挂 `LangName`，不得只发 `Value` 或只发 `Icon`。
-- 语言字典里的**英文等非设计语言文案**只能来自设计稿、目标项目已登记字典或 AI/工程师产出的 `languages.translations` 译文清单；生成脚本本身不得做翻译或调用机翻服务，译文必须是可追溯的显式输入。AI 翻译是允许且默认要求的步骤（工序顺序与"同一份译文双重用途"已在本节第 3 条与「自动派生结果的交付要求」登记，不在这里重复）。派生报告里的 `pendingTranslations` 只用于核对漏译，补齐后重跑即可；确实无法消除的临时键与中文占位，仍按上面「自动派生结果的交付要求」逐条列入交付说明后交付，不得静默交付。
-
-## 页面输出目录
-
-新建页面的页面名（Target）按 `references/adapters/mtslg-iocontrol/mtslg-mode.md` 第 1 节的「页面名（Target）的确定口径」确定：先查项目登记表/Layout，未登记时按 `{区域前缀}{英文语义名}` 推导（区域前缀**直接取 DSL 的 `ui` 字段本身**，如 `F2`，不再补 `F`）并**人工确认一次**后写入登记表；推导不出或冲突则落 `pending` 并拒绝生成。
-
-> **全局固定常量：`contentOriginY = 192px`。** 所有 MasterGo 业务页面都必须按 `normalizedY = pageAbsY - 192` 计算；192 不是页面参数、不是可选配置，也不能由单个项目、页面或控件改写。只在页面根级扣除一次，嵌套控件不得重复扣除。
-
-- MW WPF 页面优先写入目标项目 .csproj 已声明的 View/ViewModel 路径，例如 `UI/<区域>/View` 和 `UI/<区域>/ViewModel`；只有项目没有路径证据时，才使用目标项目根目录下的 `Pages/` 作为通用兜底。不得为同一页面同时生成两套 View。
-- MTSLG IOContorl 页面必须写入目标项目的实际运行目录，不能默认写入 `Generated/`。输出路径按以下优先级解析：
-  1. 有效的 `framework.config.json.pages_root`；
-  2. 目标项目 `.csproj` 中已声明的 `Content Include` 页面目录、`Page Include` 图标目录和 `Content Include` 的 `Layout.xml` 路径；
-  3. 项目源码、宿主配置和已确认的运行目录共同给出的唯一路径；
-  4. 仅在无法唯一确定运行目录，或用户明确要求静态产物时，才使用 `Generated/`。
-- **一页一目录（MTSLG 固定约定）**：页面产物按页写入 `Resources/Pages/{name}/`——页面 XML 为 `Resources/Pages/{name}/{name}Page.xml`，页面 Icon 为 `Resources/Pages/{name}/{name}Icons.xaml`；Layout 写入 `Resources/Layout/Layout.xml`。View/ViewModel 仍写入目标项目声明的 `UI/<区域>/View` 与 `UI/<区域>/ViewModel`。目标 `.csproj`/`framework.config.json` 已声明的真实路径优先于本约定。
-- 对没有 `framework.config.json` 的新项目，`.csproj` 的路径声明是运行路径证据，不得因为缺少 `framework.config.json` 或既有 `Layout.xml` 就把整套页面降级到 `Generated/`。例如项目声明 `Resources\\Pages\\<页面名>\\*Page.xml`、`Resources\\Pages\\<页面名>\\*Icons.xaml` 和 `Resources\\Layout\\Layout.xml` 时，正式产物必须分别写入这些路径。
-- `Generated/` 只保存 mapping/provenance、MCP manifest、图标提取清单、验证脚本和验证结果等溯源/审计文件，不作为 MTSLG 运行时默认加载目录。
-- 正式页面或图标文件已经存在时，生成器必须先备份；只有用户明确要求“重新生成/覆盖”时才替换，禁止静默覆盖。新建的 `Layout.xml` 也必须写入项目声明的正式路径。
-- 所有输出模式的 MasterGo 业务页面根级 Y 坐标都固定向上归一化 192px，且只扣除一次；顶部栏、底部栏和 Layout Header 不参与该偏移。对 MTSLG，这个归一化值进入 IOContorl 的根级 `Top`；对 MW WPF，它只是页面内容坐标的输入基准，最终 `Canvas/Grid` 等布局属性仍必须由目标 WPF 容器和项目事实确定，不能把 IOContorl XML 的 `Top` 属性直接当成 WPF 布局实现。
-
-## 组件和映射原则
-
-- 使用一份组件语义映射，并按组件登记 `targets.mw-wpf` 与 `targets.mtslg-iocontrol`；正式映射存在时严格按映射表，不得凭外观、Group 名称或截图猜控件。
-- WPF 控件、Style、资源和协议以源码/真实页面为事实源；IOContorl 的组件结构和 `ControlType` 以正式映射表为事实源，目标项目运行时资料用于核对属性、资源键和绑定。
-- 组件实例优先于原始图层；未登记的业务组合必须标记待确认。
-- 未确认的运行时字段只能写入 mapping manifest 或 XML 注释，禁止把“待人工绑定”作为可见 `Value`、伪造 `IOName` 或伪造 `IOCommand`。
-- 每个 ControlType 按 `mtslg-iocontrol-map.json` 的 `controlTypeRequiredAttrs` 发射固定必写字段：**属性恒写，取不到来源时写空字符串占位**（`ID`/`ControlType` 恒由节点身份发射，`Left`/`Top`/`Width`/`Height` 恒由 DSL bbox 发射，TextBlock 为 `Width=NaN`、`Height=40`）。按钮族（`IconButton` / `Button` / `StatusButton`）在此基础上恒写 `PageName`、`IOVisible`、`IOCommand`、`IOEnable`（**变体登记 `omitRequiredAttrs` 时该变体做减法：登记的属性不发射，生成器与校验器共用 `omittedAttrs()` 判据（见飞书组件库映射规范「组件级固定变体的公共口径」）**）；`IconButton` 的 `Icon`/`IconWidth`/`IconHeight` 恒写，有图标槽位时取**台账命中条目节点自身 bbox**（不是控件宽高）并四舍五入取整，无图标槽位时写空字符串（**唯一例外：变体登记 `iconPolicy=runtime` 时 `Icon` 由目标项目提供、本页台账没有也不该有该条目，尺寸改取该实例子树里唯一 PATH 的 bbox；多个 PATH 直接失败并要求设计侧消歧——登记台账对该变体无效，Bundle 会把命中该 owner 的条目剔除**）；`Button`/`StatusButton` 不含图标字段，不发射这三项；映射带 `Icon` 却没有图标尺寸来源时生成器直接失败。`LangName` 是另一个例外：全量多语言下每个设计文本 `Value` 都产键挂 `LangName`，只有**槽位登记 `langRefPolicy=none` 的值**（当前只有选择框 `Value`）与**空文本节点**（`Value=""`，没有可翻译的文案）不产键、不写空占位。组件族匹配使用“组件集名 + 公开属性名 + 真实属性值”，图层名称只作核对、不参与匹配。
-- **属性顺序固定（页面 XML 与 Layout 统一）**：`ID` → `ControlType` → `Style` → `Icon` → 文本（`TopLeftContent` / `Value` / `Header`）→ `LangName` → 运行时字段（`PageName` / `IOName` / `IOCommand` / `IOVisible` / `IOEnable` / 其余 `IO*`）→ 控件尺寸（`Width` / `Height`）→ 图标尺寸（`IconWidth` / `IconHeight`）→ 位置（`Left` / `Top`）。Layout 的 `MenuItem` 按同一约定排列：`Name` → `Icon` → `TopLeftContent` → `Index` → `LangName` → `PageName` / `IO*` → `UserRightId` → `IconWidth` / `IconHeight`。`gen-iocontrol-xml.js` 的 `ATTR_ORDER` 与 `gen-mtslg-layout.js` 的 `ATTR_FIELDS` 是唯一真值源，不得按单个页面另排顺序。
-- **节点发射顺序按设计稿上下布局（仅页面 XML）**：同一父节点下的子节点按**视觉行**发射，判据只有一个（行首基准）：
-  1. 先把同一父节点下的子节点按 `Top`（Y）升序、`Left`（X）升序排一遍；
-  2. 从最上面的节点开始另起一行，**与该行第一个（`Top` 最小）节点的 `Top` 差 ≤ `VISUAL_ROW_TOLERANCE_PX`（当前 15px）就并入本行，否则另起一行**（用行首基准而不是"与上一个节点相邻差"，避免链式合并把整块并成一行）；
-  3. 行内按 `Left`（X）从左到右；行与行按 `Top` 从上到下；坐标完全相同时保持 `mapping.nodes` 原顺序。
-  作用域是**所有父节点**，不区分横向/纵向容器——理由是 DSL 图层树顺序与画面位置无关，而上下布局容器的子节点顺序决定运行时显示顺序。只改变排列顺序，`ID` / 坐标 / 属性 / 层级关系都不变（回归用「忽略顺序的属性集合」逐项比对）。fresh 与 merge（新增同级节点）都走同一份实现：`gen-iocontrol-xml.js` 的 `sortNodesByDesignOrder()` + `orderChildrenByVisualRows()`。
-  - **fresh 与 merge 的差异**：排序在读取 mapping 时统一生效，但 merge 只为**新节点**计算插入点、既有节点按原 XML 顺序原样保留，因此 **merge 不会纠正既有节点的排列顺序**；需要整页设计顺序时用 `--fresh` 重建。
-  - **不覆盖 Layout**：Layout 的 MenuItem 顺序真值源是 `manifest.menuItems` 数组与 `Index`（`gen-mtslg-layout.js`），不使用本排序。
-  - **与"模板槽位顺序"的关系**：正式映射表决定的是模板的**槽位语义**（节点数量、父子关系、哪个槽位对应哪个字段），本排序只决定同一父节点下**节点的发射次序**；两者不冲突——语义由模板与 mapping 固定，次序按设计坐标。出现分歧时以"模板决定语义、坐标决定次序"为准。
-- 设计稿中顶部栏、底部栏和其他公共外壳按宿主边界剥离；保留节点统一换算到内容区坐标，并记录被剥离节点。
-
-### 组件内部内容与来源
-
-- 所有适配器都必须读取组件实例的完整 DSL 父子链；组件内部的 TEXT、PATH/SVG、FRAME 只能按已选适配器的正式映射解释，不能因视觉外观提升为独立业务控件。
-- 输入框、选择框的 MTSLG 控件类型、40/36/32 变体、内部 padding、TEXT/PATH 归属和 XML 输出模板归作业 B 的适配器手册 `references/adapters/mtslg-iocontrol/feishu-component-library-mapping.md` 维护，总 Skill 不重复这些映射事实；转换时的读取口径按**作业 B 第 1 步**（默认不预读，异常时定点查）。
-
-
-### 文本来源与 Value 绑定硬门禁
-
-- 每个生成的 XML/XAML 文本控件必须绑定到唯一的 MasterGo `layerId`/DSL `ref`，并记录其真实 `sourceParent`、原始文本、文本槽位和最终输出属性；组件实例的 `ID`、语义名称、坐标方向或业务推测不能作为文本来源。
-- `Value` 只能使用对应 DSL 文本节点的真实文本或已确认的运行时绑定字段。禁止因为 XML `ID` 含有 `X`、`Y`、`Label`、`Value` 等词，或因为控件位于某个视觉位置，就推断、替换或重命名文本；例如 `RelativePositionXLabel` 不得自动生成 `Value="X"`。
-- MTSLG `TextBlock` 的 `Height` 固定为 `40`、`Width` 固定为 `NaN`（宽度自适应，不写文本 bbox 宽度；文本 bbox 宽度只作为 `dslWidth` 记入 mapping 溯源）；`FontSize` 独立取字体事实，不能用文字 bbox、外层组件高度或行高改写这两个固定值。`FontWeight` **命中才写，判定顺序为「样式名优先」**：先取设计稿自己的字体样式名（`styles[...].value.style` 的 `fontStyle`，如 `Bold`；`75 SemiBold` 去掉档位数字写作 `SemiBold`），命中 `normalStyleNames` 即 normal 不写；只有样式名取不到（`style` 缺失/非法 JSON/无 `fontStyle` 字段）时才回退看 `weight` 数值（命中 `normalValues` 同样判 normal、不写）。映射表 `textBlockFontWeight` 是真值源，normal 名单的完整清单以映射表的 `normalStyleNames`/`normalValues` 为准（正文不另立枚举）。输入框、选择框等非 TextBlock 控件仍按其正式变体模板取自身宽高。
-- 同一模板的每个实例必须分别读取文本覆盖和父子层级；相同 `componentId`、相同结构、相邻排列或截图文字不能互相借用。设计稿中的 `3:56338 → 镜头倍率` 与兄弟节点 `3:56367 → Y` 必须保持独立。
-- **换行口径固定**：设计换行码点（`U+2028` / `U+2029` / `CR`(U+000D) / `LF`(U+000A) / `CRLF`）一律归一成 LF，并按框架写法发射为字符引用 `&#x0a;`——页面 XML 的文案属性（`Value` / `Header` / `MenuItem Name` / `TopLeftContent`…）与页面语言字典值都写 `&#x0a;`（属性里不能出现字面换行，解析器会把它归一成空格；字典把换行压成空格会导致两行文案运行时退化成一行）。同一行内不同字体的多个 text run 是 `text` 数组多项、按空串拼接，**不是**换行。空白处理分三条用途：① 页面 XML 属性只归一换行、其余空白原样；② 字典值额外做「行内空白折叠成单个空格 → 换行两侧空白一并去掉 → 行首行尾 trim」（实现是 `scripts/lib/script-helpers.js` 的 `langValueText`）；③ 键派生/查译文用全量压平值。实现真值源是 `scripts/lib/script-helpers.js`（`normalizeNewlines` / `langValueText` / `xmlAttr` / `xmlElementText` / `normalizeForCompare`），生成器、校验器、Bundle 与字典发射器共用同一份，不允许各写一份；映射表 `textNewlinePolicy` **只登记**同一口径供人读与回归断言比对，不是脚本的运行期输入。
-- 生成前执行“XML 节点 → 唯一 layerId/ref → 父节点链 → 原始文本 → Value/绑定字段”反向核对；任一项缺失、重复或冲突时，停止生成并标记待确认，不得用语义名称或坐标补齐。
-
-### 坐标转换硬门禁（实例与全部子组件）
-
-- 每个 MasterGo 实例、子实例、Frame、Group 和文本/控件节点都必须绑定唯一的来源 `layerId`（或 DSL `ref`），并单独记录 `sourceParent`、`pageAbsX/pageAbsY`、`relativeX/relativeY`、`Width/Height` 和最终发射的 `Left/Top`；没有来源绑定的节点不得进入最终 XML。
-- 页面根级和嵌套节点都必须先解析为各自的 MasterGo 页面绝对 bbox。`pageAbsX/pageAbsY` 是不可变的来源事实；`relativeX/relativeY` 仅用于验证真实父子链，不能在未确认最终输出父子关系前直接复制为 XML/WPF 坐标。
-- 即使多个实例拥有相同 `componentId`、相同结构、相同文本或相同变体，也必须分别读取并计算各自实例及其全部子节点坐标；固定模板只决定结构和语义槽位，不决定实例位置。
-- 禁止根据文字语义、截图观感、相邻排列、组件模板、其他实例或“应该在这里”的布局习惯推断任何 `Left/Top`。设计稿数据与视觉观感冲突时，暂停并报告冲突。
-- 生成前必须逐项核对“XML 节点 ↔ 唯一 MasterGo layerId/ref ↔ 父节点链 ↔ 页面绝对坐标”；语义名称或 `ControlType + 坐标` 只能用于诊断，不能作为最终绑定。
-
-### 绝对坐标输出规则
-
-- 每个最终输出的 IOContorl/WPF 控件都必须由自身 MasterGo bbox 定位；`Left/Top` 不能由父容器尺寸、相邻控件、字体或视觉间距推算。
-- 根级节点，或正式映射确认可展平的节点，先按统一页面坐标归一化：`normalizedX = pageAbsX - contentOriginX`、`normalizedY = pageAbsY - 192`，公共外壳偏移只扣一次。MTSLG 将归一化结果发射为 IOContorl 坐标；MW WPF 只能把它作为页面内容坐标输入，再按真实 WPF 容器完成布局。
-- MTSLG 中正式映射要求保留父容器的子节点，按该已保留父容器发射相对坐标；根级扣除内容区偏移后，子节点不重复扣除。具体公式、裁剪边界与 XML 示例只读取 `references/adapters/mtslg-iocontrol/mtslg-mode.md`。
-- WPF 的最终坐标/布局属性必须由目标页面的真实布局容器决定；不得把 MTSLG 的 XML 坐标规则照搬到 WPF。
-- 输出前必须保留“输出节点 ↔ 唯一 layerId/ref ↔ 自身 pageAbs bbox ↔ 输出父节点 ↔ 最终 Left/Top”清单；任一控件缺少自身 bbox 或输出父节点依据时不得交付。
-
-### 来源清单与不可交付门禁
-
-- **页面节点 `ID` 口径**：`ID` 是 WPF 控件的 `.Name` 与框架 `GetValueByID` / `GetControlByID` 等 API 的控件句柄，必须**页内唯一且跨版本稳定**。公式的唯一真值源是 `scripts/lib/page-node-id.js`（生成器 `gen-mtslg-mapping-from-dsl.js` 的 `allocateId` 只是它的调用点：先查重再转调）：`ID = "MX_" + sha256(页面键 + "\n" + 节点 ref)` 的前 32 位小写十六进制（页面键 = DSL 根节点 id，ref = 全路径 ref）。**禁止**用遍历序号（`MG_0001` / `MGText_0008` / `MGCol_0001`）当节点身份；人工维护约定（人工节点沿用 GUID 写法、"是不是我们生成的"靠 mapping 判断、文案改动需回灌设计稿、语言字典整份重写）见 `mtslg-mode.md` 第 2 节「页面节点 ID 口径」与第 5 节 merge 语义。
-
-- 生成 IOContorl XML 前必须建立逐节点 mapping manifest；manifest 必须同时包含从原始 DSL 机械提取的 sourceNodes。每条 sourceNodes 记录至少包含 ref、parentRef、pageAbsX/pageAbsY、relativeX/relativeY、width/height 和真实 text（文本节点）；每条输出节点记录至少包含 xmlId、唯一 sourceRef、sourceParent、sourceText（文本节点）、输出父节点依据、expectedLeft/expectedTop/expectedWidth/expectedHeight。
-- **输出父节点可以不同于 `sourceParent`，但只能在声明过的容器重挂步骤里改**：`sourceParent` 永远保留 DSL 真实父节点作为来源事实，`parent`/`layoutParent` 记录实际输出父节点；`validate-iocontrol-provenance.js` 已支持该形态——它要求 `layoutParent`（否则 `parent`、再否则 `sourceParent`）存在于 `sourceNodes`，并据此独立重算 `expectedLeft/expectedTop`（容器内子节点按父容器归一化原点相对计算，内容区偏移只扣一次），不要求它与 `sourceParent` 相等。目前唯一合法的改写来源是 Bundle 的容器嵌套步骤（`apply-container-containment.js`，见「辅助脚本触发矩阵」与固定调用顺序），它只把命中 `childPolicy=nested-page-templates` 的容器子控件重挂进该容器。任何绕过该步骤、手工把 `parent`/`layoutParent` 改成未登记容器，或让子控件坐标不再等于相对新父容器的机械换算值，都属于静默发射，必须拒绝交付。
-- 文本节点的 Value 必须机械复制 sourceText；valueSource 必须为 dsl.text。禁止用 XML ID、组件属性名、字段名、坐标方向、视觉位置、模板槽位或业务语义生成 Value。RelativePositionXLabel 不得生成 Value="X"。
-- 坐标必须机械计算：MTSLG 根级/展平节点以 `pageAbsX - contentOriginX`、`pageAbsY - 192` 发射；保留父容器的子节点以 `pageAbs - parent.pageAbs - parent.contentInset` 发射（`contentInset` 只有容器类控件才有：GroupBox 的模板是标题条 + 内容区两段式，子坐标从内容区原点量；inset 由容器变体的**内容区原点键** `contentInsetStyle` 在映射表 `infoGroupTemplates.styleInsets` 查得——发射到 XML 的 `style` 与它是两个字段，GroupBox 的 `Style` 恒为空串，空 `Style` 时内容区原点就是 `IOGroupBoxSecondary` 的 `{left:1, top:35}`；两者都是项目框架侧的确定口径，按既定事实直接换算、不设待确认项），并且内容区偏移只在根级扣一次；`Width/Height` 必须来自同一 sourceRef 的 bbox。禁止用 ID、相邻节点、截图观感、固定模板或“应该在这里”补坐标。MW WPF 复用同一份已归一化页面来源，但最终布局仍须由目标 WPF 容器确定。
-- 坐标空间必须明确：`sourceNodes` 永远保存 MasterGo 原始页面绝对坐标；输出节点的 `expectedLeft/expectedTop` 记录实际发射坐标，而不是替代来源事实。校验器必须用 `sourceNodes`、真实父子链和根级内容区偏移独立重算。
-- 生成器必须在写文件前执行 scripts/validate-iocontrol-provenance.js；校验器不得把 nodes 中的 expected 值当作 DSL 事实，必须用 sourceNodes 独立重算。任何 sourceNodes 缺失、UNTRACKED、Value != sourceText、缺少来源字段、父节点缺失或几何不匹配都必须以非零状态失败。验证失败时禁止输出、覆盖或交付 XML。
-- 禁止仅凭 XML 可解析、控件数量正确或肉眼看起来接近就宣称完成；必须保留 manifest 和校验输出作为交付证据。无法建立来源链的已映射节点必须停止并标记待确认；未映射组件则保留其来源记录，不得伪造 XML 节点。
-
-## MasterGo DSL 单响应采集流水线（强制）
-
-当任务需要读取完整 MasterGo 页面或容器时，必须先调用一次 `getDsl`，再使用 `scripts/mastergo-dsl-pipeline.ps1` 固化完整响应；禁止把单次响应重新拆成 section，也禁止继续使用分段总览、分段写入、分段合并或失败 section 重试：
-
-1. 从 MasterGo 链接解析 `fileId` 和 `layerId`，调用 `getDsl(fileId, layerId, format=json)` 一次读取完整 DSL，并将 MCP 文本响应保存为一个 JSON 输入文件。
-2. 执行 `mastergo-dsl-pipeline.ps1 -Action Capture -InputFile <getDsl.json> -Out <runDir> -FileId <fileId> -LayerId <layerId> -Ui <ui>`。脚本验证根节点、全部递归节点、唯一 ref 和父子链，并生成唯一的 `dsl.snapshot.json`、`manifest.json`、`coverage-report.json` 和 `timing.json`。
-3. 只有 `coverage-report.json.status=complete` 且 `duplicateNodeRefs=[]`、`unknownParentRefs=[]` 时，才允许进入组件映射、Icon 发现和 `gen-mastergo-page-bundle.js`。一次性 `getDsl` 没有独立的远端节点总数，`capturedNodeCount` 只表示本地递归解析到的节点数，不得把它当成远端完整性证明。
-   - 完全相同的同 ID、同父节点节点允许在 Capture 阶段折叠为一个，并写入 `collapsedDuplicateRefs` 审计；同 ID 但父节点、类型、内容或几何不同仍写入 `duplicateNodeRefs` 并阻断生成。
-4. 覆盖校验失败时，停止本次转换并报告重复 ref、缺失 id 或断裂父子链；不得改为分段读取或凭不完整数据生成 XML、Icon、Layout 或 WPF 宿主。
-5. 该流水线只负责一次性 DSL 快照的结构完整性和来源保留。当前 MTSLG 页面转换还必须在 `getDsl` 成功后按需调用 `extractSvg`，将响应保存为 `<runDir>/extractSvg.json`；Bundle 清单的 `svgPath` 必须指向该文件。没有可用运行时 Icon 时也必须提供合法的 `{ "svgs": [] }` 输入，不能省略 `svgPath`。随后再执行 `gen-iocontrol-xml.js`、`gen-mtslg-page-icons.js`、`gen-mtslg-layout.js` 和 `gen-mastergo-page-bundle.js`；页面 mapping 不是这一步手工产出的前置输入，而是由 Bundle 内部调用 `scripts/gen-mtslg-mapping-from-dsl.js` 生成（见下节）。
-
-### 可见性事实提取与 mapping 机械生成
-
-在组件映射前，对唯一的完整快照运行 `scripts/resolve-mastergo-visibility.js --input <runDir>/dsl.snapshot.json --out <runDir>/visibility.json`。该脚本只机械输出节点的 `explicitVisible`、`effectiveVisible`、`visibilityProperty`、`visibilitySourceRef` 以及 `texts`/`paths` 索引；它不决定组件类型、不命名 Icon、不生成 IOContorl XML。它的输出是 `scripts/gen-mtslg-mapping-from-dsl.js` 判定文本去留的事实输入，不是人工映射的中间稿。
-
-`scripts/gen-mtslg-mapping-from-dsl.js` 同时读取 DSL 快照、`visibility.json` 和正式组件映射，按有效可见状态**机械**决定每个普通 TEXT、F 文本和 Icon 是否进入 mapping：可见的当前页面文本必须生成，明确 hidden 文本删除；只有页面根级/工件级大标题标记为 `page-title` 时永远删除，组件内部标题、GroupBox Header、表格列标题以及组件库占位文案都按自身可见属性生成。宿主公共栏由结构边界剥离，不作为组件文本删除理由。生成的 mapping 用 `textAudit` 记录每个 TEXT 的 `sourceRef`、真实文本、可见性、角色、输出决定和 `outputRefs`，再交给 Bundle 生成页面文件。
-
-新建页面的 mapping 由 Bundle 在本次生成中调用该脚本创建，**不由人工/AI 逐条改写**：输入来自 DSL 快照、`visibility.json`、正式映射表、图标台账和可选的 `--exclude-instances` 隔离清单，产物带 `mappingTag=新页面完整DSL映射`；提供 `manifest.dslPath` 时 Bundle 会重新生成并覆盖该路径，手写内容不会进入链路。需要偏离机械结果时改的是**输入**而不是 mapping 产物——组件结构与模板不符时用 `manifest.excludeInstances` 隔离该实例（登记进 `pending`/`unmappedComponents`，不猜 `ControlType`），文案语义用 `manifest.pageTitleText` / `langGlossary` / `languages.translations` 表达。人工/AI 的输出是这些输入清单与边界决策，不是 mapping 文件本身。
-
-- `_placeholder=true` 只是 MasterGo 组件库来源提示，不是删除条件。即使正式组件映射把文本标记为 placeholder，只要它属于当前页面或当前组件的可见内容，也必须生成。`decision=omit` 分两条路径，真值源都在 `validate-iocontrol-provenance.js`：① **明确 hidden 的文本**（`visibility=false`）按可见性 omit，`omitReason='hidden'`，登记在 `OMIT_REASONS`；② **可见文本的角色驱动 omit**，`role` 必须落在 `OMIT_ROLES` 集合（当前为 `page-title`、`host-shell`、`excluded-component`、`unmapped-component`、`camera-viewport-internal`、`table-data-cell`：分别是页面根级大标题、宿主公共栏、被隔离组件内部、未命中模板组件内部、**整体控件内部渲染**——相机视口按映射表 `cameraTemplates.innerTextPolicy` 要求其内部 TEXT 整体 omit、**表格行数据**——表格按映射表 `tableTemplates.innerTextPolicy` 要求其行内文本（行标题、单位、单元格文本，含输入框实例内部的固定文本）整体 omit，因为表格的行是 PageData 数据不是页面控件）。可见文本的角色不在 `OMIT_ROLES` 内时校验直接拒绝；新增任何一种 omit 角色都必须同时登记进该集合，并在本节同步说明，不得只在文档或映射表里单方面声明。
-
-- **表格族（`tableTemplates`）按结构签名命中并发射 `DataGrid`**：表格在团队组件库里没有组件集（设计稿里只是一个 `GROUP`），因此本族**只登记一条命中路径**（映射表里没有 `match.property` / `componentSet`）——节点类型 `GROUP` + 孩子里含名为「表头」的群组 + 至少一个名为 `item` 的行群组 + 表头至少有 `signature.minHeaderTexts` 条可见文本，**四项同时成立**才算命中；**图层名不参与匹配**（图层怎么命名、是否带序号都不改变命中结果，与「图层名称只用于核对」同一原则）。**部分命中**只有一种：表的「表头 + `item` 行」结构身份成立、但表头没有足够可见文本，列标题无处取值——此时登记 `pending` 并写明原因（既不静默套模板，也不静默丢表）；结构身份不成立的普通 `GROUP` 不属于候选、不产生候选记录。命中后发射一个 `DataGrid` 根节点 + 由**表头可见文本从左到右**展开的列定义子节点：列节点是**列结构**不是页面控件，几何按映射表 `tableTemplates.columnTemplate` 固定发射（`Left=0` / `Top=0` / `Height=45`、不写 `Width`），属性只发射 `Value`（列标题，`valueSource=dsl.text`）加 `alwaysWrittenAttrs` 空占位，**不套** `controlTypeRequiredAttrs`；列 `ControlType` 按该列单元格类型**严格多数**判定（没有多数退化为 `TextBlock`），每列的类型分布写进 `mapping.tableAudits[].columns` 供复核。表格的行是 PageData 数据不是控件：行内文本（行标题、单位、单元格文本，含输入框实例内部的固定文本）一律 `decision=omit` + `role=table-data-cell`，行内容按行登记进 `mapping.tableAudits[].rows`，单元格实例不再按 `inputTemplates` 单独发射控件。根节点 `Value` 恒写、**当前阶段固定写空串**（数据源由工程师或运行时后续绑定，禁止编造文件名），并置 `tableAudits[].valuePending=true` 作为待绑定提示（提示性审计字段，不是交付门禁；绑定真实文件名后置 `valuePending=false`）；表格图层声明尺寸覆盖不了自身内容范围时记入 `tableAudits[].geometry.declaredBoxCoversContent=false`，交设计侧修正。Bundle 审计输出同名 `tables[]` 摘要（列数、列类型、行数、`valuePending`、bbox 覆盖结论）。
-
-### 辅助脚本触发矩阵
-
-以下脚本不是每次都由 Bundle 自动调用，而是按场景触发：
-
-- `resolve-mastergo-visibility.js`：组件映射前强制运行；输出所有节点的有效可见性，是 `gen-mtslg-mapping-from-dsl.js` 生成 mapping/`textAudit` 的事实输入。
-- 显隐事实只读取当前组件实例的 `componentInfo.properties`；仅当明确的显示槽位属性（如“显示文案”“显示icon”“显示主标题”“显示F”）为布尔 `false` 时隐藏对应槽位。节点自身的 `visible/visibility` 及其他泛化属性不参与当前页面显隐判定。
-- `scan-mtslg-keys.ps1`：只有存在目标 MTSLG 运行时目录、需要确认 Style/Icon/LangName/IOName/IOCommand 等键时运行；静态映射没有目标目录时不运行。
-- `gen-mtslg-lang-keys-from-dsl.js`：`languages.auto=true` 时由 Bundle 在 XML 生成前自动调用；也可单独运行以预先审阅派生键（`--report` 输出待翻译清单、临时键 `provisionalKeys`、中英文写法相同的键 `identicalTextKeys` 与槽位豁免 `valueLangExempt`）。不负责翻译，只做机械派生。
-- `classify-mastergo-groups.js`：DSL 中存在未明确语义的 GROUP、容器或组合层级时运行；已由正式组件模板命中的实例不重复运行。
-- `scan-icon-coords.js`：Icon XAML 已生成且包含 Geometry 时运行；页面没有 Geometry 时跳过。
-- `audit-mtslg-feishu-map.js`：组件映射文档或模板 JSON 修改后运行，用于检查文档覆盖（`missing` / `unregisteredFamilies` / `unregisteredVariants` / `undocumented` / `duplicateMatchKeys` 必须全为空），不是页面生成步骤；新增或修改映射的整批同步清单见 `skills/mastergo-iocontrol-document-format/SKILL.md` 的「新增/修改映射的同步清单」。
-- `audit-script-duplication.js`：**改任何脚本后由 `tests/script-duplication.test.js` 自动运行**。同一个功能只允许一份实现：复制体（函数体完全相同）直接失败；同名函数必须复用 `scripts/lib/` 下的共享实现，或在 `scripts/lib/script-reuse-registry.json` 登记 reason。
-- `cap-window.ps1` / `cap-window2.ps1`：运行时宿主加载成功后做视觉截图验证；不能替代 XML/provenance 校验。
-- `sync-to-mt.ps1`：静态 XML、来源、坐标与键查证全部通过，**且用户要求部署到运行目录**时运行（属「项目运行时交付」门禁）；同步是部署动作，宿主加载验证在同步之后执行；不能作为生成步骤自动调用。
-- `apply-container-containment.js`：**由 Bundle 默认自动调用**（不是手工触发）；在模板解析之后、语言键派生之前，把命中 `childPolicy=nested-page-templates` 的容器（信息分组 / 手动控制弹层）按「坐标完全包含」重挂子控件，改写 `parent`/`layoutParent` 并重算 `expectedLeft/expectedTop`；报告落 `Generated/<页面名>.nesting-report.json`，Bundle 审计写入 `nesting: { enabled, containers, reparented, conflicts }`。可用 `manifest.nesting = { "enabled": false }` 一键关闭，关闭后行为与未引入嵌套完全一致。未登记容器、未命中模板的组件实例不参与重挂。
-主 Bundle 的固定调用顺序是：模板解析 → **容器嵌套重挂（`apply-container-containment.js`，默认开启，可用 `manifest.nesting.enabled=false` 关闭）** → 语言键派生（`languages.auto`）→ LangName 绑定 → XML 生成 → provenance/坐标校验 → Icon discovery/生成 → Layout → WPF 宿主 → 最终校验。辅助脚本不得被误认为已自动包含在 Bundle 中；`apply-container-containment.js` 是唯一例外。
-
-## 交付和验证
-
-默认交付完整页面，不是截图、占位控件或近似原型。生成后必须按目标模式验证：
-
-- WPF：检查项目引用、Style/Resource 键、命名空间、绑定和原有代码风格，并执行可用的编译/加载验证；
-- IOContorl：在 XML 结构检查前，使用 node scripts/validate-iocontrol-provenance.js --xml <page.xml> --mapping <mapping.json> 做 Value/来源/坐标硬校验；非零退出码即停止交付；
-- IOContorl：检查 XML 结构、`ControlType`、属性白名单、父子坐标（静态检查，本步不加载宿主、不截图）；
-- 运行时交付门禁（`Ctrl+R`/加载验证、截图核对、视觉一致性报告）只在用户明确要求时执行；纯转换交付以 XML/provenance/坐标校验结果为准，**不读图、不做视觉判断**。
-
-## 公共参考（仅在对应条件满足时读取）
-
-- 框架发现、路径绑定和索引：当前 MTSLG 路线直接读取目标项目的 `framework.config.json`、`.csproj`、项目本地 `docs/ai-index/`、源码和现有页面。缺少目标项目事实时只能完成静态映射/脚手架，不能宣称运行时交付验证通过。
-- 项目首次适配：`references/project-adapter-initialization.md`；仅在有效 `framework.config.json`、组件目录或资源目录尚未确认时使用。它不选择适配器。
-- 跨适配器组件语义：`references/mastergo-component-mapping-rules.md`；仅用于两条作业共用的设计来源、组件身份与来源链规则。
-- 样式库 Profile：`references/style-library-profiles.md`；当目标框架存在多个可复用的样式/主题/图标/资源库、需要区分「框架适配器」与「样式 Profile」并处理版本选择与冲突时读取（通常在项目首次适配阶段判断）。
-
-不得默认加载全部 references；适配器专用参考和脚本只按各自作业链读取与执行。
+### 模型必须提供的三类页面级输入（语义判断不进脚本）
+
+| 输入 | 位置 | 内容 |
+|---|---|---|
+| 图标命名表 | `Generated/_inputs/<Target>.icon-naming.json` | 候选下标 → 英文资源名（`…Geometry`）+ 中文注释（可选 `fromDsl`） |
+| 译文清单 | `Generated/_inputs/<Target>.lang-translations.json` | 中文 → 英文译文；脚本不做翻译、不调机翻服务 |
+| 术语表 | `Generated/_inputs/<Target>.lang-glossary.json` | 无英文语义或单字符文案的稳定标识符 |
+
+## 硬门禁索引
+
+每条都是「不改就会失败」的规则；细则与真值源见对应 reference，本节不复述细节。
+
+- **Value / 坐标 / provenance**：一律由设计事实机械推导，不得语义猜测 → `mtslg-mode.md` 第 3 节 + `scripts/validate-iocontrol-provenance.js`
+- **内容区原点 `contentOriginY = 192px`**：全局固定常量，只在页面根级扣一次 → `mtslg-mode.md` 第 3 节
+- **容器 `GroupBox` 的 `Style` 恒为空串**，原点查表键是 `contentInsetStyle` → `feishu-component-library-mapping.md` 的「组件父子相对坐标」小节
+- **多语言全量产键**：设计稿给出的每个文本 `Value` 都产键挂 `LangName`；唯一不产键的是映射表在值槽位登记 `langRefPolicy: "none"` 的节点（当前只有选择框 `Value`），槽位豁免记入 `valueLangExempt` → `references/adapters/mtslg-iocontrol/page-build-rules.md` 第 3 节
+- **可见性 omit 有两条路径**：明确 hidden，以及角色驱动 omit；角色集合 `OMIT_ROLES` 与 `OMIT_REASONS` 的真值源是 `scripts/validate-iocontrol-provenance.js`，新增角色必须同时登记该集合 → `mtslg-mode.md`
+- **页面节点 ID**：`MX_` + `sha256(页面键 + 节点 ref)` 前 32 位；禁止用遍历序号当节点身份，人工维护约定随属性一起写在 mapping → `mtslg-mode.md` 第 2 节
+- **图标是页面级资源**：本页 `Icons.xaml` 的键必须页面内唯一、并被本页（含 Layout 菜单项）引用；禁止由图层 ID / 坐标 / 外观拼名（如 `MGIcon_<layer-id>`）→ `references/adapters/mtslg-iocontrol/page-build-rules.md` 第 2 节
+- **页面输出目录**：一页一目录（页面 XML / Icon / 语言字典同页目录，Layout 项目级共享）+ 运行目录解析优先级 → `references/adapters/mtslg-iocontrol/page-build-rules.md` 第 1 节
+- **组件族细则**：表格族 `tableTemplates` 按结构签名命中并发射 `DataGrid`（列定义来自 `columnTemplate`，行是数据不发射控件）；相机族 `cameraTemplates` 内部文本整体 omit；`TextBlock` 的 `FontWeight` 与换行（`&#x0a;`、`U+2028`）都有确定口径 → `feishu-component-library-mapping.md` + 映射表 `mtslg-iocontrol-map.json`
+- **页面级 / 项目级边界**：页面 XML、本页 Icon、本页语言字典、本页 View/ViewModel、本页 mapping 与审计是页面级（跨页不得同名、不得互相引用）；`Resources/Layout/Layout.xml`、`.csproj`、`framework.config.json` 是项目级，本页只增量写自己的注册
+- **不得把 WPF 私有协议写进 IOContorl**：如 `s:Action`、WPF `PageName`、ResourceDictionary 或绑定语法
+
+## 交付与验收
+
+- 交付物：页面 XML、本页 `Icons.xaml`、`CN`/`EN` 语言字典、Layout 注册、`View.xaml` + `View.xaml.cs` + `ViewModel.cs`、目标项目要求的宿主壳、mapping/审计与交付说明。
+- 静态验收顺序：`validate-iocontrol-provenance.js`（Value/来源/坐标）→ 坐标检查 → Icon 引用闭环 → 页面结构校验；`run-all.ps1` 第 11、12 步就是这套门禁。
+- 只有项目引用、真实运行时资源、可编译宿主与加载验证都通过，才能称「完整可运行页面」；**运行时交付门禁**（部署、宿主加载、`Ctrl+R`、截图核对）只在用户明确要求时执行。
+- 交付说明必须列出：待翻译条目与临时键、槽位豁免 `valueLangExempt`、中英文写法相同的键 `identicalTextKeys`、未映射组件与待配置的运行时字段。
+
+## 参考文件读取条件
+
+- 本路线必读：`references/adapters/mtslg-iocontrol/mtslg-mode.md`（页面格式、坐标、ID、merge、验证）。
+- 触发才读：`references/adapters/mtslg-iocontrol/pipeline-contract.md`（跑流水线时）；`references/adapters/mtslg-iocontrol/page-build-rules.md`（处理图标命名/几何来源、多语言译文与词典、输出目录、辅助脚本触发时）；设计稿含顶部栏/底部栏或快捷键，或本次要创建/修改 Layout 注册 → `references/adapters/mtslg-iocontrol/feishu-layout-mapping.md`；要写或改 Bundle 清单 → `references/adapters/mtslg-iocontrol/bundle-manifest.md`。
+- **默认不预读**：`references/adapters/mtslg-iocontrol/feishu-component-library-mapping.md` 与 `references/adapters/mtslg-iocontrol/mtslg-iocontrol-map.json`——组件匹配、`ControlType`、槽位与属性白名单由 `resolve-mtslg-template-mapping.js` / `gen-mtslg-mapping-from-dsl.js` 在生成期按映射表执行。只有脚本报出 `pending` / `unmappedComponents` / `templateConflicts` 时，才按关键词定点查（不通读）。
+- 按需：`references/project-adapter-initialization.md`（项目首次适配）、`references/mastergo-component-mapping-rules.md`（两条作业共用的来源链规则）、`references/style-library-profiles.md`（多套样式/主题/图标库并存时）。
+- 停用：`references/adapters/mw-wpf/**`（作业 A 资料）不读，也不作为 XML 事实源。

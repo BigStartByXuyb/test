@@ -115,7 +115,7 @@ const manifest = path.join(root, "bundle.json");
 fs.writeFileSync(manifest, JSON.stringify({
   projectRoot: project,
   csproj: "Demo.Pages.csproj",
-  pageName: "F2NewPage",
+  name: "F2NewPage",
   area: "F2-Teach",
   viewPath: "UI/F2-Teach/View/F2NewPageView.xaml",
   codeBehindPath: "UI/F2-Teach/View/F2NewPageView.xaml.cs",
@@ -268,7 +268,7 @@ assert.strictEqual(bundleAudit.inputs.pageName, "F2NewPage", "审计必须内嵌
 const emptyIconMap = path.join(root, "empty-icon-map.json");
 fs.writeFileSync(emptyIconMap, JSON.stringify({ icons: [] }, null, 2), "utf8");
 const noIconManifest = JSON.parse(fs.readFileSync(manifest, "utf8"));
-noIconManifest.pageName = "NoIconPage";
+noIconManifest.name = "NoIconPage";
 noIconManifest.pageTarget = "NoIconPage";
   noIconManifest.pageLangName = "NoIconPagePageTitle";
 noIconManifest.viewPath = "UI/F2-Teach/View/NoIconPageView.xaml";
@@ -291,7 +291,7 @@ assert.doesNotMatch(
 );
 
 const auditCollision = JSON.parse(JSON.stringify(noIconManifest));
-auditCollision.pageName = "AuditCollision";
+auditCollision.name = "AuditCollision";
 auditCollision.pageTarget = "AuditCollision";
   auditCollision.pageLangName = "AuditCollisionPageTitle";
 auditCollision.viewPath = "UI/F2-Teach/View/AuditCollisionView.xaml";
@@ -310,7 +310,7 @@ assert.ok(!fs.existsSync(path.join(project, "Resources/Pages/AuditCollision/Audi
 
 // 关闭开关：manifest.cleanup.work === false 时保留 _work 中间文件（重跑前想留着输入清单的场景）。
 const keepWorkManifest = JSON.parse(JSON.stringify(noIconManifest));
-keepWorkManifest.pageName = "WorkKeep";
+keepWorkManifest.name = "WorkKeep";
 keepWorkManifest.pageTarget = "WorkKeep";
 keepWorkManifest.pageLangName = "WorkKeepPageTitle";
 keepWorkManifest.viewPath = "UI/F2-Teach/View/WorkKeepView.xaml";
@@ -411,7 +411,7 @@ for (const item of nestingOffMappingDoc.nodes || []) {
 }
 fs.writeFileSync(nestingOffMapping, JSON.stringify(nestingOffMappingDoc, null, 2), "utf8");
 const nestingOffManifest = JSON.parse(fs.readFileSync(manifest, "utf8"));
-nestingOffManifest.pageName = "NestingOff";
+nestingOffManifest.name = "NestingOff";
 nestingOffManifest.pageTarget = "NestingOff";
 nestingOffManifest.pageLangName = "NestingOffPageTitle";
 nestingOffManifest.viewPath = "UI/F2-Teach/View/NestingOffView.xaml";
@@ -441,7 +441,7 @@ fs.writeFileSync(scaffoldManifest, JSON.stringify({
   projectRoot: scaffoldProject,
   projectName: "EmptyScaffold",
   scaffold: true,
-  pageName: "Scaffold",
+  name: "Scaffold",
   area: "F2-Teach",
   pageTarget: "ScaffoldPage",
   pageLangName: "ScaffoldPageTitle",
@@ -502,7 +502,7 @@ assert.ok(scaffoldPaths.includes("framework.config.json"));
 assert.ok(scaffoldPaths.includes("UI/F2-Teach/View/ScaffoldView.xaml"));
 
 const incompleteManifest = JSON.parse(fs.readFileSync(manifest, "utf8"));
-incompleteManifest.pageName = "NoLayoutState";
+incompleteManifest.name = "NoLayoutState";
 incompleteManifest.pageTarget = "NoLayoutState";
 incompleteManifest.viewPath = "UI/F2-Teach/View/NoLayoutStateView.xaml";
 incompleteManifest.codeBehindPath = "UI/F2-Teach/View/NoLayoutStateView.xaml.cs";
@@ -526,7 +526,7 @@ fs.copyFileSync(csproj, path.join(brokenProject, "Broken.Pages.csproj"));
 fs.writeFileSync(brokenManifest, JSON.stringify({
   projectRoot: brokenProject,
   csproj: "Broken.Pages.csproj",
-  pageName: "BrokenPage",
+  name: "BrokenPage",
   area: "F2-Teach",
   pageXmlPath: "Resources/Pages/BrokenPage/BrokenPagePage.xml",
   iconPath: "Resources/Pages/BrokenPage/BrokenPageIcons.xaml",
@@ -562,7 +562,7 @@ const langPageTextKeys = [
 ];
 function langManifestFor(pageName, languages) {
   const item = JSON.parse(JSON.stringify(langBase));
-  item.pageName = pageName;
+  item.name = pageName;
   item.pageTarget = pageName;
   item.pageLangName = pageName + "PageTitle";
   item.viewPath = "UI/F2-Teach/View/" + pageName + "View.xaml";
@@ -841,7 +841,7 @@ assert.ok(!comboAudit.languages.derivation.identicalTextKeys.some((item) => item
 
 // 反例：给槽位豁免的节点登记显式 keys[] 是自相矛盾的输入 → 必须失败，不静默忽略、也不静默挂 LangName。
 const comboForcedManifest = JSON.parse(JSON.stringify(comboManifest));
-comboForcedManifest.pageName = "LangComboForced";
+comboForcedManifest.name = "LangComboForced";
 comboForcedManifest.pageTarget = "LangComboForced";
 comboForcedManifest.pageLangName = "LangComboForcedPageTitle";
 comboForcedManifest.viewPath = "UI/F2-Teach/View/LangComboForcedView.xaml";
@@ -947,5 +947,14 @@ result = spawnSync(process.execPath, [script, "--manifest", registryOk.file, "--
 assert.notStrictEqual(result.status, 0, "存在未登记的旧同名文件时必须失败");
 assert.match(result.stderr + result.stdout, /未登记的旧同名文件/);
 fs.rmSync(path.join(project, "Generated", "dsl.snapshot.json"));
+
+// 反向 4：清单里出现 pageName（页面名的第二个字段名）→ 失败。页面名只有一个字段 name。
+const legacyNameManifest = path.join(root, "legacy-page-name.json");
+const legacyNameDoc = JSON.parse(fs.readFileSync(manifest, "utf8"));
+legacyNameDoc.pageName = legacyNameDoc.name;
+fs.writeFileSync(legacyNameManifest, JSON.stringify(legacyNameDoc, null, 2), "utf8");
+result = spawnSync(process.execPath, [script, "--manifest", legacyNameManifest], { encoding: "utf8" });
+assert.notStrictEqual(result.status, 0, "清单出现 pageName 字段时必须失败");
+assert.match(result.stderr + result.stdout, /不接受 pageName 字段/);
 
 console.log("PASS MasterGo page bundle regression test");

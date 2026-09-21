@@ -4,9 +4,9 @@
 //   - menuItems / layoutStatus / layoutEvidence 照抄推导产物，不手写菜单
 //   - **采集输入（dslPath / visibilityPath / svgPath）只从运行登记表取**：`--run-json` 是必填，
 //     按登记表解析 + 校验，并把 sha256 写进清单（manifest.runRegistry.digests），Bundle 会复校；
-//     没有 --run-json 直接报错——不再回落到顶层 `Generated/*.json`（那正是"旧文件静默顶替"的来源）。
+//     没有 --run-json 直接报错（清单不允许自己拼采集输入路径）。
 // 用法: node build-bundle-manifest.mjs <layout-manifest.json> <out-bundle.json> <projectRoot> <area>
-//        [--run-json <run.json>] [--page-title <标题>] [--replace-existing]
+//        --run-json <run.json> [--page-title <标题>] [--replace-existing]
 //
 // `area`（区域前缀）**必填且不做推导**：它决定 `UI/<区域>/View|ViewModel` 的输出目录，
 // 唯一实现是 run-all.ps1 的取值链（命令行 -Ui → 项目登记表 pages[].ui → derivation 的 F<n>
@@ -38,7 +38,7 @@ for (let index = 0; index < process.argv.slice(2).length; index += 1) {
 }
 const [layoutManifestFile, outFile, projectRootArg, areaArg] = positional;
 if (!layoutManifestFile || !outFile) {
-  console.error("usage: node build-bundle-manifest.mjs <layout-manifest.json> <out-bundle.json> <projectRoot> <area> [--run-json <run.json>] [--page-title <标题>] [--replace-existing]");
+  console.error("usage: node build-bundle-manifest.mjs <layout-manifest.json> <out-bundle.json> <projectRoot> <area> --run-json <run.json> [--page-title <标题>] [--replace-existing]");
   process.exit(2);
 }
 // area 必填：位置在 projectRoot 之后，因此"缺 area"优先于"缺 --run-json"报错（与参数顺序一致）。

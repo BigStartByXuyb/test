@@ -191,7 +191,7 @@ function valueLiteralSuffix(value) {
 // 译文派生语义名：用该页已产出的英文译文做机械 PascalCase，中文文案 → 英文标识符。
 //   "工件边缘录入" → "Workpiece Edge Teaching" → WorkpieceEdgeTeaching
 //   "光源调整"     → "Light Source Adjust"     → LightSourceAdjust
-// 算法（与 SKILL.md 同口径）：按非字母数字字符切词 → 每个词首字母大写、其余字符原样保留 → 连接；
+// 算法（与 page-build-rules.md 第 3.1 节同口径）：按非字母数字字符切词 → 每个词首字母大写、其余字符原样保留 → 连接；
 // 结果必须匹配 KEY_RE 且长度 ≥ 3，否则本条不成立、继续走后面的来源。
 // 脚本仍然不翻译：译文是 AI / 工程师产出的 languages.translations，这里只做大小写与分词归一化；
 // 纯数字/符号（+5、9.0%）或首位不是字母的译文会被 KEY_RE 拦下，继续走后面的来源（signNumber / 兜底）。

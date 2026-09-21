@@ -18,6 +18,7 @@ const GENERATOR = path.join(__dirname, "..", "gen-iocontrol-xml.js");
 const VALIDATOR = path.join(__dirname, "..", "validate-iocontrol-provenance.js");
 const FEISHU_MAPPING = path.join(__dirname, "..", "..", "references", "adapters", "mtslg-iocontrol", "feishu-component-library-mapping.md");
 const MODE_DOC = path.join(__dirname, "..", "..", "references", "adapters", "mtslg-iocontrol", "mtslg-mode.md");
+const PAGE_BUILD_RULES = path.join(__dirname, "..", "..", "references", "adapters", "mtslg-iocontrol", "page-build-rules.md");
 
 const map = JSON.parse(fs.readFileSync(MAP, "utf8"));
 const docFormat = fs.readFileSync(DOC_FORMAT_SKILL, "utf8");
@@ -26,6 +27,7 @@ const generator = fs.readFileSync(GENERATOR, "utf8");
 const validator = fs.readFileSync(VALIDATOR, "utf8");
 const feishuMapping = fs.readFileSync(FEISHU_MAPPING, "utf8");
 const modeDoc = fs.readFileSync(MODE_DOC, "utf8");
+const pageBuildRules = fs.readFileSync(PAGE_BUILD_RULES, "utf8");
 
 const family = map.buttonFamily;
 const required = map.controlTypeRequiredAttrs;
@@ -61,7 +63,6 @@ for (const variant of omitVariants) {
     "右栏固定变体必须登记收窄掉的必写字段: " + variant.style);
 }
 for (const [label, text] of [
-  ["SKILL.md", mainSkill],
   ["mtslg-mode.md", modeDoc],
   ["feishu-component-library-mapping.md", feishuMapping],
   ["mastergo-iocontrol-document-format/SKILL.md", docFormat],
@@ -113,7 +114,6 @@ assert.strictEqual(langRefSlots.filter((item) => item.startsWith("selectBoxTempl
   "选择框-40/36/32/28 四个变体都要登记，缺一个就会又给 Value 产键");
 for (const [label, text] of [
   ["映射表 selectBoxTemplates.langRefPolicyNote", String(map.selectBoxTemplates.langRefPolicyNote || "")],
-  ["SKILL.md", mainSkill],
   ["mtslg-mode.md", modeDoc],
   ["feishu-component-library-mapping.md", feishuMapping],
 ]) {
@@ -126,7 +126,6 @@ assert.ok(mainSkill.includes("valueLangExempt"),
 // 全量多语言口径：五处权威来源必须同口径（每个设计文本 Value 都产键挂 LangName，
 // 唯一不产键的是槽位登记 langRefPolicy=none 的值），不得再出现"中英文一致就不产键"的旧说法。
 for (const [label, text] of [
-  ["SKILL.md", mainSkill],
   ["mtslg-mode.md", modeDoc],
   ["feishu-component-library-mapping.md", feishuMapping],
   ["mtslg-iocontrol-map.json（controlTypeRequiredAttrs._note）", JSON.stringify(map)],
@@ -157,8 +156,8 @@ const sweep = (dir) => {
 };
 sweep(pluginRootDir);
 // 派生器头注释同样必须写全量口径（不再是「枚举只在 SKILL.md 维护」那套豁免口径）。
-assert.ok(/`languages\.keys\[\]` 显式提供的条目优先级最高[^\n]*唯一例外/.test(mainSkill),
-  "显式 keys[] 的「优先级最高」必须就地写明槽位豁免这一例外，不能只在别处另立一句相反口径");
+assert.ok(/`languages\.keys\[\]` 显式提供的条目优先级最高[^\n]*唯一例外/.test(pageBuildRules),
+  "语言键真值源（page-build-rules.md）必须就地写明显式 keys[] 的「优先级最高」以槽位豁免为唯一例外");
 assert.ok(!/`LangName` 是唯一例外/.test(JSON.stringify(map)),
   "映射表必须与两份正文同口径：不得再写「LangName 是唯一例外」");
 
@@ -189,7 +188,6 @@ assert.ok(/ATTR_ORDER[\s\S]{0,600}FontWeight/.test(generator),
   "gen-iocontrol-xml.js 的 ATTR_ORDER 必须包含 FontWeight（属性顺序：FontSize → FontWeight → Width/Height）");
 // 三份人读文档必须写 FontWeight 并指向真值源，不得再抄一份 normal 名单（那是历史漂移点）。
 for (const [label, text] of [
-  ["SKILL.md", mainSkill],
   ["mtslg-mode.md", modeDoc],
   ["feishu-component-library-mapping.md", feishuMapping],
 ]) {
@@ -223,8 +221,8 @@ assert.ok(cameraFamily.innerTextPolicy && cameraFamily.innerTextPolicy.role,
 assert.strictEqual(cameraFamily.innerTextPolicy.decision, "omit", "相机内部文本必须 decision=omit");
 assert.ok(validator.includes("'" + cameraFamily.innerTextPolicy.role + "'"),
   "相机内部文本的 omit 角色必须登记进 validate-iocontrol-provenance.js 的 OMIT_ROLES: " + cameraFamily.innerTextPolicy.role);
-assert.ok(mainSkill.includes(cameraFamily.innerTextPolicy.role),
-  "SKILL.md 的可见性映射边界必须写明相机内部文本的 omit 角色");
+assert.ok(feishuMapping.includes(cameraFamily.innerTextPolicy.role),
+  "人读映射文档必须写明相机内部文本的 omit 角色（该角色登记在校验器 OMIT_ROLES）");
 assert.ok(fontGenerator.includes("innerTextPolicy"),
   "映射生成器必须按 innerTextPolicy 消费/omit 相机内部文本");
 // innerTextPolicy 的每个字段都必须被生成器真正消费（禁止"登记了但没人读"）。
@@ -233,11 +231,20 @@ for (const field of ["innerTextPolicy.decision", "innerTextPolicy.role"]) {
   assert.ok(fontGenerator.includes("innerPolicy." + token),
     "映射生成器必须读取 " + field + "（登记字段必须是行为真值源）: " + token);
 }
-// SKILL.md 的 omit 说明必须指向 OMIT_ROLES 真值源，并列出集合里的全部角色（避免封闭清单与指针两读）。
+// omit 角色的真值源是校验器的 OMIT_ROLES 集合。要求两件事：
+//   ① 映射表里登记的族内文本角色必须都在 OMIT_ROLES 里（否则生成器 omit、校验器判"未登记角色"，两侧互斥）；
+//   ② 集合里每个角色都要有人读登记点（page-build-rules.md 的 omit 一节 / 飞书映射文档 / mtslg-mode.md）。
 const omitRolesMatch = /const OMIT_ROLES = \[([^\]]+)\]/.exec(validator);
 assert.ok(omitRolesMatch, "必须能在校验器里读到 OMIT_ROLES 定义");
-for (const role of omitRolesMatch[1].split(",").map((item) => item.trim().replace(/^'|'$/g, "")).filter(Boolean)) {
-  assert.ok(mainSkill.includes(role), "SKILL.md 的 omit 说明必须列出 OMIT_ROLES 里的角色: " + role);
+const omitRoles = omitRolesMatch[1].split(",").map((item) => item.trim().replace(/^'|'$/g, "")).filter(Boolean);
+for (const [familyLabel, family] of [["cameraTemplates", cameraFamily], ["tableTemplates", map.tableTemplates]]) {
+  const role = family && family.innerTextPolicy && family.innerTextPolicy.role;
+  assert.ok(role && omitRoles.includes(role),
+    "映射表 " + familyLabel + ".innerTextPolicy.role 必须登记进校验器 OMIT_ROLES: " + role);
+}
+for (const role of omitRoles) {
+  assert.ok(pageBuildRules.includes(role) || feishuMapping.includes(role) || modeDoc.includes(role),
+    "OMIT_ROLES 里的角色必须在人读文档有登记点（page-build-rules.md / 飞书映射文档 / mtslg-mode.md）: " + role);
 }
 // hidden 是第二条 omit 路径（OMIT_REASONS = ['hidden', ...OMIT_ROLES]），SKILL.md 必须同时写清，
 // 不能把 omit 说成只由 OMIT_ROLES 决定。
@@ -321,10 +328,12 @@ assert.ok(iconRuleLine, "文档格式 Skill 的特殊规则必须按映射表写
 assert.ok(iconRuleLine.includes("IconHeight"), "特殊规则的图标字段规则必须同时覆盖 IconWidth / IconHeight");
 
 // ---------- 4. 主 Skill 与生成器注释不得留下相反表述 ----------
-assert.ok(!mainSkill.includes('不得写 `Icon=""`'), "主 Skill 不得保留可两读的否定写法");
-assert.ok(mainSkill.includes("模板不含图标字段时不写"), "主 Skill 必须写明模板不含图标字段时不写这三项");
-assert.ok(mainSkill.includes("没有图标槽位时仍按必写字段发射空字符串占位"),
-  "主 Skill 必须写明 IconButton 无图标槽位时仍发射空字符串占位");
+assert.ok(!mainSkill.includes('不得写 `Icon=""`'), "SKILL.md 不得保留可两读的否定写法");
+// 图标字段口径的人读登记点是两份适配器参考（SKILL.md 只留一行指针，不再复述细节）。
+for (const [label, text] of [["mtslg-mode.md", modeDoc], ["feishu-component-library-mapping.md", feishuMapping]]) {
+  assert.ok(text.includes("模板不含图标字段"), label + " 必须写明模板不含图标字段时不写这三项");
+  assert.ok(text.includes("无图标槽位时"), label + " 必须写明模板含图标字段但无图标槽位时的空字符串占位");
+}
 assert.ok(!generator.includes("都不发射"), "生成器注释不得保留「无图标槽位时都不发射」的旧口径");
 
 // ---------- 5. 两份人读参考文档的口径不得与映射表相反 ----------
@@ -365,7 +374,6 @@ for (const file of mdFiles) {
 }
 
 const MUST_STATE_NO_PARENT_MATCH_KEY = [
-  "skills/mastergo-to-wpf/SKILL.md",
   "skills/mastergo-iocontrol-document-format/SKILL.md",
   "skills/mastergo-to-wpf/references/mastergo-component-mapping-rules.md",
   "skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/mtslg-mode.md",
@@ -453,7 +461,7 @@ assert.ok(hostGenerator.includes("RESERVED_VIEWMODEL_MEMBERS"),
 assert.ok(hostGenerator.includes("与 ViewModel 成员同名") && hostGenerator.includes("两个按钮算出同一个处理方法名"),
   "宿主壳生成器必须对固定成员撞名与同页按钮撞名两条都直接失败");
 
-console.log("PASS 按钮族固定字段单一真值源（映射表 ↔ 脚本默认 ↔ 两份 Skill ↔ 两份人读参考）一致性回归测试");
+console.log("PASS 按钮族固定字段单一真值源（映射表 ↔ 脚本默认 ↔ 格式 Skill ↔ 适配器人读参考）一致性回归测试");
 console.log("PASS ViewModel 按钮处理方法名口径（page-shell-generator.md ↔ gen-mw-wpf-page.js）");
 console.log("PASS 已作废表述（父节点语义匹配键 / parentVariants）插件根 .md 扫描");
 
@@ -525,7 +533,6 @@ assert.ok(bundleGenerator.includes("tableAudits"), "编排器审计必须输出�
 
 // 四份人读文档必须写明同一条口径。
 for (const [label, text] of [
-  ["SKILL.md", mainSkill],
   ["mastergo-iocontrol-document-format/SKILL.md", docFormat],
   ["mtslg-mode.md", modeDoc],
   ["feishu-component-library-mapping.md", feishuMapping],
@@ -587,7 +594,6 @@ assert.ok(!(columnTemplate.alwaysWrittenAttrs || []).includes("IOVisible"),
   "列定义不得登记 IOVisible（表头文本没有「是否主键」信息，没有可靠来源；REVIEW-005）");
 
 for (const [label, text] of [
-  ["SKILL.md", mainSkill],
   ["mastergo-iocontrol-document-format/SKILL.md", docFormat],
   ["mtslg-mode.md", modeDoc],
   ["feishu-component-library-mapping.md", feishuMapping],
@@ -600,7 +606,7 @@ for (const [label, text] of [
     label + " 必须写明 DataGrid 根 Value 当前阶段固定写空串（数据源由工程师后续绑定）");
 }
 // 图层名例外清单：表格族按结构身份命中、与图层名无关，因此只剩「底部栏」一条例外。
-for (const [label, text] of [["SKILL.md", mainSkill], ["mtslg-mode.md", modeDoc]]) {
+for (const [label, text] of [["mtslg-mode.md", modeDoc]]) {
   assert.ok(text.includes("例外只有一条"),
     label + " 的图层名例外清单只能登记一条例外（底部栏按组件名匹配）");
   assert.ok(!text.includes("例外只有两条"),
@@ -663,7 +669,6 @@ assert.ok(/\bxmlElementText\b/.test(pageLang), "语言字典发射器必须用�
 
 // 三份人读文档都必须写明换行口径（写 &#x0a; + 设计换行码点），否则文档与实现又会漂移。
 for (const [label, text] of [
-  ["SKILL.md", mainSkill],
   ["mtslg-mode.md", modeDoc],
   ["feishu-component-library-mapping.md", feishuMapping],
 ]) {
@@ -698,11 +703,11 @@ assert.ok(LAYOUT_DOC.includes("U+2028"), "feishu-layout-mapping.md 必须写明�
 assert.ok(modeDoc.includes("压成空格会让两行文案退化成一行"),
   "mtslg-mode.md 必须写明字典压成空格的后果");
 
-// 换行口径的同步范围：映射表 mapRole 与组件库映射文档必须给出同一份「四文档」清单
+// 换行口径的同步范围：映射表 mapRole 与组件库映射文档必须给出同一份「三文档」清单
 // （BLOCK-001：两处基数/集合不一致会让维护者按其中一处执行时漏同步）。
+// 换行细则是适配器参考层的事实：SKILL.md 不再承载该口径，因此不在同步清单里。
 {
   const docList = [
-    "skills/mastergo-to-wpf/SKILL.md",
     "skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/mtslg-mode.md",
     "skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/feishu-component-library-mapping.md",
     "skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/feishu-layout-mapping.md",
@@ -713,10 +718,12 @@ assert.ok(modeDoc.includes("压成空格会让两行文案退化成一行"),
     assert.ok(feishuMapping.includes(docPath),
       "组件库映射文档的换行同步清单必须登记同一路径: " + docPath);
   }
-  assert.ok(!/人读文档：SKILL\.md/.test(newlineRule.mapRole || ""),
-    "mapRole 不得用裸文件名 SKILL.md 指代同步对象（插件内有两份 SKILL.md）");
-  assert.ok(!feishuMapping.includes("三份人读文档"), "组件库映射文档不得再写「三份人读文档」");
-  assert.ok(!/三份人读文档/.test(newlineRule.mapRole || ""), "映射表 mapRole 不得再写「三份人读文档」");
+  assert.ok(!/SKILL\.md/.test(newlineRule.mapRole || "") && !feishuMapping.includes("SKILL.md"),
+    "换行同步清单不得把 SKILL.md 当同步对象（换行口径在适配器参考层，不在 SKILL.md）");
+  assert.ok(feishuMapping.includes("三份人读文档"), "组件库映射文档必须写明同步范围是「三份人读文档」");
+  assert.ok(!feishuMapping.includes("四份人读文档"), "组件库映射文档不得再写「四份人读文档」");
+  assert.ok(/三份人读文档/.test(newlineRule.mapRole || ""), "映射表 mapRole 必须写明同步范围是「三份人读文档」");
+  assert.ok(!/四份人读文档/.test(newlineRule.mapRole || ""), "映射表 mapRole 不得再写「四份人读文档」");
 }
 
 // ---------- mapping 生成者口径（防回归） ----------

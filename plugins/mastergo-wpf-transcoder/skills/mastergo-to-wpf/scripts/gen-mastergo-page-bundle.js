@@ -68,12 +68,13 @@ function parseArgs(argv) {
 }
 
 function normalizePageManifest(manifest) {
-  const name = manifest.name || manifest.pageName;
-  if (typeof name !== "string" || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
-    fail("manifest 必须提供合法页面 name（或兼容字段 pageName）");
+  // 页面名只有一个清单字段：name。同一含义不接受第二个字段名。
+  if (manifest.pageName !== undefined) {
+    fail("manifest 不接受 pageName 字段：页面名统一写在 name");
   }
-  if (manifest.name && manifest.pageName && manifest.name !== manifest.pageName) {
-    fail("manifest.name 与 manifest.pageName 必须一致");
+  const name = manifest.name;
+  if (typeof name !== "string" || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
+    fail("manifest 必须提供合法页面 name");
   }
   if (typeof manifest.area !== "string" || !manifest.area.trim()) {
     fail("新页面必须提供 area");
@@ -211,8 +212,10 @@ function ensureScaffold(manifest) {
   manifest.frameworkConfigPath = configRelative;
   const dirs = [
     PAGE_ROOT, LAYOUT_DIR, pageFolderFor(manifest.name), "Generated",
-    "UI/" + String(manifest.area || "F2-Manual") + "/View",
-    "UI/" + String(manifest.area || "F2-Manual") + "/ViewModel"
+    // area 已在 validateManifest() 里 fail-closed 校验过（缺失直接报错），这里不得再给任何默认值：
+    // 兜底默认值会让"清单漏字段"变成"写到另一个区域目录"的静默错误。
+    "UI/" + String(manifest.area) + "/View",
+    "UI/" + String(manifest.area) + "/ViewModel"
   ];
   dirs.forEach(relative => fs.mkdirSync(path.join(projectRoot, ...relative.split("/")), { recursive: true }));
   return { projectRoot, scaffold: true, frameworkConfigPath };

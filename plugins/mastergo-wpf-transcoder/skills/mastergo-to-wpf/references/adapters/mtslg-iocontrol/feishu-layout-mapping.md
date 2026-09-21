@@ -47,7 +47,7 @@
 
 ## Layout 清单（menuItems）的机械推导
 
-底部栏菜单不再人工登记，由 `gen-mtslg-layout-manifest.js` 从 DSL 快照 + 当前页面 Icon 映射 + 模板表机械推导，规则全部登记在 `mtslg-iocontrol-map.json` 的 `layoutRules.bottomBar`：
+底部栏菜单由 `gen-mtslg-layout-manifest.js` 从 DSL 快照 + 当前页面 Icon 映射 + 模板表机械推导（不人工登记），规则全部登记在 `mtslg-iocontrol-map.json` 的 `layoutRules.bottomBar`：
 
 - **底部栏容器**：任一"直接子节点里含右下角常驻分组"的容器（不记图层 ID、不记页面路径）。
 - **变体匹配键**：`layoutRules.bottomBar.match` —— `componentName: true` 时用实例名（被引用组件的名字）当变体值；也可登记 `property: "属性名"` 改用公开属性值。一族一个键，与组件模板族同一套机制。

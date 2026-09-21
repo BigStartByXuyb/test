@@ -12,6 +12,7 @@
 
     例：
         pwsh -NoProfile -File _tool\run-all.ps1 -List
+        pwsh -NoProfile -File _tool\run-all.ps1 -List -Format json   # 12 步契约（输入/产物/失败/续跑），供文档生成使用
         pwsh -NoProfile -File _tool\run-all.ps1 -LayerId <图层id> -Target <页面Target> -StopAfter discover
         pwsh -NoProfile -File _tool\run-all.ps1 -Progress layout          # 图标台账/译文改好之后
         pwsh -NoProfile -File _tool\run-all.ps1 -Progress bundle -Overwrite
@@ -21,7 +22,10 @@
 param(
     [string] $ProjectRoot,
     [string] $SkillRoot,
-    [string] $FileId = '181586559903927',
+    # MasterGo 文件 id 没有内置默认值：只能显式传，或由项目登记表 docs/page-registry.json 提供。
+    # 缺失就报错（fail-closed）——插件里写死某个项目的文件 id，会让别的项目在没传参数时静默取到
+    # 另一个项目的设计稿；把某个项目的 id 当"哨兵值"还会让显式传入的同名 id 被登记表覆盖。
+    [string] $FileId,
     [string] $LayerId,
     [string] $Ui,
     [string] $Target,
@@ -31,6 +35,8 @@ param(
     [switch] $Overwrite,
     [switch] $AllowEmptyLedger,
     [switch] $List,
+    [ValidateSet('text', 'json')]
+    [string] $Format = 'text',
     [string] $ConfigPath = ''
 )
 
@@ -53,26 +59,108 @@ $ProjectRoot = (Resolve-Path -LiteralPath $ProjectRoot).Path
 $ScriptsFolder = Join-Path $SkillRoot 'scripts'
 $TemplateMap = Join-Path $SkillRoot 'references\adapters\mtslg-iocontrol\mtslg-iocontrol-map.json'
 
-# 步骤表：Id / 名称 / 说明。前置依赖由下方 switch（按步骤名硬编码）表达，这里不重复声明。
+# 步骤表：Id / 名称 / 说明 / 契约（输入 → 产物 → 失败 → 怎么修）。
+# 前置依赖由下方 switch（按步骤名硬编码）表达，这里不重复声明。
+# 契约字段是「一键流水线」文档的唯一真值源：`-List -Format json` 输出它们，
+# references/adapters/mtslg-iocontrol/pipeline-contract.md 由 scripts/gen-pipeline-contract.mjs 生成，
+# 回归测试重新生成并比对——文档里的步骤表不再手写，避免"文档说一套、脚本做一套"。
 $Steps = @(
-    [pscustomobject]@{ Id = 1;  Name = 'fetch';      Title = '取数 getDsl（只落盘，不进上下文）' },
-    [pscustomobject]@{ Id = 2;  Name = 'capture';    Title = 'DSL 结构化快照 + 覆盖校验' },
-    [pscustomobject]@{ Id = 3;  Name = 'svg';        Title = 'extractSvg 图标几何' },
-    [pscustomobject]@{ Id = 4;  Name = 'visibility'; Title = '显隐事实提取' },
-    [pscustomobject]@{ Id = 5;  Name = 'mapping';    Title = 'mapping 草稿（按当前台账）' },
-    [pscustomobject]@{ Id = 6;  Name = 'discover';   Title = '图标候选发现 + 打印待命名清单' },
-    [pscustomobject]@{ Id = 7;  Name = 'ledger';     Title = '由命名表生成图标台账 + 图标几何来源核对' },
-    [pscustomobject]@{ Id = 8;  Name = 'layout';     Title = 'Layout 清单机械推导（底部栏 MenuItem）' },
-    [pscustomobject]@{ Id = 9;  Name = 'inputs';     Title = '校验译文并生成 Bundle 清单' },
-    [pscustomobject]@{ Id = 10; Name = 'bundle';     Title = 'Bundle 生成页面 XML / Icon / Layout / 宿主壳' },
-    [pscustomobject]@{ Id = 11; Name = 'gates';      Title = '严格门禁（审计逐条断言）' },
-    [pscustomobject]@{ Id = 12; Name = 'verify';     Title = '四项独立验证（provenance / 坐标 / Icon / 结构）' }
+    [pscustomobject]@{
+        Id = 1; Name = 'fetch'; Title = '取数 getDsl（只落盘，不进上下文）'
+        Inputs   = @('MasterGo 文件 id 与图层 id（命令行 -FileId/-LayerId，或项目登记表 docs/page-registry.json）', 'MasterGo MCP token（MASTERGO_MCP_TOKEN 或 -ConfigPath 指向的配置）')
+        Outputs  = @('Generated/runs/<Target>/getDsl.json', '运行登记表 Generated/runs/<Target>/run.json（产出即登记）')
+        Failures = @('缺 fileId 或 layerId', 'MasterGo MCP token 缺失或失效', 'MCP 调用失败/超时')
+        Recovery = @('显式传 -FileId/-LayerId 或补项目登记表（脚本不内置任何项目的文件 id）', '补 token 后重跑：-Progress fetch')
+    },
+    [pscustomobject]@{
+        Id = 2; Name = 'capture'; Title = 'DSL 结构化快照 + 覆盖校验'
+        Inputs   = @('第 1 步的 getDsl.json', '区域前缀 -Ui 与设计页名 -PageName（缺失时由 run-all 取值链解析）')
+        Outputs  = @('Generated/runs/<Target>/dsl.snapshot.json', 'coverage-report.json（节点覆盖/重复 ref/断裂父子链）')
+        Failures = @('覆盖校验 status≠complete', '存在重复 ref 或断裂父子链', '区域前缀取值链取不到')
+        Recovery = @('确认 layerId 指向目标图层全部节点后重跑：-Progress capture', '区域前缀显式传 -Ui')
+    },
+    [pscustomobject]@{
+        Id = 3; Name = 'svg'; Title = 'extractSvg 图标几何'
+        Inputs   = @('fileId / layerId', 'MasterGo MCP token')
+        Outputs  = @('Generated/runs/<Target>/extractSvg.json（PATH 自身几何，按分页取全）')
+        Failures = @('MCP 调用失败或分页中断')
+        Recovery = @('重跑：-Progress svg（响应只落盘，不进上下文）')
+    },
+    [pscustomobject]@{
+        Id = 4; Name = 'visibility'; Title = '显隐事实提取'
+        Inputs   = @('第 2 步的 dsl.snapshot.json')
+        Outputs  = @('Generated/runs/<Target>/visibility.json（每个节点的 visible/hidden 事实与 omit 角色）')
+        Failures = @('快照缺字段（旧版快照或手工删改）')
+        Recovery = @('重跑第 2 步后重跑：-Progress visibility')
+    },
+    [pscustomobject]@{
+        Id = 5; Name = 'mapping'; Title = 'mapping 草稿（按当前台账）'
+        Inputs   = @('dsl.snapshot.json + visibility.json', '正式映射表 mtslg-iocontrol-map.json', '图标台账（尚无台账时用空 candidates 占位）')
+        Outputs  = @('Generated/runs/<Target>/mapping 草稿与映射审计（unmappedComponents / pending / templateConflicts）')
+        Failures = @('组件与固定模板冲突', '结构签名部分命中')
+        Recovery = @('只补输入（用 manifest.excludeInstances 隔离该实例、把偏差写进待确认），不改 mapping 产物；重跑：-Progress mapping')
+    },
+    [pscustomobject]@{
+        Id = 6; Name = 'discover'; Title = '图标候选发现 + 打印待命名清单'
+        Inputs   = @('extractSvg.json + mapping 草稿 + dsl.snapshot.json')
+        Outputs  = @('Generated/_inputs/<Target>.icon-candidates.json（待命名清单：候选下标/归属控件/层名/尺寸）')
+        Failures = @('缺 svg 或 mapping（前置步骤未跑）')
+        Recovery = @('先补跑前置步骤，再重跑：-Progress discover')
+    },
+    [pscustomobject]@{
+        Id = 7; Name = 'ledger'; Title = '由命名表生成图标台账 + 图标几何来源核对'
+        Inputs   = @('候选清单', '命名表 Generated/_inputs/<Target>.icon-naming.json（人工/AI 语义输入）')
+        Outputs  = @('图标台账 Generated/_inputs/<Target>.icon-map.json', 'verify-icon-source 的几何来源核对结果')
+        Failures = @('缺命名表（未加 -AllowEmptyLedger）', 'icons[] 为空', 'sourceId 指向页面根或被多条共用', '缺 extractSvg 条目且未声明 fromDsl')
+        Recovery = @('在命名表里定名或标 fromDsl，重跑：-Progress ledger；本页确实无图标槽位时加 -AllowEmptyLedger')
+    },
+    [pscustomobject]@{
+        Id = 8; Name = 'layout'; Title = 'Layout 清单机械推导（底部栏 MenuItem）'
+        Inputs   = @('dsl.snapshot.json + 图标台账 + 正式映射表')
+        Outputs  = @('Layout 清单与推导报告 Generated/_inputs/<Target>.layout-manifest.json(.report.json)')
+        Failures = @('layoutStatus≠complete', 'layoutEvidence.unresolvedBottomBarItems≠0')
+        Recovery = @('补齐底部栏变体命中后重跑：-Progress layout（校验失败表示清单不完整，不是拒绝生成页面）')
+    },
+    [pscustomobject]@{
+        Id = 9; Name = 'inputs'; Title = '校验译文并生成 Bundle 清单'
+        Inputs   = @('Layout 清单', '运行登记表 run.json（采集输入只按它取）', '译文清单 Generated/_inputs/<Target>.lang-translations.json（术语表可选）')
+        Outputs  = @('Bundle 清单 Generated/_inputs/<Target>.bundle.json（含 runRegistry 指纹）')
+        Failures = @('缺区域前缀 area', '缺 --run-json 或译文清单', '发现未登记的旧同名采集文件', '登记表 sha256 与文件不符')
+        Recovery = @('补齐输入后重跑：-Progress inputs（采集输入只按登记表取，未登记的旧同名文件一律拒绝）')
+    },
+    [pscustomobject]@{
+        Id = 10; Name = 'bundle'; Title = 'Bundle 生成页面 XML / Icon / Layout / 宿主壳'
+        Inputs   = @('Bundle 清单', '复校通过的采集输入（getDsl/snapshot/extractSvg，按登记表取）')
+        Outputs  = @('页面 XML、本页 Icons.xaml、CN/EN 语言字典、Layout 增量注册、View + code-behind + ViewModel、宿主壳', 'Bundle 审计与其 files[] 统一登记')
+        Failures = @('同名目标文件已存在且未 -Overwrite', 'area/路径不合法', '语言键引用闭环失败', '清单指纹与登记表不符')
+        Recovery = @('确认要替换时用 operation=replace-existing + -Overwrite（覆盖前逐个备份，保留最近 2 份），否则改名或先确认；重跑：-Progress bundle')
+    },
+    [pscustomobject]@{
+        Id = 11; Name = 'gates'; Title = '严格门禁（审计逐条断言）'
+        Inputs   = @('Bundle 审计 + mapping 审计 + coverage-report.json')
+        Outputs  = @('门禁结论（失败即停；通过时列出必须写进交付说明的警告）')
+        Failures = @('临时语言键', '待翻译条目', '容器嵌套冲突', '底部栏未命中变体', 'Bundle 静态校验未通过')
+        Recovery = @('回到产出该字段的步骤补输入（译文/命名表/隔离清单），重跑：-Progress gates')
+    },
+    [pscustomobject]@{
+        Id = 12; Name = 'verify'; Title = '四项独立验证（provenance / 坐标 / Icon / 结构）'
+        Inputs   = @('页面 XML + 本页 Icon/语言字典 + 项目 Layout + 审计文件')
+        Outputs  = @('Generated/_work/verification/<页面>/ 的 provenance/坐标/Icon/结构报告')
+        Failures = @('provenance 与设计文本不符', '坐标与 DSL bbox 不符', 'Icon 引用闭环缺失', '页面结构校验失败')
+        Recovery = @('修输入或生成器后重跑：-Progress verify（不要改报告）')
+    }
 )
 
 if ($List) {
-    $Steps | ForEach-Object { '{0,2}  {1,-10} {2}' -f $_.Id, $_.Name, $_.Title }
-    Write-Output ''
-    Write-Output '用法: -Progress <步骤> / -StopAfter <步骤>，可写步骤号或步骤名。'
+    if ($Format -eq 'json') {
+        ConvertTo-Json -InputObject @($Steps) -Depth 6
+    }
+    else {
+        $Steps | ForEach-Object { '{0,2}  {1,-10} {2}' -f $_.Id, $_.Name, $_.Title }
+        Write-Output ''
+        Write-Output '用法: -Progress <步骤> / -StopAfter <步骤>，可写步骤号或步骤名。'
+        Write-Output '契约（输入/产物/失败/怎么修）：-List -Format json，或看 references/adapters/mtslg-iocontrol/pipeline-contract.md'
+    }
     exit 0
 }
 
@@ -90,10 +178,17 @@ function Get-ProjectTarget {
     if (-not (Test-Path -LiteralPath $registry)) { return $null }
     $doc = Get-Content -LiteralPath $registry -Raw -Encoding UTF8 | ConvertFrom-Json
     $page = @($doc.pages)[0]
+    # 逐字段读 designSource：不能直写 `$page.designSource.fileId`——登记表缺该字段时
+    # Set-StrictMode 会抛出"property cannot be found"，掩盖真正的原因（登记表缺 fileId/layerId）。
+    # 这里取成 $null，由下面的显式门禁给出可执行的报错。
+    $design = if ($page.PSObject.Properties['designSource']) { $page.designSource } else { $null }
+    $layerId = if ($design -and $design.PSObject.Properties['layerId']) { $design.layerId } else { $null }
+    $fileId = if ($design -and $design.PSObject.Properties['fileId']) { $design.fileId } else { $null }
+    $designPageName = if ($design -and $design.PSObject.Properties['designPageName']) { $design.designPageName } else { $null }
     return [pscustomobject]@{
         Target  = $page.target
-        LayerId = $page.designSource.layerId
-        FileId  = $page.designSource.fileId
+        LayerId = $layerId
+        FileId  = $fileId
         # 区域前缀（area）：① 登记表显式 `pages[].ui`；② `derivation` 里第一个 `F<数字>`。
         # 两者都是可选字段（老登记表可能没有），缺失时留空——由下面的取值链继续解析
         # （Target 编号前缀 → Target 首词），仍然取不到才报错要求显式传 -Ui。
@@ -104,7 +199,7 @@ function Get-ProjectTarget {
         Ui      = if ($page.PSObject.Properties['ui'] -and -not [string]::IsNullOrWhiteSpace($page.ui)) { $page.ui }
                   elseif ($page.PSObject.Properties['derivation'] -and ($page.derivation -match 'F\d+')) { $Matches[0] }
                   else { $null }
-        Design  = $page.designSource.designPageName
+        Design  = $designPageName
         # 页面标题的人工确认值：机械流水线必须带上它，否则标题会退回设计页名原文（带 (x.y) 编号）。
         # 该字段是可选登记项：老登记表没有它时不能因为 Set-StrictMode 直接抛错。
         PageTitleText = if ($page.PSObject.Properties['pageTitleText']) { $page.pageTitleText } else { $null }
@@ -201,7 +296,9 @@ $Registry = Get-ProjectTarget -Root $ProjectRoot
 if ($Registry) {
     if (-not $Target) { $Target = $Registry.Target }
     if (-not $LayerId) { $LayerId = $Registry.LayerId }
-    if (-not $FileId -or $FileId -eq '181586559903927') { $FileId = $Registry.FileId }
+    # fileId 与 layerId 同口径：命令行没给才读登记表；命令行给了就以命令行为准（不设"哨兵值"，
+    # 否则显式传入与"没传"无法区分，登记表会静默覆盖调用方的输入）。
+    if (-not $FileId) { $FileId = $Registry.FileId }
     if (-not $DesignPageName) { $DesignPageName = $Registry.Design }
     # 区域前缀：命令行没给就先看项目登记表（docs/page-registry.json）里的 pages[].ui / derivation 的 F<n>。
     if (-not $Ui -and $Registry.Ui) { $Ui = $Registry.Ui; $UiSource = '项目登记表 docs/page-registry.json' }
@@ -223,6 +320,15 @@ if (-not $Ui -and $Target) {
 }
 if (-not $Ui) {
     throw "缺少区域前缀：命令行 -Ui、项目登记表 pages[].ui / derivation、Target（$Target）都取不到。它会写进快照 ui 字段并决定 UI/<区域>/View 输出目录，必须显式给出。"
+}
+# MasterGo 文件 id：命令行 → 项目登记表 → 报错。
+# 这里 fail-closed 而不是给默认值：插件是通用发布物，内置任何项目的文件 id 都会让别的项目
+# 在没传参数时静默取到另一个项目的设计稿（取数看着"成功"，产物却来自别的页面）。
+if (-not $FileId) {
+    throw "缺少 MasterGo 文件 id：请显式传 -FileId，或在项目登记表 docs/page-registry.json 的 pages[].designSource.fileId 登记。脚本不内置任何项目的文件 id"
+}
+if (-not $LayerId) {
+    throw "缺少 MasterGo 图层 id：请显式传 -LayerId，或在项目登记表 docs/page-registry.json 的 pages[].designSource.layerId 登记。"
 }
 
 foreach ($required in @('Target', 'LayerId')) {
@@ -371,7 +477,7 @@ foreach ($step in $Steps) {
                 }
                 elseif (-not (Test-Path -LiteralPath $LedgerJson)) {
                     if (-not $AllowEmptyLedger) {
-                        throw "缺少命名表 $NamingJson：请把候选清单里被 Icon 槽位引用的图形定名写进命名表（格式见 SKILL.md 一键流水线小节；若本页确实没有图标槽位，加 -AllowEmptyLedger）"
+                        throw "缺少命名表 $NamingJson：请把候选清单里被 Icon 槽位引用的图形定名写进命名表（格式见 references/adapters/mtslg-iocontrol/pipeline-contract.md 第 7 步；若本页确实没有图标槽位，加 -AllowEmptyLedger）"
                     }
                     New-Item -ItemType Directory -Force -Path $Inputs | Out-Null
                     '{ "icons": [], "candidates": [], "unmapped": [] }' | Set-Content -LiteralPath $LedgerJson -Encoding UTF8

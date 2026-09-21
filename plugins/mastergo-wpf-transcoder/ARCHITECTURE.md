@@ -102,7 +102,7 @@ flowchart LR
 | 页面格式与验证 | `skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/mtslg-mode.md` | 坐标、TextBlock 尺寸、运行时约束、验证流程 |
 | 流程路由与硬规则 | `skills/mastergo-to-wpf/SKILL.md` | **唯一流程路由**；不在别处复制流程 |
 | 跨适配器语义 | `skills/mastergo-to-wpf/references/mastergo-component-mapping-rules.md` | 组件身份与来源链通用规则 |
-| 跨适配器样式库 | `skills/mastergo-to-wpf/references/style-library-profiles.md` | 样式库 Profile 的划分、版本选择与冲突处理；由 `skills/mastergo-to-wpf/SKILL.md`「公共参考」登记，并在项目首次适配阶段由 `skills/mastergo-to-wpf/references/project-adapter-initialization.md` 按条件引用 |
+| 跨适配器样式库 | `skills/mastergo-to-wpf/references/style-library-profiles.md` | 样式库 Profile 的划分、版本选择与冲突处理；由 `skills/mastergo-to-wpf/SKILL.md`「参考文件读取条件」登记，并在项目首次适配阶段由 `skills/mastergo-to-wpf/references/project-adapter-initialization.md` 按条件引用 |
 | 团队/设计师阅读副本 | 无仓库内路径（飞书在线文档：组件库映射标准 / 页面壳层 Layout 映射标准 / 完整页面转换流程与维护指南 / 转码原理） | 供团队/设计师阅读的**同步副本**，不参与运行时；**不在仓库内写死文档地址**（文档可能被移动或重建），需要同步时按标题检索定位 |
 
 原则：**一个规则只保留一个权威来源**——本地 `skills/mastergo-to-wpf/references/` 是唯一事实源，在线飞书文档是按标题检索定位的同步阅读副本；两者不一致时**以本地为准**，并把本地改动同步过去。改规则时同步"映射表 → 说明文档 → 在线文档 → 生成/校验脚本 → 回归测试"。
@@ -150,7 +150,7 @@ DSL/mapping 文案 ──► 英文等译文由 AI 产出 translations 清单并
                  ──► LangName 绑定 → 门禁校验引用闭环
 ```
 
-工序顺序以 `skills/mastergo-to-wpf/SKILL.md` 的「语言键自动派生」为准：译文清单先落盘，再派生语言键，随后才发射 XML 与 Layout。
+工序顺序以 `skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/page-build-rules.md` 第 3 节「页面多语言文件与语言键」为准：译文清单先落盘，再派生语言键，随后才发射 XML 与 Layout。
 
 页面字典**自包含**：不复用项目里已登记的跨页键（`keyCatalog` 是可选的显式复用开关，默认关闭）。
 

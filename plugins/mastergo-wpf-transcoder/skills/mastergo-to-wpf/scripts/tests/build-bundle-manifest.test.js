@@ -2,7 +2,7 @@
 "use strict";
 
 // Bundle 清单生成器回归：采集输入只从运行登记表取（并写 digests 供 Bundle 复校），
-// 未提供登记表时退回旧顶层路径但必须给出警告；旧同名影子文件一律拒绝。
+// 缺 --run-json 直接失败；未登记的旧同名文件一律拒绝。
 
 const assert = require("assert");
 const fs = require("fs");
