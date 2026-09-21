@@ -77,7 +77,7 @@ function normalizePageManifest(manifest) {
     fail("manifest 必须提供合法页面 name");
   }
   if (typeof manifest.area !== "string" || !manifest.area.trim()) {
-    fail("新页面必须提供 area");
+    fail("必须提供 area（新建与 replace-existing 都需要：它同时决定 UI/<area>/… 路径与宿主壳命名空间）");
   }
 
   // Bundle 的页面 XML 恒用 --fresh 发射，因此它没有"合并已有页面"这条路径。

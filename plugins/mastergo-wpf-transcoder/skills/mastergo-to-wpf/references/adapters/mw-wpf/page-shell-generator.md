@@ -123,7 +123,7 @@ public class <Page>ViewModel : IOScreen, IPage
 
     node scripts/gen-mw-wpf-page.js --manifest .\page.json
 
-已有宿主文件不会静默覆盖。明确需要重新生成时，**必须同时满足两个条件**：清单里 `operation` 为 `modify-existing` 或 `replace-existing`，并显式加 `--overwrite`（只加 `--overwrite` 而清单 `operation` 仍是新建模式时，脚本会直接失败并提示 `operation=replace-existing`）：
+已有宿主文件不会静默覆盖。明确需要重新生成时，**必须同时满足两个条件**：清单里 `operation` 为 `replace-existing`，并显式加 `--overwrite`（只加 `--overwrite` 而清单 `operation` 仍是新建模式时，脚本会直接失败并提示 `operation=replace-existing`）：
 
     {
       "operation": "replace-existing",
