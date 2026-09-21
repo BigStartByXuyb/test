@@ -6,7 +6,8 @@
  *   --fresh               从映射 JSON 全新渲染页面 XML
  *   --merge <现有XML>     按 merge 语义更新现有页面（当前主路径）
  *
- * 映射 JSON 输入格式（由 LLM 从 MasterGo 完整 DSL 逐节点建立，bbox 值机械抄录）：
+ * 映射 JSON 输入格式（由 gen-mtslg-mapping-from-dsl.js 从 DSL 快照 + visibility + 正式模板映射表机械生成；
+ * 本脚本只发射 XML，不生成映射、也不做语义判断）：
  * {
  *   "comment": "页面中文名（可选，写进 xml 声明后的注释）",
  *   "nodes": [

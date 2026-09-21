@@ -89,5 +89,36 @@ for (const pattern of forbidden) {
   assert.ok(!pattern.test(text), "SKILL.md 不得包含项目专属字面量/默认值: " + pattern);
 }
 
+// 全局对照：指导文档里点名的脚本文件必须真实存在。
+// 背景：cap-window2.ps1 被合并进 cap-window.ps1 后，三份文档仍写着两个文件名——
+// 这类"改名/删除后引用悬空"不报错，只会在执行时才发现。
+const scriptIndex = new Set();
+(function collect(dir) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const target = path.join(dir, entry.name);
+    if (entry.isDirectory()) { if (entry.name !== "node_modules") collect(target); continue; }
+    if (/\.(ps1|js|mjs)$/.test(entry.name)) scriptIndex.add(entry.name);
+  }
+})(SKILL);
+for (const entry of fs.readdirSync(path.join(SKILL, "..", ".."), { withFileTypes: true })) {
+  if (entry.isFile() && /\.(ps1|js|mjs)$/.test(entry.name)) scriptIndex.add(entry.name);
+}
+const guidanceDocs = [
+  "SKILL.md",
+  "references/adapters/mtslg-iocontrol/mtslg-mode.md",
+  "references/adapters/mtslg-iocontrol/page-build-rules.md",
+  "references/adapters/mtslg-iocontrol/pipeline-contract.md",
+  "references/adapters/mtslg-iocontrol/bundle-manifest.md",
+];
+// 只认"独立点名"的脚本名：跳过 `*.test.js` 这类通配写法（前缀是 * 或 . 或 -）。
+const scriptNameRe = /(?<![\w*.\-/])[A-Za-z0-9_-]+\.(?:ps1|js|mjs)\b/g;
+for (const rel of guidanceDocs) {
+  const doc = fs.readFileSync(path.join(SKILL, rel), "utf8");
+  for (const match of doc.matchAll(scriptNameRe)) {
+    assert.ok(scriptIndex.has(match[0]),
+      rel + " 点名的脚本不存在（改名/删除后引用未全局同步）: " + match[0]);
+  }
+}
+
 console.log("PASS SKILL.md 分层与预算（" + lines.length + " 行 / " + text.length + " 字符，" +
   pointers.size + " 个参考指针全部存在）");

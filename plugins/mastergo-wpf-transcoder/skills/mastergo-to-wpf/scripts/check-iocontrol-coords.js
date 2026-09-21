@@ -5,7 +5,7 @@
  * 核对生成的页面 XML 的几何（Left/Top/Width/Height）与设计稿节点 bbox 是否逐项一致。
  * MTSLG 页面生成后必须执行此检查。
  *
- * 节点输入 JSON（由 LLM 从 MasterGo 完整 DSL 机械抄录 page-absolute bbox）：
+ * 节点输入 JSON（由 check-coords.mjs 从页面 mapping 机械生成 page-absolute bbox；不由人或模型逐节点抄录）：
  *   [
  *     { "id": "dsl-node-id（与 XML 的 ID 属性一致；XML 无 ID 的节点用 ref）",
  *       "x": 10, "y": 35, "w": 160, "h": 150,          // 控件自身 page-absolute bbox，double

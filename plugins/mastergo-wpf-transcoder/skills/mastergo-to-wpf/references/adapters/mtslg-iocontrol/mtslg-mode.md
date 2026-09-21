@@ -224,7 +224,7 @@
 
 运行时（目标项目重载动作 + 截图）：
 1. 切到目标页，执行适配记录中的重载动作，并等待目标项目完成加载。
-2. 使用 `cap-window.ps1` 或目标项目认可的截图方式，传入已确认的运行宿主与输出路径。
+2. 使用 `cap-window.ps1`（默认 `-Method printwindow`，被遮挡也能截全；窗口可见时可用 `-Method screen`）或目标项目认可的截图方式，传入已确认的运行宿主与输出路径。
 3. 坐标换算：以适配记录中的目标客户区尺寸为基准；若运行时存在缩放，记录客户区原点与缩放系数后再逐区比对。
 4. 按 DSL bbox 裁剪关键区逐区对照；没有可视化通道时，可用像素采样、UI Automation 或间隔截图像素差异确认页面**稳定性与关键控件位置**（仅限本运行时门禁；不得据此判断图标朝向、改 Geometry 或推断设计侧缺失）。
 5. 检查目标项目要求的语言环境中 LangName 生效，且 IOEnable/IOVisible 无缺键报错。
@@ -250,7 +250,7 @@
 | `scan-mtslg-keys.ps1` | 键白名单生成（styles/icons/langNames 成对/pageTargets/ioCommands/ioNames） | 新 |
 | `sync-to-mt.ps1` | 安全同步：备份+回滚+拒绝副本路径+svn 摘要 | 新 |
 | `classify-mastergo-groups.js` | Group 名称→语义 role 分类 | 双模式共用 |
-| `cap-window.ps1` / `cap-window2.ps1` | 截图验证（运行宿主与输出路径由适配记录提供） | 双模式共用 |
+| `cap-window.ps1` | 截图验证（`-Method printwindow` 默认，`screen` 为屏幕抓取兜底；运行宿主与输出路径由适配记录提供） | 双模式共用 |
 | `discover-mtslg-page-icon-map.js` | 从当前页面 mapping 的真实 PATH/SVG 发现候选，保留已确认资源键并输出 `candidates/unmapped` 审计 | 双模式共用 |
 | `gen-mtslg-page-icons.js` | 从发现结果和逐项确认的图标映射生成当前页面 Icon 文件；未确认候选不发射 | 双模式共用 |
 | `gen-mtslg-page-lang.js` | 从语言清单发射当前页面的 `{name}_{LOCALE}.xaml` 多语言字典，强制各语言 key 完全一致 | MTSLG |

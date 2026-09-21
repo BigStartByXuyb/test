@@ -104,7 +104,7 @@ function makeRightSidebarMapping(buttonType, sourceRef, text, icon) {
       valueSource: "dsl.text"
     }],
     componentInstances: [{
-      template: "rightSidebar",
+      template: "rightSidebarTemplates",
       instanceRef,
       properties: { "按钮类型": buttonType },
       requiredSlots: [{ slot: "button", sourceRef }]
@@ -341,7 +341,7 @@ const resolvedRight = resolveTemplateMapping(
   templateMap
 );
 assert.strictEqual(resolvedRight.resolvedTemplates.length, 1);
-assert.strictEqual(resolvedRight.resolvedTemplates[0].template, "rightSidebar");
+assert.strictEqual(resolvedRight.resolvedTemplates[0].template, "rightSidebarTemplates");
 assert.strictEqual(resolvedRight.nodes[0].attrs.Style, "RightButtonStyle");
 
 const resolvedRightIcon = resolveTemplateMapping(

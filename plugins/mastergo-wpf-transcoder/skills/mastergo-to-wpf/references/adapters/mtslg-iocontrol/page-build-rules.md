@@ -117,7 +117,7 @@
 - `scan-icon-coords.js`：Icon XAML 已生成且包含 Geometry 时运行。
 - `audit-mtslg-feishu-map.js`：组件映射文档或模板 JSON 修改后运行，检查文档覆盖（`missing` / `unregisteredFamilies` / `unregisteredVariants` / `undocumented` / `duplicateMatchKeys` 必须全为空）；整批同步清单见 `skills/mastergo-iocontrol-document-format/SKILL.md` 的「新增/修改映射的同步清单」。
 - `audit-script-duplication.js`：改任何脚本后由 `tests/script-duplication.test.js` 自动运行——同一功能只允许一份实现：复制体（函数体完全相同）直接失败；同名函数必须复用 `scripts/lib/` 的共享实现，或在 `scripts/lib/script-reuse-registry.json` 登记 reason。
-- `cap-window.ps1` / `cap-window2.ps1`：运行时宿主加载成功后做视觉截图验证，不能替代 XML/provenance 校验。
+- `cap-window.ps1`：运行时宿主加载成功后做视觉截图验证（默认 `-Method printwindow`，`-Method screen` 为兜底），不能替代 XML/provenance 校验。
 - `sync-to-mt.ps1`：静态 XML、来源、坐标与键查证全部通过且用户要求部署到运行目录时运行（属「项目运行时交付」门禁）；同步前强制备份，宿主加载验证在同步之后执行。
 
 Bundle 的固定调用顺序：模板解析 → **容器嵌套重挂（`apply-container-containment.js`，默认开启，可用 `manifest.nesting.enabled=false` 关闭）** → 语言键派生（`languages.auto`）→ LangName 绑定 → XML 生成 → provenance/坐标校验 → Icon discovery/生成 → Layout → 宿主壳 → 最终校验。嵌套重挂把命中 `childPolicy=nested-page-templates` 的容器（信息分组 / 手动控制弹层）按「坐标完全包含」重挂子控件，改写 `parent`/`layoutParent` 并重算 `expectedLeft`/`expectedTop`；报告落 `Generated/<页面名>.nesting-report.json`，审计写入 `nesting: { enabled, containers, reparented, conflicts }`。

@@ -101,7 +101,14 @@ foreach ($langName in ($pageLangNames + $menuLangNames | Sort-Object -Unique)) {
 Write-Output ("页面节点数: " + $allNodes.Count)
 Write-Output ("Geometry 键: " + $iconKeys.Count + "  页面/Layout 引用: " + (($usedIcons + $layoutIcons | Sort-Object -Unique).Count))
 Write-Output ("语言 key: " + $cnKeys.Count + "  CN=EN 一致: " + (($cnKeys -join '|') -eq ($enKeys -join '|')))
-Write-Output ("Layout: 全文件登记页面 " + (@($layoutDoc.SelectNodes('//Page')).Count) + " 张；本页菜单项 " + (@($ownPageNode.SelectNodes('.//MenuItem')).Count) + " 个")
+# Layout 可能不存在、也可能没有本页注册：$layoutDoc/$ownPageNode 为空时不能直接点属性
+# （$ErrorActionPreference='Stop' 下会抛 null 引用，把上面的 FAIL 清单顶掉）。
+if ($layoutDoc -and $ownPageNode) {
+    Write-Output ("Layout: 全文件登记页面 " + (@($layoutDoc.SelectNodes('//Page')).Count) + " 张；本页菜单项 " + (@($ownPageNode.SelectNodes('.//MenuItem')).Count) + " 个")
+}
+else {
+    Write-Output "Layout: 未读取到本页注册（本页 FAIL 清单里已列出原因）"
+}
 
 if ($fail.Count) {
     Write-Output "---- FAIL ----"

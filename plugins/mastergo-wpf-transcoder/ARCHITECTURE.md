@@ -74,7 +74,7 @@ flowchart LR
 | 编排（外层一键） | `run-all.ps1`、`build-icon-ledger.mjs`、`build-bundle-manifest.mjs` | 把「取数 → 快照 → extractSvg → 显隐 → mapping → 图标候选 → 台账 → Layout 清单 → Bundle 清单 → bundle → 门禁 → 验证」12 步串成一条命令；支持 `-Progress` / `-StopAfter` 断点续跑、每步落日志；`build-icon-ledger.mjs` 按页面自己的命名表生成台账，`build-bundle-manifest.mjs` 由 Layout 清单 + `.csproj` 推导 Bundle 清单 |
 | 门禁 | `validate-iocontrol-provenance.js`、`check-iocontrol-coords.js` | 来源闭环、必写字段、坐标 0 MISMATCH / 0 EXTRA；表格列定义按 `tableTemplates.columnTemplate` 的固定几何与字段集单独校验（不套 `controlTypeRequiredAttrs`） |
 | 门禁（交付前后核对） | `run-verifications.ps1`、`verify-page.ps1`、`verify-icon-source.mjs`、`check-coords.mjs` | 四项独立验证（provenance / 坐标 / Icon 坐标 / 结构闭环）并落日志；结构闭环按**本页** `<Page>` 子树校验（Layout 是项目级共享文件）；图标几何来源核对（`sourceId` 指向页面根 / 被多条条目共用 / 缺 extractSvg 条目 → 必须 `fromDsl`）由 `run-all.ps1` 的 **ledger 步（第 7 步）自动调用**（`--naming` 只核对本页登记的条目）；坐标核对输入按映射重算 |
-| 审计/运维 | `audit-mtslg-feishu-map.js`、`classify-mastergo-groups.js`、`scan-mtslg-keys.ps1`、`sync-to-mt.ps1`、`cap-window*.ps1` | 文档覆盖审计、组件分类、键查证、运行目录同步、视觉截图 |
+| 审计/运维 | `audit-mtslg-feishu-map.js`、`classify-mastergo-groups.js`、`scan-mtslg-keys.ps1`、`sync-to-mt.ps1`、`cap-window.ps1` | 文档覆盖审计、组件分类、键查证、运行目录同步、视觉截图（`cap-window.ps1 -Method printwindow\|screen`） |
 | 脚本复用门禁 | `audit-script-duplication.js`（由 `tests/script-duplication.test.js` 调用） | 禁止「同一个功能写两份」：复制体（函数体完全相同）直接失败；同名函数必须在 `lib/script-reuse-registry.json` 登记原因 |
 
 ### 4.1 脚本函数复用（`scripts/lib/` 与硬门禁）

@@ -36,7 +36,6 @@ function loadTemplateMap(filePath) {
 
 function templatesForName(templateMap, templateName) {
   if (!templateName || templateName === "componentTemplates") return templateMap.componentTemplates;
-  if (templateName === "rightSidebar") return templateMap.rightSidebarTemplates;
   return templateMap[templateName];
 }
 
