@@ -152,6 +152,10 @@ const timer = setTimeout(function () {
   process.exit(3);
 }, timeoutMs);
 
+// extractSvg 是分页接口（服务端 pageSize 上限 100）：只取第一页会让 >100 个图标的页面静默漏条目。
+// 这里把上限做成显式常量，防御服务端 hasMore 永真的情况（宁可失败，也不无限拉）。
+const MAX_SVG_PAGES = 100;
+
 function toTextContent(result) {
   const content = result && Array.isArray(result.content) ? result.content : [];
   const textParts = content.filter(function (item) { return item && item.type === "text"; });
@@ -213,9 +217,66 @@ function shutdown(exitCode) {
     return;
   }
 
+  // extractSvg：按 hasMore 把后续分页拉全并合并成一份再落盘。
+  // 关键纪律：合并完成（且条数与 totalCount 一致）之前**不写输出文件**——宁可留旧文件，也不落一份"看着完整、其实截断"的采集产物。
+  let outputText = text;
+  let svgPaging = null;
+  if (args.tool === "extractSvg") {
+    const pageSize = Number(toolArgs.pageSize) || 100;
+    let merged = null;
+    let pagesFetched = 0;
+    let page = Number(toolArgs.page) || 0;
+    let payloadText = text;
+    for (;;) {
+      let parsed = null;
+      try { parsed = JSON.parse(payloadText); } catch (error) { parsed = null; }
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed) || !Array.isArray(parsed.svgs)) {
+        console.error("extractSvg 响应不是 { totalCount, svgs, hasMore } 形态：无法做分页聚合，未覆盖输出文件");
+        shutdown(4);
+        return;
+      }
+      if (!merged) {
+        merged = Object.assign({}, parsed, { svgs: [] });
+        if (merged.totalCount === undefined) {
+          console.error("extractSvg 响应缺 totalCount：无法核对分页是否取全（继续按 hasMore 收敛）");
+        }
+      }
+      for (const svg of parsed.svgs) merged.svgs.push(svg);
+      pagesFetched += 1;
+      if (!parsed.hasMore) break;
+      if (pagesFetched >= MAX_SVG_PAGES) {
+        console.error("extractSvg 分页超过上限 " + MAX_SVG_PAGES + " 页（已取 " + merged.svgs.length + " 条）：服务端分页状态异常，未覆盖输出文件");
+        shutdown(4);
+        return;
+      }
+      page += 1;
+      const next = await request("tools/call", { name: serverToolName, arguments: Object.assign({}, toolArgs, { page: page }) });
+      const nextText = toTextContent(next && next.result);
+      if (nextText === null) {
+        console.error("extractSvg 第 " + (page + 1) + " 页响应不受本地采集契约支持（必须且仅有一个字符串 text content），未覆盖输出文件");
+        shutdown(4);
+        return;
+      }
+      payloadText = nextText;
+    }
+    const expected = Number(merged.totalCount);
+    if (Number.isFinite(expected) && merged.svgs.length !== expected) {
+      console.error("extractSvg 分页聚合不完整：totalCount=" + expected + "，实际取到 " + merged.svgs.length + " 条（已拉 " + pagesFetched + " 页），未覆盖输出文件");
+      shutdown(4);
+      return;
+    }
+    merged.count = merged.svgs.length;
+    merged.page = 0;
+    merged.pageSize = pageSize;
+    merged.hasMore = false;
+    merged.pagesFetched = pagesFetched;
+    outputText = JSON.stringify(merged);
+    svgPaging = { pages: pagesFetched, entries: merged.svgs.length, totalCount: merged.totalCount };
+  }
+
   const absolute = path.resolve(args.out);
   fs.mkdirSync(path.dirname(absolute), { recursive: true });
-  fs.writeFileSync(absolute, text, "utf8");
+  fs.writeFileSync(absolute, outputText, "utf8");
 
   const isError = Boolean(response.result && response.result.isError);
   // 工具把业务错误也当作正常结果返回（`result.isError` 为假），例如伪造 fileId 时
@@ -238,9 +299,10 @@ function shutdown(exitCode) {
     tool: args.tool,
     serverTool: serverToolName,
     out: absolute,
-    bytes: Buffer.byteLength(text, "utf8"),
+    bytes: Buffer.byteLength(outputText, "utf8"),
     isError: isError,
     payloadError: payloadError || null,
+    svgPaging: svgPaging,
   }));
   shutdown(isError || payloadError ? 5 : 0);
 })().catch(function (error) {

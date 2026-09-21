@@ -15,7 +15,8 @@ function captureWithStub(t, config) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "mastergo-stream-"));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const stubPath = path.join(root, "stub.cjs");
-  const out = path.join(root, "getDsl.json");
+  const tool = config.tool || "getDsl";
+  const out = path.join(root, tool + ".json");
   const previous = "existing capture must survive an unsupported response";
   fs.writeFileSync(out, previous);
   fs.writeFileSync(stubPath, `
@@ -30,9 +31,16 @@ input.on("line", (line) => {
   if (message.method === "initialize") {
     result = { protocolVersion: "2024-11-05", capabilities: {} };
   } else if (message.method === "tools/list") {
-    result = { tools: [{ name: "mcp__getDsl" }] };
+    result = { tools: [{ name: "mcp__getDsl" }, { name: "mcp__extractSvg" }] };
   } else if (message.method === "tools/call") {
-    result = { content: config.content };
+    if (config.pages) {
+      const page = Number((message.params && message.params.arguments && message.params.arguments.page) || 0);
+      const payload = config.pages[page];
+      if (payload === undefined) throw new Error("unexpected page: " + page);
+      result = { content: [{ type: "text", text: JSON.stringify(payload) }] };
+    } else {
+      result = { content: config.content };
+    }
   }
   const bytes = Buffer.from(JSON.stringify({ jsonrpc: "2.0", id: message.id, result }) + "\\n");
   if (message.method === "tools/call" && config.splitCharacter) {
@@ -45,10 +53,12 @@ input.on("line", (line) => {
   }
 });
 `);
-  const result = spawnSync(process.execPath, [
-    cli, "--tool", "getDsl", "--out", out, "--token", "fake-token",
+  const args = [
+    cli, "--tool", tool, "--out", out, "--token", "fake-token",
     "--mcp", process.execPath, "--mcp-arg", stubPath, "--timeoutMs", "5000"
-  ], { encoding: "utf8", timeout: 10000 });
+  ];
+  if (config.pageSize !== undefined) args.push("--pageSize", String(config.pageSize));
+  const result = spawnSync(process.execPath, args, { encoding: "utf8", timeout: 10000 });
   assert.ifError(result.error);
   assert.equal(result.signal, null);
   return { ...result, captured: fs.readFileSync(out, "utf8"), previous };
@@ -81,3 +91,43 @@ for (const content of [
     assert.match(result.stderr, /text content/);
   });
 }
+
+// extractSvg 是分页接口（pageSize 上限 100）。只取第一页会让 >100 个图标的页面静默漏条目，
+// 因此聚合必须是"拉全 + 合并 + 与 totalCount 对齐"，且不完整时**不写输出文件**。
+test("extractSvg aggregation fetches every page and merges them into one capture", (t) => {
+  const page0 = { totalCount: 3, count: 2, page: 0, pageSize: 2, hasMore: true, svgs: [{ id: "a" }, { id: "b" }] };
+  const page1 = { totalCount: 3, count: 1, page: 1, pageSize: 2, hasMore: false, svgs: [{ id: "c" }] };
+  const result = captureWithStub(t, { tool: "extractSvg", pageSize: 2, pages: { 0: page0, 1: page1 } });
+
+  assert.equal(result.status, 0, result.stderr);
+  const merged = JSON.parse(result.captured);
+  assert.deepEqual(merged.svgs.map((item) => item.id), ["a", "b", "c"]);
+  assert.equal(merged.count, 3);
+  assert.equal(merged.totalCount, 3);
+  assert.equal(merged.hasMore, false);
+  assert.equal(merged.pagesFetched, 2);
+  const summary = JSON.parse(result.stdout.trim());
+  assert.deepEqual(summary.svgPaging, { pages: 2, entries: 3, totalCount: 3 });
+});
+
+test("extractSvg aggregation refuses a truncated page set instead of writing it", (t) => {
+  // 服务端声称有 3 条却只给 1 条且 hasMore=false：聚合结果与 totalCount 不符 → 失败且保留旧文件。
+  const page0 = { totalCount: 3, count: 1, page: 0, pageSize: 2, hasMore: false, svgs: [{ id: "a" }] };
+  const result = captureWithStub(t, { tool: "extractSvg", pageSize: 2, pages: { 0: page0 } });
+
+  assert.equal(result.status, 4, result.stderr);
+  assert.equal(result.captured, result.previous);
+  assert.match(result.stderr, /分页聚合不完整/);
+});
+
+test("extractSvg aggregation stops at the page cap when hasMore never clears", (t) => {
+  const pages = {};
+  for (let index = 0; index < 200; index += 1) {
+    pages[index] = { totalCount: 999, count: 1, page: index, pageSize: 1, hasMore: true, svgs: [{ id: "x" + index }] };
+  }
+  const result = captureWithStub(t, { tool: "extractSvg", pageSize: 1, pages });
+
+  assert.equal(result.status, 4, result.stderr);
+  assert.equal(result.captured, result.previous);
+  assert.match(result.stderr, /超过上限/);
+});
