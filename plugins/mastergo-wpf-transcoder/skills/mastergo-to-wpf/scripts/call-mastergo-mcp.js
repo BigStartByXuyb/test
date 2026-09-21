@@ -120,9 +120,13 @@ function request(method, params) {
   });
 }
 
-child.stderr.on("data", function (chunk) { stderrText += chunk.toString("utf8"); });
+// 管道分块不保证落在字符边界；让流解码器保留跨块的 UTF-8 字节。
+// 逐块 Buffer.toString 会把被拆开的中文/补充平面字符永久替换成 U+FFFD。
+child.stdout.setEncoding("utf8");
+child.stderr.setEncoding("utf8");
+child.stderr.on("data", function (chunk) { stderrText += chunk; });
 child.stdout.on("data", function (chunk) {
-  stdoutBuffer += chunk.toString("utf8");
+  stdoutBuffer += chunk;
   let index = stdoutBuffer.indexOf("\n");
   while (index >= 0) {
     const line = stdoutBuffer.slice(0, index).trim();
@@ -148,11 +152,16 @@ const timer = setTimeout(function () {
   process.exit(3);
 }, timeoutMs);
 
+// extractSvg 是分页接口（服务端 pageSize 上限 100）：只取第一页会让 >100 个图标的页面静默漏条目。
+// 这里把上限做成显式常量，防御服务端 hasMore 永真的情况（宁可失败，也不无限拉）。
+const MAX_SVG_PAGES = 100;
+
 function toTextContent(result) {
   const content = result && Array.isArray(result.content) ? result.content : [];
-  const textPart = content.find(function (item) { return item && item.type === "text"; });
-  if (!textPart) return null;
-  return textPart.text;
+  const textParts = content.filter(function (item) { return item && item.type === "text"; });
+  // 多个 text 块没有本地拼接协议：不能只取第一块、也不能猜测如何拼接 JSON。
+  if (textParts.length !== 1 || typeof textParts[0].text !== "string") return null;
+  return textParts[0].text;
 }
 
 // 结束子进程并保证本进程一定退出（shell:true 时子进程可能持有管道，导致事件循环不空）
@@ -202,15 +211,72 @@ function shutdown(exitCode) {
 
   const text = toTextContent(response && response.result);
   if (text === null) {
-    console.error("响应里没有 text content（工具 " + serverToolName + "）");
-    console.error(JSON.stringify(response).slice(0, 2000));
-    child.kill();
-    process.exit(4);
+    console.error("响应必须包含且仅包含一个字符串 text content（工具 " + serverToolName + "）；响应形态不受本地采集契约支持，未覆盖输出文件");
+    // 错误分支也不得把 DSL、图像或资源内容回显到模型上下文。
+    shutdown(4);
+    return;
+  }
+
+  // extractSvg：按 hasMore 把后续分页拉全并合并成一份再落盘。
+  // 关键纪律：合并完成（且条数与 totalCount 一致）之前**不写输出文件**——宁可留旧文件，也不落一份"看着完整、其实截断"的采集产物。
+  let outputText = text;
+  let svgPaging = null;
+  if (args.tool === "extractSvg") {
+    const pageSize = Number(toolArgs.pageSize) || 100;
+    let merged = null;
+    let pagesFetched = 0;
+    let page = Number(toolArgs.page) || 0;
+    let payloadText = text;
+    for (;;) {
+      let parsed = null;
+      try { parsed = JSON.parse(payloadText); } catch (error) { parsed = null; }
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed) || !Array.isArray(parsed.svgs)) {
+        console.error("extractSvg 响应不是 { totalCount, svgs, hasMore } 形态：无法做分页聚合，未覆盖输出文件");
+        shutdown(4);
+        return;
+      }
+      if (!merged) {
+        merged = Object.assign({}, parsed, { svgs: [] });
+        if (merged.totalCount === undefined) {
+          console.error("extractSvg 响应缺 totalCount：无法核对分页是否取全（继续按 hasMore 收敛）");
+        }
+      }
+      for (const svg of parsed.svgs) merged.svgs.push(svg);
+      pagesFetched += 1;
+      if (!parsed.hasMore) break;
+      if (pagesFetched >= MAX_SVG_PAGES) {
+        console.error("extractSvg 分页超过上限 " + MAX_SVG_PAGES + " 页（已取 " + merged.svgs.length + " 条）：服务端分页状态异常，未覆盖输出文件");
+        shutdown(4);
+        return;
+      }
+      page += 1;
+      const next = await request("tools/call", { name: serverToolName, arguments: Object.assign({}, toolArgs, { page: page }) });
+      const nextText = toTextContent(next && next.result);
+      if (nextText === null) {
+        console.error("extractSvg 第 " + (page + 1) + " 页响应不受本地采集契约支持（必须且仅有一个字符串 text content），未覆盖输出文件");
+        shutdown(4);
+        return;
+      }
+      payloadText = nextText;
+    }
+    const expected = Number(merged.totalCount);
+    if (Number.isFinite(expected) && merged.svgs.length !== expected) {
+      console.error("extractSvg 分页聚合不完整：totalCount=" + expected + "，实际取到 " + merged.svgs.length + " 条（已拉 " + pagesFetched + " 页），未覆盖输出文件");
+      shutdown(4);
+      return;
+    }
+    merged.count = merged.svgs.length;
+    merged.page = 0;
+    merged.pageSize = pageSize;
+    merged.hasMore = false;
+    merged.pagesFetched = pagesFetched;
+    outputText = JSON.stringify(merged);
+    svgPaging = { pages: pagesFetched, entries: merged.svgs.length, totalCount: merged.totalCount };
   }
 
   const absolute = path.resolve(args.out);
   fs.mkdirSync(path.dirname(absolute), { recursive: true });
-  fs.writeFileSync(absolute, text, "utf8");
+  fs.writeFileSync(absolute, outputText, "utf8");
 
   const isError = Boolean(response.result && response.result.isError);
   // 工具把业务错误也当作正常结果返回（`result.isError` 为假），例如伪造 fileId 时
@@ -233,9 +299,10 @@ function shutdown(exitCode) {
     tool: args.tool,
     serverTool: serverToolName,
     out: absolute,
-    bytes: Buffer.byteLength(text, "utf8"),
+    bytes: Buffer.byteLength(outputText, "utf8"),
     isError: isError,
     payloadError: payloadError || null,
+    svgPaging: svgPaging,
   }));
   shutdown(isError || payloadError ? 5 : 0);
 })().catch(function (error) {

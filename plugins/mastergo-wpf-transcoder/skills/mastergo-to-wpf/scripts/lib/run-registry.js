@@ -88,7 +88,29 @@ function createRegistry(options) {
   const file = options.out ? path.resolve(options.out) : registryFile(projectRoot, options.target);
   const keep = options.keep === true;
   let registry = null;
-  if (keep && fs.existsSync(file)) registry = readJson(file, "运行登记表");
+  if (keep) {
+    registry = loadRegistry(file);
+    // --keep 是续跑同一次设计采集，不是把已有产物重新标成另一张页面。
+    // 所有身份检查都先于 saveRegistry；失败时原始登记表必须逐字节不变。
+    if (registry.target !== options.target) {
+      fail("续跑不能更改 target；请从 fetch 新开运行（不要使用 --keep）");
+    }
+    if (typeof registry.projectRoot !== "string" || !registry.projectRoot ||
+        path.relative(path.resolve(registry.projectRoot), projectRoot) !== "") {
+      fail("续跑不能更改 projectRoot；请在原项目续跑，或从 fetch 新开运行");
+    }
+    if (!registry.identity || typeof registry.identity !== "object" || Array.isArray(registry.identity)) {
+      fail("续跑登记表缺少有效 identity；请从 fetch 新开运行");
+    }
+    for (const field of ["fileId", "layerId", "ui", "designPageName"]) {
+      const supplied = options[field];
+      if (supplied === undefined || supplied === null || supplied === "") continue;
+      if (supplied !== registry.identity[field]) {
+        fail("续跑不能更改 identity." + field + "（包括补写未登记的身份）；" +
+          "请从 fetch 新开运行（不要使用 --keep）");
+      }
+    }
+  }
   const now = new Date().toISOString();
   if (!registry) {
     registry = {
@@ -109,15 +131,8 @@ function createRegistry(options) {
       outputs: {},
       steps: []
     };
-  } else {
-    registry.updatedAt = now;
-    registry.identity = Object.assign({}, registry.identity, {
-      fileId: options.fileId || registry.identity.fileId,
-      layerId: options.layerId || registry.identity.layerId,
-      ui: options.ui || registry.identity.ui,
-      designPageName: options.designPageName || registry.identity.designPageName
-    });
   }
+  // 标题、译文、术语与图标命名是可修改的语义输入，不是采集身份。
   if (options.pageTitleText) registry.inputs.pageTitleText = options.pageTitleText;
   if (options.translations) registry.inputs.translations = options.translations;
   if (options.glossary) registry.inputs.glossary = options.glossary;
@@ -131,7 +146,8 @@ function loadRegistry(file) {
   const abs = path.resolve(file);
   if (!fs.existsSync(abs)) fail("登记表不存在: " + abs + "（请先跑 run-all 的 init/早期步骤）");
   const registry = readJson(abs, "运行登记表");
-  if (registry.schemaVersion !== SCHEMA_VERSION) {
+  if (!registry || typeof registry !== "object" || Array.isArray(registry) ||
+      registry.schemaVersion !== SCHEMA_VERSION) {
     fail("登记表 schemaVersion 不是 " + SCHEMA_VERSION + ": " + abs);
   }
   return registry;

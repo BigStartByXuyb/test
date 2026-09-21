@@ -128,11 +128,17 @@ function main() {
   }
 
   if (command === "check") {
-    const keys = args.key && args.key !== true ? [String(args.key)] : registry.ARTIFACT_KEYS;
+    const explicitKey = args.key !== undefined;
+    if (explicitKey && (typeof args.key !== "string" || !registry.ARTIFACT_KEYS.includes(args.key))) {
+      throw new Error("check 需要有效的 --key <产物键>（收到: " + String(args.key) + "）");
+    }
+    // 无 --key 时检查已登记的子集，允许流水线尚未完成；显式点名的产物不得静默跳过。
+    const keys = explicitKey ? [args.key] : registry.ARTIFACT_KEYS.filter(
+      (key) => data.artifacts && data.artifacts[key]
+    );
     const checked = [];
     const shadows = [];
     for (const key of keys) {
-      if (!data.artifacts || !data.artifacts[key]) continue;
       registry.resolveArtifact(data, key, { projectRoot });
       const shadow = registry.assertNoLegacyShadow(data, key, { projectRoot });
       if (shadow) shadows.push(shadow.path);
