@@ -27,7 +27,7 @@ plugins/mastergo-wpf-transcoder/
 │  │  └─ scripts/                  # 交付链路脚本（运行时）
 │  │     ├─ lib/                    # 跨脚本共享实现（唯一副本，禁止再抄进脚本）
 │  │     └─ tests/                 # 开发期回归测试（CI 不跑，本地跑）
-   └─ mastergo-iocontrol-document-format/   # 映射文档写作规范 Skill
+│  └─ mastergo-iocontrol-document-format/   # 映射文档写作规范 Skill
 ```
 
 ## 3. 交付链路（数据流）
