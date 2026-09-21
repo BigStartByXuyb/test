@@ -54,5 +54,7 @@ for (const label of ["**输入**", "**产物**", "**失败语义**", "**怎么�
 }
 assert.ok(contractDoc.includes("真值源是脚本"),
   "契约文档必须写明真值源是 run-all.ps1，而不是文档本身");
+assert.ok(contractDoc.includes("一条命令跑完全部 12 步"),
+  "契约文档必须写明一条命令跑完全部 12 步（12 个阶段用于定位失败与续跑，不是逐步手工调用）");
 
 console.log("PASS 一键流水线契约（run-all.ps1 $Steps ↔ pipeline-contract.md）一致性回归测试");

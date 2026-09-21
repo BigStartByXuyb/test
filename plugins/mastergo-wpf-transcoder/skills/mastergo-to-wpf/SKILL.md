@@ -11,7 +11,7 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 
 ### 读取纪律（避免把"照步骤执行"变成"通读实现"）
 
-- 整页转换按 `scripts/run-all.ps1` 跑，步骤、输入、产物、失败处理看 `references/adapters/mtslg-iocontrol/pipeline-contract.md`；**不需要**读 `scripts/*.js`、`scripts/*.ps1` 源码来复述规则。
+- 整页转换**一条命令跑完**（`run-all.ps1`，默认第 1→12 步）；步骤、输入、产物、失败处理看 `references/adapters/mtslg-iocontrol/pipeline-contract.md`——那份契约是**失败定位与字段口径**参考，不是 12 条要分别执行的命令。**不需要**读 `scripts/*.js`、`scripts/*.ps1` 源码来复述规则。
 - 只在下面三种情况读 reference：① 本文件明确写「读 X」；② 脚本报错，按 `pipeline-contract.md` 的「怎么修」定位到该 reference 的对应小节；③ 要写/改 Bundle 清单、图标命名表、译文清单，需要字段口径。
 - 未在「参考文件读取条件」里点名、且当前任务没触发的文件不要读；`references/adapters/mw-wpf/**` 属停用资料，不读。
 
@@ -44,7 +44,9 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 
 ## 一键流水线（12 步）
 
-整页转换用 `scripts/run-all.ps1` 串起来跑：步骤、顺序、口径与手工逐条执行完全一致；脚本负责串行调用、计时、逐步落日志、失败即停、从任意一步续跑。
+**一次调用跑完全部 12 步**：`pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -ProjectRoot <项目> -Target <Target> -Overwrite`。下表是这条命令**内部**的阶段划分，用来定位失败与断点续跑，**不是 12 条要分别执行的命令**——不要逐步手工调用子脚本，也不要为每一步单独起一次 `run-all`。默认区间就是第 1 步到第 12 步；只有两类情况才带参数：失败后从该步继续（`-Progress <步骤名>`），或需要人工补语义输入时先跑到 `discover`（`-StopAfter discover`）。
+
+脚本负责串行调用、计时、逐步落日志、失败即停与续跑。
 
 | 步骤 | 名称 | 内容 |
 |---|---|---|

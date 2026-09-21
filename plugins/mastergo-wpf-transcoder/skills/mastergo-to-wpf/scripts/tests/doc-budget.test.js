@@ -59,6 +59,12 @@ for (const heading of ["## 触发边界", "## 入口分流", "## 一键流水线
 }
 assert.ok(text.includes("--merge"), "SKILL.md 必须写明修改现有页面走 --merge");
 assert.ok(text.includes("gen-mastergo-page-bundle.js"), "SKILL.md 必须写明新建页面走 Bundle 入口");
+// 一键流水线必须写明"一次调用跑完全部 12 步"：表里的步骤是失败定位/续跑单元，
+// 不是 12 条要分别执行的命令（否则模型会逐步手工调用子脚本）。
+assert.ok(text.includes("一次调用跑完全部 12 步"),
+  "SKILL.md 必须写明一键流水线是一次调用跑完 12 步");
+assert.ok(text.includes("不是 12 条要分别执行的命令"),
+  "SKILL.md 必须写明 12 步表不是要分别执行的 12 条命令");
 for (const input of ["icon-naming.json", "lang-translations.json", "lang-glossary.json"]) {
   assert.ok(text.includes(input), "SKILL.md 必须写明模型要提供的页面级输入: " + input);
 }
