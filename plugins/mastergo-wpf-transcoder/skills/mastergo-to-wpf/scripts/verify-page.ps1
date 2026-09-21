@@ -26,6 +26,7 @@ $en = Join-Path $ProjectRoot "Resources\Pages\$page\${page}_EN.xaml"
 $layout = Join-Path $ProjectRoot "Resources\Layout\Layout.xml"
 
 $fail = New-Object System.Collections.Generic.List[string]
+$warn = New-Object System.Collections.Generic.List[string]
 
 $doc = [xml](Get-Content -LiteralPath $pageXml -Raw -Encoding UTF8)
 $root = $doc.DocumentElement
@@ -43,7 +44,6 @@ if ($ids -contains '') { $fail.Add("存在空 ID 的业务节点") }
 $iconKeys = @()
 $iconText = Get-Content -LiteralPath $iconXaml -Raw -Encoding UTF8
 $iconKeys = @([regex]::Matches($iconText, '<Geometry\s[^>]*\bx:Key="([^"]+)"') | ForEach-Object { $_.Groups[1].Value })
-if (-not $iconKeys.Count) { $fail.Add("Icon 文件没有 Geometry 资源键") }
 foreach ($key in $iconKeys) {
     $block = [regex]::Match($iconText, '<Geometry\s[^>]*\bx:Key="' + [regex]::Escape($key) + '"[^>]*>(.*?)</Geometry>', 'Singleline')
     if ($block -notmatch 'o:Freeze="True"') { $fail.Add("Geometry $key 缺少 o:Freeze=True") }
@@ -75,6 +75,18 @@ foreach ($icon in ($usedIcons + $layoutIcons | Sort-Object -Unique)) {
     if ($runtimeIcons -contains $icon) { continue }
     if ($iconKeys -notcontains $icon) { $fail.Add("引用了未生成的 Geometry: $icon") }
 }
+# Icon 文件为空的判定：只有"页面确实需要本页 Geometry"时才算失败。
+# 运行图标（映射表 iconPolicy=runtime，如 enter/exit）由框架/目标项目提供，本页 Icons.xaml 本来就该是空字典。
+$expectedPageIcons = @(($usedIcons + $layoutIcons | Sort-Object -Unique) | Where-Object { $_ -and ($runtimeIcons -notcontains $_) })
+if (-not $iconKeys.Count) {
+    if ($expectedPageIcons.Count) {
+        $fail.Add("Icon 文件没有 Geometry 资源键，但页面引用了本页 Geometry: " + ($expectedPageIcons -join ', '))
+    } else {
+        $referenced = @($usedIcons + $layoutIcons | Sort-Object -Unique | Where-Object { $_ })
+        $warn.Add("本页没有页面级 Geometry（Icon 文件是空字典）：页面/Layout 引用的图标全部由框架提供" +
+            $(if ($referenced.Count) { "（" + ($referenced -join ', ') + "）" } else { "" }))
+    }
+}
 
 $pageLangNames = @($root.SelectNodes('.//IOContorl[@LangName]') | ForEach-Object { $_.LangName } | Where-Object { $_ })
 $menuLangNames = @()
@@ -99,5 +111,9 @@ if ($fail.Count) {
     Write-Output "---- FAIL ----"
     $fail | ForEach-Object { Write-Output ("- " + $_) }
     exit 1
+}
+if ($warn.Count) {
+    Write-Output "---- WARN（不是失败，按需写进交付说明） ----"
+    $warn | ForEach-Object { Write-Output ("- " + $_) }
 }
 Write-Output "PASS: 静态结构与引用闭环校验通过"

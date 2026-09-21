@@ -46,6 +46,8 @@ function pageLangPaths(pageName, locales) {
 // 跨脚本共用工具的唯一实现（见 scripts/lib/script-helpers.js；禁止在本脚本再抄一份）。
 const { fail, xmlAttr, readJson, backupFile } = require(path.join(SCRIPT_DIR, "lib", "script-helpers.js"));
 const { inferHostPaths } = require(path.join(SCRIPT_DIR, "lib", "project-csproj.js"));
+// 运行登记表的唯一实现（见 scripts/lib/run-registry.js；禁止在本脚本再抄一份）。
+const RUN_REGISTRY = require(path.join(SCRIPT_DIR, "lib", "run-registry.js"));
 
 function parseArgs(argv) {
   let manifestPath = null;
@@ -584,6 +586,10 @@ function applyLangBindings(mapping, manifest, langSpec) {
       // 同上：槽位登记 langRefPolicy=none 的值不要求 LangName。
       if (node.langRefPolicy === "none") continue;
       if (node.valueSource !== "dsl.text") continue;
+      // 空文本节点（设计稿里的空 TEXT，valueSource 仍是 dsl.text）：没有可翻译的文案，
+      // 派生器本来就跳过它（if (!text || !ref) continue），门禁必须同口径——否则这类节点
+      // 会让整套生成失败，逼调用方为一句空字符串登记 noLangRefs。
+      if (!String(node.sourceText || "").trim()) continue;
       if (node.attrs && typeof node.attrs.LangName === "string" && node.attrs.LangName !== "") continue;
       const ref = node.sourceRef || node.ref;
       if (exempt.has(ref) || ambiguous.has(ref)) continue;
@@ -1069,6 +1075,36 @@ function main() {
       "不要指向 Generated/<页面名>.mapping.json（审计产物）");
   }
   const mappingPath = resolveInput(manifestDir, projectRoot, manifest.mappingPath, "mappingPath");
+  // 运行登记表（可选，清单里以 runRegistry.path 给出）：
+  //   采集输入（DSL 快照 / 可见性 / extractSvg）**只按登记表解析**，并逐项复校 sha256；
+  //   同时拒绝"未登记的旧同名文件"（legacy shadow：Generated/dsl.snapshot.json 这类），
+  //   避免上一次运行的旧文件被静默当成本次输入。
+  let runRegistryFile = null;
+  let runRegistryData = null;
+  if (manifest.runRegistry && manifest.runRegistry.path) {
+    runRegistryFile = path.isAbsolute(manifest.runRegistry.path)
+      ? path.resolve(manifest.runRegistry.path)
+      : path.resolve(projectRoot, manifest.runRegistry.path);
+    runRegistryData = RUN_REGISTRY.loadRegistry(runRegistryFile);
+    if (manifest.runRegistry.runId && runRegistryData.runId !== manifest.runRegistry.runId) {
+      fail("Bundle 清单与运行登记表不是同一次运行：清单 runId=" + manifest.runRegistry.runId +
+        "，登记表 runId=" + runRegistryData.runId + "（" + manifest.runRegistry.path + "）");
+    }
+    const expectedDigests = manifest.runRegistry.digests || {};
+    const bound = {};
+    for (const [key, field] of [["snapshot", "dslPath"], ["visibility", "visibilityPath"], ["extractSvg", "svgPath"]]) {
+      const abs = RUN_REGISTRY.resolveArtifact(runRegistryData, key, { projectRoot });
+      const entry = runRegistryData.artifacts[key];
+      if (expectedDigests[key] && expectedDigests[key] !== entry.sha256) {
+        fail("Bundle 清单登记的 " + key + " sha256 与运行登记表不一致：清单=" + expectedDigests[key] +
+          "，登记表=" + entry.sha256 + "（清单被改写，或与登记表不是同一次运行）");
+      }
+      RUN_REGISTRY.assertNoLegacyShadow(runRegistryData, key, { projectRoot });
+      manifest[field] = RUN_REGISTRY.projectRelative(projectRoot, abs);
+      bound[field] = manifest[field];
+    }
+    console.log("运行登记表: runId=" + runRegistryData.runId + "，采集输入按登记表绑定：" + JSON.stringify(bound));
+  }
   // 审计产物路径（与下方 generatedDir/mappingAudit 同口径，定义提前以便在这里前置校验）。
   const mappingAuditPath = path.join(projectRoot, "Generated", manifest.pageName + ".mapping.json");
   if (path.resolve(mappingPath) === path.resolve(mappingAuditPath)) {
@@ -1421,6 +1457,12 @@ function main() {
       }))
     });
     const removedWorkFiles = workCleanupEnabled ? cleanupWorkFiles(fileRegistry, projectRoot) : [];
+    // 运行登记表：把本次运行的产物（files[]）并回 outputs，让"输入登记"和"输出登记"共用同一个 runId 身份。
+    if (runRegistryData && runRegistryFile) {
+      const outputCount = RUN_REGISTRY.recordOutputs(runRegistryData, fileRegistry, { projectRoot });
+      RUN_REGISTRY.saveRegistry(runRegistryFile, runRegistryData);
+      console.log("运行登记表已登记 " + outputCount + " 个输出文件: " + RUN_REGISTRY.projectRelative(projectRoot, runRegistryFile));
+    }
     writeAuditOutput(bundleAudit, JSON.stringify({
       adapter: "mtslg-iocontrol",
       hostShell: "maxwell-wpf",

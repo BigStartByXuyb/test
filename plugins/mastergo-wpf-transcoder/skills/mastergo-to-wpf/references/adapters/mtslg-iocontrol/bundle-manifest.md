@@ -51,6 +51,7 @@ node scripts/gen-mastergo-page-bundle.js --manifest <bundle.json> [--overwrite]
 | `langGlossary` / `keyCatalog` | 无 | 术语表 / 键目录；给了就必须存在（`resolveLangCatalogPaths()` → `fail("keyCatalog 文件不存在: ")`；`resolveLangGlossary()` → `fail("langGlossary 必须是术语表对象或 JSON 文件路径")`、`fail("langGlossary 文件不存在: ")`） |
 | `nesting` | 默认开启 | `{ "enabled": false }` 可关掉容器嵌套重挂 |
 | `excludeInstances` | 无 | 逗号/空白分隔的实例 ref，排除出映射 |
+| `runRegistry` | 无 | **运行登记表绑定**（推荐由 `run-all.ps1` 写入）：`{ path, runId, digests }`。给了就**只按登记表解析采集输入**（DSL 快照 / 可见性 / extractSvg）、逐项复校 sha256，并拒绝"未登记的旧同名文件"；详见 §7 |
 | `generatedRoot` / `pagesRoot` / `iconsRoot` / `indexRoot` / `sourceRoot` / `resourceRoots` | 见脚本 | 目录约定覆盖 |
 
 `viewName` / `viewModelName` / `xmlPageName` / `pageTarget` / `pageLangName` / `pageTitleText` / `comment` 缺省由 `name` 派生（`{name}View` / `{name}ViewModel` / `{name}Page` / `{name}` / `{name}PageTitle`）。
@@ -113,3 +114,26 @@ Bundle **不会**把新页面的文件写进 `.csproj`（实测 `csprojChanged=F
 ## 6. 与本文的关系
 
 字段的**取值口径**（而不是字段本身）由各专属章节规定：页面名见 `mtslg-mode.md` 第 1 节；图标台账见总 Skill「页面 Icon 文件」；语言键见总 Skill「语言键自动派生」。本文只回答"清单能写哪些字段、必填是哪几个、缺省会怎样"。
+
+## 7. 运行登记表（run registry，`Generated/runs/<Target>/run.json`）
+
+**为什么需要它**：采集产物按页归档（`Generated/runs/<Target>/`）之后，如果消费端仍按老约定拼顶层
+`Generated/dsl.snapshot.json` 这类路径，而顶层恰好留着**上一次运行**的同名旧文件，存在性检查照样通过
+——于是静默用了旧数据。登记表把"本次运行产出了什么"变成唯一事实源：产出即登记、消费只按登记取。
+
+| 字段 | 含义 |
+|---|---|
+| `runId` | 本次运行的身份；清单 `runRegistry.runId` 与它不一致直接失败 |
+| `identity` | `{ fileId, layerId, ui, designPageName }`（来自命令行或 `docs/page-registry.json`） |
+| `inputs` | 页面级语义输入 + 指纹：`pageTitleText`、`translations{path,sha256,size}`、`glossary`、`iconNaming` |
+| `artifacts` | 本次运行产出的中间产物：`getDsl / snapshot / coverage / dslManifest / timing / visibility / extractSvg / mappingDraft / iconCandidates / iconMap / layoutManifest / bundleManifest`，每条 `{path, sha256, size, mtime, step}` |
+| `steps` | 每一步 `{id, name, status, seconds, note, log, at}`（失败步骤也登记） |
+| `outputs` | Bundle 审计的 `files[]` 并回：每条 `{kind, dependsOn, exists, sha256}`——输入登记与输出登记共用同一个 `runId` |
+
+**硬规则**
+
+1. **产出即登记**：`run-all.ps1` 每一步成功后就登记该步产物（`run-registry.mjs artifact`）；中途失败也把该步状态写进 `steps`。
+2. **消费只按登记**：`build-bundle-manifest.mjs --run-json <run.json>` 从登记表取 `snapshot` / `visibility` / `extractSvg`，并把 `sha256` 写进清单 `runRegistry.digests`；Bundle 读清单时**复校**：路径按登记表解析、`sha256` 与 `digests` 一致、`runId` 一致。
+3. **拒绝旧同名影子文件**：若磁盘上存在 `Generated/dsl.snapshot.json`、`Generated/visibility.json`、`Generated/extractSvg.json`、`Generated/coverage-report.json`、`Generated/manifest.json`、`Generated/timing.json` 这类**未登记**的旧布局文件，Bundle 直接失败并点名（内容恰好一致时只提示可清理）。迁移老项目时把这类文件移出项目（或删掉）即可。
+4. **断点续跑**：`run-all.ps1 -Progress <步骤>` 用 `run-registry.mjs init --keep` 沿用同一份登记表；重新从第 1 步跑则新开一次运行（新 `runId`，产物登记清空）。
+5. **手工调用**：`node scripts/run-registry.mjs init|artifact|step|path|check|outputs|show`；`check` 会校验所有已登记产物的 sha256 并列出可清理的影子文件。

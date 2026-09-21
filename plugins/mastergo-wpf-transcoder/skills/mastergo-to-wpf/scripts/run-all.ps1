@@ -96,6 +96,8 @@ function Get-ProjectTarget {
         FileId  = $page.designSource.fileId
         Ui      = if ($page.derivation -match '\bF\d+\b') { $Matches[0] } else { $null }
         Design  = $page.designSource.designPageName
+        # 页面标题的人工确认值：机械流水线必须带上它，否则标题会退回设计页名原文（带 (x.y) 编号）。
+        PageTitleText = $page.pageTitleText
     }
 }
 
@@ -131,6 +133,45 @@ function Assert-File {
     if (-not (Test-Path -LiteralPath $Path)) { throw $Message }
 }
 
+# ---------- 运行登记表（run registry，scripts/lib/run-registry.js 的唯一实现经 CLI 调用）----------
+# 目的：每一步产出的文件在**产出它的那一步**就登记（路径 + sha256 + size + mtime），
+# 后续步骤只按登记表取路径并校 hash；磁盘上未登记的旧同名文件（legacy shadow）一律拒绝。
+function Invoke-Registry {
+    param([string[]] $Arguments)
+    $output = & node (Join-Path $PSScriptRoot 'run-registry.mjs') @Arguments 2>&1 | Out-String
+    if ($LASTEXITCODE -ne 0) {
+        throw ("运行登记表操作失败: " + ($Arguments -join ' ') + "`n" + ($output.Trim() -split "`n" | Select-Object -Last 6 | Out-String))
+    }
+    return $output
+}
+
+# 本步产出的文件 → 登记表键（键名是消费端唯一认的入口，见 lib/run-registry.js 的 ARTIFACT_KEYS）
+function Register-StepArtifacts {
+    param([string] $StepName, [int] $StepId)
+    $pairs = @()
+    switch ($StepName) {
+        'fetch'      { $pairs += , @('getDsl', $GetDslJson) }
+        'capture'    {
+            $pairs += , @('snapshot', $SnapshotJson)
+            $pairs += , @('coverage', $CoverageJson)
+            $pairs += , @('dslManifest', (Join-Path $RunDir 'manifest.json'))
+            $pairs += , @('timing', (Join-Path $RunDir 'timing.json'))
+        }
+        'svg'        { $pairs += , @('extractSvg', $SvgJson) }
+        'visibility' { $pairs += , @('visibility', $VisibilityJson) }
+        'mapping'    { $pairs += , @('mappingDraft', $DraftMappingJson) }
+        'discover'   { $pairs += , @('iconCandidates', $CandidateJson) }
+        'ledger'     { if (Test-Path -LiteralPath $LedgerJson) { $pairs += , @('iconMap', $LedgerJson) } }
+        'layout'     { $pairs += , @('layoutManifest', $LayoutManifestJson) }
+        'inputs'     { $pairs += , @('bundleManifest', $BundleJson) }
+    }
+    foreach ($pair in $pairs) {
+        if (Test-Path -LiteralPath $pair[1]) {
+            Invoke-Registry @('artifact', '--run', $RunJson, '--key', $pair[0], '--path', $pair[1], '--step', "$StepId") | Out-Null
+        }
+    }
+}
+
 # JSON 审计里缺字段是常态（ConvertFrom-Json 不会补 null 属性），
 # Set-StrictMode 下直接取不存在的属性会抛异常，所以统一走这个取值函数。
 function Get-Prop {
@@ -164,6 +205,8 @@ $StepLogs = Join-Path $Work 'steps'
 # 采集产物按页归档：一个项目里可以有多张页面，共用一个目录会互相覆盖（旧页重跑时会拿到别的页的
 # extractSvg/snapshot，导致核对基于错误数据）。所有 DSL 采集产物一律落在 runs\<Target>\ 下。
 $RunDir = Join-Path $Generated "runs\$Target"
+# 运行登记表：本次运行的唯一"产物清单"（每一步产出后登记，后续步骤只按它取路径并校 hash）。
+$RunJson = Join-Path $RunDir 'run.json'
 $GetDslJson = Join-Path $RunDir 'getDsl.json'
 $SnapshotJson = Join-Path $RunDir 'dsl.snapshot.json'
 $CoverageJson = Join-Path $RunDir 'coverage-report.json'
@@ -180,6 +223,9 @@ $MappingAuditJson = Join-Path $Generated "$Target.mapping.json"
 $BundleAuditJson = Join-Path $Generated "$Target.bundle.manifest.json"
 $PageXml = Join-Path $ProjectRoot "Resources\Pages\$Target\${Target}Page.xml"
 
+# 页面标题的人工确认值：登记表里有就带上（否则标题会退回设计页名原文，带 (x.y) 编号）。
+$PageTitleText = if ($Registry -and $Registry.PageTitleText) { $Registry.PageTitleText } else { '' }
+
 $StartStep = Get-Step $Progress
 $EndStep = if ($StopAfter) { Get-Step $StopAfter } else { $Steps[-1] }
 if ($EndStep.Id -lt $StartStep.Id) { throw "-StopAfter 不能早于 -Progress" }
@@ -191,6 +237,21 @@ Write-Output ''
 
 $results = New-Object System.Collections.Generic.List[object]
 $warnings = New-Object System.Collections.Generic.List[string]
+
+# 初始化运行登记表：整段运行的第一个动作。断点续跑（-Progress > 1）时沿用已有登记表（--keep），
+# 否则新开一次运行（新 runId、清空产物登记）——避免把上一次运行登记过的产物当成本次的。
+$registryInit = @('init', '--project-root', $ProjectRoot, '--target', $Target,
+    '--file-id', $FileId, '--layer-id', $LayerId, '--ui', $Ui)
+if ($DesignPageName) { $registryInit += @('--design-page', $DesignPageName) }
+if ($PageTitleText) { $registryInit += @('--page-title', $PageTitleText) }
+if (Test-Path -LiteralPath $TranslationsJson) { $registryInit += @('--translations', "Generated/_inputs/$Target.lang-translations.json") }
+if (Test-Path -LiteralPath (Join-Path $Inputs "$Target.lang-glossary.json")) { $registryInit += @('--glossary', "Generated/_inputs/$Target.lang-glossary.json") }
+if (Test-Path -LiteralPath $NamingJson) { $registryInit += @('--icon-naming', "Generated/_inputs/$Target.icon-naming.json") }
+if ($StartStep.Id -gt 1) { $registryInit += '--keep' }
+$initSummary = Invoke-Registry $registryInit
+Write-Output ("运行登记表: {0}" -f $RunJson)
+Write-Output ("  {0}" -f (($initSummary.Trim() -split "`n") -join ' '))
+Write-Output ''
 
 foreach ($step in $Steps) {
     if ($step.Id -lt $StartStep.Id -or $step.Id -gt $EndStep.Id) { continue }
@@ -306,6 +367,9 @@ foreach ($step in $Steps) {
                 # build-bundle-manifest.mjs 是 run-all 的同级辅助脚本（插件布局在 scripts/、项目布局在 _tool/），
                 # 因此这里用 $PSScriptRoot；skill 自带脚本一律用 $ScriptsFolder。
                 $args = @((Join-Path $PSScriptRoot 'build-bundle-manifest.mjs'), $LayoutManifestJson, $BundleJson, $ProjectRoot, $Ui)
+                # 采集输入只从运行登记表取（并写进清单让 Bundle 复校），不再让清单自己拼顶层路径。
+                $args += @('--run-json', $RunJson)
+                if ($PageTitleText) { $args += @('--page-title', $PageTitleText) }
                 if ($Overwrite) { $args += '--replace-existing' }
                 Invoke-StepCommand -Label 'bundle manifest' -LogFile $log -File 'node' -Arguments $args | Out-Null
             }
@@ -361,11 +425,26 @@ foreach ($step in $Steps) {
         }
         $watch.Stop()
         $seconds = [math]::Round($watch.Elapsed.TotalSeconds, 1)
+        # 产出登记：本步产出的文件立刻登记（path + sha256），后续步骤只按登记表取。
+        Register-StepArtifacts -StepName $step.Name -StepId $step.Id
+        if ($step.Name -eq 'bundle' -and (Test-Path -LiteralPath $BundleAuditJson)) {
+            # 输入登记与输出登记共用同一个 runId：把 Bundle 审计的 files[] 并回登记表。
+            Invoke-Registry @('outputs', '--run', $RunJson, '--manifest', $BundleAuditJson) | Out-Null
+        }
+        Invoke-Registry @('step', '--run', $RunJson, '--id', "$($step.Id)", '--name', $step.Name,
+            '--status', 'ok', '--seconds', "$seconds", '--note', $note,
+            '--log', (Join-Path $Work ('steps\{0:D2}-{1}.log' -f $step.Id, $step.Name))) | Out-Null
         $results.Add([pscustomobject]@{ Id = $step.Id; Name = $step.Name; Status = 'ok'; Seconds = $seconds; Note = $note })
         Write-Output ("      ok  {0}s  {1}" -f $seconds, $note)
     }
     catch {
         $watch.Stop()
+        try {
+            Invoke-Registry @('step', '--run', $RunJson, '--id', "$($step.Id)", '--name', $step.Name,
+                '--status', 'failed', '--seconds', "$([math]::Round($watch.Elapsed.TotalSeconds, 1))",
+                '--note', ($_.Exception.Message -split "`n")[0]) | Out-Null
+        }
+        catch { }   # 登记表写失败不能掩盖原始错误
         $results.Add([pscustomobject]@{ Id = $step.Id; Name = $step.Name; Status = 'failed'; Seconds = [math]::Round($watch.Elapsed.TotalSeconds, 1); Note = '' })
         $where = ''
         if ($_.InvocationInfo) { $where = "（第 $($_.InvocationInfo.ScriptLineNumber) 行: $($_.InvocationInfo.Line.Trim())）" }

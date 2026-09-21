@@ -123,6 +123,17 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 | 11 `gates` | 审计逐条断言（临时语言键/待翻译/未映射组件/嵌套冲突/底栏未命中/静态校验） | — |
 | 12 `verify` | 四项独立验证 | `run-verifications.ps1` |
 
+**每一步的产物都登记在运行登记表里**：`<项目>/Generated/runs/<Target>/run.json`（`scripts/lib/run-registry.js` 是唯一实现，`run-registry.mjs` 是它的 CLI）。规则固定为「**产出即登记、消费只按登记取、旧同名文件一律拒绝**」：
+
+- 每步成功后就登记该步产物（`path` + `sha256` + `size` + `mtime` + 所属步骤）；失败步骤也登记状态；
+- `build-bundle-manifest.mjs --run-json <run.json>` 只从登记表取 `snapshot` / `visibility` / `extractSvg`，并把指纹写进清单 `runRegistry.digests`；Bundle 读清单时复校 `runId`、路径与 `sha256`，**并拒绝未登记的旧同名文件**（`Generated/dsl.snapshot.json` 这类上一次运行留下的文件）——历史上"顶层旧文件还在 → 静默用旧数据"就是漏了这一层；
+- 断点续跑（`-Progress`）用 `run-registry.mjs init --keep` 沿用同一份登记表；从第 1 步重跑则新开一次运行（新 `runId`、产物登记清空）；
+- 手工检查：`node scripts/run-registry.mjs check --run <run.json>`（校验全部已登记产物的 sha256，并列出可清理的旧同名文件）、`show`（看本次运行摘要）。
+
+- **页面标题必须来自项目登记表**：`run-all.ps1` 读 `docs/page-registry.json` 的 `pageTitleText` 并写进清单（`languages.titleSource=manifest.pageTitleText`）。设计页名带 `（x.y）` 编号时，登记表里必须写去掉编号的标题——否则标题会退回设计原文并触发"待翻译"门禁。
+- **空文本节点不参与多语言门禁**：设计稿里的空 `TEXT`（`Value=""`）照常发射为 `TextBlock`，但派生器不产键、门禁也不要求它挂 `LangName`，**不需要**为它登记 `noLangRefs`。
+- **页面级图标为空是合法的**：若页面引用的图标全部由映射表登记为运行时图标（`iconPolicy=runtime`），本页 `Icons.xaml` 就是空字典——第 12 步的结构校验按"引用闭环"判定（`usedIcons ⊆ 本页 Geometry ∪ runtimeIcons`），只在确实缺少本页 Geometry 时失败，纯运行时图标页给 WARN。
+
 ```powershell
 pwsh -NoProfile -File <skill>/scripts/run-all.ps1 -List
 pwsh -NoProfile -File <skill>/scripts/run-all.ps1 -ProjectRoot <项目> -Target <Target> -LayerId <图层id> -StopAfter discover

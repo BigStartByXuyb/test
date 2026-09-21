@@ -77,7 +77,11 @@ fs.writeFileSync(dslSnapshot, JSON.stringify({
           { type: "GROUP", id: "body-text/inner/value-group", name: "组 2525", layoutStyle: { width: 50, height: 48, relativeX: 0, relativeY: 0 }, children: [
             { type: "TEXT", id: "body-text/inner/value-group/value", name: "9.0%", layoutStyle: { width: 40, height: 22, relativeX: 0, relativeY: 26 }, text: [{ text: "9.0%" }] },
             { type: "TEXT", id: "body-text/inner/value-group/direction", name: "Dir", layoutStyle: { width: 21, height: 16, relativeX: 29, relativeY: 0 }, text: [{ text: "Dir" }] }
-          ] }
+          ] },
+          // 设计稿里的**空文本节点**（真实设计稿常见）：它仍是 valueSource=dsl.text 的内容节点，
+          // 但没有可翻译的文案。派生器跳过它（不产键），"必须挂 LangName" 门禁必须同口径跳过，
+          // 否则整个页面生成会被一句空字符串卡住（历史上要靠显式 noLangRefs 放行）。
+          { type: "TEXT", id: "body-text/inner/empty-text", name: "空文本", layoutStyle: { width: 0, height: 22, relativeX: 0, relativeY: 48 }, text: [{ text: "" }] }
         ]
       }, {
         // 设计稿的页面标题文本：必须放在组件之后，避免参与组件内部的文本槽位排序；
@@ -611,11 +615,20 @@ assert.match(langEn, /<sys:String x:Key="LangDemoPageTitle">Language Demo<\/sys:
 assert.deepStrictEqual(readLangKeys(langCn), readLangKeys(langEn), "CN/EN 的 key 必须完全一致");
 assert.deepStrictEqual(readLangKeys(langCn), langManifest.languages.keys.map((key) => key.key));
 const langPageXml = fs.readFileSync(path.join(langPageDir, "LangDemoPage.xml"), "utf8");
-const langPageBlocks = langPageXml.split("<IOContorl").slice(1).filter((block) => /Value="/.test(block));
+// 只统计**带文案**的控件：空文本节点（Value=""）没有可翻译文案，本就不该挂 LangName。
+const langPageBlocks = langPageXml.split("<IOContorl").slice(1).filter((block) => /Value="[^"]+"/.test(block));
 assert.ok(langPageBlocks.length >= 6, "示例页应包含多个带文案的控件");
 langPageBlocks.forEach((block) => {
   assert.match(block, /LangName="/, "带文案的控件必须挂 LangName，实际: " + block.split("\n")[1]);
 });
+// 空文本节点：保留 Value=""，不挂 LangName，也不产语言键——同时证明它没有让整套生成失败。
+const emptyBlock = langPageXml.split("<IOContorl").slice(1).find((block) => /Value=""\s/.test(block));
+assert.ok(emptyBlock, "空文本节点必须照常发射（Value=\"\"）");
+assert.doesNotMatch(emptyBlock, /LangName="/, "空文本节点不得挂 LangName");
+assert.deepStrictEqual(
+  langManifest.languages.keys.filter((entry) => entry.text && entry.text.CN === ""),
+  [],
+  "空文本不得产语言键");
 assert.match(langPageXml, /LangName="LangDemoPlusFive"/, "应按 CN 文案自动匹配到 key");
 const langLayout = fs.readFileSync(path.join(project, "Resources/Layout/Layout.xml"), "utf8");
 assert.match(langLayout, /<Page Target="LangDemo" LangName="LangDemoPageTitle">/);
@@ -860,5 +873,79 @@ const langOffAudit = JSON.parse(fs.readFileSync(path.join(project, "Generated/La
 assert.strictEqual(langOffAudit.languages, null);
 assert.strictEqual(langOffAudit.languageDisabled, true);
 assert.match(langOffAudit.languageDisabledReason, /确认不做多语言/);
+
+// ---- 运行登记表绑定（B）：采集输入只认登记表，且拒绝旧同名影子文件 ----
+// 背景：采集产物改成按页归档（Generated/runs/<Target>/）后，消费端一度仍在读顶层 Generated/*.json，
+// 而顶层恰好留着上一次运行的旧文件 → 静默用了旧数据。这里逐条锁住新行为。
+const registryCli = path.join(__dirname, "..", "run-registry.mjs");
+const registryTarget = "LangRegistry";
+const registryRunDir = path.join(project, "Generated", "runs", registryTarget);
+fs.mkdirSync(registryRunDir, { recursive: true });
+for (const [dest, src] of [["dsl.snapshot.json", dslSnapshot], ["visibility.json", visibility], ["extractSvg.json", svg]]) {
+  fs.copyFileSync(src, path.join(registryRunDir, dest));
+}
+let registryResult = spawnSync(process.execPath, [registryCli, "init", "--project-root", project,
+  "--target", registryTarget, "--file-id", "test-file", "--layer-id", "body-text", "--ui", "F2"], { encoding: "utf8" });
+assert.strictEqual(registryResult.status, 0, registryResult.stderr);
+const registryFile = path.join(registryRunDir, "run.json");
+for (const [key, name, step] of [["snapshot", "dsl.snapshot.json", 2], ["visibility", "visibility.json", 4], ["extractSvg", "extractSvg.json", 3]]) {
+  registryResult = spawnSync(process.execPath, [registryCli, "artifact", "--run", registryFile, "--key", key,
+    "--path", "Generated/runs/" + registryTarget + "/" + name, "--step", String(step)], { encoding: "utf8" });
+  assert.strictEqual(registryResult.status, 0, registryResult.stderr);
+}
+const registryDoc = JSON.parse(fs.readFileSync(registryFile, "utf8"));
+const registryManifestFor = (suffix) => {
+  const item = langManifestFor(registryTarget, { auto: true, locales: ["CN", "EN"], keyCatalog: autoCatalog });
+  item.runRegistry = {
+    path: "Generated/runs/" + registryTarget + "/run.json",
+    runId: registryDoc.runId,
+    digests: {
+      snapshot: registryDoc.artifacts.snapshot.sha256,
+      visibility: registryDoc.artifacts.visibility.sha256,
+      extractSvg: registryDoc.artifacts.extractSvg.sha256
+    }
+  };
+  // 清单里故意留旧顶层路径：Bundle 必须被登记表改写，而不是照旧路径读
+  item.dslPath = "Generated/dsl.snapshot.json";
+  item.visibilityPath = "Generated/visibility.json";
+  item.svgPath = "Generated/extractSvg.json";
+  const file = path.join(root, "registry-" + suffix + ".json");
+  fs.writeFileSync(file, JSON.stringify(item, null, 2), "utf8");
+  return { file, item };
+};
+
+// 正向：采集输入被登记表改写为 runs/<Target>/…，并把 files[] 回写进登记表 outputs
+const registryOk = registryManifestFor("ok");
+result = spawnSync(process.execPath, [script, "--manifest", registryOk.file], { encoding: "utf8" });
+assert.strictEqual(result.status, 0, result.stderr + result.stdout);
+const registryAudit = JSON.parse(fs.readFileSync(path.join(project, "Generated", registryTarget + ".bundle.manifest.json"), "utf8"));
+assert.strictEqual(registryAudit.inputs.dslPath, "Generated/runs/" + registryTarget + "/dsl.snapshot.json",
+  "Bundle 必须按登记表绑定采集输入，而不是清单里写的顶层旧路径");
+assert.match(result.stdout, /运行登记表: runId=/);
+const registryAfter = JSON.parse(fs.readFileSync(registryFile, "utf8"));
+assert.ok(Object.keys(registryAfter.outputs).length > 0, "Bundle 必须把本次产物回写进运行登记表的 outputs");
+assert.strictEqual(registryAfter.outputs["Resources/Pages/" + registryTarget + "/" + registryTarget + "Page.xml"].kind, "project");
+
+// 反向 1：磁盘上的采集文件被改写 → 与登记 sha256 不一致 → 失败
+fs.appendFileSync(path.join(registryRunDir, "visibility.json"), "\n", "utf8");
+result = spawnSync(process.execPath, [script, "--manifest", registryOk.file, "--overwrite"], { encoding: "utf8" });
+assert.notStrictEqual(result.status, 0, "采集文件与登记指纹不一致时必须失败");
+assert.match(result.stderr + result.stdout, /与磁盘不一致|运行登记表/);
+fs.copyFileSync(visibility, path.join(registryRunDir, "visibility.json"));
+
+// 反向 2：清单自身登记的 digests 被改写 → 与登记表不一致 → 失败
+const registryTampered = registryManifestFor("tampered");
+registryTampered.item.runRegistry.digests.visibility = "0".repeat(64);
+fs.writeFileSync(registryTampered.file, JSON.stringify(registryTampered.item, null, 2), "utf8");
+result = spawnSync(process.execPath, [script, "--manifest", registryTampered.file, "--overwrite"], { encoding: "utf8" });
+assert.notStrictEqual(result.status, 0, "清单 digests 与登记表不一致时必须失败");
+assert.match(result.stderr + result.stdout, /与运行登记表不一致/);
+
+// 反向 3：磁盘上存在未登记的旧同名文件（内容不同）→ 失败，不允许静默用旧数据
+fs.writeFileSync(path.join(project, "Generated", "dsl.snapshot.json"), JSON.stringify({ dsl: { nodes: [] }, nodeCount: 999 }), "utf8");
+result = spawnSync(process.execPath, [script, "--manifest", registryOk.file, "--overwrite"], { encoding: "utf8" });
+assert.notStrictEqual(result.status, 0, "存在未登记的旧同名文件时必须失败");
+assert.match(result.stderr + result.stdout, /未登记的旧同名文件/);
+fs.rmSync(path.join(project, "Generated", "dsl.snapshot.json"));
 
 console.log("PASS MasterGo page bundle regression test");
