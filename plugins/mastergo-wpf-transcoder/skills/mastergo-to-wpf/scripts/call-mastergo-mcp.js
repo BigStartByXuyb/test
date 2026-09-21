@@ -120,9 +120,13 @@ function request(method, params) {
   });
 }
 
-child.stderr.on("data", function (chunk) { stderrText += chunk.toString("utf8"); });
+// 管道分块不保证落在字符边界；让流解码器保留跨块的 UTF-8 字节。
+// 逐块 Buffer.toString 会把被拆开的中文/补充平面字符永久替换成 U+FFFD。
+child.stdout.setEncoding("utf8");
+child.stderr.setEncoding("utf8");
+child.stderr.on("data", function (chunk) { stderrText += chunk; });
 child.stdout.on("data", function (chunk) {
-  stdoutBuffer += chunk.toString("utf8");
+  stdoutBuffer += chunk;
   let index = stdoutBuffer.indexOf("\n");
   while (index >= 0) {
     const line = stdoutBuffer.slice(0, index).trim();
@@ -150,9 +154,10 @@ const timer = setTimeout(function () {
 
 function toTextContent(result) {
   const content = result && Array.isArray(result.content) ? result.content : [];
-  const textPart = content.find(function (item) { return item && item.type === "text"; });
-  if (!textPart) return null;
-  return textPart.text;
+  const textParts = content.filter(function (item) { return item && item.type === "text"; });
+  // 多个 text 块没有本地拼接协议：不能只取第一块、也不能猜测如何拼接 JSON。
+  if (textParts.length !== 1 || typeof textParts[0].text !== "string") return null;
+  return textParts[0].text;
 }
 
 // 结束子进程并保证本进程一定退出（shell:true 时子进程可能持有管道，导致事件循环不空）
@@ -202,10 +207,10 @@ function shutdown(exitCode) {
 
   const text = toTextContent(response && response.result);
   if (text === null) {
-    console.error("响应里没有 text content（工具 " + serverToolName + "）");
-    console.error(JSON.stringify(response).slice(0, 2000));
-    child.kill();
-    process.exit(4);
+    console.error("响应必须包含且仅包含一个字符串 text content（工具 " + serverToolName + "）；拒绝截断响应");
+    // 错误分支也不得把 DSL、图像或资源内容回显到模型上下文。
+    shutdown(4);
+    return;
   }
 
   const absolute = path.resolve(args.out);
