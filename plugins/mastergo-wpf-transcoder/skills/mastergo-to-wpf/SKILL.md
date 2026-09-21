@@ -44,7 +44,7 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 
 ## 一键流水线（12 步）
 
-**一次调用跑完全部 12 步**（默认区间第 1 → 12）；下表是这条命令**内部**的阶段划分，用来定位失败与断点续跑，**不要为每一步单独起一次 `run-all`**。常用参数只有三类（完整清单见 `references/adapters/mtslg-iocontrol/pipeline-contract.md`）：
+**一次调用跑完全部 12 步**（默认区间第 1 → 12）；下表是这条命令**内部**的阶段划分，用来定位失败与断点续跑，**不要为每一步单独起一次 `run-all`**。常用参数只有三类（完整清单见 `scripts/run-all.ps1` 的 `param` 块）：
 
 - **目标信息** `-Target` / `-LayerId` / `-FileId` / `-Ui` / `-DesignPageName`：登记表 `docs/page-registry.json` 里能命中本次页面时可省；**登记表有多页时必须用 `-Target` 或 `-LayerId` 选中本次页面**（脚本按命中选页，没命中就报错，不会取第一页顶上）；
 - **区间控制** `-Progress <步骤名>`（失败后从该步继续）/ `-StopAfter <步骤名>`（需要人工补语义输入时先跑到 `discover`）；

@@ -50,8 +50,9 @@ MasterGo 转换只从 MasterGo MCP 取数：`getDsl` 不可调用或报错时**�
 
 ```powershell
 node --test "skills/mastergo-to-wpf/scripts/tests/*.test.js"
+Get-ChildItem "skills/mastergo-to-wpf/scripts/tests/*.tests.ps1" | ForEach-Object { pwsh -NoProfile -File $_.FullName }
 ```
 
-该命令运行 `scripts/tests/` 下的全部回归测试（测试与交付链路脚本 `scripts/` 分开）；需要单跑某一个时直接指定文件名，例如 `node skills/mastergo-to-wpf/scripts/tests/gen-mastergo-page-bundle.test.js`。PowerShell 流水线回归测试同目录：`scripts/tests/mastergo-dsl-pipeline.tests.ps1`。
+第一条运行 `scripts/tests/` 下的全部 JS 回归测试（测试与交付链路脚本 `scripts/` 分开）；需要单跑某一个时直接指定文件名，例如 `node skills/mastergo-to-wpf/scripts/tests/gen-mastergo-page-bundle.test.js`。第二条把同目录的 PowerShell 用例按 `*.tests.ps1` 全跑（`mastergo-dsl-pipeline.tests.ps1` 取数与捕获、`run-all-resume-identity.tests.ps1` 续跑身份回放），新增 `.tests.ps1` 不必再改本文。
 
 Skill 中包含项目专用的 MW/MTSLG 规则。分享给其他团队前，请先检查参考资料，并根据实际项目调整路径和运行时集成方式。

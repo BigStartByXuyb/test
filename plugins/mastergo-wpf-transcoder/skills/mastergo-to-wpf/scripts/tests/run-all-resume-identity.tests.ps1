@@ -17,22 +17,24 @@ function New-Fixture {
         [string] $FrozenUi = 'F8',
         [string] $RegistryUi = 'F8',
         [string] $FrozenDesignPageName = '设计页 A',
-        [string] $RegistryDesignPageName = '设计页 A'
+        [string] $RegistryDesignPageName = '设计页 A',
+        [switch] $DropRegistryPage
     )
     $project = Join-Path $root $Name
     New-Item -ItemType Directory -Force -Path (Join-Path $project 'docs') | Out-Null
     New-Item -ItemType Directory -Force -Path (Join-Path $project 'Generated\runs\Demo') | Out-Null
+    $page = [ordered]@{
+        target = 'Demo'
+        ui = $RegistryUi
+        designSource = [ordered]@{
+            fileId = 'file-A'
+            layerId = 'layer-A'
+            designPageName = $RegistryDesignPageName
+        }
+    }
     $registry = [ordered]@{
         schemaVersion = 'mastergo-page-registry/1'
-        pages = @([ordered]@{
-            target = 'Demo'
-            ui = $RegistryUi
-            designSource = [ordered]@{
-                fileId = 'file-A'
-                layerId = 'layer-A'
-                designPageName = $RegistryDesignPageName
-            }
-        })
+        pages = if ($DropRegistryPage) { @() } else { @($page) }
     }
     ($registry | ConvertTo-Json -Depth 10) |
         Set-Content -LiteralPath (Join-Path $project 'docs\page-registry.json') -Encoding UTF8
@@ -102,6 +104,16 @@ try {
     Assert-True ($out5 -match 'Ui: F8') '续跑必须回放冻结的 ui，而不是重新读项目登记表'
     Assert-True ($out5 -match 'LayerId: layer-A') '续跑必须回放冻结的 layerId'
     Assert-True ($out5 -notmatch '续跑不能') '改动项目登记表不应再打断续跑'
+
+    # 6) 边界（与 §7 文档同口径）：删掉项目登记表条目后身份取不到值 → 先报「缺少…」，不静默续跑。
+    $case6 = New-Fixture -Name 'entry-removed' -DropRegistryPage
+    $out6 = Invoke-Resume -Project $case6
+    Assert-True ($out6 -match '缺少 MasterGo 文件 id') '删除登记表条目后应先报缺少身份，而不是静默继续'
+    Assert-True ($out6 -notmatch '缺少 Bundle 审计') '删除登记表条目后不应走到第 11 步'
+
+    # 7) 同一情形下显式传回身份 → 可以续跑（这是 §7 给出的处置）。
+    $out7 = Invoke-Resume -Project $case6 -Extra @('-FileId', 'file-A', '-LayerId', 'layer-A', '-Ui', 'F8', '-DesignPageName', '设计页 A')
+    Assert-True ($out7 -match '缺少 Bundle 审计') '显式传回身份后应能续跑'
 
     Write-Output 'PASS MasterGo run-all 续跑身份回放测试'
 }

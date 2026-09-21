@@ -135,7 +135,7 @@ node skills/mastergo-to-wpf/scripts/audit-mtslg-feishu-map.js \
      skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/feishu-component-library-mapping.md \
      skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/mtslg-iocontrol-map.json
 node --test "skills/mastergo-to-wpf/scripts/tests/*.test.js"
-pwsh -NoProfile -File skills/mastergo-to-wpf/scripts/tests/mastergo-dsl-pipeline.tests.ps1
+Get-ChildItem "skills/mastergo-to-wpf/scripts/tests/*.tests.ps1" | ForEach-Object { pwsh -NoProfile -File $_.FullName }
 ```
 
 - 覆盖审计报告里 `missing`（文档声明了但映射表没有）、`unregisteredFamilies`（映射表里有该模板族、审计脚本的家族清单没登记）、`unregisteredVariants`（`### 固定模板：属性 1=…` 标题里的变体在映射表里没有归属族）、`undocumented`（映射表登记了但文档正文没提）、`duplicateMatchKeys`（跨模板族重复匹配键）任一非空，都表示这次改动不完整；任一非空时脚本以退出码 2 结束。
