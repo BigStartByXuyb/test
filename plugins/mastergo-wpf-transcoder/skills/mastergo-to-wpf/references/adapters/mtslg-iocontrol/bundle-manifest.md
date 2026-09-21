@@ -10,15 +10,17 @@
 node scripts/gen-mastergo-page-bundle.js --manifest <bundle.json> [--overwrite]
 ```
 
-`--overwrite` 仅允许用于 `operation=modify-existing` / `replace-existing`；新建页面传了会被拒绝。
+`--overwrite` 仅允许用于 `operation=replace-existing`；新建页面传了会被拒绝。
 
 ## 1. 模式
 
 | `operation` | 含义 | 已有文件处理 |
 |---|---|---|
 | 不填 | **新建页面** | 目标文件已存在即失败（`页面目标文件已存在，未覆盖`） |
-| `modify-existing` | 修改已有页面（merge） | 允许合并，不整文件覆盖 |
 | `replace-existing` | 替换已有页面 | 需配 `--overwrite`，覆盖前逐个备份；同一目标文件只保留最近 2 份 `.bak-<时间戳>` |
+
+Bundle 的页面 XML 步骤恒为 `--fresh`，因此**没有合并语义**：`operation` 只接受上表两种取值，其他值（如 `modify-existing`）直接失败。
+**修改已有页面的业务属性**（保留工程师手写的 `IOName`、`IOCommand`、`IOEnable` 等）必须走 `gen-iocontrol-xml.js --merge <现有XML> <mapping.json>`，不经 Bundle——细节见 `mtslg-mode.md` 第 5 节。
 
 ## 2. 必填字段
 

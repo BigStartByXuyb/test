@@ -352,7 +352,7 @@ for (const source of stringMetricMapping.sourceNodes) {
 const stringMetricMappingPath = path.join(root, "string-metric-mapping.json");
 fs.writeFileSync(stringMetricMappingPath, JSON.stringify(stringMetricMapping, null, 2), "utf8");
 const stringMetricManifest = JSON.parse(fs.readFileSync(manifest, "utf8"));
-stringMetricManifest.operation = "modify-existing";
+stringMetricManifest.operation = "replace-existing";
 delete stringMetricManifest.dslPath;
 delete stringMetricManifest.visibilityPath;
 stringMetricManifest.mappingPath = stringMetricMappingPath;
@@ -419,7 +419,7 @@ nestingOffManifest.codeBehindPath = "UI/F2-Teach/View/NestingOffView.xaml.cs";
 nestingOffManifest.viewModelPath = "UI/F2-Teach/ViewModel/NestingOffViewModel.cs";
 nestingOffManifest.pageXmlPath = "Resources/Pages/NestingOff/NestingOffPage.xml";
 nestingOffManifest.iconPath = "Resources/Pages/NestingOff/NestingOffIcons.xaml";
-nestingOffManifest.operation = "modify-existing";
+nestingOffManifest.operation = "replace-existing";
 nestingOffManifest.nesting = { enabled: false };
 delete nestingOffManifest.dslPath;
 delete nestingOffManifest.visibilityPath;
@@ -956,5 +956,15 @@ fs.writeFileSync(legacyNameManifest, JSON.stringify(legacyNameDoc, null, 2), "ut
 result = spawnSync(process.execPath, [script, "--manifest", legacyNameManifest], { encoding: "utf8" });
 assert.notStrictEqual(result.status, 0, "清单出现 pageName 字段时必须失败");
 assert.match(result.stderr + result.stdout, /不接受 pageName 字段/);
+
+// 反向 5：operation=modify-existing → 失败。Bundle 的页面 XML 恒为 --fresh，没有合并语义；
+// 改已有页面的业务属性必须走 gen-iocontrol-xml.js --merge。
+const legacyOpManifest = path.join(root, "legacy-operation.json");
+const legacyOpDoc = JSON.parse(fs.readFileSync(manifest, "utf8"));
+legacyOpDoc.operation = "modify-existing";
+fs.writeFileSync(legacyOpManifest, JSON.stringify(legacyOpDoc, null, 2), "utf8");
+result = spawnSync(process.execPath, [script, "--manifest", legacyOpManifest], { encoding: "utf8" });
+assert.notStrictEqual(result.status, 0, "operation=modify-existing 时必须失败");
+assert.match(result.stderr + result.stdout, /只接受 replace-existing/);
 
 console.log("PASS MasterGo page bundle regression test");

@@ -34,8 +34,8 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 
 | 场景 | 入口 | 口径 |
 |---|---|---|
-| 修改现有页面 | `gen-iocontrol-xml.js --merge <现有XML> <mapping.json> --out <输出>` | 保留工程师已有的 `IOName`、`IOCommand`、`IOEnable` 等业务属性；**禁止对现有页面用 `--fresh`**；merge 逐条语义与「设计文本覆盖（dsl.text）」报告见 `mtslg-mode.md` 第 5 节 |
-| 新建页面 | `gen-mastergo-page-bundle.js --manifest <bundle.json>`（唯一正常入口） | 页面 XML 步骤是 `--fresh`；同名目标存在时默认停止；只有用户明确要求替换 + 清单 `operation=replace-existing` + `--overwrite` 才整套替换并逐个备份 |
+| 修改现有页面 | 单独调 `gen-iocontrol-xml.js --merge <现有XML> <mapping.json> --out <输出>`（**不经 Bundle**） | 保留工程师已有的 `IOName`、`IOCommand`、`IOEnable` 等业务属性；**禁止对现有页面用 `--fresh`**；merge 逐条语义与「设计文本覆盖（dsl.text）」报告见 `mtslg-mode.md` 第 5 节 |
+| 新建页面 / 整套替换 | `gen-mastergo-page-bundle.js --manifest <bundle.json>`（唯一正常入口） | Bundle 的页面 XML 步骤恒为 `--fresh`，**没有合并语义**；同名目标存在时默认停止；只有用户明确要求替换 + 清单 `operation=replace-existing` + `--overwrite` 才整套替换并逐个备份。清单字段见 `references/adapters/mtslg-iocontrol/bundle-manifest.md` |
 | Bundle 被环境阻塞 | 按阻塞步骤单独调子脚本 | 只补该步，不改变上游输入口径 |
 
 - Bundle 清单的字段、必填、缺省见 `references/adapters/mtslg-iocontrol/bundle-manifest.md`；不要照抄上一页的清单反推字段。
@@ -87,7 +87,7 @@ pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -ProjectRoot <项目> -Progres
 - **内容区原点 `contentOriginY = 192px`**：全局固定常量，只在页面根级扣一次 → `mtslg-mode.md` 第 3 节
 - **容器 `GroupBox` 的 `Style` 恒为空串**，原点查表键是 `contentInsetStyle` → `feishu-component-library-mapping.md` 的「组件父子相对坐标」小节
 - **多语言全量产键**：设计稿给出的每个文本 `Value` 都产键挂 `LangName`；唯一不产键的是映射表在值槽位登记 `langRefPolicy: "none"` 的节点（当前只有选择框 `Value`），槽位豁免记入 `valueLangExempt` → `references/adapters/mtslg-iocontrol/page-build-rules.md` 第 3 节
-- **可见性 omit 有两条路径**：明确 hidden，以及角色驱动 omit；角色集合 `OMIT_ROLES` 与 `OMIT_REASONS` 的真值源是 `scripts/validate-iocontrol-provenance.js`，新增角色必须同时登记该集合 → `mtslg-mode.md`
+- **可见性 omit 有两条路径**：明确 hidden，以及角色驱动 omit；角色集合 `OMIT_ROLES` 与 `OMIT_REASONS` 的真值源是 `scripts/validate-iocontrol-provenance.js`，新增角色必须同时登记该集合 → `references/adapters/mtslg-iocontrol/page-build-rules.md` 第 5 节
 - **页面节点 ID**：`MX_` + `sha256(页面键 + 节点 ref)` 前 32 位；禁止用遍历序号当节点身份，人工维护约定随属性一起写在 mapping → `mtslg-mode.md` 第 2 节
 - **图标是页面级资源**：本页 `Icons.xaml` 的键必须页面内唯一、并被本页（含 Layout 菜单项）引用；禁止由图层 ID / 坐标 / 外观拼名（如 `MGIcon_<layer-id>`）→ `references/adapters/mtslg-iocontrol/page-build-rules.md` 第 2 节
 - **页面输出目录**：一页一目录（页面 XML / Icon / 语言字典同页目录，Layout 项目级共享）+ 运行目录解析优先级 → `references/adapters/mtslg-iocontrol/page-build-rules.md` 第 1 节
@@ -105,7 +105,7 @@ pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -ProjectRoot <项目> -Progres
 ## 参考文件读取条件
 
 - 本路线必读：`references/adapters/mtslg-iocontrol/mtslg-mode.md`（页面格式、坐标、ID、merge、验证）。
-- 触发才读：`references/adapters/mtslg-iocontrol/pipeline-contract.md`（跑流水线时）；`references/adapters/mtslg-iocontrol/page-build-rules.md`（处理图标命名/几何来源、多语言译文与词典、输出目录、辅助脚本触发时）；设计稿含顶部栏/底部栏或快捷键，或本次要创建/修改 Layout 注册 → `references/adapters/mtslg-iocontrol/feishu-layout-mapping.md`；要写或改 Bundle 清单 → `references/adapters/mtslg-iocontrol/bundle-manifest.md`。
+- 触发才读：`references/adapters/mtslg-iocontrol/pipeline-contract.md`（跑流水线时）；`references/adapters/mtslg-iocontrol/page-build-rules.md`（处理图标命名/几何来源、多语言译文与词典、输出目录、可见性 omit 角色、辅助脚本触发时）；设计稿含顶部栏/底部栏或快捷键，或本次要创建/修改 Layout 注册 → `references/adapters/mtslg-iocontrol/feishu-layout-mapping.md`；要写或改 Bundle 清单 → `references/adapters/mtslg-iocontrol/bundle-manifest.md`。
 - **默认不预读**：`references/adapters/mtslg-iocontrol/feishu-component-library-mapping.md` 与 `references/adapters/mtslg-iocontrol/mtslg-iocontrol-map.json`——组件匹配、`ControlType`、槽位与属性白名单由 `resolve-mtslg-template-mapping.js` / `gen-mtslg-mapping-from-dsl.js` 在生成期按映射表执行。只有脚本报出 `pending` / `unmappedComponents` / `templateConflicts` 时，才按关键词定点查（不通读）。
 - 按需：`references/project-adapter-initialization.md`（项目首次适配）、`references/mastergo-component-mapping-rules.md`（两条作业共用的来源链规则）、`references/style-library-profiles.md`（多套样式/主题/图标库并存时）。
 - 停用：`references/adapters/mw-wpf/**`（作业 A 资料）不读，也不作为 XML 事实源。

@@ -170,7 +170,7 @@ DSL/mapping 文案 ──► 英文等译文由 AI 产出 translations 清单并
 - **PowerShell 脚本一律用 PowerShell 7（`pwsh`）**，不做 Windows PowerShell 5.1 兼容。
 - Node.js 运行全部 JS 脚本；MasterGo MCP 通过 `call-mastergo-mcp.js` 调用（token 不落盘）。
 - **文档同步工具（可选，非交付链路依赖）**：把本地规则文档同步到团队在线文档时，使用本机已授权的飞书文档 CLI（可检索/读写云文档）按标题定位并比对；它不是生成或校验流程的运行依赖，环境没有该工具时跳过同步步骤，并在交付说明里标注"在线文档未同步"，不得因此阻塞页面交付。
-- 本地回归：`node --test "skills/mastergo-to-wpf/scripts/tests/*.test.js"`（22 个，含脚本复用门禁 `script-duplication.test.js` 与文本换行口径 `text-newline.test.js`）、`pwsh -NoProfile -File skills/mastergo-to-wpf/scripts/tests/mastergo-dsl-pipeline.tests.ps1`、`node skills/mastergo-to-wpf/scripts/audit-mtslg-feishu-map.js <doc> <map>`。
+- 本地回归：`node --test "skills/mastergo-to-wpf/scripts/tests/*.test.js"`（跑满 `scripts/tests/` 下全部用例，含脚本复用门禁 `script-duplication.test.js`、文本换行口径 `text-newline.test.js`、文档预算 `doc-budget.test.js`、流水线契约 `pipeline-contract.test.js`）、`pwsh -NoProfile -File skills/mastergo-to-wpf/scripts/tests/mastergo-dsl-pipeline.tests.ps1`、`node skills/mastergo-to-wpf/scripts/audit-mtslg-feishu-map.js <doc> <map>`。
 - CI（`BigStartByXuyb/cicd` 复用工作流）只做**确定性校验 + 语义审计**，不跑上述单测；单测由提交者在本地执行。
 
 ## 11. 维护约定

@@ -80,7 +80,13 @@ function normalizePageManifest(manifest) {
     fail("新页面必须提供 area");
   }
 
-  const existingMode = ["modify-existing", "replace-existing"].includes(manifest.operation);
+  // Bundle 的页面 XML 恒用 --fresh 发射，因此它没有"合并已有页面"这条路径。
+  // 改已有页面的业务属性（IOName/IOCommand/IOEnable…）必须走 gen-iocontrol-xml.js --merge，
+  // 不经 Bundle；这里只接受 operation=replace-existing（整套替换 + 备份）或不填（新建）。
+  if (manifest.operation !== undefined && manifest.operation !== "replace-existing") {
+    fail("manifest.operation 只接受 replace-existing（整套替换并备份）：修改已有页面的业务属性请走 gen-iocontrol-xml.js --merge，不经 Bundle");
+  }
+  const existingMode = manifest.operation === "replace-existing";
   const expected = {
     pageXmlPath: defaultPageXmlPath(name),
     iconPath: defaultIconPath(name),
@@ -1046,7 +1052,7 @@ function main() {
     : (typeof manifest.excludeInstances === "string" && manifest.excludeInstances.trim()
       ? manifest.excludeInstances.split(/[,\s]+/).filter(Boolean)
       : []);
-  const existingMode = ["modify-existing", "replace-existing"].includes(manifest.operation);
+  const existingMode = manifest.operation === "replace-existing";
   const scaffoldInfo = ensureScaffold(manifest);
   const projectRoot = scaffoldInfo.projectRoot;
   // 运行开始时的既有 .bak 快照：只用于事后算"本次运行新产生了哪些副本"。
@@ -1175,7 +1181,7 @@ function main() {
   if (!args.overwrite && blocked.length) {
     fail("目标文件已存在，未覆盖: " + blocked.join(", ") + "；请停止并确认是否修改已有页面");
   }
-  if (args.overwrite && !["modify-existing", "replace-existing"].includes(manifest.operation)) {
+  if (args.overwrite && manifest.operation !== "replace-existing") {
     fail("--overwrite 仅允许用于用户明确确认的已有页面替换；请在 manifest 中设置 operation=replace-existing");
   }
 

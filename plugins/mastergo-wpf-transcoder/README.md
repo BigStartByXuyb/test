@@ -32,7 +32,7 @@ Layout 增量注册与 `--overwrite` 的语义：
 
 Agent 的完整工作流是：MasterGo MCP 一次性 `getDsl` → DSL pipeline `Capture` → coverage complete → 组件映射 → page bundle。完整页面或容器只允许用这一次 `getDsl` 响应作为设计数据源，不得拆成 section 分段采集，也不得用多个局部响应拼接页面；DSL pipeline 不负责猜测控件、资源键或运行时业务绑定。
 
-MasterGo 转换默认优先检查并调用 MasterGo MCP；浏览器、截图和其他设计稿兜底只允许在 MCP 确认不可用后使用，并须记录兜底原因。
+MasterGo 转换只从 MasterGo MCP 取数：`getDsl` 不可调用或报错时**停止转换并报告原因**，不换用浏览器、截图或其他设计稿来源继续，也不读图做判断。
 
 ## 真实项目接入
 
@@ -52,6 +52,6 @@ MasterGo 转换默认优先检查并调用 MasterGo MCP；浏览器、截图和�
 node --test "skills/mastergo-to-wpf/scripts/tests/*.test.js"
 ```
 
-该命令运行全部 22 个回归测试（测试统一放在 `scripts/tests/`，与交付链路脚本 `scripts/` 分开）；需要单跑某一个时直接指定文件名，例如 `node skills/mastergo-to-wpf/scripts/tests/gen-mastergo-page-bundle.test.js`。PowerShell 流水线回归测试同目录：`scripts/tests/mastergo-dsl-pipeline.tests.ps1`。
+该命令运行 `scripts/tests/` 下的全部回归测试（测试与交付链路脚本 `scripts/` 分开）；需要单跑某一个时直接指定文件名，例如 `node skills/mastergo-to-wpf/scripts/tests/gen-mastergo-page-bundle.test.js`。PowerShell 流水线回归测试同目录：`scripts/tests/mastergo-dsl-pipeline.tests.ps1`。
 
 Skill 中包含项目专用的 MW/MTSLG 规则。分享给其他团队前，请先检查参考资料，并根据实际项目调整路径和运行时集成方式。

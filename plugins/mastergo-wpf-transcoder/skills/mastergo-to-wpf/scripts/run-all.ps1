@@ -74,7 +74,7 @@ $Steps = @(
     },
     [pscustomobject]@{
         Id = 2; Name = 'capture'; Title = 'DSL 结构化快照 + 覆盖校验'
-        Inputs   = @('第 1 步的 getDsl.json', '区域前缀 -Ui 与设计页名 -PageName（缺失时由 run-all 取值链解析）')
+        Inputs   = @('第 1 步的 getDsl.json', '区域前缀 -Ui（缺失时按 run-all 取值链解析）', '设计页名 -PageName（命令行或项目登记表给出，不做推导）')
         Outputs  = @('Generated/runs/<Target>/dsl.snapshot.json', 'coverage-report.json（节点覆盖/重复 ref/断裂父子链）')
         Failures = @('覆盖校验 status≠complete', '存在重复 ref 或断裂父子链', '区域前缀取值链取不到')
         Recovery = @('确认 layerId 指向目标图层全部节点后重跑：-Progress capture', '区域前缀显式传 -Ui')
