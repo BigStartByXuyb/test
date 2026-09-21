@@ -21,6 +21,8 @@
 | `pages[].derivation` | 否 | 页面名推导说明；没有 `pages[].ui` 时，run-all 从它取第一个 `F<数字>` 当区域前缀（`F2`、`F3ManualAlign`、紧贴中文的 `F3区域` 都能命中——匹配不要求词边界） |
 | `pages[].pageTitleText` | 否 | **页面标题文案**（去掉设计页名编号的最终标题）。给了就写进 Bundle 清单 `pageTitleText`（`languages.titleSource=manifest.pageTitleText`）；**不给则退回设计页名原文**（带编号时会在"待翻译"门禁上暴露），因此带编号的设计页名必须登记本字段 |
 | `pages[].pageLangName` / `pages[].files` / `pages[].layoutRegistration` / `pages[].runtimeBindings` / `pages[].targetConfirmed` | 否 | 交付登记信息：标题键、产物路径、Layout 注册状态、运行时绑定状态、Target 是否已人工确认 |
+
+（续跑身份提示：本表也是 `run-all.ps1` 续跑身份的解析来源，改动 `pages[].ui` / `pages[].designSource.*` 会受续跑守卫约束；口径与复位方式见 `bundle-manifest.md` 第 7 节。）
 - 多语言目录：每种语言的资源文件、键命名规则与重载/重启要求。MTSLG 页面默认按页维护一套 `Resources/Pages/{name}/{name}_{LOCALE}.xaml`（默认 CN/EN），各语言 key 必须完全一致；运行时控件/菜单通过 `LangName` 引用这些 key。
 - 资源键来源：Style、Icon、LangName、IOName 与 IOCommand 的可核验来源。
 - 页面文件骨架：见第 2 节；组件固定模板、节点结构与字段来源以同目录的飞书组件库映射规范为唯一来源。

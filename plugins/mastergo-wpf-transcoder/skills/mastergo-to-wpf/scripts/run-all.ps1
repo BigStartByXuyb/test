@@ -70,7 +70,7 @@ $Steps = @(
         Inputs   = @('MasterGo 文件 id 与图层 id（命令行 -FileId/-LayerId，或项目登记表 docs/page-registry.json 里能命中本次页面的那一条）', 'MasterGo MCP token（MASTERGO_MCP_TOKEN 或 -ConfigPath 指向的配置）')
         Outputs  = @('Generated/runs/<Target>/getDsl.json', '运行登记表 Generated/runs/<Target>/run.json（产出即登记）')
         Failures = @('缺 fileId 或 layerId', '登记表有多条页面，但没用 -Target/-LayerId 命中本次页面（脚本不取第一页顶上）', 'MasterGo MCP token 缺失或失效', 'MCP 调用失败/超时', 'MCP 返回业务错误码（如 code=20001「获取文件key异常」，说明 fileId/layerId 不存在或无权限）')
-        Recovery = @('显式传 -FileId/-LayerId，或在登记表里登记本次页面；多页登记表必须先用 -Target 或 -LayerId 选中本次页面', '补 token 后重跑：-Progress fetch', '业务错误码：核对该 fileId/layerId（或登记表设计来源）后重跑：-Progress fetch')
+        Recovery = @('显式传 -FileId/-LayerId，或在登记表里登记本次页面（身份四项随首次运行冻结，续跑不得新增或改动，见 bundle-manifest.md 第 7 节）；多页登记表必须先用 -Target 或 -LayerId 选中本次页面', '补 token 后重跑：-Progress fetch', '业务错误码：核对该 fileId/layerId（或登记表设计来源）后重跑：-Progress fetch')
     },
     [pscustomobject]@{
         Id = 2; Name = 'capture'; Title = 'DSL 结构化快照 + 覆盖校验'
