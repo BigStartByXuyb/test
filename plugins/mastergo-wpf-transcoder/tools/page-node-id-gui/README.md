@@ -19,8 +19,9 @@ ID 的公式是 `MX_` + `sha256(页面键 + "\n" + 节点 ref)` 前 32 位，**�
 
 1. 贴**容器（页面帧）链接**：本工具记住这个页面的页面帧，ID 与转码完全一致；
 2. 之后贴该页面里的**控件链接**：直接从已知的页面帧里定位，返回这一个控件的 ID；
-3. 也可以填**工程目录**：从工程里已有的 `Generated/dsl.snapshot.json` / `docs/page-registry.json`
-   自动找页面帧，离线且更快（不占用设计稿接口）。
+3. 也可以填**工程目录**：从工程里已有的 `Generated/runs/<页面名>/dsl.snapshot.json`（旧的
+   `Generated/dsl.snapshot.json` 仍兼容）与 `docs/page-registry.json` 自动找页面帧，离线且更快
+   （不占用设计稿接口）。
 
 ## 启动参数
 

@@ -185,14 +185,23 @@ internal static class PageNodeId
     {
         string dir = AppDomain.CurrentDomain.BaseDirectory;
         string[] names = new string[] { "dsl.snapshot.json", "getDsl.json" };
-        string[] dirs = new string[]
+        // 从 exe 所在目录向上最多 3 层，每层都算上它自己与它的 Generated\：
+        // 这样「exe 放在 <项目>\tools\page-node-id\」这种布局也能找到 <项目>\Generated\...。
+        List<string> dirs = new List<string>();
+        DirectoryInfo info = new DirectoryInfo(dir);
+        for (int up = 0; info != null && up <= 3; up++)
         {
-            dir,
-            Path.Combine(dir, "Generated"),
-            Directory.GetParent(dir) != null ? Directory.GetParent(dir).FullName : dir,
-            Directory.GetParent(dir) != null && Directory.GetParent(dir).Parent != null
-                ? Path.Combine(Directory.GetParent(dir).Parent.FullName, "Generated") : dir
-        };
+            dirs.Add(info.FullName);
+            dirs.Add(Path.Combine(info.FullName, "Generated"));
+            info = info.Parent;
+        }
+        // 采集产物按页归档后位于 <项目>/Generated/runs/<页面名>/，把每个页面目录也列为候选。
+        foreach (string baseDir in dirs.ToArray())
+        {
+            string runs = Path.Combine(baseDir, "runs");
+            if (!Directory.Exists(runs)) continue;
+            foreach (string pageDir in Directory.GetDirectories(runs)) dirs.Add(pageDir);
+        }
         foreach (string d in dirs)
         {
             foreach (string n in names)

@@ -143,6 +143,14 @@ function findSiblingSnapshot(dir) {
   if (fs.existsSync(direct)) return direct;
   const underGenerated = path.join(dir, "Generated", "dsl.snapshot.json");
   if (fs.existsSync(underGenerated)) return underGenerated;
+  // 采集产物按页归档后位于 <项目>/Generated/runs/<页面名>/dsl.snapshot.json
+  const runsDir = path.join(dir, "Generated", "runs");
+  if (fs.existsSync(runsDir)) {
+    for (const entry of fs.readdirSync(runsDir)) {
+      const candidate = path.join(runsDir, entry, "dsl.snapshot.json");
+      if (fs.existsSync(candidate)) return candidate;
+    }
+  }
   return "";
 }
 
