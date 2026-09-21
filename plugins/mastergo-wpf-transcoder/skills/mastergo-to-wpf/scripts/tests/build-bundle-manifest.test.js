@@ -101,3 +101,15 @@ assert.notStrictEqual(result.status, 0, "带值开关的存在不能绕过 area 
 assert.match(result.stderr, /缺少区域前缀 area/);
 
 console.log("PASS MasterGo bundle manifest (run registry binding) regression test");
+
+for (const [field, value] of [["target", "AnotherPage"], ["ui", "AnotherArea"], ["projectRoot", path.join(root, "other")]]) {
+  const conflicting = JSON.parse(fs.readFileSync(registryFile, "utf8"));
+  if (field === "ui") conflicting.identity.ui = value;
+  else conflicting[field] = value;
+  const conflictFile = write(runDir + "/conflict-" + field + ".json", conflicting);
+  const output = path.join(root, "rejected-" + field + ".json");
+  const rejected = run([layoutManifest, output, root, "F2", "--run-json", conflictFile]);
+  assert.notStrictEqual(rejected.status, 0);
+  assert.match(rejected.stderr, /与本次/);
+  assert.strictEqual(fs.existsSync(output), false);
+}

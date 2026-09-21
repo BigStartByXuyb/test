@@ -885,7 +885,7 @@ for (const [dest, src] of [["dsl.snapshot.json", dslSnapshot], ["visibility.json
   fs.copyFileSync(src, path.join(registryRunDir, dest));
 }
 let registryResult = spawnSync(process.execPath, [registryCli, "init", "--project-root", project,
-  "--target", registryTarget, "--file-id", "test-file", "--layer-id", "body-text", "--ui", "F2"], { encoding: "utf8" });
+  "--target", registryTarget, "--file-id", "test-file", "--layer-id", "body-text", "--ui", "F2-Teach"], { encoding: "utf8" });
 assert.strictEqual(registryResult.status, 0, registryResult.stderr);
 const registryFile = path.join(registryRunDir, "run.json");
 for (const [key, name, step] of [["snapshot", "dsl.snapshot.json", 2], ["visibility", "visibility.json", 4], ["extractSvg", "extractSvg.json", 3]]) {
@@ -968,3 +968,19 @@ assert.notStrictEqual(result.status, 0, "operation=modify-existing 时必须失�
 assert.match(result.stderr + result.stdout, /只接受 replace-existing/);
 
 console.log("PASS MasterGo page bundle regression test");
+
+for (const [field, value, expected] of [
+  ["name", "OtherPage", /target 与本次页面不一致/],
+  ["area", "OtherArea", /identity.ui 与本次 area 不一致/],
+  ["pageTarget", "OtherPage", /pageTarget 与本次 name 不一致/]
+]) {
+  const candidate = registryManifestFor("binding-" + field);
+  for (const key of ["pageXmlPath", "iconPath", "viewPath", "codeBehindPath", "viewModelPath"]) delete candidate.item[key];
+  candidate.item[field] = value;
+  fs.writeFileSync(candidate.file, JSON.stringify(candidate.item));
+  const before = fs.readFileSync(csproj);
+  const rejected = spawnSync(process.execPath, [script, "--manifest", candidate.file], { encoding: "utf8" });
+  assert.notStrictEqual(rejected.status, 0);
+  assert.match(rejected.stderr, expected);
+  assert.deepStrictEqual(fs.readFileSync(csproj), before, "binding rejection must precede project writes");
+}

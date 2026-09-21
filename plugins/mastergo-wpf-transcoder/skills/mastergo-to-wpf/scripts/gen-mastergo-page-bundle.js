@@ -1053,6 +1053,18 @@ function main() {
       ? manifest.excludeInstances.split(/[,\s]+/).filter(Boolean)
       : []);
   const existingMode = manifest.operation === "replace-existing";
+  // Validate the requested page before ensureScaffold can mutate the project.
+  if (manifest.runRegistry && manifest.runRegistry.path) {
+    if (!manifest.projectRoot) fail("projectRoot 必须提供");
+    const bindingRoot = path.resolve(manifest.projectRoot);
+    const bindingFile = path.resolve(bindingRoot, manifest.runRegistry.path);
+    RUN_REGISTRY.assertBinding(RUN_REGISTRY.loadRegistry(bindingFile), {
+      projectRoot: bindingRoot, target: manifest.name, ui: manifest.area
+    });
+    if (manifest.pageTarget !== undefined && manifest.pageTarget !== manifest.name) {
+      fail("pageTarget 与本次 name 不一致");
+    }
+  }
   const scaffoldInfo = ensureScaffold(manifest);
   const projectRoot = scaffoldInfo.projectRoot;
   // 运行开始时的既有 .bak 快照：只用于事后算"本次运行新产生了哪些副本"。

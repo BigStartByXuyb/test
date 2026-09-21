@@ -66,6 +66,7 @@ if (!runJsonArg) {
 }
 const runJsonFile = path.resolve(projectRoot, runJsonArg);
 const runJsonData = runRegistry.loadRegistry(runJsonFile);
+runRegistry.assertBinding(runJsonData, { projectRoot, target: name, ui: area });
 const resolvedInputs = {
   snapshot: runRegistry.resolveArtifact(runJsonData, "snapshot", { projectRoot }),
   visibility: runRegistry.resolveArtifact(runJsonData, "visibility", { projectRoot }),

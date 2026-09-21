@@ -7,7 +7,7 @@
     断点续跑：
         -Progress <步骤号或步骤名>   从该步开始（默认 1）
         -StopAfter <步骤号或步骤名>  跑到该步后停止（用于「先出待命名清单，再回来跑后半段」）
-        每一步的 stdout/stderr 都写进 Generated\_work\steps\<NN>-<名字>.log；
+        每一步的 stdout/stderr 都写进 Generated\_work\steps\<Target>\<NN>-<名字>.log；
         某步失败时脚本打印该步日志路径并停止，修好输入后从该步继续即可。
 
     例：
@@ -193,9 +193,17 @@ function Get-ProjectTarget {
         if ($design -and $design.PSObject.Properties['layerId']) { return [string] $design.layerId } else { return '' }
     }
     $page = $null
-    if ($Target) { $page = $pages | Where-Object { (& $pageTarget $_) -eq $Target } | Select-Object -First 1 }
-    if (-not $page -and $LayerId) { $page = $pages | Where-Object { (& $pageLayerId $_) -eq $LayerId } | Select-Object -First 1 }
-    if (-not $page -and $pages.Count -eq 1) { $page = $pages[0] }
+    if ($Target) {
+        $matches = @($pages | Where-Object { (& $pageTarget $_) -ceq $Target })
+        if ($matches.Count -gt 1) { throw "项目登记表有重复 Target: $Target" }
+        if ($matches.Count -eq 1) { $page = $matches[0] }
+    }
+    if (-not $page -and $LayerId) {
+        $matches = @($pages | Where-Object { (& $pageLayerId $_) -ceq $LayerId })
+        if ($matches.Count -gt 1) { throw "项目登记表有重复 LayerId: $LayerId；请用 -Target 选页" }
+        if ($matches.Count -eq 1) { $page = $matches[0] }
+    }
+    if (-not $page -and -not $Target -and -not $LayerId -and $pages.Count -eq 1) { $page = $pages[0] }
     if (-not $page) { return $null }
     # 逐字段读 designSource：不能直写 `$page.designSource.fileId`——登记表缺该字段时
     # Set-StrictMode 会抛出"property cannot be found"，掩盖真正的原因（登记表缺 fileId/layerId）。
@@ -230,7 +238,7 @@ function Get-MastergoToken {
     # 配置路径不写死某台机器：优先 -ConfigPath，其次 CODEX_CONFIG，最后 ~/.codex/config.toml
     $configPath = if ($ConfigPath) { $ConfigPath }
         elseif ($env:CODEX_CONFIG) { $env:CODEX_CONFIG }
-        else { Join-Path $env:USERPROFILE '.codex\config.toml' }
+        else { Join-Path $HOME '.codex/config.toml' }
     if (Test-Path -LiteralPath $configPath) {
         $cfg = Get-Content -LiteralPath $configPath -Raw -Encoding UTF8
         if ($cfg -match '--token=(mg_[0-9a-fA-F]+)') { return $Matches[1] }
@@ -269,23 +277,18 @@ function Invoke-Registry {
     return $output
 }
 
-# 逐阶段输入复校：每一步在消费前，把它**实际消费的、且本次运行已登记的**产物按登记表复校 sha256。
-# 只在"已登记"时校验——新开运行的早期步骤尚未登记，不受影响；而手工改过中间产物再续跑会被当场拒掉
-# （与"消费只按登记取"是同一条契约，见 bundle-manifest.md 第 7 节）。
+# Every required input must be registered and must be the path actually consumed.
 function Assert-RegisteredInput {
-    param([string] $Key)
-    if (-not (Test-Path -LiteralPath $RunJson)) { return }
-    $doc = Get-Content -LiteralPath $RunJson -Raw -Encoding UTF8 | ConvertFrom-Json
-    $artifacts = Get-Prop $doc 'artifacts'
-    if ($artifacts -and $artifacts.PSObject.Properties[$Key]) {
-        Invoke-Registry @('check', '--run', $RunJson, '--key', $Key, '--quiet') | Out-Null
-        return
-    }
-    # 未登记：新开运行里属正常（上游步骤在本区间之前刚产出、尚未登记的情况不会走到这里）。
-    # 但续跑路径上，"产物存在却没登记"正是 §7 明令拒绝的旧同名文件——不能静默消费。
-    if ($StartStep.Id -gt 1) {
-        throw "输入 $Key 未登记在本次运行的 $RunJson 里（消费只按登记取、未登记的旧同名文件一律拒绝）：请从 fetch 新开一次运行（不带 -Progress），或先跑产出该产物的那一步。"
-    }
+  param([string] $Key, [string] $ConsumedPath)
+  Invoke-Registry @('check', '--run', $RunJson, '--key', $Key, '--quiet') | Out-Null
+  $doc = Get-Content -LiteralPath $RunJson -Raw -Encoding UTF8 | ConvertFrom-Json
+  $entry = $doc.artifacts.PSObject.Properties[$Key].Value
+  $registeredPath = [IO.Path]::GetFullPath((Join-Path $ProjectRoot $entry.path))
+  $actualPath = [IO.Path]::GetFullPath($ConsumedPath)
+  $comparison = if ($IsWindows) { [StringComparison]::OrdinalIgnoreCase } else { [StringComparison]::Ordinal }
+  if (-not [string]::Equals($registeredPath, $actualPath, $comparison)) {
+    throw "产物 $Key 的登记路径与实际消费路径不一致：$registeredPath != $actualPath"
+  }
 }
 
 # 本步产出的文件 → 登记表键（键名是消费端唯一认的入口，见 lib/run-registry.js 的 ARTIFACT_KEYS）
@@ -304,14 +307,17 @@ function Register-StepArtifacts {
         'visibility' { $pairs += , @('visibility', $VisibilityJson) }
         'mapping'    { $pairs += , @('mappingDraft', $DraftMappingJson) }
         'discover'   { $pairs += , @('iconCandidates', $CandidateJson) }
-        'ledger'     { if (Test-Path -LiteralPath $LedgerJson) { $pairs += , @('iconMap', $LedgerJson) } }
+        'ledger'     { $pairs += , @('iconMap', $LedgerJson) }
         'layout'     { $pairs += , @('layoutManifest', $LayoutManifestJson) }
         'inputs'     { $pairs += , @('bundleManifest', $BundleJson) }
     }
     foreach ($pair in $pairs) {
-        if (Test-Path -LiteralPath $pair[1]) {
-            Invoke-Registry @('artifact', '--run', $RunJson, '--key', $pair[0], '--path', $pair[1], '--step', "$StepId") | Out-Null
-        }
+      if (-not (Test-Path -LiteralPath $pair[1] -PathType Leaf)) {
+        throw "步骤 $StepName 未产出必需文件：$($pair[1])"
+      }
+    }
+    foreach ($pair in $pairs) {
+      Invoke-Registry @('artifact', '--run', $RunJson, '--key', $pair[0], '--path', $pair[1], '--step', "$StepId") | Out-Null
     }
 }
 
@@ -325,8 +331,9 @@ function Get-Prop {
     return $property.Value
 }
 
-$Token = Get-MastergoToken
-$env:MASTERGO_MCP_TOKEN = $Token
+$StartStep = Get-Step $Progress
+$EndStep = if ($StopAfter) { Get-Step $StopAfter } else { $Steps[-1] }
+if ($EndStep.Id -lt $StartStep.Id) { throw "-StopAfter 不能早于 -Progress" }
 
 # 区域前缀的来源（只用于回显，便于复核"这个 ui 是谁给的"）；取值链见下方注释。
 $UiSource = $null
@@ -337,28 +344,59 @@ $cliFileId = $FileId
 $cliLayerId = $LayerId
 $cliUi = $Ui
 $cliDesignPageName = $DesignPageName
-$Registry = Get-ProjectTarget -Root $ProjectRoot -Target $Target -LayerId $LayerId
-if ($Registry) {
-    if (-not $Target) { $Target = $Registry.Target }
-    if (-not $LayerId) { $LayerId = $Registry.LayerId }
-    # fileId 与 layerId 同口径：命令行没给才读登记表；命令行给了就以命令行为准（不设"哨兵值"，
-    # 否则显式传入与"没传"无法区分，登记表会静默覆盖调用方的输入）。
-    if (-not $FileId) { $FileId = $Registry.FileId }
-    if (-not $DesignPageName) { $DesignPageName = $Registry.Design }
-    # 区域前缀：命令行没给就先看项目登记表（docs/page-registry.json）里的 pages[].ui / derivation 的 F<n>。
-    if (-not $Ui -and $Registry.Ui) { $Ui = $Registry.Ui; $UiSource = '项目登记表 docs/page-registry.json' }
-}
-
-# 身份混搭守卫：-Target 与 -LayerId 同时显式给出时，它们必须落在项目登记表的同一页。
-# 否则会出现"Target 取自 A 页、layerId 取自 B 页"的混合身份，登记表一落盘就自相矛盾
-# （后续续跑还会把它当成冻结身份回放）。
-if ($Registry -and $cliTarget -and $cliLayerId) {
-    $registryTarget = Get-Prop $Registry 'Target'
-    $registryLayerId = Get-Prop $Registry 'LayerId'
-    if ($registryTarget -and $registryLayerId -and
-        ($registryTarget -ne $cliTarget -or $registryLayerId -ne $cliLayerId)) {
-        throw "命令行同时给了 -Target '$cliTarget' 与 -LayerId '$cliLayerId'，但项目登记表里两者不属于同一页（-Target '$cliTarget' 对应 layerId '$registryLayerId'）：请确认要转换的页面——只给 -Target（让登记表补 layerId），或先按登记表登记本次页面的 designSource。"
+if ($Target -and $Target -cnotmatch '^[A-Za-z_][A-Za-z0-9_]*$') { throw "Target 必须是页面标识符" }
+$Registry = $null
+$frozenRegistry = $null
+if ($StartStep.Id -gt 1) {
+  if (-not $Target) { throw "续跑必须用 -Target 指定已有运行" }
+  $replayPath = Join-Path $ProjectRoot "Generated/runs/$Target/run.json"
+  if (-not (Test-Path -LiteralPath $replayPath)) {
+    throw "缺少运行登记表 $replayPath：请从 fetch 新开一次运行"
+  }
+  $frozenRegistry = Get-Content -LiteralPath $replayPath -Raw -Encoding UTF8 | ConvertFrom-Json
+  if ((Get-Prop $frozenRegistry 'schemaVersion') -cne 'mastergo-run-registry/1') {
+    throw "运行登记表 schemaVersion 不受支持"
+  }
+  $frozen = Get-Prop $frozenRegistry 'identity'
+  if ($null -eq $frozen -or $frozen -is [array]) { throw "运行登记表缺少有效 identity" }
+  foreach ($pair in @(@('fileId', 'FileId'), @('layerId', 'LayerId'), @('ui', 'Ui'), @('designPageName', 'DesignPageName'))) {
+    $value = [string](Get-Prop $frozen $pair[0] '')
+    if ($PSBoundParameters.ContainsKey($pair[1]) -and
+        [string](Get-Variable $pair[1] -ValueOnly) -cne $value) {
+      throw "续跑不能更改 identity.$($pair[0])（不属于同一页或配置）；请从 fetch 新开一次运行"
     }
+    Set-Variable -Name $pair[1] -Value $value
+  }
+  $UiSource = '运行登记表 run.json（续跑回放）'
+} else {
+  $Registry = Get-ProjectTarget -Root $ProjectRoot -Target $Target -LayerId $LayerId
+  if ($Registry) {
+      if (($cliTarget -and $cliTarget -cne $Registry.Target) -or
+          ($cliLayerId -and $Registry.LayerId -and $cliLayerId -cne $Registry.LayerId) -or
+          ($cliFileId -and $Registry.FileId -and $cliFileId -cne $Registry.FileId)) {
+          throw "命令行选择器与项目登记表不属于同一页；请修正 Target / FileId / LayerId 或登记本次页面"
+      }
+      if (-not $Target) { $Target = $Registry.Target }
+      if (-not $LayerId) { $LayerId = $Registry.LayerId }
+      # fileId 与 layerId 同口径：命令行没给才读登记表；命令行给了就以命令行为准（不设"哨兵值"，
+      # 否则显式传入与"没传"无法区分，登记表会静默覆盖调用方的输入）。
+      if (-not $FileId) { $FileId = $Registry.FileId }
+      if (-not $DesignPageName) { $DesignPageName = $Registry.Design }
+      # 区域前缀：命令行没给就先看项目登记表（docs/page-registry.json）里的 pages[].ui / derivation 的 F<n>。
+      if (-not $Ui -and $Registry.Ui) { $Ui = $Registry.Ui; $UiSource = '项目登记表 docs/page-registry.json' }
+  }
+
+  # 身份混搭守卫：-Target 与 -LayerId 同时显式给出时，它们必须落在项目登记表的同一页。
+  # 否则会出现"Target 取自 A 页、layerId 取自 B 页"的混合身份，登记表一落盘就自相矛盾
+  # （后续续跑还会把它当成冻结身份回放）。
+  if ($Registry -and $cliTarget -and $cliLayerId) {
+      $registryTarget = Get-Prop $Registry 'Target'
+      $registryLayerId = Get-Prop $Registry 'LayerId'
+      if ($registryTarget -and $registryLayerId -and
+          ($registryTarget -ne $cliTarget -or $registryLayerId -ne $cliLayerId)) {
+          throw "命令行同时给了 -Target '$cliTarget' 与 -LayerId '$cliLayerId'，但项目登记表里两者不属于同一页（-Target '$cliTarget' 对应 layerId '$registryLayerId'）：请确认要转换的页面——只给 -Target（让登记表补 layerId），或先按登记表登记本次页面的 designSource。"
+      }
+  }
 }
 # 区域前缀（`ui`）决定两件事：① capture 快照里的 `ui` 字段；② 宿主壳输出目录 `UI/<区域>/View|ViewModel`。
 # 取值顺序固定（不再写死 F2、也不静默兜底）：
@@ -369,7 +407,7 @@ if ($Registry -and $cliTarget -and $cliLayerId) {
 #   ⑤ 没有编号时取 Target 的首个英文词（CamelCase 首段：`HomeContent` → `Home`、`Home` → `Home`、
 #      全大写 `HOME` → `HOME`）——即"外层的语义英文"
 #   ⑥ 都取不到 → 报错，要求显式给出
-if (-not $Ui -and $Target) {
+if ($StartStep.Id -eq 1 -and -not $Ui -and $Target) {
     # 必须用 -cmatch（大小写敏感）：PowerShell 的 -match 默认大小写不敏感，
     # 会让 `[A-Z]+(?![a-z])` 把 `HomeContent` 整串吃掉（`[A-Z]` 也会匹配小写字母）。
     if ($Target -cmatch '^([A-Za-z]+\d+)') { $Ui = $Matches[1]; $UiSource = "Target 编号前缀（$Target）" }
@@ -393,10 +431,11 @@ foreach ($required in @('Target', 'LayerId')) {
     if (-not $value) { throw "缺少 -$required（或在 docs/page-registry.json 里登记后省略）" }
 }
 
+if ($Target -cnotmatch '^[A-Za-z_][A-Za-z0-9_]*$') { throw "Target 必须是页面标识符" }
 $Generated = Join-Path $ProjectRoot 'Generated'
 $Inputs = Join-Path $Generated '_inputs'
 $Work = Join-Path $Generated '_work'
-$StepLogs = Join-Path $Work 'steps'
+$StepLogs = Join-Path $Work "steps/$Target"
 # 采集产物按页归档：一个项目里可以有多张页面，共用一个目录会互相覆盖（旧页重跑时会拿到别的页的
 # extractSvg/snapshot，导致核对基于错误数据）。所有 DSL 采集产物一律落在 runs\<Target>\ 下。
 $RunDir = Join-Path $Generated "runs\$Target"
@@ -419,57 +458,16 @@ $BundleAuditJson = Join-Path $Generated "$Target.bundle.manifest.json"
 $PageXml = Join-Path $ProjectRoot "Resources\Pages\$Target\${Target}Page.xml"
 
 # 页面标题的人工确认值：登记表里有就带上（否则标题会退回设计页名原文，带 (x.y) 编号）。
-$PageTitleText = if ($Registry -and $Registry.PageTitleText) { $Registry.PageTitleText } else { '' }
+$PageTitleText = if ($frozenRegistry) { Get-Prop (Get-Prop $frozenRegistry 'inputs') 'pageTitleText' '' }
+  elseif ($Registry -and $Registry.PageTitleText) { $Registry.PageTitleText } else { '' }
 
-$StartStep = Get-Step $Progress
-$EndStep = if ($StopAfter) { Get-Step $StopAfter } else { $Steps[-1] }
-if ($EndStep.Id -lt $StartStep.Id) { throw "-StopAfter 不能早于 -Progress" }
-
-# 断点续跑：身份四项一律回放首次运行冻结在 run.json 里的值——续跑是"沿用同一次运行的身份"，
-# 不是"重新做一次身份判定"。这样 capture 拿到的一定是首次那份身份（不会退回 DSL 根节点名），
-# 项目登记表 `docs/page-registry.json` 之后的增删改也不会再影响正在续跑的这一次。
-# 省略 → 用冻结值；显式传不同的值、或给首次运行时缺失的身份补值 → fail-closed，改身份只能新开运行。
-if ($StartStep.Id -gt 1) {
-    if (-not (Test-Path -LiteralPath $RunJson)) {
-        throw "缺少运行登记表 $RunJson：续跑只能沿用同一次运行的身份，请改从 fetch 新开一次运行（不带 -Progress）"
-    }
-    try {
-        $frozenRegistry = Get-Content -LiteralPath $RunJson -Raw -Encoding UTF8 | ConvertFrom-Json
-    }
-    catch {
-        throw "运行登记表 $RunJson 不是合法 JSON：$($_.Exception.Message)"
-    }
-    $frozen = Get-Prop $frozenRegistry 'identity'
-    if ($null -eq $frozen) {
-        throw "运行登记表 $RunJson 缺少 identity：请从 fetch 新开一次运行（不带 -Progress）"
-    }
-    $replayFields = @(
-        [pscustomobject]@{ Field = 'fileId'; Frozen = (Get-Prop $frozen 'fileId'); Explicit = $cliFileId; Resolved = $FileId }
-        [pscustomobject]@{ Field = 'layerId'; Frozen = (Get-Prop $frozen 'layerId'); Explicit = $cliLayerId; Resolved = $LayerId }
-        [pscustomobject]@{ Field = 'ui'; Frozen = (Get-Prop $frozen 'ui'); Explicit = $cliUi; Resolved = $Ui }
-        [pscustomobject]@{ Field = 'designPageName'; Frozen = (Get-Prop $frozen 'designPageName'); Explicit = $cliDesignPageName; Resolved = $DesignPageName }
-    )
-    foreach ($item in $replayFields) {
-        $frozenValue = if ($item.Frozen) { [string]$item.Frozen } else { '' }
-        $explicitValue = if ($item.Explicit) { [string]$item.Explicit } else { '' }
-        $resolvedValue = if ($item.Resolved) { [string]$item.Resolved } else { '' }
-        if (-not $frozenValue) {
-            # 首次运行时这一项没有身份（例如当时还没登记设计页名）：不得在续跑里补写。
-            if ($resolvedValue) {
-                throw "续跑不能为首次运行缺失的身份 identity.$($item.Field) 补值（本次解析出 '$resolvedValue'）：请从 fetch 新开一次运行（不带 -Progress）"
-            }
-            continue
-        }
-        if ($explicitValue -and $explicitValue -ne $frozenValue) {
-            throw "续跑不能更改 identity.$($item.Field)（首次运行 = '$frozenValue'，本次显式传入 = '$explicitValue'）：请从 fetch 新开一次运行（不带 -Progress）"
-        }
-        switch ($item.Field) {
-            'fileId' { $FileId = $frozenValue }
-            'layerId' { $LayerId = $frozenValue }
-            'ui' { $Ui = $frozenValue; $UiSource = '运行登记表 run.json（续跑回放）' }
-            'designPageName' { $DesignPageName = $frozenValue }
-        }
-    }
+# Refetch is an explicit new run, never an implicit overwrite of its evidence.
+if ($StartStep.Id -eq 1 -and ((Test-Path -LiteralPath $GetDslJson) -or (Test-Path -LiteralPath $SnapshotJson))) {
+  throw "已存在采集证据：请先归档整个 $RunDir，再从 fetch 新开一次运行；-Overwrite 不覆盖原始采集"
+}
+# Offline resume never requires a MasterGo credential.
+if ($StartStep.Id -le 3 -and ($EndStep.Id -ge 3 -or $StartStep.Id -eq 1)) {
+  $env:MASTERGO_MCP_TOKEN = Get-MastergoToken
 }
 
 Write-Output ("项目: {0}" -f $ProjectRoot)
@@ -499,42 +497,54 @@ Write-Output ''
 foreach ($step in $Steps) {
     if ($step.Id -lt $StartStep.Id -or $step.Id -gt $EndStep.Id) { continue }
 
-    # 前置检查：断点续跑时，前面跳过但仍需存在的产物在这里兜底
-    switch ($step.Name) {
-        'capture'    { Assert-File $GetDslJson   "缺少 $GetDslJson：请先跑 -Progress fetch"
-                       Assert-RegisteredInput 'getDsl' }
-        'visibility' { Assert-File $SnapshotJson "缺少 $SnapshotJson：请先跑 -Progress capture"
-                       Assert-RegisteredInput 'snapshot' }
-        'mapping'    { Assert-File $SnapshotJson "缺少 $SnapshotJson：请先跑 -Progress capture"
-                       Assert-File $VisibilityJson "缺少 $VisibilityJson：请先跑 -Progress visibility"
-                       Assert-RegisteredInput 'snapshot'
-                       Assert-RegisteredInput 'visibility' }
-        'discover'   { Assert-File $SvgJson "缺少 $SvgJson：请先跑 -Progress svg"
-                       $mappingForDiscover = if (Test-Path -LiteralPath $DraftMappingJson) { $DraftMappingJson } else { $MappingAuditJson }
-                       Assert-File $mappingForDiscover "缺少 mapping（$DraftMappingJson 或 $MappingAuditJson）：请先跑 -Progress mapping"
-                       Assert-RegisteredInput 'extractSvg'
-                       Assert-RegisteredInput 'mappingDraft' }
-        'ledger'     { Assert-RegisteredInput 'iconCandidates' }
-        'layout'     { if (-not $AllowEmptyLedger) { Assert-File $LedgerJson "缺少图标台账 $LedgerJson（人工/AI 定名后的输入）" }
-                       Assert-RegisteredInput 'snapshot'
-                       Assert-RegisteredInput 'iconMap' }
-        'inputs'     { if (-not $AllowEmptyLedger) { Assert-File $LedgerJson "缺少图标台账 $LedgerJson" }
-                       Assert-File $TranslationsJson "缺少译文清单 $TranslationsJson（页面文案的英文译文必须显式落盘）"
-                       Assert-RegisteredInput 'layoutManifest' }
-        'bundle'     { Assert-File $BundleJson "缺少 Bundle 清单 $BundleJson：请先跑 -Progress inputs"
-                       Assert-File $SvgJson "缺少 $SvgJson：请先跑 -Progress svg"
-                       Assert-RegisteredInput 'bundleManifest'
-                       Assert-RegisteredInput 'extractSvg' }
-        'gates'      { Assert-File $BundleAuditJson "缺少 Bundle 审计 $BundleAuditJson：请先跑 -Progress bundle" }
-        'verify'     { Assert-File $PageXml "缺少页面 XML $PageXml：请先跑 -Progress bundle" }
-    }
-
     $log = Join-Path $StepLogs ('{0:D2}-{1}.log' -f $step.Id, $step.Name)
     $watch = [System.Diagnostics.Stopwatch]::StartNew()
     $note = ''
     Write-Output ("[{0:D2}] {1} …" -f $step.Id, $step.Title)
 
     try {
+    # 前置检查：断点续跑时，前面跳过但仍需存在的产物在这里兜底
+    switch ($step.Name) {
+        'svg'        { Assert-RegisteredInput 'snapshot' $SnapshotJson
+                       Assert-RegisteredInput 'coverage' $CoverageJson }
+        'capture'    { Assert-File $GetDslJson   "缺少 $GetDslJson：请先跑 -Progress fetch"
+                       Assert-RegisteredInput 'getDsl' $GetDslJson }
+        'visibility' { Assert-File $SnapshotJson "缺少 $SnapshotJson：请先跑 -Progress capture"
+                       Assert-RegisteredInput 'snapshot' $SnapshotJson }
+        'mapping'    { Assert-File $SnapshotJson "缺少 $SnapshotJson：请先跑 -Progress capture"
+                       Assert-File $VisibilityJson "缺少 $VisibilityJson：请先跑 -Progress visibility"
+                       Assert-RegisteredInput 'snapshot' $SnapshotJson
+                       Assert-RegisteredInput 'visibility' $VisibilityJson }
+        'discover'   { Assert-File $SvgJson "缺少 $SvgJson：请先跑 -Progress svg"
+                       $mappingForDiscover = if (Test-Path -LiteralPath $DraftMappingJson) { $DraftMappingJson } else { $MappingAuditJson }
+                       Assert-File $mappingForDiscover "缺少 mapping（$DraftMappingJson 或 $MappingAuditJson）：请先跑 -Progress mapping"
+                       Assert-RegisteredInput 'extractSvg' $SvgJson
+                       Assert-RegisteredInput 'mappingDraft' $DraftMappingJson
+                       Assert-RegisteredInput 'snapshot' $SnapshotJson }
+        'ledger'     { Assert-RegisteredInput 'iconCandidates' $CandidateJson
+                       Assert-RegisteredInput 'snapshot' $SnapshotJson
+                       Assert-RegisteredInput 'extractSvg' $SvgJson }
+        'layout'     { if (-not $AllowEmptyLedger) { Assert-File $LedgerJson "缺少图标台账 $LedgerJson（人工/AI 定名后的输入）" }
+                       Assert-RegisteredInput 'snapshot' $SnapshotJson
+                       Assert-RegisteredInput 'iconMap' $LedgerJson }
+        'inputs'     { if (-not $AllowEmptyLedger) { Assert-File $LedgerJson "缺少图标台账 $LedgerJson" }
+                       Assert-File $TranslationsJson "缺少译文清单 $TranslationsJson（页面文案的英文译文必须显式落盘）"
+                       Assert-RegisteredInput 'layoutManifest' $LayoutManifestJson
+                       Assert-RegisteredInput 'iconMap' $LedgerJson }
+        'bundle'     { Assert-File $BundleJson "缺少 Bundle 清单 $BundleJson：请先跑 -Progress inputs"
+                       Assert-File $SvgJson "缺少 $SvgJson：请先跑 -Progress svg"
+                       Assert-RegisteredInput 'bundleManifest' $BundleJson
+                       Assert-RegisteredInput 'extractSvg' $SvgJson }
+        'gates'      { Assert-File $BundleAuditJson "缺少 Bundle 审计 $BundleAuditJson：请先跑 -Progress bundle"
+                       Assert-RegisteredInput 'coverage' $CoverageJson
+                       Invoke-Registry @('check-output', '--run', $RunJson, '--path', "Generated/$Target.bundle.manifest.json") | Out-Null
+                       Invoke-Registry @('check-output', '--run', $RunJson, '--path', "Generated/$Target.mapping.json") | Out-Null }
+        'verify'     { Assert-File $PageXml "缺少页面 XML $PageXml：请先跑 -Progress bundle"
+                       foreach ($output in @("Resources/Pages/$Target/${Target}Page.xml", "Generated/$Target.mapping.json")) {
+                         Invoke-Registry @('check-output', '--run', $RunJson, '--path', $output) | Out-Null
+                       } }
+    }
+
         switch ($step.Name) {
             'fetch' {
                 Invoke-StepCommand -Label 'getDsl' -LogFile $log -File 'node' -Arguments @(
@@ -614,7 +624,7 @@ foreach ($step in $Steps) {
                     '--out', $LayoutManifestJson,
                     '--report', (Join-Path $Inputs "$Target.layout-manifest.report.json")) | Out-Null
                 $layout = Get-Content -LiteralPath $LayoutManifestJson -Raw -Encoding UTF8 | ConvertFrom-Json
-                if ($layout.layoutStatus -ne 'complete') { throw "Layout 清单不完整: layoutStatus=$($layout.layoutStatus)（日志: $log）" }
+                if ($layout.layoutStatus -notin @('complete', 'none')) { throw "Layout 清单不完整: layoutStatus=$($layout.layoutStatus)（日志: $log）" }
                 if ($layout.layoutEvidence.unresolvedBottomBarItems -ne 0) { throw "底部栏有 $($layout.layoutEvidence.unresolvedBottomBarItems) 个未命中变体的实例（日志: $log）" }
                 $note = "菜单项 $(@($layout.menuItems).Count) 个"
             }
@@ -688,7 +698,7 @@ foreach ($step in $Steps) {
         }
         Invoke-Registry @('step', '--run', $RunJson, '--id', "$($step.Id)", '--name', $step.Name,
             '--status', 'ok', '--seconds', "$seconds", '--note', $note,
-            '--log', (Join-Path $Work ('steps\{0:D2}-{1}.log' -f $step.Id, $step.Name))) | Out-Null
+            '--log', ([IO.Path]::GetRelativePath($ProjectRoot, $log))) | Out-Null
         $results.Add([pscustomobject]@{ Id = $step.Id; Name = $step.Name; Status = 'ok'; Seconds = $seconds; Note = $note })
         Write-Output ("      ok  {0}s  {1}" -f $seconds, $note)
     }

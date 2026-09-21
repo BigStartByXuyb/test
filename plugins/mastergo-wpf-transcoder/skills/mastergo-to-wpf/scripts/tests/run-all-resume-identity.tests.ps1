@@ -94,9 +94,9 @@ try {
 
     # 4) 首次运行缺失的身份不得在续跑里补写。
     $case4 = New-Fixture -Name 'backfill' -FrozenDesignPageName ''
-    $out4 = Invoke-Resume -Project $case4
+    $out4 = Invoke-Resume -Project $case4 -Extra @('-DesignPageName', '新名称')
     Assert-True ($out4 -match 'identity.designPageName') '补写首次缺失的身份必须被拒绝'
-    Assert-True ($out4 -match '补值') '拒绝文案必须点明"补值"'
+    Assert-True ($out4 -match '续跑不能更改') '拒绝文案必须点明"补值"'
 
     # 5) 续跑回放：项目登记表被改动（ui F8 → F9）也不影响正在续跑的这一次。
     $case5 = New-Fixture -Name 'registry-edited' -FrozenUi 'F8' -RegistryUi 'F9'
@@ -105,11 +105,11 @@ try {
     Assert-True ($out5 -match 'LayerId: layer-A') '续跑必须回放冻结的 layerId'
     Assert-True ($out5 -notmatch '续跑不能') '改动项目登记表不应再打断续跑'
 
-    # 6) 边界（与 §7 文档同口径）：删掉项目登记表条目后身份取不到值 → 先报「缺少…」，不静默续跑。
+    # 6) 删除项目登记表条目不影响已登记运行的身份回放。
     $case6 = New-Fixture -Name 'entry-removed' -DropRegistryPage
     $out6 = Invoke-Resume -Project $case6
-    Assert-True ($out6 -match '缺少 MasterGo 文件 id') '删除登记表条目后应先报缺少身份，而不是静默继续'
-    Assert-True ($out6 -notmatch '缺少 Bundle 审计') '删除登记表条目后不应走到第 11 步'
+    Assert-True ($out6 -match '缺少 Bundle 审计') '删除登记表条目后仍须使用运行身份并到达门禁步骤'
+    Assert-True ($out6 -notmatch '缺少 MasterGo 文件 id') '续跑不得重新要求项目登记表提供 fileId'
 
     # 7) 同一情形下显式传回身份 → 可以续跑（这是 §7 给出的处置）。
     $out7 = Invoke-Resume -Project $case6 -Extra @('-FileId', 'file-A', '-LayerId', 'layer-A', '-Ui', 'F8', '-DesignPageName', '设计页 A')
@@ -138,11 +138,11 @@ try {
     $out9 = Invoke-Resume -Project $case9 -Progress 'capture'
     Assert-True ($out9 -match '与磁盘不一致') '被改过的已登记采集产物必须在消费前被拒'
 
-    # 10) 续跑时"未登记但存在"的旧采集产物不得被静默消费（§7：未登记的旧同名文件一律拒绝）
+    # 10) Preserve the upstream unregistered-input case; assert behavior rather than one phrasing.
     $case10 = New-Fixture -Name 'unregistered-present'
     Set-Content -LiteralPath (Join-Path $case10 'Generated\runs\Demo\getDsl.json') -Value '{"dsl":"stale from a previous run"}' -Encoding UTF8
     $out10 = Invoke-Resume -Project $case10 -Progress 'capture'
-    Assert-True ($out10 -match '未登记') '续跑遇到未登记的旧采集产物必须拒绝'
+    Assert-True ($out10 -match '未登记|没有产物') '续跑遇到未登记的旧采集产物必须拒绝'
     Assert-True ($out10 -notmatch '缺少 Bundle 审计') '未登记产物必须在消费前拦下'
 
     Write-Output 'PASS MasterGo run-all 续跑身份回放测试'

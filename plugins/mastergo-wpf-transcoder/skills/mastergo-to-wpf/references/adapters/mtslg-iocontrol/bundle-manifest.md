@@ -134,12 +134,15 @@ Bundle **不会**把新页面的文件写进 `.csproj`（实测 `csprojChanged=F
 
 **硬规则**
 
-1. **产出即登记**：`run-all.ps1` 每一步成功后就登记该步产物（`run-registry.mjs artifact`）；中途失败也把该步状态写进 `steps`。
+1. **产出即登记**：子进程退出 0 还不够；所有声明产物必须实际存在，缺一个即整步失败。`run-all.ps1` 每一步成功后就登记该步产物（`run-registry.mjs artifact`）；中途失败也把该步状态写进 `steps`。
 2. **消费只按登记**：`build-bundle-manifest.mjs <…> <area> --run-json <run.json>` 从登记表取 `snapshot` / `visibility` / `extractSvg`，并把 `sha256` 写进清单 `runRegistry.digests`；Bundle 读清单时**复校**：路径按登记表解析、`sha256` 与 `digests` 一致、`runId` 一致。**`--run-json` 是必填**——缺了直接报错，不再回落到顶层 `Generated/*.json`（`area` 同理必填，推导只在 run-all.ps1 里做一次）。
 3. **未登记的旧同名文件一律拒绝**：Bundle 直接失败并点名它**实际消费的三个采集输入**——`Generated/dsl.snapshot.json`、`Generated/visibility.json`、`Generated/extractSvg.json`（内容与本次登记恰好一致时只提示可清理）。其余同层文件（`Generated/coverage-report.json`、`Generated/manifest.json`、`Generated/timing.json`、`Generated/getDsl.json`）不参与输入解析，由 `run-registry.mjs check` 按同一张 `LEGACY_SHADOWS` 表列出。
-4. **断点续跑（身份不可变）**：`run-all.ps1 -Progress <步骤>` 且步骤号大于 1 时才用 `run-registry.mjs init --keep`。续跑**优先回放首次运行冻结的身份**：`fileId` / `layerId` / `ui` / `designPageName` 取 `run.json` 的 `identity`，命令行显式值必须与它一致——所以项目登记表里**改了值**不影响续跑（回放赢）。身份解析顺序仍是「命令行 → 项目登记表」，因此**删掉登记表条目**时取不到值会先报「缺少…」；此时显式传回 `-FileId` / `-LayerId` / `-Ui` / `-DesignPageName` 即可续跑（**步骤循环内**失败时脚本会打印带全参数的续跑命令；这条例出的身份解析段失败发生在循环之前，不会打印，需自行带上这四个参数）。`-Progress fetch`（第 1 步）不带 `--keep`，一律新开一次运行：新 `runId`、产物登记清空，登记表不存在时直接新建；步骤号大于 1 而运行登记表缺失时直接报错，提示从 `fetch` 新开。`target` / 归一化后的 `projectRoot` / schema 由守卫直接校验，失败发生在保存之前、原登记表逐字节不变；不得通过编辑 `run.json` 绕过。
-   - **省略 → 用冻结值**：冻结值非空时 capture 拿到的就是首次那份身份（不会退回 DSL 根节点名）。冻结值为空时分两种：本次解析**仍为空** → 按既有口径兜底；本次解析出**非空** → 按「不得补写」失败。
-   - **逐阶段输入复校**：每步消费前对它实际消费的产物复校 sha256；续跑路径上若该产物**未登记**（存在但没进本次 `run.json`），按「未登记的旧同名文件一律拒绝」直接失败。
-   - **显式传入不同值 → fail-closed**：要换设计来源或运行配置就是**新开一次运行**（不带 `-Progress`），那时才按「命令行 → 项目登记表 `docs/page-registry.json` → 报错」重新解析身份；已有产物要重写时用 `-Overwrite` + 清单 `operation=replace-existing`。
-   - **语义输入不受限**：标题 / 译文 / 术语表 / 图标命名在续跑里照旧可改（它们不属于 `identity`）。
+4. **断点续跑（身份不可变）**：步骤号大于 1 时必须给 `-Target`，入口先读取已有 `run.json`，再执行任何步骤；不读取项目登记表，也不重新推导 `fileId` / `layerId` / `ui` / `designPageName`。省略参数沿用冻结值（包括空的设计页名），显式参数必须逐字一致；项目登记表被改名、删除、清空或损坏均不影响已有运行。原运行目录/schema/target/projectRoot 不匹配则拒绝，不通过修改 `run.json` 绕过。
+   - 离线步骤不索取 MasterGo token；只有本区间包含 `fetch` 或 `svg` 才需要凭证。
+   - `fetch` 新建登记表前先检查旧采集证据；存在 `getDsl.json` 或快照时必须先归档**整个运行目录及原始 capture**。`-Overwrite` 只授权页面产物替换，不授权覆盖采集证据。独立 MCP 调用器同样拒绝不同字节覆盖已有 `getDsl`；完全相同的字节可重复使用。错误/不完整的响应不发布，写入使用同目录暂存文件。
+   - 标题沿用已登记输入；译文、术语表与图标命名仍是可修改的语义输入。改动后从消费该输入的阶段重跑，不能以跳过生成后的旧校验结果代替新验收。
 5. **手工调用**：`node scripts/run-registry.mjs init|artifact|step|path|check|outputs|show`。不带 `--key` 的 `check` 只检查本次已登记的产物，允许未完成的运行；显式 `check --key <产物键>` 必须命中 `ARTIFACT_KEYS` 且该产物已登记，否则非零退出，不能静默跳过。两种方式都复算所检查文件的 sha256，并核对旧同名文件；`--quiet` 只关闭成功摘要，不豁免任何失败。
+
+6. **逐阶段消费边界**：采集与派生的必需输入必须已登记，消费前复算摘要并核对登记路径等于实际消费路径；不再跳过缺登记的输入。失败记录进 `steps`。页面验收通过 `check-output --path <项目相对路径>` 核对本页 mapping、Bundle 审计与页面 XML 的输出摘要；项目共享 Layout 仍按本页子树结构验证，不用跨页文件摘要阻断另一页的合法更新。
+7. **跨对象绑定**：清单构建器与 Bundle 都必须验证 `target == name/pageTarget`、`identity.ui == area`、`projectRoot` 一致；Bundle 在创建脚手架前检查。哈希一致不代表来自本次请求的页面。
+8. **SVG 完整性**：采集从第 0 页开始，要求每页 `svgs`、boolean `hasMore` 和非负整数 `totalCount`；后续页错误、计数变化、重复 id、无进展或超时均拒绝发布。上限 100 页，超时覆盖整个交换过程而不在首个响应后取消；任何失败保留旧文件。此检查是本地一致性验证，不是源站真实性认证。
