@@ -67,10 +67,10 @@ $TemplateMap = Join-Path $SkillRoot 'references\adapters\mtslg-iocontrol\mtslg-i
 $Steps = @(
     [pscustomobject]@{
         Id = 1; Name = 'fetch'; Title = '取数 getDsl（只落盘，不进上下文）'
-        Inputs   = @('MasterGo 文件 id 与图层 id（命令行 -FileId/-LayerId，或项目登记表 docs/page-registry.json）', 'MasterGo MCP token（MASTERGO_MCP_TOKEN 或 -ConfigPath 指向的配置）')
+        Inputs   = @('MasterGo 文件 id 与图层 id（命令行 -FileId/-LayerId，或项目登记表 docs/page-registry.json 里能命中本次页面的那一条）', 'MasterGo MCP token（MASTERGO_MCP_TOKEN 或 -ConfigPath 指向的配置）')
         Outputs  = @('Generated/runs/<Target>/getDsl.json', '运行登记表 Generated/runs/<Target>/run.json（产出即登记）')
-        Failures = @('缺 fileId 或 layerId', 'MasterGo MCP token 缺失或失效', 'MCP 调用失败/超时')
-        Recovery = @('显式传 -FileId/-LayerId 或补项目登记表（脚本不内置任何项目的文件 id）', '补 token 后重跑：-Progress fetch')
+        Failures = @('缺 fileId 或 layerId', '登记表有多条页面，但没用 -Target/-LayerId 命中本次页面（脚本不取第一页顶上）', 'MasterGo MCP token 缺失或失效', 'MCP 调用失败/超时', 'MCP 返回业务错误码（如 code=20001「获取文件key异常」，说明 fileId/layerId 不存在或无权限）')
+        Recovery = @('显式传 -FileId/-LayerId，或在登记表里登记本次页面；多页登记表必须先用 -Target 或 -LayerId 选中本次页面', '补 token 后重跑：-Progress fetch', '业务错误码：核对该 fileId/layerId（或登记表设计来源）后重跑：-Progress fetch')
     },
     [pscustomobject]@{
         Id = 2; Name = 'capture'; Title = 'DSL 结构化快照 + 覆盖校验'
@@ -609,7 +609,8 @@ foreach ($step in $Steps) {
         Write-Output ''
         Write-Output ("!! 步骤 {0}({1}) 失败：{2}{3}" -f $step.Id, $step.Name, $_.Exception.Message, $where)
         if ($_.ScriptStackTrace) { Write-Output ("   调用链: " + (($_.ScriptStackTrace -split "`n" | Select-Object -First 4) -join ' <- ')) }
-        Write-Output ("   修好后从这一步继续：pwsh -NoProfile -File _tool\run-all.ps1 -Progress {0}{1}" -f $step.Name, $(if ($Overwrite) { ' -Overwrite' } else { '' }))
+        # 续跑命令带上目标信息：登记表有多页时必须能命中本次页面（只写 -Progress 会取不到来源）。
+        Write-Output ("   修好后从这一步继续：pwsh -NoProfile -File _tool\run-all.ps1 -ProjectRoot `"$ProjectRoot`" -Target {0} -Progress {1}{2}" -f $Target, $step.Name, $(if ($Overwrite) { ' -Overwrite' } else { '' }))
         Write-Output ''
         Write-Output '--- 本区间进度 ---'
         $results | ForEach-Object { '{0,2} {1,-10} {2,-7} {3,6}s' -f $_.Id, $_.Name, $_.Status, $_.Seconds }

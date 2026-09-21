@@ -72,10 +72,10 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 - 区域前缀（`ui`）：取值链的唯一实现在 `run-all.ps1`（`-Ui` → 项目登记表 `pages[].ui` / `derivation` → Target 编号前缀 → Target 首词 → **报错**）；取不到就报错，不静默默认。`fileId` / `layerId` 同样按「命令行 → 项目登记表 → 报错」解析，插件不内置任何项目的设计来源。
 
 ```powershell
-pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -ProjectRoot <项目> -Target <Target>   # 一次跑完 12 步
-pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -ProjectRoot <项目> -Progress bundle  # 失败后从该步继续
-pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -ProjectRoot <项目> -Overwrite        # 仅用户明确要求替换时
-pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -List -Format json                    # 12 步契约（机器可读）
+pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -ProjectRoot <项目> -Target <Target>                       # 一次跑完 12 步
+pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -ProjectRoot <项目> -Target <Target> -Progress <步骤名>     # 失败后从该步继续
+pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -ProjectRoot <项目> -Target <Target> -Overwrite            # 仅用户明确要求替换时
+pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -List -Format json                                        # 12 步契约（机器可读）
 ```
 
 ### 模型必须提供的三类页面级输入（语义判断不进脚本）

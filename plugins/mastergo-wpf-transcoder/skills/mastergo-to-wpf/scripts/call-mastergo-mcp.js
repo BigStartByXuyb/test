@@ -216,6 +216,8 @@ function shutdown(exitCode) {
   // 工具把业务错误也当作正常结果返回（`result.isError` 为假），例如伪造 fileId 时
   // getDsl 返回 {"code":"20001","message":"…获取文件key异常"}。这类响应必须在这里就失败，
   // 否则第 1 步会报 ok、错误要到下一步才暴露（"取数成功"的假象）。
+  // 只把「非零业务码 + 缺少该工具应有的负载字段」判为失败，避免把恰好带 code 字段的成功响应误判。
+  const PAYLOAD_KEYS = { getDsl: ["dsl", "nodes"], extractSvg: ["svgs"] };
   const payloadError = (function () {
     let parsed;
     try { parsed = JSON.parse(text); } catch (error) { return null; }
@@ -223,6 +225,8 @@ function shutdown(exitCode) {
     if (parsed.code === undefined || parsed.code === null) return null;
     const code = String(parsed.code).trim();
     if (code === "" || code === "0" || code === "200") return null;
+    const expected = PAYLOAD_KEYS[args.tool] || [];
+    if (expected.some(function (key) { return parsed[key] !== undefined; })) return null;
     return "MCP 返回错误码 " + code + (parsed.message ? "：" + String(parsed.message).slice(0, 200) : "");
   })();
   if (payloadError) console.error(payloadError + "（响应已落盘: " + absolute + "）");
