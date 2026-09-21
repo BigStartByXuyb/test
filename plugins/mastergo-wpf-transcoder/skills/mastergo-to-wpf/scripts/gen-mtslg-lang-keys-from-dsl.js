@@ -34,8 +34,9 @@
  *
  * 【全量多语言】设计稿给出的**每个 Value 都产键挂 LangName**，不按文本形态（数字 / 符号 / 版本号 /
  * 日期时间 / 型号…）做豁免。中英文写法完全相同的文本只是 EN 值等于原文，不会记入 pendingTranslations；
- * 逐条列在报告 identicalTextKeys 里供交付说明核对。唯一的例外是映射表在值槽位登记 langRefPolicy=none
- * 的节点（当前只有选择框 Value，运行时由数据决定），它们不产键、不挂 LangName，记入 valueLangExempt。
+ * 逐条列在报告 identicalTextKeys 里供交付说明核对。不产键的只有两类：① 映射表在值槽位登记 langRefPolicy=none
+ * 的节点（当前只有选择框 Value，运行时由数据决定），记入 valueLangExempt；② 空文本节点（Value 为空串，无文案可翻译）——
+ * 照常发射 Value 空串、不挂 LangName，也不进任何豁免清单。
  * 例外：Layout 的 MenuItem 必须挂 LangName，所以菜单名仍会派生 key（命名优先用 Icon 资源名）。
  *
  * 【英文文案】取值优先级：

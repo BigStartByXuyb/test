@@ -23,7 +23,7 @@ param(
     [string] $SkillRoot,
     [string] $FileId = '181586559903927',
     [string] $LayerId,
-    [string] $Ui = 'F2',
+    [string] $Ui,
     [string] $Target,
     [string] $DesignPageName = '',
     [string] $Progress = '1',
@@ -94,7 +94,8 @@ function Get-ProjectTarget {
         Target  = $page.target
         LayerId = $page.designSource.layerId
         FileId  = $page.designSource.fileId
-        Ui      = if ($page.derivation -match '\bF\d+\b') { $Matches[0] } else { $null }
+        # derivation 是可选说明字段：老登记表可能没有它（Set-StrictMode 下直接取会抛错）。
+        Ui      = if ($page.PSObject.Properties['derivation'] -and $page.derivation -match '\bF\d+\b') { $Matches[0] } else { $null }
         Design  = $page.designSource.designPageName
         # 页面标题的人工确认值：机械流水线必须带上它，否则标题会退回设计页名原文（带 (x.y) 编号）。
         # 该字段是可选登记项：老登记表没有它时不能因为 Set-StrictMode 直接抛错。
@@ -192,7 +193,10 @@ if ($Registry) {
     if (-not $LayerId) { $LayerId = $Registry.LayerId }
     if (-not $FileId -or $FileId -eq '181586559903927') { $FileId = $Registry.FileId }
     if (-not $DesignPageName) { $DesignPageName = $Registry.Design }
+    # 区域前缀：命令行没给就从登记表 derivation 里取到的 F<n> 用上（仍没有则退回 F2）。
+    if (-not $Ui -and $Registry.Ui) { $Ui = $Registry.Ui }
 }
+if (-not $Ui) { $Ui = 'F2' }
 
 foreach ($required in @('Target', 'LayerId')) {
     $value = Get-Variable -Name $required -ValueOnly
