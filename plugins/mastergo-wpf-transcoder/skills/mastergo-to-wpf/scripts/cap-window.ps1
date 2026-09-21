@@ -2,7 +2,7 @@
 # 用法:
 #   powershell -NoProfile -File cap-window.ps1 -ProcName SsdMainMenu -Out shot.png
 #   powershell -NoProfile -File cap-window.ps1 -ProcName SsdMainMenu -Out shot.png -Crop "540,1390,260,140" -CropOut card.png
-#   pwsh -NoProfile -File cap-window.ps1 -ProcName SsdMainMenu -Out shot.png -Method screen   # 窗口被遮挡时改屏幕抓取
+#   pwsh -NoProfile -File cap-window.ps1 -ProcName SsdMainMenu -Out shot.png -Method screen   # printwindow 截不出内容时才用（要求窗口可见且在最前）
 param(
   [Parameter(Mandatory=$true)][string]$ProcName,
   [Parameter(Mandatory=$true)][string]$Out,

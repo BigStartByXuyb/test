@@ -53,11 +53,11 @@ Bundle 的页面 XML 步骤恒为 `--fresh`，因此**没有合并语义**：`op
 | `nesting` | 默认开启 | `{ "enabled": false }` 可关掉容器嵌套重挂 |
 | `excludeInstances` | 无 | 逗号/空白分隔的实例 ref，排除出映射 |
 | `runRegistry` | 无 | **运行登记表绑定**（推荐由 `run-all.ps1` 写入）：`{ path, runId, digests }`。给了就**只按登记表解析采集输入**（DSL 快照 / 可见性 / extractSvg）、逐项复校 sha256，并拒绝"未登记的旧同名文件"；详见 §7 |
-
-> `contentOriginY` **不是清单字段**：清单里写它不会被读取。`192` 的规则作用在 **mapping** 上——`gen-mtslg-mapping-from-dsl.js` 恒写 `contentOriginY: 192`，`gen-mastergo-page-bundle.js` 与 `validate-iocontrol-provenance.js` 对非 192 的 mapping 直接失败（坐标细则见 `mtslg-mode.md` 第 3 节）。
 | `generatedRoot` / `pagesRoot` / `iconsRoot` / `indexRoot` / `sourceRoot` / `resourceRoots` | 见脚本 | 目录约定覆盖 |
 
 `viewName` / `viewModelName` / `xmlPageName` / `pageTarget` / `pageLangName` / `pageTitleText` / `comment` 缺省由 `name` 派生（`{name}View` / `{name}ViewModel` / `{name}Page` / `{name}` / `{name}PageTitle`）。
+
+> `contentOriginY` **不是清单字段**：清单里写它不会被读取。`192` 的规则作用在 **mapping** 上——`gen-mtslg-mapping-from-dsl.js` 恒写 `contentOriginY: 192`，`gen-mastergo-page-bundle.js` 与 `validate-iocontrol-provenance.js` 对非 192 的 mapping 直接失败（坐标细则见 `mtslg-mode.md` 第 3 节）。
 
 ## 3.1 输入文件（必填 / 条件必填，**不属于**第 3 节的可选字段）
 

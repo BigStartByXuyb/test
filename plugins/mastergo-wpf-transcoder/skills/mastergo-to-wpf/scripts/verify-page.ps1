@@ -64,6 +64,9 @@ if (Test-Path -LiteralPath $layout) {
         $layoutIcons = @($ownPageNode.SelectNodes('.//MenuItem[@Icon]') | ForEach-Object { $_.Icon } | Where-Object { $_ } | Sort-Object -Unique)
     }
 }
+else {
+    $warn.Add("Layout.xml 不存在：本页尚未注册（$layout）")
+}
 # 映射表登记 iconPolicy=runtime 的变体：Icon 资源由目标项目提供，本页 Icons.xaml 里不该有该键。
 $runtimeIcons = @()
 $mappingAudit = Join-Path $ProjectRoot "Generated\${page}.mapping.json"
@@ -107,7 +110,7 @@ if ($layoutDoc -and $ownPageNode) {
     Write-Output ("Layout: 全文件登记页面 " + (@($layoutDoc.SelectNodes('//Page')).Count) + " 张；本页菜单项 " + (@($ownPageNode.SelectNodes('.//MenuItem')).Count) + " 个")
 }
 else {
-    Write-Output "Layout: 未读取到本页注册（本页 FAIL 清单里已列出原因）"
+    Write-Output "Layout: 未读取到本页注册（Layout.xml 缺失记 WARN，缺少本页 <Page> 记 FAIL，见上面的清单）"
 }
 
 if ($fail.Count) {
