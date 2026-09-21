@@ -18,7 +18,7 @@ function captureWithStub(t, config) {
   const tool = config.tool || "getDsl";
   const out = path.join(root, tool + ".json");
   const previous = "existing capture must survive an unsupported response";
-  fs.writeFileSync(out, previous);
+  if (config.existing !== false) fs.writeFileSync(out, previous);
   fs.writeFileSync(stubPath, `
 const readline = require("node:readline");
 const config = ${JSON.stringify(config)};
@@ -37,7 +37,8 @@ input.on("line", (line) => {
       const page = Number((message.params && message.params.arguments && message.params.arguments.page) || 0);
       const payload = config.pages[page];
       if (payload === undefined) throw new Error("unexpected page: " + page);
-      result = { content: [{ type: "text", text: JSON.stringify(payload) }] };
+      if (config.hangPage === page) return;
+      result = { isError: config.errorPage === page, content: [{ type: "text", text: JSON.stringify(payload) }] };
     } else {
       result = { content: config.content };
     }
@@ -59,8 +60,7 @@ input.on("line", (line) => {
 `);
   const args = [
     cli, "--tool", tool, "--out", out, "--token", "fake-token",
-    "--mcp", process.execPath, "--mcp-arg", stubPath,
-    "--timeoutMs", String(config.timeoutMs === undefined ? 5000 : config.timeoutMs)
+    "--mcp", process.execPath, "--mcp-arg", stubPath, "--timeoutMs", String(config.timeoutMs || 5000)
   ];
   if (config.pageSize !== undefined) args.push("--pageSize", String(config.pageSize));
   const result = spawnSync(process.execPath, args, { encoding: "utf8", timeout: 10000 });
@@ -73,7 +73,7 @@ for (const splitCharacter of ["汉", "🙂", "é"]) {
   test("MCP preserves UTF-8 when a pipe chunk splits " + splitCharacter, (t) => {
     const payload = JSON.stringify({ text: "汉字🙂é", marker });
     const result = captureWithStub(t, {
-      content: [{ type: "text", text: payload }], splitCharacter
+      content: [{ type: "text", text: payload }], splitCharacter, existing: false
     });
     assert.equal(result.status, 0, result.stderr);
     assert.equal(result.captured, payload);
@@ -137,8 +137,57 @@ test("extractSvg aggregation stops at the page cap when hasMore never clears", (
   assert.match(result.stderr, /超过上限/);
 });
 
-// 回归（v1.0.246 语义审计 REVIEW-002）：分页聚合会发多次 tools/call，超时窗口必须**按请求重新武装**。
-// 改造前定时器在首个响应后就被清掉，第 2 页及以后卡住会让脚本永久挂起（而不是按契约以非零码退出）。
+for (const [label, modify] of [
+  ["missing totalCount", (a) => { delete a.totalCount; }],
+  ["nonboolean hasMore", (a) => { a.hasMore = "false"; }],
+  ["wrong page", (a) => { a.page = 9; }],
+  ["wrong count", (a) => { a.count = 999; }],
+  ["changing totalCount", (_a, b) => { b.totalCount = 4; }],
+  ["duplicate id", (_a, b) => { b.svgs[0].id = "a"; }],
+  ["later business error", (_a, b) => { b.code = "20001"; }]
+]) {
+  test("extractSvg rejects " + label + " without replacing the old capture", (t) => {
+    const a = { totalCount: 2, count: 1, page: 0, hasMore: true, svgs: [{ id: "a" }] };
+    const b = { totalCount: 2, count: 1, page: 1, hasMore: false, svgs: [{ id: "b" }] };
+    modify(a, b);
+    const result = captureWithStub(t, { tool: "extractSvg", pages: { 0: a, 1: b } });
+    assert.equal(result.status, 4, result.stderr);
+    assert.equal(result.captured, result.previous);
+  });
+}
+
+test("extractSvg rejects a later isError envelope even when its payload looks valid", (t) => {
+  const result = captureWithStub(t, { tool: "extractSvg", errorPage: 1, pages: {
+    0: { totalCount: 2, page: 0, hasMore: true, svgs: [{ id: "a" }] },
+    1: { totalCount: 2, page: 1, hasMore: false, svgs: [{ id: "b" }] }
+  } });
+  assert.equal(result.status, 4);
+  assert.equal(result.captured, result.previous);
+});
+
+test("extractSvg timeout covers later pages, not just the initial response", (t) => {
+  const result = captureWithStub(t, { tool: "extractSvg", timeoutMs: 700, hangPage: 1, pages: {
+    0: { totalCount: 2, page: 0, hasMore: true, svgs: [{ id: "a" }] },
+    1: { totalCount: 2, page: 1, hasMore: false, svgs: [{ id: "b" }] }
+  } });
+  assert.equal(result.status, 3, result.stderr);
+  assert.equal(result.captured, result.previous);
+});
+
+test("successful getDsl cannot replace a different existing capture", (t) => {
+  const result = captureWithStub(t, { content: [{ type: "text", text: '{"dsl":{}}' }] });
+  assert.equal(result.status, 4);
+  assert.equal(result.captured, result.previous);
+});
+
+test("getDsl business error preserves existing capture and does not expose its message", (t) => {
+  const result = captureWithStub(t, { content: [{ type: "text", text: JSON.stringify({ code: 20001, message: marker }) }] });
+  assert.equal(result.status, 5);
+  assert.equal(result.captured, result.previous);
+  assert.equal((result.stdout + result.stderr).includes(marker), false);
+});
+
+// Preserve upstream 1.0.247's delayed-page regression alongside the indefinitely hung-page case.
 test("extractSvg pagination keeps each page request under the timeout window", (t) => {
   const page0 = { totalCount: 2, count: 1, page: 0, pageSize: 1, hasMore: true, svgs: [{ id: "a" }] };
   const page1 = { totalCount: 2, count: 1, page: 1, pageSize: 1, hasMore: false, svgs: [{ id: "b" }] };
@@ -146,8 +195,18 @@ test("extractSvg pagination keeps each page request under the timeout window", (
     tool: "extractSvg", pageSize: 1, timeoutMs: 400,
     pages: { 0: page0, 1: page1 }, delayPages: { 1: 2000 }
   });
-
-  assert.equal(result.status, 3, "第 2 页超时必须按超时失败码退出，而不是无限挂起");
+  assert.equal(result.status, 3, "A delayed second page must fail with the timeout code");
   assert.match(result.stderr, /超时/);
   assert.equal(result.captured, result.previous);
+});
+
+test("successful pagination renews the timeout for each request", (t) => {
+  const page0 = { totalCount: 2, count: 1, page: 0, hasMore: true, svgs: [{ id: "a" }] };
+  const page1 = { totalCount: 2, count: 1, page: 1, hasMore: false, svgs: [{ id: "b" }] };
+  const result = captureWithStub(t, {
+    tool: "extractSvg", pageSize: 1, timeoutMs: 700,
+    pages: { 0: page0, 1: page1 }, delayPages: { 0: 450, 1: 450 }
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(JSON.parse(result.captured).svgs.map((svg) => svg.id), ["a", "b"]);
 });

@@ -153,6 +153,18 @@ function loadRegistry(file) {
   return registry;
 }
 
+// A matching digest is not sufficient when the caller requests another page or area.
+function assertBinding(registry, options) {
+  if (registry.target !== options.target) fail("target 与本次页面不一致: " + options.target);
+  if (!registry.identity || registry.identity.ui !== options.ui) {
+    fail("identity.ui 与本次 area 不一致: " + options.ui);
+  }
+  if (typeof registry.projectRoot !== "string" ||
+      path.relative(path.resolve(registry.projectRoot), path.resolve(options.projectRoot)) !== "") {
+    fail("projectRoot 与本次项目不一致");
+  }
+}
+
 function saveRegistry(file, registry) {
   registry.updatedAt = new Date().toISOString();
   writeJson(path.resolve(file), registry);
@@ -259,6 +271,16 @@ function recordOutputs(registry, files, options) {
   return count;
 }
 
+// Only inspect explicitly selected page-local outputs. Shared Layout may be updated by another page.
+function resolveOutput(registry, relative, options) {
+  const key = toSlash(relative);
+  const entry = registry.outputs && registry.outputs[key];
+  if (!entry || entry.removed || !entry.sha256) fail("未登记有效输出: " + key);
+  const file = path.resolve(options.projectRoot, key);
+  if (!fs.existsSync(file) || sha256File(file) !== entry.sha256) fail("输出与本次登记不一致: " + key);
+  return file;
+}
+
 function summarize(registry) {
   const artifacts = Object.keys(registry.artifacts || {});
   const outputs = Object.keys(registry.outputs || {});
@@ -289,8 +311,10 @@ module.exports = {
   createRegistry,
   loadRegistry,
   saveRegistry,
+  assertBinding,
   recordArtifact,
   resolveArtifact,
+  resolveOutput,
   assertNoLegacyShadow,
   recordStep,
   recordOutputs,

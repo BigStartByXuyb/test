@@ -112,6 +112,7 @@ function send(message) {
 }
 
 function request(method, params) {
+  armTimeout();
   const id = nextId;
   nextId += 1;
   return new Promise(function (resolve, reject) {
@@ -137,7 +138,7 @@ child.stdout.on("data", function (chunk) {
       if (message && message.id !== undefined && pending.has(message.id)) {
         const entry = pending.get(message.id);
         pending.delete(message.id);
-        if (message.error) entry.reject(new Error("MCP 调用失败: " + JSON.stringify(message.error)));
+        if (message.error) entry.reject(new Error("MCP 调用失败（JSON-RPC error）"));
         else entry.resolve(message);
       }
     }
@@ -146,19 +147,16 @@ child.stdout.on("data", function (chunk) {
 });
 
 const timeoutMs = Number(args.timeoutMs || 240000);
-// 超时窗口按**每次请求**重新武装：extractSvg 的分页聚合会发多次 tools/call，
-// 只武装一次会让第 2 页及以后的请求失去超时保护（服务端卡住 → 脚本永久挂起，
-// 而不是按契约以非零码退出）。
+// A fresh timeout budget for each RPC, including every SVG page. Never log server payloads.
 let timer = null;
 function armTimeout() {
-  if (timer) clearTimeout(timer);
+  clearTimeout(timer);
   timer = setTimeout(function () {
-    console.error("MCP 调用超时 " + timeoutMs + "ms" + (stderrText ? "；服务端 stderr: " + stderrText.slice(-400) : ""));
+    console.error("MCP 调用超时 " + timeoutMs + "ms");
     try { child.kill(); } catch (error) { /* ignore */ }
     process.exit(3);
   }, timeoutMs);
 }
-armTimeout();
 
 // extractSvg 是分页接口（服务端 pageSize 上限 100）：只取第一页会让 >100 个图标的页面静默漏条目。
 // 这里把上限做成显式常量，防御服务端 hasMore 永真的情况（宁可失败，也不无限拉）。
@@ -214,9 +212,7 @@ function shutdown(exitCode) {
     // tools/list 不可用时退回原名调用
   }
 
-  armTimeout();
   const response = await request("tools/call", { name: serverToolName, arguments: toolArgs });
-  clearTimeout(timer);
 
   const text = toTextContent(response && response.result);
   if (text === null) {
@@ -226,85 +222,91 @@ function shutdown(exitCode) {
     return;
   }
 
-  // extractSvg：按 hasMore 把后续分页拉全并合并成一份再落盘。
-  // 关键纪律：合并完成（且条数与 totalCount 一致）之前**不写输出文件**——宁可留旧文件，也不落一份"看着完整、其实截断"的采集产物。
+  function responseError(result, payload) {
+    if (result && result.isError) return "MCP result.isError=true";
+    let data;
+    try { data = JSON.parse(payload); } catch (_) { return null; }
+    if (!data || data.code === undefined || data.code === null) return null;
+    const code = String(data.code).trim();
+    if (["", "0", "200"].includes(code)) return null;
+    return "MCP 返回错误码 " + (/^-?[0-9]{1,12}$/.test(code) ? code : "invalid");
+  }
+  const isError = Boolean(response.result && response.result.isError);
+  const payloadError = responseError(response.result, text);
+  const absolute = path.resolve(args.out);
+  if (payloadError) {
+    console.error(payloadError + "（未覆盖输出文件）");
+    console.log(JSON.stringify({ tool: args.tool, out: absolute, isError, payloadError }));
+    shutdown(5);
+    return;
+  }
+
   let outputText = text;
   let svgPaging = null;
   if (args.tool === "extractSvg") {
-    const pageSize = Number(toolArgs.pageSize) || 100;
+    const pageSize = Number(toolArgs.pageSize || 100);
+    let page = Number(toolArgs.page || 0);
+    if (page !== 0 || !Number.isInteger(pageSize) || pageSize < 1 || pageSize > 100) {
+      throw new Error("extractSvg 完整采集要求 page=0，pageSize 是 1..100 的整数");
+    }
+    let current = response;
+    let payload = text;
     let merged = null;
+    const ids = new Set();
     let pagesFetched = 0;
-    let page = Number(toolArgs.page) || 0;
-    let payloadText = text;
     for (;;) {
-      let parsed = null;
-      try { parsed = JSON.parse(payloadText); } catch (error) { parsed = null; }
-      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed) || !Array.isArray(parsed.svgs)) {
-        console.error("extractSvg 响应不是 { totalCount, svgs, hasMore } 形态：无法做分页聚合，未覆盖输出文件");
-        shutdown(4);
-        return;
+      const error = responseError(current.result, payload);
+      if (error) throw new Error(error + "（分页失败，未覆盖输出文件）");
+      let data;
+      try { data = JSON.parse(payload); } catch (_) { throw new Error("extractSvg 返回无效 JSON"); }
+      if (!data || !Array.isArray(data.svgs) || typeof data.hasMore !== "boolean" ||
+          !Number.isSafeInteger(data.totalCount) || data.totalCount < 0) {
+        throw new Error("extractSvg 必须提供 svgs、boolean hasMore 和非负整数 totalCount");
       }
-      if (!merged) {
-        merged = Object.assign({}, parsed, { svgs: [] });
-        if (merged.totalCount === undefined) {
-          console.error("extractSvg 响应缺 totalCount：无法核对分页是否取全（继续按 hasMore 收敛）");
+      if (data.page !== undefined && data.page !== page) throw new Error("extractSvg 响应 page 与请求不一致");
+      if (data.count !== undefined && data.count !== data.svgs.length) throw new Error("extractSvg count 与 svgs 条数不一致");
+      if (!merged) merged = { ...data, svgs: [] };
+      if (data.totalCount !== merged.totalCount) throw new Error("extractSvg 分页 totalCount 变化，需重新采集");
+      for (const svg of data.svgs) {
+        if (!svg || typeof svg.id !== "string" || !svg.id || ids.has(svg.id)) {
+          throw new Error("extractSvg 条目缺少唯一 id 或分页重复");
         }
+        ids.add(svg.id);
+        merged.svgs.push(svg);
       }
-      for (const svg of parsed.svgs) merged.svgs.push(svg);
       pagesFetched += 1;
-      if (!parsed.hasMore) break;
-      if (pagesFetched >= MAX_SVG_PAGES) {
-        console.error("extractSvg 分页超过上限 " + MAX_SVG_PAGES + " 页（已取 " + merged.svgs.length + " 条）：服务端分页状态异常，未覆盖输出文件");
-        shutdown(4);
-        return;
+      if (merged.svgs.length > merged.totalCount || (data.hasMore && data.svgs.length === 0)) {
+        throw new Error("extractSvg 分页状态无进展或超过 totalCount");
       }
+      if (!data.hasMore) break;
+      if (pagesFetched >= MAX_SVG_PAGES) throw new Error("extractSvg 分页超过上限 " + MAX_SVG_PAGES);
       page += 1;
-      armTimeout();
-      const next = await request("tools/call", { name: serverToolName, arguments: Object.assign({}, toolArgs, { page: page }) });
-      clearTimeout(timer);
-      const nextText = toTextContent(next && next.result);
-      if (nextText === null) {
-        console.error("extractSvg 第 " + (page + 1) + " 页响应不受本地采集契约支持（必须且仅有一个字符串 text content），未覆盖输出文件");
-        shutdown(4);
-        return;
-      }
-      payloadText = nextText;
+      current = await request("tools/call", { name: serverToolName, arguments: { ...toolArgs, page } });
+      payload = toTextContent(current && current.result);
+      if (payload === null) throw new Error("extractSvg 分页必须包含一个字符串 text content");
     }
-    const expected = Number(merged.totalCount);
-    if (Number.isFinite(expected) && merged.svgs.length !== expected) {
-      console.error("extractSvg 分页聚合不完整：totalCount=" + expected + "，实际取到 " + merged.svgs.length + " 条（已拉 " + pagesFetched + " 页），未覆盖输出文件");
-      shutdown(4);
-      return;
-    }
-    merged.count = merged.svgs.length;
-    merged.page = 0;
-    merged.pageSize = pageSize;
-    merged.hasMore = false;
-    merged.pagesFetched = pagesFetched;
+    if (merged.svgs.length !== merged.totalCount) throw new Error("extractSvg 分页聚合不完整");
+    Object.assign(merged, { count: merged.svgs.length, page: 0, pageSize, hasMore: false, pagesFetched });
     outputText = JSON.stringify(merged);
     svgPaging = { pages: pagesFetched, entries: merged.svgs.length, totalCount: merged.totalCount };
   }
 
-  const absolute = path.resolve(args.out);
-  fs.mkdirSync(path.dirname(absolute), { recursive: true });
-  fs.writeFileSync(absolute, outputText, "utf8");
-
-  const isError = Boolean(response.result && response.result.isError);
-  // 工具把业务错误也当作正常结果返回（`result.isError` 为假），例如伪造 fileId 时
-  // getDsl 返回 {"code":"20001","message":"…获取文件key异常"}。这类响应必须在这里就失败，
-  // 否则第 1 步会报 ok、错误要到下一步才暴露（"取数成功"的假象）。
-  // 非零业务码即失败（没有例外分支）：成功响应不带顶层 code（getDsl = dsl/componentDocumentLinks/rules，
-  // extractSvg = totalCount/count/svgs/page/pageSize/hasMore），带非零 code 的一律按错误处理。
-  const payloadError = (function () {
-    let parsed;
-    try { parsed = JSON.parse(text); } catch (error) { return null; }
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
-    if (parsed.code === undefined || parsed.code === null) return null;
-    const code = String(parsed.code).trim();
-    if (code === "" || code === "0" || code === "200") return null;
-    return "MCP 返回错误码 " + code + (parsed.message ? "：" + String(parsed.message).slice(0, 200) : "");
-  })();
-  if (payloadError) console.error(payloadError + "（响应已落盘: " + absolute + "）");
+  // Existing getDsl bytes are immutable. Identical replay is harmless; replacement requires archival.
+  const bytes = Buffer.from(outputText, "utf8");
+  const immutable = args.tool === "getDsl";
+  if (immutable && fs.existsSync(absolute)) {
+    if (!fs.readFileSync(absolute).equals(bytes)) throw new Error("原始 getDsl 采集已存在且内容不同；请归档旧运行，未覆盖输出文件");
+  } else {
+    fs.mkdirSync(path.dirname(absolute), { recursive: true });
+    const temp = absolute + ".tmp-" + require("crypto").randomUUID();
+    try {
+      fs.writeFileSync(temp, bytes, { flag: "wx" });
+      if (immutable) fs.linkSync(temp, absolute); // atomic create, never replace a competing capture
+      else fs.renameSync(temp, absolute);
+    } finally {
+      if (fs.existsSync(temp)) fs.unlinkSync(temp);
+    }
+  }
   // 只输出摘要：内容是整页 DSL / SVG，绝不进上下文
   console.log(JSON.stringify({
     tool: args.tool,
@@ -318,6 +320,6 @@ function shutdown(exitCode) {
   shutdown(isError || payloadError ? 5 : 0);
 })().catch(function (error) {
   console.error(error && error.message ? error.message : String(error));
-  if (stderrText) console.error("服务端 stderr: " + stderrText.slice(-400));
+
   shutdown(4);
 });

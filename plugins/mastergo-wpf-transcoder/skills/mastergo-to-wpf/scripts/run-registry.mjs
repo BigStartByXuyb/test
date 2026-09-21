@@ -11,6 +11,7 @@
 //   node run-registry.mjs path     --run <run.json> --key <键>
 //   node run-registry.mjs check    --run <run.json> [--key <键>] [--quiet]
 //   node run-registry.mjs outputs  --run <run.json> --manifest <bundle.manifest.json>
+//   node run-registry.mjs check-output --run <run.json> --path <项目相对路径>
 //   node run-registry.mjs show     --run <run.json>
 //
 // 约定：登记表里的路径一律是"相对项目根"；本 CLI 打印的 path 是绝对路径（供 shell 直接使用）。
@@ -37,7 +38,7 @@ function parseArgs(argv) {
 }
 
 function usage() {
-  console.error("用法见 run-registry.mjs 头部注释（init / artifact / step / path / check / outputs / show）");
+  console.error("用法见 run-registry.mjs 头部注释（init / artifact / step / path / check / check-output / outputs / show）");
   process.exit(2);
 }
 
@@ -124,6 +125,12 @@ function main() {
     const shadow = registry.assertNoLegacyShadow(data, String(args.key), { projectRoot });
     if (shadow) console.error("提示: 旧布局文件 " + shadow.path + " 仍存在，但内容与本次登记一致（可以清理）");
     console.log(abs);
+    return;
+  }
+
+  if (command === "check-output") {
+    if (typeof args.path !== "string" || !args.path) throw new Error("check-output 需要 --path");
+    registry.resolveOutput(data, args.path, { projectRoot });
     return;
   }
 

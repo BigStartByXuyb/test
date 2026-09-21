@@ -46,9 +46,10 @@ Invoke-Step -Name 'provenance' -File '1-provenance.log' -Body {
 }
 
 Invoke-Step -Name 'coords' -File '2-coords.log' -Body {
-    $coords = Join-Path $ProjectRoot 'Generated\_work\coords.json'
+    $coords = Join-Path $ProjectRoot "Generated/_work/verification/$page/coords.json"
     # 外层辅助脚本与 run-verifications.ps1 同目录（插件布局在 scripts/、项目布局在 _tool/）
     node (Join-Path $PSScriptRoot 'check-coords.mjs') $mapping $coords | Out-Null
+    if ($LASTEXITCODE -ne 0) { return }
     node (Join-Path $SkillRoot 'scripts\check-iocontrol-coords.js') --xml $pageXml --nodes $coords
 }
 
