@@ -1132,8 +1132,8 @@ function main() {
     : DEFAULT_TEMPLATE_MAP;
   const autoMapping = Boolean(manifest.dslPath || manifest.visibilityPath);
   // New pages always create their page-specific mapping from the current
-  // design snapshot. Existing-page merge/replace workflows may provide an
-  // explicit mapping because they retain existing runtime/business data.
+  // design snapshot. Replace-existing runs may provide an explicit mapping
+  // because they retain existing runtime/business data.
   if (!existingMode && (!manifest.dslPath || !manifest.visibilityPath)) {
     fail("新建页面必须提供当前页面的 dslPath 和 visibilityPath；mapping 将在本次生成中创建");
   }

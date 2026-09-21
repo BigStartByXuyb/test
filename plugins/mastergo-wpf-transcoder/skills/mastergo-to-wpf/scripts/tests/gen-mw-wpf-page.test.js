@@ -144,7 +144,7 @@ fs.writeFileSync(manifestPath, JSON.stringify({
   csproj: 'Demo.Pages.csproj',
   area: 'F2-Teach',
   pageName: 'F2NewOperation',
-  operation: 'modify-existing',
+  operation: 'replace-existing',
   viewPath: 'UI/F2-Teach/View/F2NewOperationView.xaml',
   codeBehindPath: 'UI/F2-Teach/View/F2NewOperationView.xaml.cs',
   viewModelPath: 'UI/F2-Teach/ViewModel/F2NewOperationViewModel.cs',

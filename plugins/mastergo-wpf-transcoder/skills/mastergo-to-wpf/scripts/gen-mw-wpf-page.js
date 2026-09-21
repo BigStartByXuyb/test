@@ -130,8 +130,8 @@ function loadManifest(manifestPath) {
   // 页面多语言资源字典：与页面 XML/Icon 同目录，形如 Resources/Pages/<页面名>/<页面名>_<语言>.xaml。
   const langPaths = (Array.isArray(manifest.langPaths) ? manifest.langPaths : [])
     .map(function (relative) { return safeRelativePath(relative, "langPath"); });
-  // 只有真正的新建页面才强制约定路径；modify-existing / replace-existing 必须沿用项目已声明的真实路径。
-  if (!["modify-existing", "replace-existing"].includes(manifest.operation)) {
+  // 只有真正的新建页面才强制约定路径；replace-existing（整套替换）必须沿用项目已声明的真实路径。
+  if (manifest.operation !== "replace-existing") {
     const expectedPaths = {
       iconPath: "Resources/Pages/" + pageName + "/" + pageName + "Icons.xaml",
       pageXmlPath: "Resources/Pages/" + pageName + "/" + pageName + "Page.xml",
@@ -488,7 +488,7 @@ function main() {
     return projectPath(config.projectRoot, relative, "输出文件");
   });
   const existing = outputPaths.filter(fs.existsSync);
-  if (existing.length && (!args.overwrite || !["modify-existing", "replace-existing"].includes(config.operation))) {
+  if (existing.length && (!args.overwrite || config.operation !== "replace-existing")) {
     fail("目标文件已存在，未覆盖: " + existing.join(", ") + "；如需修改已有页面，必须显式使用 operation=replace-existing");
   }
   const backups = [];

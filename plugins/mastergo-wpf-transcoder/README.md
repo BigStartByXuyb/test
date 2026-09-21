@@ -25,8 +25,8 @@
 Layout 增量注册与 `--overwrite` 的语义：
 
 - 新增一个尚不存在的 `Page Target`：允许增量写入已有 Layout，并在覆盖前创建备份；
-- 替换已有的同名 `Page Target`：必须显式传入 `--overwrite`；
-- 页面 XML、Icon 和 WPF 宿主文件已存在时：必须显式传入 `--overwrite`。
+- 替换已有的同名 `Page Target`：必须显式传入 `--overwrite`，并在清单里设置 `operation=replace-existing`；
+- 页面 XML、Icon 和 WPF 宿主文件已存在时：必须显式传入 `--overwrite`（同样要求 `operation=replace-existing`）。
 
 页面可以没有任何运行时 Icon。Bundle 不以 PATH 候选数量或 Geometry 数量判断页面是否需要图标；只有 IOContorl 节点或 Layout 菜单实际引用了 Icon 时，才要求对应 Geometry 已生成。
 
