@@ -94,8 +94,14 @@ function Get-ProjectTarget {
         Target  = $page.target
         LayerId = $page.designSource.layerId
         FileId  = $page.designSource.fileId
-        # derivation 是可选说明字段：老登记表可能没有它（Set-StrictMode 下直接取会抛错）。
-        Ui      = if ($page.PSObject.Properties['derivation'] -and $page.derivation -match '\bF\d+\b') { $Matches[0] } else { $null }
+        # 区域前缀（area）：① 登记表显式 `pages[].ui`；② `derivation` 里第一个 `F<数字>`。
+        # 两者都是可选字段（老登记表可能没有），缺失时留空——由下面的硬门禁要求显式传 -Ui，
+        # 不再静默退回 F2（否则非 F2 页面的 UI/<区域>/View 输出目录会被悄悄写错）。
+        # 匹配不用 `\b`：Target 形状是 `{区域前缀}{英文语义名}`，`F3ManualAlign`、`F3区域`
+        # 这类连写里 F3 后面紧跟单词字符，词边界匹配不到。
+        Ui      = if ($page.PSObject.Properties['ui']) { $page.ui }
+                  elseif ($page.PSObject.Properties['derivation'] -and ($page.derivation -match 'F\d+')) { $Matches[0] }
+                  else { $null }
         Design  = $page.designSource.designPageName
         # 页面标题的人工确认值：机械流水线必须带上它，否则标题会退回设计页名原文（带 (x.y) 编号）。
         # 该字段是可选登记项：老登记表没有它时不能因为 Set-StrictMode 直接抛错。
@@ -193,10 +199,14 @@ if ($Registry) {
     if (-not $LayerId) { $LayerId = $Registry.LayerId }
     if (-not $FileId -or $FileId -eq '181586559903927') { $FileId = $Registry.FileId }
     if (-not $DesignPageName) { $DesignPageName = $Registry.Design }
-    # 区域前缀：命令行没给就从登记表 derivation 里取到的 F<n> 用上（仍没有则退回 F2）。
+    # 区域前缀：命令行没给就用项目登记表（docs/page-registry.json）里取到的值（pages[].ui 或 derivation 的 F<n>）。
     if (-not $Ui -and $Registry.Ui) { $Ui = $Registry.Ui }
 }
-if (-not $Ui) { $Ui = 'F2' }
+# 取不到区域前缀时不猜：它决定 UI/<区域>/View|ViewModel 的输出目录与 capture 的 ui 字段，
+# 静默退回 F2 会把非 F2 页面的产物写到错目录。要求显式给出 -Ui 或在项目登记表里登记。
+if (-not $Ui) {
+    throw "缺少 -Ui：命令行没有提供，项目登记表 docs/page-registry.json 里也没有 pages[].ui，且 derivation 里取不到 F<数字>"
+}
 
 foreach ($required in @('Target', 'LayerId')) {
     $value = Get-Variable -Name $required -ValueOnly

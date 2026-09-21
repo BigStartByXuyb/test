@@ -37,7 +37,8 @@
  * 逐条列在报告 identicalTextKeys 里供交付说明核对。不产键的只有两类：① 映射表在值槽位登记 langRefPolicy=none
  * 的节点（当前只有选择框 Value，运行时由数据决定），记入 valueLangExempt；② 空文本节点（Value 为空串，无文案可翻译）——
  * 照常发射 Value 空串、不挂 LangName，也不进任何豁免清单。
- * 例外：Layout 的 MenuItem 必须挂 LangName，所以菜单名仍会派生 key（命名优先用 Icon 资源名）。
+ * 另有两条硬要求（不是"不产键"的例外，而是必须产键的场景）：Layout 的 MenuItem 必须挂 LangName；
+ * 按钮族（IconButton / Button / StatusButton）带文案的节点同样必须挂 LangName。
  *
  * 【英文文案】取值优先级：
  *   1. 目标项目已登记字典里同 key 的英文（工程已确认，优先）
@@ -633,7 +634,8 @@ function deriveLangSpec(options) {
     }
     // 全量多语言：设计稿给出的**每个 Value 都产键挂 LangName**，不按文本形态（数字/符号/版本号/
     // 日期时间/型号…）做豁免——中英文写法一致的文本只是 EN 值等于原文，不记待翻译。
-    // 唯一的例外是上面已经 continue 掉的槽位豁免（映射表登记 langRefPolicy=none，如选择框 Value）。
+    // 不产键的两类在上面都已 continue 跳过：先跳过空文本节点（Value 为空串），再跳过槽位豁免节点
+    // （映射表登记 langRefPolicy=none，如选择框 Value）；走到这里的每个节点都必须产键。
     // 原本会被"中英文一致"规则挡下的节点在这里改记 identicalTextKeys，供交付说明逐条核对。
     const dynamic = isDynamicText(text);
     if (dynamic.dynamic) {
