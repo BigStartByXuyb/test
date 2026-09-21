@@ -207,7 +207,7 @@ function shutdown(exitCode) {
 
   const text = toTextContent(response && response.result);
   if (text === null) {
-    console.error("响应必须包含且仅包含一个字符串 text content（工具 " + serverToolName + "）；拒绝截断响应");
+    console.error("响应必须包含且仅包含一个字符串 text content（工具 " + serverToolName + "）；响应形态不受本地采集契约支持，未覆盖输出文件");
     // 错误分支也不得把 DSL、图像或资源内容回显到模型上下文。
     shutdown(4);
     return;

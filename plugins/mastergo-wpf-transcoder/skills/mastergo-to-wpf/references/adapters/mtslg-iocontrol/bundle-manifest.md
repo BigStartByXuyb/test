@@ -137,5 +137,7 @@ Bundle **不会**把新页面的文件写进 `.csproj`（实测 `csprojChanged=F
 1. **产出即登记**：`run-all.ps1` 每一步成功后就登记该步产物（`run-registry.mjs artifact`）；中途失败也把该步状态写进 `steps`。
 2. **消费只按登记**：`build-bundle-manifest.mjs <…> <area> --run-json <run.json>` 从登记表取 `snapshot` / `visibility` / `extractSvg`，并把 `sha256` 写进清单 `runRegistry.digests`；Bundle 读清单时**复校**：路径按登记表解析、`sha256` 与 `digests` 一致、`runId` 一致。**`--run-json` 是必填**——缺了直接报错，不再回落到顶层 `Generated/*.json`（`area` 同理必填，推导只在 run-all.ps1 里做一次）。
 3. **未登记的旧同名文件一律拒绝**：Bundle 直接失败并点名它**实际消费的三个采集输入**——`Generated/dsl.snapshot.json`、`Generated/visibility.json`、`Generated/extractSvg.json`（内容与本次登记恰好一致时只提示可清理）。其余同层文件（`Generated/coverage-report.json`、`Generated/manifest.json`、`Generated/timing.json`、`Generated/getDsl.json`）不参与输入解析，由 `run-registry.mjs check` 按同一张 `LEGACY_SHADOWS` 表列出。
-4. **断点续跑**：`run-all.ps1 -Progress <步骤>` 用 `run-registry.mjs init --keep` 沿用同一份登记表；重新从第 1 步跑则新开一次运行（新 `runId`，产物登记清空）。
-5. **手工调用**：`node scripts/run-registry.mjs init|artifact|step|path|check|outputs|show`；`check` 会校验所有已登记产物的 sha256 并列出可清理的影子文件。
+4. **断点续跑**：`run-all.ps1 -Progress <步骤>` 用 `run-registry.mjs init --keep` 沿用同一份登记表。登记表必须存在且 schema 受支持；`target`、归一化后的 `projectRoot` 与 `identity{fileId, layerId, ui, designPageName}` 不得改变，也不得为已登记产物补写原先缺失的身份。CLI 省略的 identity 字段保留原值；显式传入的非空值必须相同。守卫失败发生在保存之前，原登记表逐字节不变。标题、译文、术语表与图标命名仍是可修改的语义输入。
+   - `identity` 保存的是**来源与运行配置**，不是全都来自设计侧；`ui` 是已冻结的区域配置，决定快照元数据与宿主目录。续跑要求解析后的**值**一致，不要求它仍来自同一参数来源。
+   - 配置改动导致误命中守卫时，先恢复原值即可续跑，例如显式传 `-Ui <run.json 中原 identity.ui>`；首次依赖显式 `-FileId` / `-LayerId` 等参数时，续跑同样要让解析结果保持一致。确实要改来源或运行配置，才先归档原运行目录与原始 capture，再从 `fetch` 新开运行（新 `runId`，产物登记清空）；不得通过编辑 `run.json` 绕过守卫。登记表缺失时同样从 `fetch` 新开运行。
+5. **手工调用**：`node scripts/run-registry.mjs init|artifact|step|path|check|outputs|show`。不带 `--key` 的 `check` 只检查本次已登记的产物，允许未完成的运行；显式 `check --key <产物键>` 必须命中 `ARTIFACT_KEYS` 且该产物已登记，否则非零退出，不能静默跳过。两种方式都复算所检查文件的 sha256，并核对旧同名文件；`--quiet` 只关闭成功摘要，不豁免任何失败。
