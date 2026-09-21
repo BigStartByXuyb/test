@@ -23,6 +23,10 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+# 输出编码：本脚本会往 stdout/stderr 写中文（失败原因、审计结论）。不显式设成 UTF-8 时，
+# 被父进程按 UTF-8 解码就是乱码（表现为 "MasterGo getDsl ��Ӧ�� dsl.nodes[] Ϊ��"）。
+try { [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false) } catch { }
+
 function Write-AtomicJson {
     param([string] $Path, [object] $Value)
     $parent = Split-Path -Parent $Path
@@ -141,7 +145,12 @@ function Capture-Run {
     }
 
     $nodes = @($payload.dsl.nodes)
-    if ($nodes.Count -eq 0) { throw 'MasterGo getDsl 响应的 dsl.nodes[] 为空' }
+    if ($nodes.Count -eq 0) {
+        throw ("MasterGo getDsl 响应的 dsl.nodes[] 为空（layerId=$LayerId）：" +
+            '常见原因：① 传的是「页面」链接（page_id）而不是具体容器/控件；' +
+            '② 该页画布在 MasterGo 里尚未加载完（先在 MasterGo 打开该文件、切到该页面，等画布加载完成后重试）；' +
+            '③ token 无该文件权限')
+    }
     $root = $nodes[0]
     $rootId = if ($root.PSObject.Properties.Name -contains 'id') { [string] $root.id } else { '' }
     if (-not $rootId -or $rootId -ne $LayerId) {

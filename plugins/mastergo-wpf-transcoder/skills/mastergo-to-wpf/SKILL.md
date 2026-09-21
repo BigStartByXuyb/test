@@ -104,6 +104,53 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 
 本作业不得写入 WPF 私有协议，例如 `s:Action`、WPF `PageName` 或 WPF ResourceDictionary/绑定语法；没有正式映射时不得降级为普通 Button、无类型容器或静态占位结构。未映射组件仅进入静态来源清单，不进入伪造的 IOContorl 节点。
 
+## 一键流水线（`scripts/run-all.ps1`，外层编排）
+
+在目标项目里做整页转换时，用 `scripts/run-all.ps1` 把下面 12 步**按顺序**串起来跑。步骤、顺序、口径与手工逐条执行完全一致，脚本只负责：串行调用、计时、把每步 stdout/stderr 落日志、失败即停、支持从任意一步继续。
+
+| 步骤 | 内容 | 调用的脚本 |
+|---|---|---|
+| 1 `fetch` | 取数（响应只落盘） | `call-mastergo-mcp.js --tool getDsl` |
+| 2 `capture` | DSL 快照 + 覆盖校验 | `mastergo-dsl-pipeline.ps1 -Action Capture` |
+| 3 `svg` | 图标几何 | `call-mastergo-mcp.js --tool extractSvg` |
+| 4 `visibility` | 显隐事实 | `resolve-mastergo-visibility.js` |
+| 5 `mapping` | mapping 草稿 | `gen-mtslg-mapping-from-dsl.js` |
+| 6 `discover` | 图标候选清单 | `discover-mtslg-page-icon-map.js` |
+| 7 `ledger` | 台账就绪校验（台账由 `build-icon-ledger.mjs` + 命名表生成，见下） | — |
+| 8 `layout` | Layout 清单推导 | `gen-mtslg-layout-manifest.js` |
+| 9 `inputs` | Bundle 清单生成 | `build-bundle-manifest.mjs` |
+| 10 `bundle` | 页面 XML / Icon / Layout / 宿主壳 | `gen-mastergo-page-bundle.js` |
+| 11 `gates` | 审计逐条断言（临时语言键/待翻译/未映射组件/嵌套冲突/底栏未命中/静态校验） | — |
+| 12 `verify` | 四项独立验证 | `run-verifications.ps1` |
+
+```powershell
+pwsh -NoProfile -File <skill>/scripts/run-all.ps1 -List
+pwsh -NoProfile -File <skill>/scripts/run-all.ps1 -ProjectRoot <项目> -Target <Target> -LayerId <图层id> -StopAfter discover
+pwsh -NoProfile -File <skill>/scripts/run-all.ps1 -ProjectRoot <项目> -Progress bundle -Overwrite
+```
+
+- `-Progress` / `-StopAfter` 可写步骤号或步骤名；失败时脚本打印失败步的日志路径与续跑命令，修好输入后从该步继续，不需要重跑前面。
+- 每步日志：`<项目>/Generated/_work/steps/NN-<步骤名>.log`。
+- **语义判断不合并进脚本**，必须由人给三个页面级输入文件：`<项目>/Generated/_inputs/<Target>.icon-naming.json`（候选下标 → 英文资源名/中文注释/是否 `fromDsl`）、`<Target>.lang-translations.json`（中文→英文译文）、`<Target>.lang-glossary.json`（无英文语义或单字符文案的稳定标识符）。
+- 覆盖已有页面产物必须显式 `-Overwrite`（Bundle 会逐个备份）。
+- 项目已在 `docs/page-registry.json` 登记时，`-Target` / `-LayerId` 可省略（从登记表读）。
+
+### 页面级 / 项目级资源边界（强制）
+
+- **页面级（互不引用，且跨页不得同名）**：`Resources/Pages/<Target>/<Target>Page.xml`、`<Target>Icons.xaml`、`<Target>_CN.xaml`、`<Target>_EN.xaml`、`UI/<区域>/View|ViewModel/<Target>*`、页面专属 mapping/审计、`Generated/_inputs/<Target>.*`。这些文件里出现别的页面 Target，或引用别的页面的 Icon/LangName 键，即为串页。
+- **项目级（一个项目里唯一、多页共享）**：`Resources/Layout/Layout.xml`（登记本项目所有页面）、`.csproj`、`framework.config.json`。Layout 里出现别的页面注册是**正常**的；本页只增量写入/更新自己的 `<Page>` 节点，不得改写其他页面的注册。
+- 校验脚本据此按页取节点：`verify-page.ps1` 只校验本页 `<Page>` 子树，绝不拿整个共享 Layout 去跟本页字典/Icon 比对；验证日志按页分目录 `Generated/_work/verification/<页面>/`。
+
+### 图标几何来源核对（`scripts/verify-icon-source.mjs`，定名前必跑）
+
+台账条目的 `sourceId` 只有在**唯一指向该图标自己的图形节点**时才能用于取几何。出现下列任一情形，必须改成 `fromDsl: true` + 该图标 PATH 节点的 ref（否则会把别的图形当成本图标，而且**静态校验不会报错**、只在运行时肉眼可见）：
+
+1. `sourceId` 指向页面根（该条目是整页几何）；
+2. 同一个 `sourceId` 被多条台账条目共用（典型：多个按钮的图标被归到同一个分组节点）；
+3. `extractSvg` 没有该条目。
+
+注意反面：**同一页里多个按钮共用同一个图形是正常的**（设计复用，几何会完全一致）。判据是「这条来源能否唯一确定这个图形」，不是「图形是否相同」——不要用"指纹相同"当失败条件。
+
 ## 页面 Icon 文件（按路线区分）
 
 每个页面使用自己的 Icon 文件，文件名固定由页面 `name` 派生为 `Resources/Pages/{name}/{name}Icons.xaml`，与页面 XML 同处该页专属目录。新页面不得复用或覆盖其他页面的 Icon 文件。`gen-mtslg-page-icons.js` 只负责创建当前页面的新 ResourceDictionary，目标文件已存在时失败，不执行 Icon 合并。
