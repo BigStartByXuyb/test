@@ -5,8 +5,13 @@
 //   - **采集输入（dslPath / visibilityPath / svgPath）优先从运行登记表取**：给 --run-json 时
 //     按登记表解析 + 校验，并把 sha256 写进清单（manifest.runRegistry.digests），Bundle 会复校；
 //     不给 --run-json 时退回旧顶层路径并明确警告（旧路径与"按页归档"并存时就是静默用旧数据的来源）。
-// 用法: node build-bundle-manifest.mjs <layout-manifest.json> <out-bundle.json> <projectRoot> [area]
+// 用法: node build-bundle-manifest.mjs <layout-manifest.json> <out-bundle.json> <projectRoot> <area>
 //        [--run-json <run.json>] [--page-title <标题>] [--replace-existing]
+//
+// `area`（区域前缀）**必填且不做推导**：它决定 `UI/<区域>/View|ViewModel` 的输出目录，
+// 唯一实现是 run-all.ps1 的取值链（命令行 -Ui → 项目登记表 pages[].ui → derivation 的 F<n>
+// → Target 编号前缀 → Target 首词 → 报错）。本脚本再写一份推导就会出现两处口径不一致
+// （例如无编号 Target 一处给 `HomeContent`、另一处给 `Home`），因此缺失就报错。
 import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
@@ -17,7 +22,7 @@ const runRegistry = require("./lib/run-registry.js");
 const positional = process.argv.slice(2).filter((value) => !value.startsWith("--"));
 const [layoutManifestFile, outFile, projectRootArg, areaArg] = positional;
 if (!layoutManifestFile || !outFile) {
-  console.error("usage: node build-bundle-manifest.mjs <layout-manifest.json> <out-bundle.json> <projectRoot> [area] [--replace-existing]");
+  console.error("usage: node build-bundle-manifest.mjs <layout-manifest.json> <out-bundle.json> <projectRoot> <area> [--run-json <run.json>] [--page-title <标题>] [--replace-existing]");
   process.exit(2);
 }
 
@@ -58,8 +63,12 @@ if (csprojs.length !== 1) {
 }
 const csproj = csprojs[0];
 const projectName = path.basename(csproj, ".csproj");
-const areaMatch = name.match(/^([A-Za-z]+\d+)/);
-const area = areaArg || (areaMatch ? areaMatch[1] : name);
+if (!areaArg || !String(areaArg).trim()) {
+  throw new Error("缺少区域前缀 area（第 4 个位置参数）：它决定 UI/<区域>/View|ViewModel 输出目录。" +
+    "取值链的唯一实现在 run-all.ps1（-Ui → 项目登记表 pages[].ui → derivation 的 F<n> → Target 编号前缀 → Target 首词），" +
+    "本脚本不再自行推导；手工调用请显式传入。");
+}
+const area = String(areaArg).trim();
 const inputs = (file) => `Generated/_inputs/${name}.${file}`;
 const glossary = inputs("lang-glossary.json");
 

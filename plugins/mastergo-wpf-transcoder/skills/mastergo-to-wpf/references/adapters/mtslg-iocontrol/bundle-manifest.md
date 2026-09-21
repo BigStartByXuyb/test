@@ -25,7 +25,7 @@ node scripts/gen-mastergo-page-bundle.js --manifest <bundle.json> [--overwrite]
 | 字段 | 约束 | 脚本锚点（函数 + fail 文案） |
 |---|---|---|
 | `name`（或兼容 `pageName`） | 合法标识符 `^[A-Za-z_][A-Za-z0-9_]*$`；两者同时出现必须一致 | `normalizePageManifest()` → `fail("manifest 必须提供合法页面 name（或兼容字段 pageName）")`、`fail("manifest.name 与 manifest.pageName 必须一致")` |
-| `area` | 非空字符串（新建页面必须）；决定 View/ViewModel 路径 `UI/<area>/…` | `normalizePageManifest()` → `fail("新页面必须提供 area")` |
+| `area` | 非空字符串（新建页面必须）；决定 View/ViewModel 路径 `UI/<area>/…`。由 `run-all.ps1` 按「-Ui → 项目登记表 pages[].ui → derivation 的 F<n> → Target 编号前缀 → Target 首词」解析后传入；`build-bundle-manifest.mjs` 自身不做推导，缺参数即报错（避免两处口径不一致） | `normalizePageManifest()` → `fail("新页面必须提供 area")` |
 | `projectRoot` | 必须存在（脚手架模式也要明确给出要创建的目标目录） | `ensureScaffold()` → `fail("projectRoot 必须提供；脚手架模式也必须明确指定要创建的目标目录")`、`fail("projectRoot 不存在: ")` |
 
 **新建页面另需**：`dslPath` + `visibilityPath` 同时提供且文件存在（mapping 由本次生成创建，并必须带 Tag `新页面完整DSL映射`）——`main()` → `fail("新建页面必须提供当前页面的 dslPath 和 visibilityPath；mapping 将在本次生成中创建")`、`fail("dslPath/visibilityPath 输入文件不存在")`、`fail("本次生成的 mapping 缺少算法 Tag：…")`。

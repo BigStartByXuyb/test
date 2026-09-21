@@ -95,8 +95,9 @@ function Get-ProjectTarget {
         LayerId = $page.designSource.layerId
         FileId  = $page.designSource.fileId
         # 区域前缀（area）：① 登记表显式 `pages[].ui`；② `derivation` 里第一个 `F<数字>`。
-        # 两者都是可选字段（老登记表可能没有），缺失时留空——由下面的硬门禁要求显式传 -Ui，
-        # 不再静默退回 F2（否则非 F2 页面的 UI/<区域>/View 输出目录会被悄悄写错）。
+        # 两者都是可选字段（老登记表可能没有），缺失时留空——由下面的取值链继续解析
+        # （Target 编号前缀 → Target 首词），仍然取不到才报错要求显式传 -Ui。
+        # 任何情况下都不静默退回 F2（否则非 F2 页面的 UI/<区域>/View 输出目录会被悄悄写错）。
         # 匹配不用 `\b`：Target 形状是 `{区域前缀}{英文语义名}`，`F3ManualAlign`、`F3区域`
         # 这类连写里 F3 后面紧跟单词字符，词边界匹配不到。
         Ui      = if ($page.PSObject.Properties['ui']) { $page.ui }
