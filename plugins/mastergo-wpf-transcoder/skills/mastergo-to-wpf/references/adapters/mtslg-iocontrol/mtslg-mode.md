@@ -22,12 +22,13 @@
 | `pages[].pageTitleText` | 否 | **页面标题文案**（去掉设计页名编号的最终标题）。给了就写进 Bundle 清单 `pageTitleText`（`languages.titleSource=manifest.pageTitleText`）；**不给则退回设计页名原文**（带编号时会在"待翻译"门禁上暴露），因此带编号的设计页名必须登记本字段 |
 | `pages[].pageLangName` / `pages[].files` / `pages[].layoutRegistration` / `pages[].runtimeBindings` / `pages[].targetConfirmed` | 否 | 交付登记信息：标题键、产物路径、Layout 注册状态、运行时绑定状态、Target 是否已人工确认 |
 
-（续跑身份提示：本表也是 `run-all.ps1` 续跑身份的解析来源，改动 `pages[].ui` / `pages[].designSource.*` 会受续跑守卫约束；口径与复位方式见 `bundle-manifest.md` 第 7 节。）
 - 多语言目录：每种语言的资源文件、键命名规则与重载/重启要求。MTSLG 页面默认按页维护一套 `Resources/Pages/{name}/{name}_{LOCALE}.xaml`（默认 CN/EN），各语言 key 必须完全一致；运行时控件/菜单通过 `LangName` 引用这些 key。
 - 资源键来源：Style、Icon、LangName、IOName 与 IOCommand 的可核验来源。
 - 页面文件骨架：见第 2 节；组件固定模板、节点结构与字段来源以同目录的飞书组件库映射规范为唯一来源。
 - 内容区坐标：`contentOriginX`、固定 `contentOriginY=192`、设计稿标题处理与目标画布尺寸。
 - Target 映射：新建页面首次必须以运行时加载验证页面 Target 与文件的实际关联（属「项目运行时交付」门禁；只做静态结构映射时不执行，改为在待确认清单里登记该验证项）。
+
+（续跑身份提示：本表是 `run-all.ps1` 解析续跑身份的来源之一，改动 `pages[].ui` / `pages[].designSource.*` 会受运行登记表 `Generated/runs/<Target>/run.json` 的身份守卫约束；口径与复位方式见 `bundle-manifest.md` 第 7 节。）
 
 ## 1.1 MasterGo 组件库映射入口
 
