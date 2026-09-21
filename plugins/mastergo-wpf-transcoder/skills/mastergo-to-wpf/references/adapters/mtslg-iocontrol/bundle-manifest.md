@@ -139,5 +139,6 @@ Bundle **不会**把新页面的文件写进 `.csproj`（实测 `csprojChanged=F
 3. **未登记的旧同名文件一律拒绝**：Bundle 直接失败并点名它**实际消费的三个采集输入**——`Generated/dsl.snapshot.json`、`Generated/visibility.json`、`Generated/extractSvg.json`（内容与本次登记恰好一致时只提示可清理）。其余同层文件（`Generated/coverage-report.json`、`Generated/manifest.json`、`Generated/timing.json`、`Generated/getDsl.json`）不参与输入解析，由 `run-registry.mjs check` 按同一张 `LEGACY_SHADOWS` 表列出。
 4. **断点续跑**：`run-all.ps1 -Progress <步骤>` 用 `run-registry.mjs init --keep` 沿用同一份登记表。登记表必须存在且 schema 受支持；`target`、归一化后的 `projectRoot` 与 `identity{fileId, layerId, ui, designPageName}` 不得改变，也不得为已登记产物补写原先缺失的身份。CLI 省略的 identity 字段保留原值；显式传入的非空值必须相同。守卫失败发生在保存之前，原登记表逐字节不变。标题、译文、术语表与图标命名仍是可修改的语义输入。
    - `identity` 保存的是**来源与运行配置**，不是全都来自设计侧；`ui` 是已冻结的区域配置，决定快照元数据与宿主目录。续跑要求解析后的**值**一致，不要求它仍来自同一参数来源。
-   - 配置改动导致误命中守卫时，先恢复原值即可续跑，例如显式传 `-Ui <run.json 中原 identity.ui>`；首次依赖显式 `-FileId` / `-LayerId` 等参数时，续跑同样要让解析结果保持一致。确实要改来源或运行配置，才先归档原运行目录与原始 capture，再从 `fetch` 新开运行（新 `runId`，产物登记清空）；不得通过编辑 `run.json` 绕过守卫。登记表缺失时同样从 `fetch` 新开运行。
+   - **误命中守卫（只想继续）**：配置或取值链变化导致守卫失败时，先恢复原值即可续跑，例如显式传 `-Ui <run.json 中原 identity.ui>`；首次依赖显式 `-FileId` / `-LayerId` 等参数时，续跑同样要让解析结果保持一致。
+   - **确实要改（或无可续跑）**：要改来源或运行配置时，先归档原运行目录与原始 capture，再从 `fetch` 新开运行（新 `runId`，产物登记清空）；登记表缺失时无物可归档，直接从 `fetch` 新开运行。两种情形都不得通过编辑 `run.json` 绕过守卫。
 5. **手工调用**：`node scripts/run-registry.mjs init|artifact|step|path|check|outputs|show`。不带 `--key` 的 `check` 只检查本次已登记的产物，允许未完成的运行；显式 `check --key <产物键>` 必须命中 `ARTIFACT_KEYS` 且该产物已登记，否则非零退出，不能静默跳过。两种方式都复算所检查文件的 sha256，并核对旧同名文件；`--quiet` 只关闭成功摘要，不豁免任何失败。
