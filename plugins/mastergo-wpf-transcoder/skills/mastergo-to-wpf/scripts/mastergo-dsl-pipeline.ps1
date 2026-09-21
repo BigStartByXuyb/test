@@ -16,12 +16,19 @@ param(
     [string] $LayerId,
 
     [string] $PageName,
-    [string] $Ui = 'F2',
+    # 区域前缀（写进快照 ui 字段、决定页面输出目录）：**不给默认值**。
+    # 走 run-all 时由 run-all 按「命令行 → 项目登记表 → Target 前缀/首词」解析后显式传入；
+    # 手工单独调用时必须显式给 -Ui（不猜、不静默按 F2 采集）。
+    [string] $Ui,
     [string] $RunId
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+
+if (-not $Ui) {
+    throw "缺少 -Ui：区域前缀会写进快照 ui 字段并决定 UI/<区域>/View 输出目录，必须显式给出（或改用 run-all.ps1，它会按项目登记表 / Target 自动解析）。"
+}
 
 # 输出编码：本脚本会往 stdout/stderr 写中文（失败原因、审计结论）。不显式设成 UTF-8 时，
 # 被父进程按 UTF-8 解码就是乱码（表现为 "MasterGo getDsl ��Ӧ�� dsl.nodes[] Ϊ��"）。

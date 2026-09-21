@@ -130,6 +130,7 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 - 断点续跑（`-Progress`）用 `run-registry.mjs init --keep` 沿用同一份登记表；从第 1 步重跑则新开一次运行（新 `runId`、产物登记清空）；
 - 手工检查：`node scripts/run-registry.mjs check --run <run.json>`（校验全部已登记产物的 sha256，并列出可清理的旧同名文件）、`show`（看本次运行摘要）。
 
+- **区域前缀（`ui`）不再写死 F2**：`run-all.ps1` 按固定顺序取值——① 命令行 `-Ui`；② 项目登记表 `pages[].ui`；③ 项目登记表 `derivation` 里的 `F<n>`；④ Target 的编号前缀（`F2ManualAlign` → `F2`）；⑤ 没有编号时取 Target 的首个英文词（`HomeContent` → `Home`、`Home` → `Home`，即"外层的语义英文"）；⑥ 都取不到直接报错。它写进采集快照的 `ui` 字段并决定宿主壳目录 `UI/<区域>/View|ViewModel`，所以不允许静默兜底；`mastergo-dsl-pipeline.ps1` 单独调用时必须显式给 `-Ui`。
 - **页面标题必须来自项目登记表**：`run-all.ps1` 读 `docs/page-registry.json` 的 `pageTitleText` 并写进清单（`languages.titleSource=manifest.pageTitleText`）。设计页名带 `（x.y）` 编号时，登记表里必须写去掉编号的标题——否则标题会退回设计原文并触发"待翻译"门禁。
 - **空文本节点不参与多语言门禁**：设计稿里的空 `TEXT`（`Value=""`）照常发射为 `TextBlock`，但派生器不产键、门禁也不要求它挂 `LangName`，**不需要**为它登记 `noLangRefs`。
 - **页面级图标为空是合法的**：若页面引用的图标全部由映射表登记为运行时图标（`iconPolicy=runtime`），本页 `Icons.xaml` 就是空字典——第 12 步的结构校验按"引用闭环"判定（`usedIcons ⊆ 本页 Geometry ∪ runtimeIcons`），只在确实缺少本页 Geometry 时失败，纯运行时图标页给 WARN。

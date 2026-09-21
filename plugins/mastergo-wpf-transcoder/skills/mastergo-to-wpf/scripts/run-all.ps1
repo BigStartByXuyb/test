@@ -193,19 +193,34 @@ function Get-Prop {
 $Token = Get-MastergoToken
 $env:MASTERGO_MCP_TOKEN = $Token
 
+# 区域前缀的来源（只用于回显，便于复核"这个 ui 是谁给的"）；取值链见下方注释。
+$UiSource = $null
 $Registry = Get-ProjectTarget -Root $ProjectRoot
 if ($Registry) {
     if (-not $Target) { $Target = $Registry.Target }
     if (-not $LayerId) { $LayerId = $Registry.LayerId }
     if (-not $FileId -or $FileId -eq '181586559903927') { $FileId = $Registry.FileId }
     if (-not $DesignPageName) { $DesignPageName = $Registry.Design }
-    # 区域前缀：命令行没给就用项目登记表（docs/page-registry.json）里取到的值（pages[].ui 或 derivation 的 F<n>）。
-    if (-not $Ui -and $Registry.Ui) { $Ui = $Registry.Ui }
+    # 区域前缀：命令行没给就先看项目登记表（docs/page-registry.json）里的 pages[].ui / derivation 的 F<n>。
+    if (-not $Ui -and $Registry.Ui) { $Ui = $Registry.Ui; $UiSource = '项目登记表 docs/page-registry.json' }
 }
-# 取不到区域前缀时不猜：它决定 UI/<区域>/View|ViewModel 的输出目录与 capture 的 ui 字段，
-# 静默退回 F2 会把非 F2 页面的产物写到错目录。要求显式给出 -Ui 或在项目登记表里登记。
+# 区域前缀（`ui`）决定两件事：① capture 快照里的 `ui` 字段；② 宿主壳输出目录 `UI/<区域>/View|ViewModel`。
+# 取值顺序固定（不再写死 F2、也不静默兜底）：
+#   ① 命令行 -Ui
+#   ② 项目登记表 pages[].ui（最权威的人工登记）
+#   ③ 项目登记表 derivation 里的 F<n>
+#   ④ Target 的编号前缀（`F2ManualAlign` → `F2`）
+#   ⑤ 没有编号时取 Target 的首个英文词（CamelCase 首段：`HomeContent` → `Home`、`Home` → `Home`、
+#      全大写 `HOME` → `HOME`）——即"外层的语义英文"
+#   ⑥ 都取不到 → 报错，要求显式给出
+if (-not $Ui -and $Target) {
+    # 必须用 -cmatch（大小写敏感）：PowerShell 的 -match 默认大小写不敏感，
+    # 会让 `[A-Z]+(?![a-z])` 把 `HomeContent` 整串吃掉（`[A-Z]` 也会匹配小写字母）。
+    if ($Target -cmatch '^([A-Za-z]+\d+)') { $Ui = $Matches[1]; $UiSource = "Target 编号前缀（$Target）" }
+    elseif ($Target -cmatch '^([A-Z]+(?![a-z])|[A-Z][a-z0-9]*)') { $Ui = $Matches[1]; $UiSource = "Target 首词（$Target）" }
+}
 if (-not $Ui) {
-    throw "缺少 -Ui：命令行没有提供，项目登记表 docs/page-registry.json 里也没有 pages[].ui，且 derivation 里取不到 F<数字>"
+    throw "缺少区域前缀：命令行 -Ui、项目登记表 pages[].ui / derivation、Target（$Target）都取不到。它会写进快照 ui 字段并决定 UI/<区域>/View 输出目录，必须显式给出。"
 }
 
 foreach ($required in @('Target', 'LayerId')) {
@@ -246,7 +261,8 @@ $EndStep = if ($StopAfter) { Get-Step $StopAfter } else { $Steps[-1] }
 if ($EndStep.Id -lt $StartStep.Id) { throw "-StopAfter 不能早于 -Progress" }
 
 Write-Output ("项目: {0}" -f $ProjectRoot)
-Write-Output ("Target: {0}   LayerId: {1}   Ui: {2}" -f $Target, $LayerId, $Ui)
+Write-Output ("Target: {0}   LayerId: {1}   Ui: {2}{3}" -f $Target, $LayerId, $Ui,
+    $(if ($UiSource) { "（来源: $UiSource）" } else { "" }))
 Write-Output ("区间: {0}({1}) → {2}({3})" -f $StartStep.Id, $StartStep.Name, $EndStep.Id, $EndStep.Name)
 Write-Output ''
 

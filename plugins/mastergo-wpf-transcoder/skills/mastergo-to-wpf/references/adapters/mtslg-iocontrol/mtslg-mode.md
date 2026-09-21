@@ -17,7 +17,7 @@
 |---|---|---|
 | `pages[].target` | 是 | 页面 Target（与 `Layout.xml` 的 `<Page Target>` 一致） |
 | `pages[].designSource.fileId` / `.layerId` / `.designPageName` | 是 | 设计来源：文件 id、图层 id、设计页名（带 `（x.y）` 编号的原名） |
-| `pages[].ui` | 否 | 区域前缀（如 `F2`）。**最优先**——run-all 先读它，再退回 `derivation` 里的第一个 `F<数字>`；两者都取不到时 run-all 直接报错要求显式传 `-Ui`（不再默认 F2，避免非 F2 页面的 `UI/<区域>/View` 目录被写错） |
+| `pages[].ui` | 否 | 区域前缀（如 `F2`）。**最优先**——取值链是「命令行 `-Ui` → 本字段 → `derivation` 里的第一个 `F<数字>` → **Target 的编号前缀**（`F2ManualAlign` → `F2`）→ **Target 的首个英文词**（`HomeContent` → `Home`、`Home` → `Home`，即外层的语义英文）→ 报错」；不再默认 F2，也不静默兜底（该值决定 `UI/<区域>/View|ViewModel` 输出目录与快照 `ui` 字段） |
 | `pages[].derivation` | 否 | 页面名推导说明；没有 `pages[].ui` 时，run-all 从它取第一个 `F<数字>` 当区域前缀（`F2`、`F3ManualAlign`、紧贴中文的 `F3区域` 都能命中——匹配不要求词边界） |
 | `pages[].pageTitleText` | 否 | **页面标题文案**（去掉设计页名编号的最终标题）。给了就写进 Bundle 清单 `pageTitleText`（`languages.titleSource=manifest.pageTitleText`）；**不给则退回设计页名原文**（带编号时会在"待翻译"门禁上暴露），因此带编号的设计页名必须登记本字段 |
 | `pages[].pageLangName` / `pages[].files` / `pages[].layoutRegistration` / `pages[].runtimeBindings` / `pages[].targetConfirmed` | 否 | 交付登记信息：标题键、产物路径、Layout 注册状态、运行时绑定状态、Target 是否已人工确认 |
