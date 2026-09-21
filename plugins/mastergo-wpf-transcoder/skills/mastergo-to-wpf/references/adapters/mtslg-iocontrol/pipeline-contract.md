@@ -13,6 +13,7 @@ pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -ProjectRoot <项目> -Target 
 ```
 
 默认区间是第 1 步 → 第 12 步。下面的 12 个阶段用于**定位失败**与**断点续跑**：失败后从该步继续 `-Progress <步骤名>`；需要人工补语义输入时先跑到 `-StopAfter discover`。
+续跑/停止示例都要带上目标信息（`-ProjectRoot` 与 `-Target`，多页登记表下还可加 `-LayerId`）——只给 `-Progress` 时脚本取不到本次页面的来源。
 
 ## 步骤总览（同一条命令内部的阶段）
 
@@ -210,7 +211,7 @@ pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -ProjectRoot <项目> -Target 
 
 ```powershell
 pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -ProjectRoot <项目> -Target <Target>              # 一次跑完 12 步
-pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -ProjectRoot <项目> -Progress <步骤名>           # 失败后从该步继续
+pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -ProjectRoot <项目> -Target <Target> -Progress <步骤名> # 失败后从该步继续
 pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -ProjectRoot <项目> -Target <Target> -Overwrite # 仅用户明确要求替换时
 pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -List -Format json                            # 本文件的机器可读来源
 ```

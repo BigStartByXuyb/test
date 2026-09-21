@@ -66,5 +66,9 @@ assert.ok(contractDoc.includes("没用 -Target/-LayerId 命中本次页面"),
   "第 1 步失败语义必须写明多页登记表未命中本次页面");
 assert.ok(contractDoc.includes("MCP 返回业务错误码"),
   "第 1 步失败语义必须写明 MCP 业务错误码");
+assert.ok(contractDoc.includes("-Target <Target> -Progress <步骤名>"),
+  "续跑示例必须带目标信息（与 SKILL.md 同一口径）");
+assert.ok(contractDoc.includes("只给 `-Progress` 时脚本取不到本次页面的来源"),
+  "契约文档必须写明只给 -Progress 会取不到来源");
 
 console.log("PASS 一键流水线契约（run-all.ps1 $Steps ↔ pipeline-contract.md）一致性回归测试");

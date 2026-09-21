@@ -105,6 +105,25 @@ const errorSummary = JSON.parse(errorRun.stdout.trim().split("\n").filter(Boolea
 assert.match(String(errorSummary.payloadError || ""), /20001/,
   "摘要必须带 payloadError，供 run-all 定位失败原因");
 
+// 非零业务码没有例外分支：即使响应里同时带着负载字段名，也按失败处理（避免"带 code 的成功"两读）。
+const mixedPayload = JSON.stringify({ code: "20001", message: "❌ 获取文件key异常", dsl: null, svgs: [] });
+const mixedPayloadPath = path.join(root, "mixed-payload.json");
+fs.writeFileSync(mixedPayloadPath, mixedPayload, "utf8");
+const mixedStubPath = path.join(root, "stub-mixed-mcp.js");
+fs.writeFileSync(mixedStubPath,
+  stubLines.join("\n").replace(JSON.stringify(payloadPath), JSON.stringify(mixedPayloadPath)), "utf8");
+const mixedRun = spawnSync(process.execPath, [script,
+  "--tool", "getDsl",
+  "--fileId", "999999999999999",
+  "--layerId", "9:000009",
+  "--format", "json",
+  "--out", path.join(root, "run", "mixed-getDsl.json"),
+  "--token", "fake-token",
+  "--mcp", process.execPath,
+  "--mcp-arg", mixedStubPath,
+], { encoding: "utf8" });
+assert.notStrictEqual(mixedRun.status, 0, "带非零 code 的响应一律失败（没有负载字段例外）");
+
 // 缺 --out / 缺 token 必须拒绝
 const noOut = spawnSync(process.execPath, [script, "--tool", "getDsl", "--fileId", "f", "--layerId", "l", "--token", "t"], { encoding: "utf8" });
 assert.notStrictEqual(noOut.status, 0, "缺少 --out 必须失败");

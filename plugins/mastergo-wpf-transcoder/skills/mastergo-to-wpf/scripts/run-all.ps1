@@ -13,10 +13,10 @@
     例：
         pwsh -NoProfile -File _tool\run-all.ps1 -List
         pwsh -NoProfile -File _tool\run-all.ps1 -List -Format json   # 12 步契约（输入/产物/失败/续跑），供文档生成使用
-        pwsh -NoProfile -File _tool\run-all.ps1 -LayerId <图层id> -Target <页面Target> -StopAfter discover
-        pwsh -NoProfile -File _tool\run-all.ps1 -Progress layout          # 图标台账/译文改好之后
-        pwsh -NoProfile -File _tool\run-all.ps1 -Progress bundle -Overwrite
-        pwsh -NoProfile -File _tool\run-all.ps1 -Progress verify
+        pwsh -NoProfile -File _tool\run-all.ps1 -ProjectRoot <项目> -Target <页面Target> -LayerId <图层id> -StopAfter discover
+        pwsh -NoProfile -File _tool\run-all.ps1 -ProjectRoot <项目> -Target <页面Target> -Progress layout          # 图标台账/译文改好之后
+        pwsh -NoProfile -File _tool\run-all.ps1 -ProjectRoot <项目> -Target <页面Target> -Progress bundle -Overwrite
+        pwsh -NoProfile -File _tool\run-all.ps1 -ProjectRoot <项目> -Target <页面Target> -Progress verify
 #>
 [CmdletBinding()]
 param(
@@ -609,8 +609,17 @@ foreach ($step in $Steps) {
         Write-Output ''
         Write-Output ("!! 步骤 {0}({1}) 失败：{2}{3}" -f $step.Id, $step.Name, $_.Exception.Message, $where)
         if ($_.ScriptStackTrace) { Write-Output ("   调用链: " + (($_.ScriptStackTrace -split "`n" | Select-Object -First 4) -join ' <- ')) }
-        # 续跑命令带上目标信息：登记表有多页时必须能命中本次页面（只写 -Progress 会取不到来源）。
-        Write-Output ("   修好后从这一步继续：pwsh -NoProfile -File _tool\run-all.ps1 -ProjectRoot `"$ProjectRoot`" -Target {0} -Progress {1}{2}" -f $Target, $step.Name, $(if ($Overwrite) { ' -Overwrite' } else { '' }))
+        # 续跑命令回填本次调用的全部输入：只写 -Progress 会取不到来源；-Ui / -AllowEmptyLedger /
+        # -ConfigPath 这些命令行专属输入若不复现，续跑会在不同区域前缀或不同前置条件下静默继续。
+        $resumeArgs = @("-ProjectRoot `"$ProjectRoot`"", "-Target $Target")
+        if ($LayerId) { $resumeArgs += "-LayerId $LayerId" }
+        if ($FileId) { $resumeArgs += "-FileId $FileId" }
+        if ($Ui) { $resumeArgs += "-Ui $Ui" }
+        if ($DesignPageName) { $resumeArgs += "-DesignPageName `"$DesignPageName`"" }
+        if ($Overwrite) { $resumeArgs += '-Overwrite' }
+        if ($AllowEmptyLedger) { $resumeArgs += '-AllowEmptyLedger' }
+        if ($ConfigPath) { $resumeArgs += "-ConfigPath `"$ConfigPath`"" }
+        Write-Output ("   修好后从这一步继续：pwsh -NoProfile -File _tool\run-all.ps1 {0} -Progress {1}" -f ($resumeArgs -join ' '), $step.Name)
         Write-Output ''
         Write-Output '--- 本区间进度 ---'
         $results | ForEach-Object { '{0,2} {1,-10} {2,-7} {3,6}s' -f $_.Id, $_.Name, $_.Status, $_.Seconds }
@@ -637,5 +646,5 @@ if ($EndStep.Id -eq 6) {
     Write-Output ("     格式：[{ `"index`": <候选下标>, `"name`": `"<英文资源名>Geometry`", `"comment`": `"<中文注释>`", `"fromDsl`": <bool，可选> }, ...]")
     Write-Output ("  3) 枚举本页需要翻译的文案：node `"$PSScriptRoot\list-lang-sources.mjs`" `"$MappingAuditJson`" `"$LayoutManifestJson`"")
     Write-Output ("     据此把中文→英文译文写进：$TranslationsJson")
-    Write-Output '  4) 然后继续（台账由命名表生成、并自动做图标几何来源核对）：pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -ProjectRoot <项目> -Progress ledger'
+    Write-Output ("  4) 然后继续（台账由命名表生成、并自动做图标几何来源核对）：pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -ProjectRoot `"$ProjectRoot`" -Target $Target -Progress ledger")
 }
