@@ -10,6 +10,9 @@
 //
 // 这里把口径固定成机械断言：**实现级判据词只允许出现在权威文档**（bundle-manifest.md 第 7 节），
 // SKILL.md 与生成物不得承载它们；文档里的 CLI 参数名必须与脚本 param 块同口径。
+//
+// 覆盖边界（不要高估本门禁）：它按**词表**拦（ASCII 判据词 + 少量固定中文口径词），不做语义判断——
+// 换成同义写法的复述仍要靠人工评审。词表就是下面两个常量，加词即扩大覆盖。
 
 const assert = require("assert");
 const fs = require("fs");
@@ -26,7 +29,8 @@ const DISABLED_PREFIX = path.join("references", "adapters", "mw-wpf");
 // 实现级判据词：出现它们就意味着在复述脚本行为，因此只允许出现在权威文档里。
 const IMPLEMENTATION_TOKENS = ["--keep", "ARTIFACT_KEYS", "LEGACY_SHADOWS", "逐字节不变", "不得补写", "run-registry.mjs"];
 // 续跑身份口径词：生成物只能承载 $Steps 里的步骤信息，不得承载身份判据。
-const IDENTITY_TOKENS = ["identity", "--keep", "冻结", "回放", "不得补写"];
+// 中文词是 REVIEW 反馈补上的：只查 ASCII 会让「换身份」「身份口径」这类改写漏网。
+const IDENTITY_TOKENS = ["identity", "--keep", "冻结", "回放", "不得补写", "换身份", "身份口径", "身份不可变"];
 
 function collectDocs(dir, out = []) {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
