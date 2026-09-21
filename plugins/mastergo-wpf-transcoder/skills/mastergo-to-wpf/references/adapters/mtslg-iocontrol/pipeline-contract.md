@@ -67,7 +67,7 @@ pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -ProjectRoot <项目> -Target 
   - 存在重复 ref 或断裂父子链
   - 区域前缀取值链取不到
 - **怎么修**：
-  - 确认 layerId 指向目标图层全部节点后重跑：-Progress capture
+  - 改 layerId / 设计来源属换身份：从第 1 步 fetch 新开一次运行（capture 只消费第 1 步的 getDsl.json）；来源不变而捕获失败时才重跑：-Progress capture
   - 区域前缀显式传 -Ui
 
 ### 3. `svg` —— extractSvg 图标几何

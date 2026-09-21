@@ -77,7 +77,7 @@ $Steps = @(
         Inputs   = @('第 1 步的 getDsl.json', '区域前缀 -Ui（缺失时按 run-all 取值链解析）', '设计页名 -DesignPageName（命令行或项目登记表；为空时 capture 用 DSL 根节点名兜底，再取不到用 layerId）')
         Outputs  = @('Generated/runs/<Target>/dsl.snapshot.json', 'coverage-report.json（节点覆盖/重复 ref/断裂父子链）')
         Failures = @('覆盖校验 status≠complete', '存在重复 ref 或断裂父子链', '区域前缀取值链取不到')
-        Recovery = @('确认 layerId 指向目标图层全部节点后重跑：-Progress capture', '区域前缀显式传 -Ui')
+        Recovery = @('改 layerId / 设计来源属换身份：从第 1 步 fetch 新开一次运行（capture 只消费第 1 步的 getDsl.json）；来源不变而捕获失败时才重跑：-Progress capture', '区域前缀显式传 -Ui')
     },
     [pscustomobject]@{
         Id = 3; Name = 'svg'; Title = 'extractSvg 图标几何'
