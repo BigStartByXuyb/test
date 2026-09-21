@@ -97,7 +97,8 @@ function Get-ProjectTarget {
         Ui      = if ($page.derivation -match '\bF\d+\b') { $Matches[0] } else { $null }
         Design  = $page.designSource.designPageName
         # 页面标题的人工确认值：机械流水线必须带上它，否则标题会退回设计页名原文（带 (x.y) 编号）。
-        PageTitleText = $page.pageTitleText
+        # 该字段是可选登记项：老登记表没有它时不能因为 Set-StrictMode 直接抛错。
+        PageTitleText = if ($page.PSObject.Properties['pageTitleText']) { $page.pageTitleText } else { $null }
     }
 }
 

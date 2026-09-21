@@ -75,17 +75,13 @@ foreach ($icon in ($usedIcons + $layoutIcons | Sort-Object -Unique)) {
     if ($runtimeIcons -contains $icon) { continue }
     if ($iconKeys -notcontains $icon) { $fail.Add("引用了未生成的 Geometry: $icon") }
 }
-# Icon 文件为空的判定：只有"页面确实需要本页 Geometry"时才算失败。
-# 运行图标（映射表 iconPolicy=runtime，如 enter/exit）由框架/目标项目提供，本页 Icons.xaml 本来就该是空字典。
-$expectedPageIcons = @(($usedIcons + $layoutIcons | Sort-Object -Unique) | Where-Object { $_ -and ($runtimeIcons -notcontains $_) })
+# Icon 文件为空只记 WARN：上面的逐图标引用检查（usedIcons ⊆ 本页 Geometry ∪ runtimeIcons）已经覆盖"缺图"这一类失败，
+# 这里不再另立一条重复的失败判据。运行图标（映射表 iconPolicy=runtime，如 enter/exit）由框架/目标项目提供，
+# 本页 Icons.xaml 本来就该是空字典。
 if (-not $iconKeys.Count) {
-    if ($expectedPageIcons.Count) {
-        $fail.Add("Icon 文件没有 Geometry 资源键，但页面引用了本页 Geometry: " + ($expectedPageIcons -join ', '))
-    } else {
-        $referenced = @($usedIcons + $layoutIcons | Sort-Object -Unique | Where-Object { $_ })
-        $warn.Add("本页没有页面级 Geometry（Icon 文件是空字典）：页面/Layout 引用的图标全部由框架提供" +
-            $(if ($referenced.Count) { "（" + ($referenced -join ', ') + "）" } else { "" }))
-    }
+    $referenced = @($usedIcons + $layoutIcons | Sort-Object -Unique | Where-Object { $_ })
+    $warn.Add("本页没有页面级 Geometry（Icon 文件是空字典）：页面/Layout 引用的图标全部由框架提供" +
+        $(if ($referenced.Count) { "（" + ($referenced -join ', ') + "）" } else { "" }))
 }
 
 $pageLangNames = @($root.SelectNodes('.//IOContorl[@LangName]') | ForEach-Object { $_.LangName } | Where-Object { $_ })
