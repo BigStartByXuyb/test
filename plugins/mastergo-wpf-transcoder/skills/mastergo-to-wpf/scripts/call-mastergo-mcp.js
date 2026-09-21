@@ -146,11 +146,19 @@ child.stdout.on("data", function (chunk) {
 });
 
 const timeoutMs = Number(args.timeoutMs || 240000);
-const timer = setTimeout(function () {
-  console.error("MCP 调用超时 " + timeoutMs + "ms" + (stderrText ? "；服务端 stderr: " + stderrText.slice(-400) : ""));
-  try { child.kill(); } catch (error) { /* ignore */ }
-  process.exit(3);
-}, timeoutMs);
+// 超时窗口按**每次请求**重新武装：extractSvg 的分页聚合会发多次 tools/call，
+// 只武装一次会让第 2 页及以后的请求失去超时保护（服务端卡住 → 脚本永久挂起，
+// 而不是按契约以非零码退出）。
+let timer = null;
+function armTimeout() {
+  if (timer) clearTimeout(timer);
+  timer = setTimeout(function () {
+    console.error("MCP 调用超时 " + timeoutMs + "ms" + (stderrText ? "；服务端 stderr: " + stderrText.slice(-400) : ""));
+    try { child.kill(); } catch (error) { /* ignore */ }
+    process.exit(3);
+  }, timeoutMs);
+}
+armTimeout();
 
 // extractSvg 是分页接口（服务端 pageSize 上限 100）：只取第一页会让 >100 个图标的页面静默漏条目。
 // 这里把上限做成显式常量，防御服务端 hasMore 永真的情况（宁可失败，也不无限拉）。
@@ -206,6 +214,7 @@ function shutdown(exitCode) {
     // tools/list 不可用时退回原名调用
   }
 
+  armTimeout();
   const response = await request("tools/call", { name: serverToolName, arguments: toolArgs });
   clearTimeout(timer);
 
@@ -250,7 +259,9 @@ function shutdown(exitCode) {
         return;
       }
       page += 1;
+      armTimeout();
       const next = await request("tools/call", { name: serverToolName, arguments: Object.assign({}, toolArgs, { page: page }) });
+      clearTimeout(timer);
       const nextText = toTextContent(next && next.result);
       if (nextText === null) {
         console.error("extractSvg 第 " + (page + 1) + " 页响应不受本地采集契约支持（必须且仅有一个字符串 text content），未覆盖输出文件");

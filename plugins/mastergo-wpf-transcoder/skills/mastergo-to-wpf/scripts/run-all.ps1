@@ -277,9 +277,15 @@ function Assert-RegisteredInput {
     if (-not (Test-Path -LiteralPath $RunJson)) { return }
     $doc = Get-Content -LiteralPath $RunJson -Raw -Encoding UTF8 | ConvertFrom-Json
     $artifacts = Get-Prop $doc 'artifacts'
-    if ($null -eq $artifacts) { return }
-    if (-not $artifacts.PSObject.Properties[$Key]) { return }
-    Invoke-Registry @('check', '--run', $RunJson, '--key', $Key, '--quiet') | Out-Null
+    if ($artifacts -and $artifacts.PSObject.Properties[$Key]) {
+        Invoke-Registry @('check', '--run', $RunJson, '--key', $Key, '--quiet') | Out-Null
+        return
+    }
+    # 未登记：新开运行里属正常（上游步骤在本区间之前刚产出、尚未登记的情况不会走到这里）。
+    # 但续跑路径上，"产物存在却没登记"正是 §7 明令拒绝的旧同名文件——不能静默消费。
+    if ($StartStep.Id -gt 1) {
+        throw "输入 $Key 未登记在本次运行的 $RunJson 里（消费只按登记取、未登记的旧同名文件一律拒绝）：请从 fetch 新开一次运行（不带 -Progress），或先跑产出该产物的那一步。"
+    }
 }
 
 # 本步产出的文件 → 登记表键（键名是消费端唯一认的入口，见 lib/run-registry.js 的 ARTIFACT_KEYS）

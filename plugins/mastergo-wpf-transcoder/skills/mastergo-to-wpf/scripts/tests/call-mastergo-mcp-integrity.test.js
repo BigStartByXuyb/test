@@ -43,7 +43,11 @@ input.on("line", (line) => {
     }
   }
   const bytes = Buffer.from(JSON.stringify({ jsonrpc: "2.0", id: message.id, result }) + "\\n");
-  if (message.method === "tools/call" && config.splitCharacter) {
+  const page = Number((message.params && message.params.arguments && message.params.arguments.page) || 0);
+  const delay = message.method === "tools/call" && config.delayPages ? (config.delayPages[page] || 0) : 0;
+  if (delay) {
+    setTimeout(() => process.stdout.write(bytes), delay);
+  } else if (message.method === "tools/call" && config.splitCharacter) {
     const cut = bytes.indexOf(Buffer.from(config.splitCharacter)) + 1;
     if (cut < 1) throw new Error("test character not found");
     process.stdout.write(bytes.subarray(0, cut));
@@ -55,7 +59,8 @@ input.on("line", (line) => {
 `);
   const args = [
     cli, "--tool", tool, "--out", out, "--token", "fake-token",
-    "--mcp", process.execPath, "--mcp-arg", stubPath, "--timeoutMs", "5000"
+    "--mcp", process.execPath, "--mcp-arg", stubPath,
+    "--timeoutMs", String(config.timeoutMs === undefined ? 5000 : config.timeoutMs)
   ];
   if (config.pageSize !== undefined) args.push("--pageSize", String(config.pageSize));
   const result = spawnSync(process.execPath, args, { encoding: "utf8", timeout: 10000 });
@@ -130,4 +135,19 @@ test("extractSvg aggregation stops at the page cap when hasMore never clears", (
   assert.equal(result.status, 4, result.stderr);
   assert.equal(result.captured, result.previous);
   assert.match(result.stderr, /超过上限/);
+});
+
+// 回归（v1.0.246 语义审计 REVIEW-002）：分页聚合会发多次 tools/call，超时窗口必须**按请求重新武装**。
+// 改造前定时器在首个响应后就被清掉，第 2 页及以后卡住会让脚本永久挂起（而不是按契约以非零码退出）。
+test("extractSvg pagination keeps each page request under the timeout window", (t) => {
+  const page0 = { totalCount: 2, count: 1, page: 0, pageSize: 1, hasMore: true, svgs: [{ id: "a" }] };
+  const page1 = { totalCount: 2, count: 1, page: 1, pageSize: 1, hasMore: false, svgs: [{ id: "b" }] };
+  const result = captureWithStub(t, {
+    tool: "extractSvg", pageSize: 1, timeoutMs: 400,
+    pages: { 0: page0, 1: page1 }, delayPages: { 1: 2000 }
+  });
+
+  assert.equal(result.status, 3, "第 2 页超时必须按超时失败码退出，而不是无限挂起");
+  assert.match(result.stderr, /超时/);
+  assert.equal(result.captured, result.previous);
 });

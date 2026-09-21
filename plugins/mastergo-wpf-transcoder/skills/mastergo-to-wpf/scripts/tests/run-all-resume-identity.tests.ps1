@@ -138,6 +138,13 @@ try {
     $out9 = Invoke-Resume -Project $case9 -Progress 'capture'
     Assert-True ($out9 -match '与磁盘不一致') '被改过的已登记采集产物必须在消费前被拒'
 
+    # 10) 续跑时"未登记但存在"的旧采集产物不得被静默消费（§7：未登记的旧同名文件一律拒绝）
+    $case10 = New-Fixture -Name 'unregistered-present'
+    Set-Content -LiteralPath (Join-Path $case10 'Generated\runs\Demo\getDsl.json') -Value '{"dsl":"stale from a previous run"}' -Encoding UTF8
+    $out10 = Invoke-Resume -Project $case10 -Progress 'capture'
+    Assert-True ($out10 -match '未登记') '续跑遇到未登记的旧采集产物必须拒绝'
+    Assert-True ($out10 -notmatch '缺少 Bundle 审计') '未登记产物必须在消费前拦下'
+
     Write-Output 'PASS MasterGo run-all 续跑身份回放测试'
 }
 finally {
