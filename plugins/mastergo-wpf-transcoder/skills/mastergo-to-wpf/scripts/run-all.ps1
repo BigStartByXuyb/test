@@ -311,6 +311,12 @@ $env:MASTERGO_MCP_TOKEN = $Token
 
 # 区域前缀的来源（只用于回显，便于复核"这个 ui 是谁给的"）；取值链见下方注释。
 $UiSource = $null
+# 命令行显式给的取值：与"从项目登记表解析出来的值"区分开——续跑回放冻结身份要用它判断
+# 调用方是否在要求改身份（显式给不同值 = 要改，省略 = 沿用）。
+$cliFileId = $FileId
+$cliLayerId = $LayerId
+$cliUi = $Ui
+$cliDesignPageName = $DesignPageName
 $Registry = Get-ProjectTarget -Root $ProjectRoot -Target $Target -LayerId $LayerId
 if ($Registry) {
     if (-not $Target) { $Target = $Registry.Target }
@@ -386,6 +392,53 @@ $PageTitleText = if ($Registry -and $Registry.PageTitleText) { $Registry.PageTit
 $StartStep = Get-Step $Progress
 $EndStep = if ($StopAfter) { Get-Step $StopAfter } else { $Steps[-1] }
 if ($EndStep.Id -lt $StartStep.Id) { throw "-StopAfter 不能早于 -Progress" }
+
+# 断点续跑：身份四项一律回放首次运行冻结在 run.json 里的值——续跑是"沿用同一次运行的身份"，
+# 不是"重新做一次身份判定"。这样 capture 拿到的一定是首次那份身份（不会退回 DSL 根节点名），
+# 项目登记表 `docs/page-registry.json` 之后的增删改也不会再影响正在续跑的这一次。
+# 省略 → 用冻结值；显式传不同的值、或给首次运行时缺失的身份补值 → fail-closed，改身份只能新开运行。
+if ($StartStep.Id -gt 1) {
+    if (-not (Test-Path -LiteralPath $RunJson)) {
+        throw "缺少运行登记表 $RunJson：续跑只能沿用同一次运行的身份，请改从 fetch 新开一次运行（不带 -Progress）"
+    }
+    try {
+        $frozenRegistry = Get-Content -LiteralPath $RunJson -Raw -Encoding UTF8 | ConvertFrom-Json
+    }
+    catch {
+        throw "运行登记表 $RunJson 不是合法 JSON：$($_.Exception.Message)"
+    }
+    $frozen = Get-Prop $frozenRegistry 'identity'
+    if ($null -eq $frozen) {
+        throw "运行登记表 $RunJson 缺少 identity：请从 fetch 新开一次运行（不带 -Progress）"
+    }
+    $replayFields = @(
+        [pscustomobject]@{ Field = 'fileId'; Frozen = (Get-Prop $frozen 'fileId'); Explicit = $cliFileId; Resolved = $FileId }
+        [pscustomobject]@{ Field = 'layerId'; Frozen = (Get-Prop $frozen 'layerId'); Explicit = $cliLayerId; Resolved = $LayerId }
+        [pscustomobject]@{ Field = 'ui'; Frozen = (Get-Prop $frozen 'ui'); Explicit = $cliUi; Resolved = $Ui }
+        [pscustomobject]@{ Field = 'designPageName'; Frozen = (Get-Prop $frozen 'designPageName'); Explicit = $cliDesignPageName; Resolved = $DesignPageName }
+    )
+    foreach ($item in $replayFields) {
+        $frozenValue = if ($item.Frozen) { [string]$item.Frozen } else { '' }
+        $explicitValue = if ($item.Explicit) { [string]$item.Explicit } else { '' }
+        $resolvedValue = if ($item.Resolved) { [string]$item.Resolved } else { '' }
+        if (-not $frozenValue) {
+            # 首次运行时这一项没有身份（例如当时还没登记设计页名）：不得在续跑里补写。
+            if ($resolvedValue) {
+                throw "续跑不能为首次运行缺失的身份 identity.$($item.Field) 补值（本次解析出 '$resolvedValue'）：请从 fetch 新开一次运行（不带 -Progress）"
+            }
+            continue
+        }
+        if ($explicitValue -and $explicitValue -ne $frozenValue) {
+            throw "续跑不能更改 identity.$($item.Field)（首次运行 = '$frozenValue'，本次显式传入 = '$explicitValue'）：请从 fetch 新开一次运行（不带 -Progress）"
+        }
+        switch ($item.Field) {
+            'fileId' { $FileId = $frozenValue }
+            'layerId' { $LayerId = $frozenValue }
+            'ui' { $Ui = $frozenValue; $UiSource = '运行登记表 run.json（续跑回放）' }
+            'designPageName' { $DesignPageName = $frozenValue }
+        }
+    }
+}
 
 Write-Output ("项目: {0}" -f $ProjectRoot)
 Write-Output ("Target: {0}   LayerId: {1}   Ui: {2}{3}" -f $Target, $LayerId, $Ui,

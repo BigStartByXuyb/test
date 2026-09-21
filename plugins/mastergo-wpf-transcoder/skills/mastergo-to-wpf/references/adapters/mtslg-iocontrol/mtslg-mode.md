@@ -28,7 +28,7 @@
 - 内容区坐标：`contentOriginX`、固定 `contentOriginY=192`、设计稿标题处理与目标画布尺寸。
 - Target 映射：新建页面首次必须以运行时加载验证页面 Target 与文件的实际关联（属「项目运行时交付」门禁；只做静态结构映射时不执行，改为在待确认清单里登记该验证项）。
 
-（续跑身份提示：本表是 `run-all.ps1` 解析续跑身份的来源之一，改动 `pages[].ui` / `pages[].designSource.*` 会受运行登记表 `Generated/runs/<Target>/run.json` 的身份守卫约束；口径与复位方式见 `bundle-manifest.md` 第 7 节。）
+（续跑身份提示：本表是**新开运行**解析身份的输入；续跑回放运行登记表 `Generated/runs/<Target>/run.json` 里冻结的 `identity`，因此改动本表的 `pages[].ui` / `pages[].designSource.*` 不会影响正在续跑的这一次——要改身份请新开一次运行。口径见 `bundle-manifest.md` 第 7 节。）
 
 ## 1.1 MasterGo 组件库映射入口
 

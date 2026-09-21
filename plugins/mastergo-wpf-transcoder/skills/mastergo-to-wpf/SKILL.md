@@ -68,7 +68,7 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 | 12 | `verify` | 四项独立验证（provenance / 坐标 / Icon / 结构） |
 
 - **每一步的输入 / 产物 / 失败语义 / 怎么修：`references/adapters/mtslg-iocontrol/pipeline-contract.md`**。该文件由 `run-all.ps1` 的步骤定义生成（`node scripts/gen-pipeline-contract.mjs`），**真值源是脚本**；要改契约就改脚本再重新生成，手改文档会挂测试。
-- 运行登记表：`<项目>/Generated/runs/<Target>/run.json`，规则是「**产出即登记、消费只按登记取、未登记的旧同名文件一律拒绝**」；清单里的采集输入（`dslPath` / `visibilityPath` / `svgPath`）都从登记表解析并校验 `sha256`。断点续跑用 `-Progress <步骤名>`（身份与运行配置约束、复位路径、可改语义输入与 `check --key` 口径见 `references/adapters/mtslg-iocontrol/bundle-manifest.md` 第 7 节）。
+- 运行登记表：`<项目>/Generated/runs/<Target>/run.json`，规则是「**产出即登记、消费只按登记取、未登记的旧同名文件一律拒绝**」；清单里的采集输入（`dslPath` / `visibilityPath` / `svgPath`）都从登记表解析并校验 `sha256`。断点续跑用 `-Progress <步骤名>`（续跑回放冻结身份、可改语义输入与 `check --key` 口径见 `references/adapters/mtslg-iocontrol/bundle-manifest.md` 第 7 节）。
 - 区域前缀（`ui`）：取值链的唯一实现在 `run-all.ps1`（`-Ui` → 项目登记表 `pages[].ui` / `derivation` → Target 编号前缀 → Target 首词 → **报错**）；取不到就报错，不静默默认。`fileId` / `layerId` 同样按「命令行 → 项目登记表 → 报错」解析，插件不内置任何项目的设计来源。
 
 ```powershell
