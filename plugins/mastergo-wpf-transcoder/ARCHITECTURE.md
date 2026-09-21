@@ -27,10 +27,7 @@ plugins/mastergo-wpf-transcoder/
 │  │  └─ scripts/                  # 交付链路脚本（运行时）
 │  │     ├─ lib/                    # 跨脚本共享实现（唯一副本，禁止再抄进脚本）
 │  │     └─ tests/                 # 开发期回归测试（CI 不跑，本地跑）
-│  └─ mastergo-iocontrol-document-format/   # 映射文档写作规范 Skill
-└─ tools/
-   ├─ page-node-id-gui/             # 本地 GUI：贴 MasterGo 链接 → 返回控件该用的 ID（+ 命中映射时的控件代码）
-   └─ page-node-id/                 # 离线 exe：按名字在本地 DSL 快照里查 ID（不装 Node 的机器用）
+   └─ mastergo-iocontrol-document-format/   # 映射文档写作规范 Skill
 ```
 
 ## 3. 交付链路（数据流）
@@ -73,7 +70,6 @@ flowchart LR
 | 页面发射 | `gen-iocontrol-xml.js` | 发射页面 IOContorl XML（fresh / merge） |
 | 多语言 | `gen-mtslg-lang-keys-from-dsl.js`、`gen-mtslg-page-lang.js` | 派生语言键、发射 CN/EN 字典 |
 | 宿主 | `gen-mw-wpf-page.js` | 生成 View / code-behind / ViewModel 与 csproj 登记 |
-| 查 ID（人工手写控件时用） | `resolve-node-control.js` + `tools/page-node-id-gui/`（本地 GUI）、`tools/page-node-id/`（离线 exe） | 输入 MasterGo 链接 → 输出该控件该用的 `ID`（命中正式映射表时同时给出可粘贴的控件代码）。GUI 经 `resolve-node-control.js` 转调 `lib/page-node-id.js`；离线 exe 是同一公式的**第二实现**（`tools/page-node-id/PageNodeId.cs`），由 `scripts/tests/page-node-id-tool.test.js` 交叉校验——`lib/page-node-id.js` 的「唯一实现」只覆盖 JS 侧，改公式必须两处同步 |
 | 编排 | **`gen-mastergo-page-bundle.js`（主入口）** | 串起模板解析 → 容器嵌套重挂 → 语言键 → LangName → XML → 校验 → Icon → Layout → 宿主 → 最终校验 |
 | 编排（外层一键） | `run-all.ps1`、`build-icon-ledger.mjs`、`build-bundle-manifest.mjs` | 把「取数 → 快照 → extractSvg → 显隐 → mapping → 图标候选 → 台账 → Layout 清单 → Bundle 清单 → bundle → 门禁 → 验证」12 步串成一条命令；支持 `-Progress` / `-StopAfter` 断点续跑、每步落日志；`build-icon-ledger.mjs` 按页面自己的命名表生成台账，`build-bundle-manifest.mjs` 由 Layout 清单 + `.csproj` 推导 Bundle 清单 |
 | 门禁 | `validate-iocontrol-provenance.js`、`check-iocontrol-coords.js` | 来源闭环、必写字段、坐标 0 MISMATCH / 0 EXTRA；表格列定义按 `tableTemplates.columnTemplate` 的固定几何与字段集单独校验（不套 `controlTypeRequiredAttrs`） |
@@ -93,7 +89,6 @@ flowchart LR
 | `lib/mastergo-rules.js` | DSL 层共用判定（如宿主壳标记词 `isHostShellName`） | `gen-mtslg-mapping-from-dsl.js`、`apply-container-containment.js` |
 | `lib/page-node-id.js` | 页面节点 ID 口径的唯一真值源（`MX_` + sha256(页面键 + "\n" + 节点 ref) 前 32 位小写十六进制） | `gen-mtslg-mapping-from-dsl.js`（`allocateId` 转调） |
 | `lib/icon-ownership.js` | 图标归属判据（树包含优先、前缀回退、取最深命中） | `gen-mtslg-mapping-from-dsl.js`、`discover-mtslg-page-icon-map.js` |
-| `lib/iocontrol-xml-chunk.js` | 从整页 XML 里按 ID 取出**单个控件**的完整片段（自闭合只取自身、容器取整棵子树） | `resolve-node-control.js`（GUI 的"复制代码"来源） |
 
 规则：**同一个功能要复用，不许反复造轮子**。新脚本需要已存在的工具就 `require` 共享模块；确实职责不同但同名的函数，登记到 `lib/script-reuse-registry.json` 并写清 `reason`（登记是显式决定，不是隐藏白名单）。发版前 `tests/script-duplication.test.js` 必须 PASS。
 

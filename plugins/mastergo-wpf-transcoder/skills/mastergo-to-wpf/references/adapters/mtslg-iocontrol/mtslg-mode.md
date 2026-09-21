@@ -66,7 +66,6 @@
 - **人工维护约定**：人工新增/手改的节点，ID 沿用原有 GUID 写法（`MX_` + 32 位十六进制），唯一性由人工保证；**"这个节点是不是我们生成的"不靠名字判断**，而靠 mapping（有没有设计来源）判断（见第 5 节的人工/外部节点条目）。人工若要改动文案，需回灌设计稿——文案与 `LangName` 都是设计侧派生的。
 - **溯源资料缺失时**（例如从代码仓库新拉下来的项目只有页面 XML）：`id-map` / `mapping` 都不是必需品——ID 可由设计稿随时重算（重取 DSL → 重推 mapping → 以现有 XML 作 merge 输入）。前提是能拿到设计稿（`fileId + layerId`）。
 
-- **查 ID 的工具（给"只手写一个控件、不跑整页转码"的人）**：`tools/page-node-id-gui/`（本地 GUI，`start.cmd` 启动：贴容器/控件链接 → 返回该控件该用的 `ID`，命中正式映射表时同时给出可粘贴的控件代码）与 `tools/page-node-id/MasterGoPageNodeId.exe`（离线：按名字在本地 DSL 快照里查）。**GUI** 经 `scripts/resolve-node-control.js` 转调 `lib/page-node-id.js` 取 ID；**离线 exe** 是同一公式的**第二实现**（`tools/page-node-id/PageNodeId.cs` 自行做 sha256），由 `scripts/tests/page-node-id-tool.test.js` 交叉校验——因此 `lib/page-node-id.js` 自称的「唯一实现」只覆盖 JS 侧，改动该公式时必须两处同步；两者都不落登记表。**页面帧决定页面键**：同一个控件用"控件链接"单独抓 DSL 时根节点是控件自己、页面键就变了，算出的 ID 与整页转码不一致；所以工具必须先拿到页面帧链接，或从工程里已有的页面快照（`docs/page-registry.json` / `Generated/runs/<页面名>/dsl.snapshot.json`）反查页面帧。这是 ID 一致性的前提，不是可选优化。
 
 ## 3. 坐标规则（核心）
 
