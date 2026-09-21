@@ -116,7 +116,7 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 | 4 `visibility` | 显隐事实 | `resolve-mastergo-visibility.js` |
 | 5 `mapping` | mapping 草稿 | `gen-mtslg-mapping-from-dsl.js` |
 | 6 `discover` | 图标候选清单 | `discover-mtslg-page-icon-map.js` |
-| 7 `ledger` | 台账就绪校验（台账由 `build-icon-ledger.mjs` + 命名表生成，见下） | — |
+| 7 `ledger` | 由命名表生成图标台账 + 图标几何来源核对 | `build-icon-ledger.mjs`、`verify-icon-source.mjs --naming` |
 | 8 `layout` | Layout 清单推导 | `gen-mtslg-layout-manifest.js` |
 | 9 `inputs` | Bundle 清单生成 | `build-bundle-manifest.mjs` |
 | 10 `bundle` | 页面 XML / Icon / Layout / 宿主壳 | `gen-mastergo-page-bundle.js` |
@@ -131,7 +131,11 @@ pwsh -NoProfile -File <skill>/scripts/run-all.ps1 -ProjectRoot <项目> -Progres
 
 - `-Progress` / `-StopAfter` 可写步骤号或步骤名；失败时脚本打印失败步的日志路径与续跑命令，修好输入后从该步继续，不需要重跑前面。
 - 每步日志：`<项目>/Generated/_work/steps/NN-<步骤名>.log`。
+- **采集产物按页归档**：`<项目>/Generated/runs/<Target>/`（`getDsl.json` / `dsl.snapshot.json` / `coverage-report.json` / `visibility.json` / `extractSvg.json` / `manifest.json` / `timing.json`）。一个项目里可以有多张页面，写在同一层会互相覆盖，导致旧页重跑时拿错别页的 `extractSvg`/快照。
 - **语义判断不合并进脚本**，必须由人给三个页面级输入文件：`<项目>/Generated/_inputs/<Target>.icon-naming.json`（候选下标 → 英文资源名/中文注释/是否 `fromDsl`）、`<Target>.lang-translations.json`（中文→英文译文）、`<Target>.lang-glossary.json`（无英文语义或单字符文案的稳定标识符）。
+- 步骤 7 做两件事：先按命名表机械生成台账（`build-icon-ledger.mjs <候选清单> <icon-map.json> <命名表>`），再对本页登记的条目做几何来源核对（`verify-icon-source.mjs <候选清单> <dsl.snapshot.json> <extractSvg.json> --naming <命名表>`）。命中「`sourceId` 指向页面根 / 被多条共用 / 缺 extractSvg 条目且未声明 `fromDsl`」时该步直接失败——不要手写 `icon-map.json` 的 `icons[]` 绕过这一步。
+- 待翻译文案用 `list-lang-sources.mjs <mapping.json> [layout-manifest.json]` 枚举（列出本页需要多语言条目的设计文案、页面标题与 Layout 菜单名），据此产出译文清单。
+- **脚本根约定**：外层辅助脚本（`run-all.ps1` 及其同级：`build-*`、`verify-*`、`run-verifications.ps1`、`check-coords.mjs`、`inspect-*`、`list-lang-sources.mjs`）与 `run-all.ps1` **同目录**——插件里即 `skills/mastergo-to-wpf/scripts/`，项目里整组放 `<项目>/_tool/`；skill 自带脚本（`gen-*`、`validate-*`、`discover-*`、`scan-*` …）一律从 skill 的 `scripts/` 取。两种布局下 `run-all.ps1` 都能自动识别，无需手工传脚本根。
 - 覆盖已有页面产物必须显式 `-Overwrite`（Bundle 会逐个备份）。
 - 项目已在 `docs/page-registry.json` 登记时，`-Target` / `-LayerId` 可省略（从登记表读）。
 

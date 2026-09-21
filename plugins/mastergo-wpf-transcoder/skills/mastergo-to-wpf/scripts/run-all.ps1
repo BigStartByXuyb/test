@@ -31,7 +31,7 @@ param(
     [switch] $Overwrite,
     [switch] $AllowEmptyLedger,
     [switch] $List,
-    [string] $ConfigPath = 'C:\Users\xuyb\.codex\config.toml'
+    [string] $ConfigPath = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -53,20 +53,20 @@ $ProjectRoot = (Resolve-Path -LiteralPath $ProjectRoot).Path
 $ScriptsFolder = Join-Path $SkillRoot 'scripts'
 $TemplateMap = Join-Path $SkillRoot 'references\adapters\mtslg-iocontrol\mtslg-iocontrol-map.json'
 
-# 步骤表：Id / 名称 / 说明 / 依赖（用于断点续跑时的前置检查）
+# 步骤表：Id / 名称 / 说明。前置依赖由下方 switch（按步骤名硬编码）表达，这里不重复声明。
 $Steps = @(
-    [pscustomobject]@{ Id = 1;  Name = 'fetch';      Title = '取数 getDsl（只落盘，不进上下文）';                 Needs = @() },
-    [pscustomobject]@{ Id = 2;  Name = 'capture';    Title = 'DSL 结构化快照 + 覆盖校验';                        Needs = @('fetch') },
-    [pscustomobject]@{ Id = 3;  Name = 'svg';        Title = 'extractSvg 图标几何';                              Needs = @() },
-    [pscustomobject]@{ Id = 4;  Name = 'visibility'; Title = '显隐事实提取';                                     Needs = @('capture') },
-    [pscustomobject]@{ Id = 5;  Name = 'mapping';    Title = 'mapping 草稿（按当前台账）';                        Needs = @('capture', 'visibility') },
-    [pscustomobject]@{ Id = 6;  Name = 'discover';   Title = '图标候选发现 + 打印待命名清单';                     Needs = @('svg', 'mapping') },
-    [pscustomobject]@{ Id = 7;  Name = 'ledger';     Title = '校验图标台账（人工/AI 定名后的输入）';              Needs = @() },
-    [pscustomobject]@{ Id = 8;  Name = 'layout';     Title = 'Layout 清单机械推导（底部栏 MenuItem）';            Needs = @('ledger') },
-    [pscustomobject]@{ Id = 9;  Name = 'inputs';     Title = '校验译文并生成 Bundle 清单';                        Needs = @('layout') },
-    [pscustomobject]@{ Id = 10; Name = 'bundle';     Title = 'Bundle 生成页面 XML / Icon / Layout / 宿主壳';      Needs = @('inputs', 'svg', 'capture', 'visibility') },
-    [pscustomobject]@{ Id = 11; Name = 'gates';      Title = '严格门禁（审计逐条断言）';                          Needs = @('bundle') },
-    [pscustomobject]@{ Id = 12; Name = 'verify';     Title = '四项独立验证（provenance / 坐标 / Icon / 结构）';   Needs = @() }
+    [pscustomobject]@{ Id = 1;  Name = 'fetch';      Title = '取数 getDsl（只落盘，不进上下文）' },
+    [pscustomobject]@{ Id = 2;  Name = 'capture';    Title = 'DSL 结构化快照 + 覆盖校验' },
+    [pscustomobject]@{ Id = 3;  Name = 'svg';        Title = 'extractSvg 图标几何' },
+    [pscustomobject]@{ Id = 4;  Name = 'visibility'; Title = '显隐事实提取' },
+    [pscustomobject]@{ Id = 5;  Name = 'mapping';    Title = 'mapping 草稿（按当前台账）' },
+    [pscustomobject]@{ Id = 6;  Name = 'discover';   Title = '图标候选发现 + 打印待命名清单' },
+    [pscustomobject]@{ Id = 7;  Name = 'ledger';     Title = '由命名表生成图标台账 + 图标几何来源核对' },
+    [pscustomobject]@{ Id = 8;  Name = 'layout';     Title = 'Layout 清单机械推导（底部栏 MenuItem）' },
+    [pscustomobject]@{ Id = 9;  Name = 'inputs';     Title = '校验译文并生成 Bundle 清单' },
+    [pscustomobject]@{ Id = 10; Name = 'bundle';     Title = 'Bundle 生成页面 XML / Icon / Layout / 宿主壳' },
+    [pscustomobject]@{ Id = 11; Name = 'gates';      Title = '严格门禁（审计逐条断言）' },
+    [pscustomobject]@{ Id = 12; Name = 'verify';     Title = '四项独立验证（provenance / 坐标 / Icon / 结构）' }
 )
 
 if ($List) {
@@ -101,11 +101,15 @@ function Get-ProjectTarget {
 
 function Get-MastergoToken {
     if ($env:MASTERGO_MCP_TOKEN) { return $env:MASTERGO_MCP_TOKEN }
-    if (Test-Path -LiteralPath $ConfigPath) {
-        $cfg = Get-Content -LiteralPath $ConfigPath -Raw -Encoding UTF8
+    # 配置路径不写死某台机器：优先 -ConfigPath，其次 CODEX_CONFIG，最后 ~/.codex/config.toml
+    $configPath = if ($ConfigPath) { $ConfigPath }
+        elseif ($env:CODEX_CONFIG) { $env:CODEX_CONFIG }
+        else { Join-Path $env:USERPROFILE '.codex\config.toml' }
+    if (Test-Path -LiteralPath $configPath) {
+        $cfg = Get-Content -LiteralPath $configPath -Raw -Encoding UTF8
         if ($cfg -match '--token=(mg_[0-9a-fA-F]+)') { return $Matches[1] }
     }
-    throw "缺少 MasterGo token：设置环境变量 MASTERGO_MCP_TOKEN 或确认 $ConfigPath 里的 mastergo 配置（token 不会写入任何产物）"
+    throw "缺少 MasterGo token：设置环境变量 MASTERGO_MCP_TOKEN，或用 -ConfigPath / CODEX_CONFIG 指向含 mastergo 配置的 config.toml（当前尝试: $configPath；token 不会写入任何产物）"
 }
 
 function Invoke-StepCommand {
@@ -157,13 +161,17 @@ $Generated = Join-Path $ProjectRoot 'Generated'
 $Inputs = Join-Path $Generated '_inputs'
 $Work = Join-Path $Generated '_work'
 $StepLogs = Join-Path $Work 'steps'
-$GetDslJson = Join-Path $Generated 'getDsl.json'
-$SnapshotJson = Join-Path $Generated 'dsl.snapshot.json'
-$CoverageJson = Join-Path $Generated 'coverage-report.json'
-$SvgJson = Join-Path $Generated 'extractSvg.json'
-$VisibilityJson = Join-Path $Generated 'visibility.json'
+# 采集产物按页归档：一个项目里可以有多张页面，共用一个目录会互相覆盖（旧页重跑时会拿到别的页的
+# extractSvg/snapshot，导致核对基于错误数据）。所有 DSL 采集产物一律落在 runs\<Target>\ 下。
+$RunDir = Join-Path $Generated "runs\$Target"
+$GetDslJson = Join-Path $RunDir 'getDsl.json'
+$SnapshotJson = Join-Path $RunDir 'dsl.snapshot.json'
+$CoverageJson = Join-Path $RunDir 'coverage-report.json'
+$SvgJson = Join-Path $RunDir 'extractSvg.json'
+$VisibilityJson = Join-Path $RunDir 'visibility.json'
 $LedgerJson = Join-Path $Inputs "$Target.icon-map.json"
 $CandidateJson = Join-Path $Inputs "$Target.icon-candidates.json"
+$NamingJson = Join-Path $Inputs "$Target.icon-naming.json"
 $TranslationsJson = Join-Path $Inputs "$Target.lang-translations.json"
 $LayoutManifestJson = Join-Path $Inputs "$Target.layout-manifest.json"
 $BundleJson = Join-Path $Inputs "$Target.bundle.json"
@@ -220,7 +228,7 @@ foreach ($step in $Steps) {
             'capture' {
                 Invoke-StepCommand -Label 'Capture' -LogFile $log -File 'pwsh' -Arguments @(
                     '-NoProfile', '-File', (Join-Path $ScriptsFolder 'mastergo-dsl-pipeline.ps1'),
-                    '-Action', 'Capture', '-InputFile', $GetDslJson, '-Out', $Generated,
+                    '-Action', 'Capture', '-InputFile', $GetDslJson, '-Out', $RunDir,
                     '-FileId', $FileId, '-LayerId', $LayerId, '-Ui', $Ui, '-PageName', $DesignPageName) | Out-Null
                 $coverage = Get-Content -LiteralPath $CoverageJson -Raw -Encoding UTF8 | ConvertFrom-Json
                 if ($coverage.status -ne 'complete') { throw "覆盖校验未通过: status=$($coverage.status)（日志: $log）" }
@@ -259,18 +267,25 @@ foreach ($step in $Steps) {
                 $note = "待命名清单: $CandidateJson（候选数见日志 $log）"
             }
             'ledger' {
-                if (-not (Test-Path -LiteralPath $LedgerJson)) {
+                # 台账由「候选清单 + 命名表」机械生成（命名表是人在 discover 之后产出的语义输入）。
+                if (Test-Path -LiteralPath $NamingJson) {
+                    Invoke-StepCommand -Label 'build icon ledger' -LogFile $log -File 'node' -Arguments @(
+                        (Join-Path $PSScriptRoot 'build-icon-ledger.mjs'), $CandidateJson, $LedgerJson, $NamingJson) | Out-Null
+                    # 生成后立刻核对几何来源：sourceId 指向页面根 / 被多条共用 / 缺 extractSvg 条目且未声明 fromDsl
+                    Invoke-StepCommand -Label 'verify icon source' -LogFile (Join-Path $StepLogs '07-ledger-verify-icon-source.log') -File 'node' -Arguments @(
+                        (Join-Path $PSScriptRoot 'verify-icon-source.mjs'), $CandidateJson, $SnapshotJson, $SvgJson, '--naming', $NamingJson) | Out-Null
+                }
+                elseif (-not (Test-Path -LiteralPath $LedgerJson)) {
                     if (-not $AllowEmptyLedger) {
-                        throw "缺少图标台账 $LedgerJson：请先把候选清单里被 Icon 槽位引用的图形定名写进 icons[]（若本页确实没有图标槽位，加 -AllowEmptyLedger）"
+                        throw "缺少命名表 $NamingJson：请把候选清单里被 Icon 槽位引用的图形定名写进命名表（格式见 SKILL.md 一键流水线小节；若本页确实没有图标槽位，加 -AllowEmptyLedger）"
                     }
                     New-Item -ItemType Directory -Force -Path $Inputs | Out-Null
                     '{ "icons": [], "candidates": [], "unmapped": [] }' | Set-Content -LiteralPath $LedgerJson -Encoding UTF8
-                    $note = '已写入空台账占位（-AllowEmptyLedger）'
                 }
                 $ledger = Get-Content -LiteralPath $LedgerJson -Raw -Encoding UTF8 | ConvertFrom-Json
                 $icons = @($ledger.icons)
                 if ($icons.Count -eq 0 -and -not $AllowEmptyLedger) {
-                    throw "图标台账 $LedgerJson 的 icons[] 为空。若本页确实没有任何 Icon 槽位，加 -AllowEmptyLedger；否则请先把候选清单里的图标定名写进台账。"
+                    throw "图标台账 $LedgerJson 的 icons[] 为空。若本页确实没有任何 Icon 槽位，加 -AllowEmptyLedger；否则请先在命名表 $NamingJson 里定名。"
                 }
                 if ($icons.Count) { $note = "已登记图标 $($icons.Count) 个" }
             }
@@ -288,6 +303,8 @@ foreach ($step in $Steps) {
                 $note = "菜单项 $(@($layout.menuItems).Count) 个"
             }
             'inputs' {
+                # build-bundle-manifest.mjs 是 run-all 的同级辅助脚本（插件布局在 scripts/、项目布局在 _tool/），
+                # 因此这里用 $PSScriptRoot；skill 自带脚本一律用 $ScriptsFolder。
                 $args = @((Join-Path $PSScriptRoot 'build-bundle-manifest.mjs'), $LayoutManifestJson, $BundleJson, $ProjectRoot, $Ui)
                 if ($Overwrite) { $args += '--replace-existing' }
                 Invoke-StepCommand -Label 'bundle manifest' -LogFile $log -File 'node' -Arguments $args | Out-Null
@@ -377,7 +394,10 @@ if ($warnings.Count) {
 if ($EndStep.Id -eq 6) {
     Write-Output ''
     Write-Output '下一步（语义判断，必须人工/AI 做）：'
-    Write-Output ("  1) 读 $CandidateJson 的 candidates，把真正被 Icon 槽位引用的图形定名，写进 $LedgerJson 的 icons[]")
-    Write-Output ("  2) 把页面文案的英文译文写进 $TranslationsJson")
-    Write-Output '  3) 然后：pwsh -NoProfile -File _tool\run-all.ps1 -Progress layout'
+    Write-Output ("  1) 读候选清单：$CandidateJson（含每个候选的归属控件、同级 PATH 数、图标层名与尺寸）")
+    Write-Output ("  2) 把被 Icon 槽位引用的图形定名，写进命名表：$NamingJson")
+    Write-Output ("     格式：[{ `"index`": <候选下标>, `"name`": `"<英文资源名>Geometry`", `"comment`": `"<中文注释>`", `"fromDsl`": <bool，可选> }, ...]")
+    Write-Output ("  3) 枚举本页需要翻译的文案：node `"$PSScriptRoot\list-lang-sources.mjs`" `"$MappingAuditJson`" `"$LayoutManifestJson`"")
+    Write-Output ("     据此把中文→英文译文写进：$TranslationsJson")
+    Write-Output '  4) 然后继续（台账由命名表生成、并自动做图标几何来源核对）：pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -ProjectRoot <项目> -Progress ledger'
 }

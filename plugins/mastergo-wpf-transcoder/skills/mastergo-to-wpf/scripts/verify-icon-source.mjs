@@ -7,10 +7,25 @@
 // 本工具只做上述可机械判定的检查，不判断图形外观。
 import fs from "node:fs";
 
-const [candidatesFile, dslFile, svgFile] = process.argv.slice(2);
+const argv = process.argv.slice(2);
+const namingIndex = argv.indexOf("--naming");
+const namingFile = namingIndex >= 0 ? argv[namingIndex + 1] : null;
+const [candidatesFile, dslFile, svgFile] = argv;
 if (!candidatesFile || !dslFile || !svgFile) {
-  console.error("usage: node verify-icon-source.mjs <icon-candidates.json> <dsl.snapshot.json> <extractSvg.json>");
+  console.error("usage: node verify-icon-source.mjs <icon-candidates.json> <dsl.snapshot.json> <extractSvg.json> [--naming <icon-naming.json>]");
   process.exit(2);
+}
+
+// 给了 --naming 时只核对「本次登记的候选」（其余候选不登记、不参与），并且把 naming 的 fromDsl 决策算进去：
+// 命名表声明 fromDsl=true 的条目，几何改由 DSL 的 PATH 节点合成，因此候选自身的 sourceId 不再要求唯一。
+const naming = namingFile ? JSON.parse(fs.readFileSync(namingFile, "utf8")) : null;
+const registered = new Map();
+if (naming) {
+  const entries = Array.isArray(naming.icons) ? naming.icons : Object.entries(naming).map(([index, value]) => ({ index, ...value }));
+  for (const entry of entries) {
+    const index = Number(entry.index);
+    if (Number.isInteger(index)) registered.set(index, entry);
+  }
 }
 
 const candidates = JSON.parse(fs.readFileSync(candidatesFile, "utf8")).candidates || [];
@@ -51,6 +66,7 @@ if (svgs[0]) console.log(`extractSvg 条目: id=${svgs[0].id} name=${JSON.string
 
 const rows = [];
 candidates.forEach((candidate, index) => {
+  if (naming && !registered.has(index)) return;
   const ledger = candidate.ledgerFields || {};
   const targetRef = ledger.ledgerSourceRef || ledger.sourceRef;
   const entry = byRef.get(targetRef) || byId.get(ledger.sourceId);
@@ -58,7 +74,8 @@ candidates.forEach((candidate, index) => {
   const svgEntry = ledger.sourceId ? svgById.get(ledger.sourceId) : null;
   const svgPaths = svgEntry ? svgPathData(svgEntry) : [];
   const sourceIsRoot = ledger.sourceId === root.id;
-  const suspicious = sourceIsRoot || (!svgEntry && !ledger.fromDsl);
+  const declaredFromDsl = Boolean(ledger.fromDsl) || Boolean(registered.get(index) && registered.get(index).fromDsl === true);
+  const suspicious = !declaredFromDsl && (sourceIsRoot || !svgEntry);
   rows.push({
     index,
     owner: candidate.ownerControlType || "-",
@@ -98,4 +115,13 @@ for (const row of rows) {
     : "";
   console.log(`#${String(row.index).padStart(2)} ${row.owner}/${JSON.stringify(row.ownerText)} 同级PATH=${row.siblingPaths} 目标节点下PATH=${row.dslPathsUnderTarget} extractSvg条目=${row.extractSvgEntry}(路径 ${row.extractSvgPaths})${flag}`);
   console.log(`     ledgerSourceRef=${row.ledgerSourceRef}  sourceId=${row.sourceId}`);
+}
+
+const bad = rows.filter((row) => row.suspicious);
+if (naming) {
+  if (bad.length) {
+    console.error(`FAIL: 本次登记里有 ${bad.length} 条图标来源不可信（见上方 <<< 标记）：请在命名表里把这些条目标成 "fromDsl": true，几何改由各自的 PATH 节点合成。`);
+    process.exit(1);
+  }
+  console.log(`PASS: 本次登记的 ${rows.length} 条图标来源都可唯一确定（其余候选未登记，不参与核对）。`);
 }

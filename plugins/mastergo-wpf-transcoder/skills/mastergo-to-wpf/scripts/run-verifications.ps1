@@ -47,7 +47,8 @@ Invoke-Step -Name 'provenance' -File '1-provenance.log' -Body {
 
 Invoke-Step -Name 'coords' -File '2-coords.log' -Body {
     $coords = Join-Path $ProjectRoot 'Generated\_work\coords.json'
-    node (Join-Path $ProjectRoot '_tool\check-coords.mjs') $mapping $coords | Out-Null
+    # 外层辅助脚本与 run-verifications.ps1 同目录（插件布局在 scripts/、项目布局在 _tool/）
+    node (Join-Path $PSScriptRoot 'check-coords.mjs') $mapping $coords | Out-Null
     node (Join-Path $SkillRoot 'scripts\check-iocontrol-coords.js') --xml $pageXml --nodes $coords
 }
 
@@ -56,7 +57,7 @@ Invoke-Step -Name 'icon-coords' -File '3-icon-coords.log' -Body {
 }
 
 Invoke-Step -Name 'structure' -File '4-structure.log' -Body {
-    pwsh -NoProfile -File (Join-Path $ProjectRoot '_tool\verify-page.ps1') -ProjectRoot $ProjectRoot -Page $page
+    pwsh -NoProfile -File (Join-Path $PSScriptRoot 'verify-page.ps1') -ProjectRoot $ProjectRoot -Page $page
 }
 
 Write-Output '--- summary ---'
