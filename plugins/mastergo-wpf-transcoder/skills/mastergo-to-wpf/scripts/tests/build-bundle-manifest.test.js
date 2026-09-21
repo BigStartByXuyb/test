@@ -93,4 +93,13 @@ assert.strictEqual(legacy.dslPath, "Generated/dsl.snapshot.json");
 assert.match(result.stderr, /未提供 --run-json/);
 assert.match(result.stderr, /未提供页面标题/);
 
+// 6) area 缺失必须报错，且不能被带值开关的取值顶掉（`… <projectRoot> --run-json X` 不能把 X 当 area）
+result = run([layoutManifest, path.join(root, "Generated/_inputs/F2Demo.no-area.json"), root]);
+assert.notStrictEqual(result.status, 0, "缺少 area 必须失败");
+assert.match(result.stderr, /缺少区域前缀 area/);
+result = run([layoutManifest, path.join(root, "Generated/_inputs/F2Demo.no-area2.json"), root,
+  "--run-json", registryFile]);
+assert.notStrictEqual(result.status, 0, "带值开关的存在不能绕过 area 必填门禁");
+assert.match(result.stderr, /缺少区域前缀 area/);
+
 console.log("PASS MasterGo bundle manifest (run registry binding) regression test");

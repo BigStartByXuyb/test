@@ -19,7 +19,23 @@ import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const runRegistry = require("./lib/run-registry.js");
 
-const positional = process.argv.slice(2).filter((value) => !value.startsWith("--"));
+// 参数解析：带值开关（--run-json / --page-title）的取值必须从位置参数里剔除，
+// 否则 `… <projectRoot> --run-json X` 这种少传 area 的调用会把 X 当成 area，绕过必填门禁。
+const positional = [];
+const flags = {};
+for (let index = 0; index < process.argv.slice(2).length; index += 1) {
+  const token = process.argv.slice(2)[index];
+  if (token === "--replace-existing") { flags.replaceExisting = true; continue; }
+  if (token === "--run-json" || token === "--page-title") {
+    const value = process.argv.slice(2)[index + 1];
+    if (value === undefined || value.startsWith("--")) throw new Error(token + " 缺少取值");
+    flags[token.slice(2)] = value;
+    index += 1;
+    continue;
+  }
+  if (token.startsWith("--")) throw new Error("未知参数: " + token);
+  positional.push(token);
+}
 const [layoutManifestFile, outFile, projectRootArg, areaArg] = positional;
 if (!layoutManifestFile || !outFile) {
   console.error("usage: node build-bundle-manifest.mjs <layout-manifest.json> <out-bundle.json> <projectRoot> <area> [--run-json <run.json>] [--page-title <标题>] [--replace-existing]");
@@ -32,14 +48,8 @@ const name = layout.pageTarget;
 if (!name) throw new Error("Layout 清单缺少 pageTarget，无法推导页面名");
 
 // 运行登记表（可选）：给了就只按登记表解析采集输入，不再自己拼路径。
-const runJsonArg = (() => {
-  const index = process.argv.indexOf("--run-json");
-  return index >= 0 ? process.argv[index + 1] : null;
-})();
-const pageTitleArg = (() => {
-  const index = process.argv.indexOf("--page-title");
-  return index >= 0 ? process.argv[index + 1] : null;
-})();
+const runJsonArg = flags["run-json"] || null;
+const pageTitleArg = flags["page-title"] || null;
 let runJsonFile = null;
 let runJsonData = null;
 let resolvedInputs = null;
@@ -124,7 +134,7 @@ if (pageTitleText) manifest.pageTitleText = pageTitleText;
 else console.error("提示: 未提供页面标题（--page-title 或登记表 inputs.pageTitleText）；" +
   "标题将退回 mapping.textAudit 的设计原文（可能带设计页名编号）。");
 
-if (process.argv.includes("--replace-existing")) {
+if (flags.replaceExisting) {
   manifest.operation = "replace-existing";
 }
 if (fs.existsSync(path.join(projectRoot, ...glossary.split("/")))) { manifest.langGlossary = glossary; }
