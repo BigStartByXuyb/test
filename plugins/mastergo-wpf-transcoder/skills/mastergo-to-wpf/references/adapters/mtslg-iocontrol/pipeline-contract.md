@@ -58,7 +58,7 @@ pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -ProjectRoot <项目> -Target 
 - **输入**：
   - 第 1 步的 getDsl.json
   - 区域前缀 -Ui（缺失时按 run-all 取值链解析）
-  - 设计页名 -PageName（命令行或项目登记表；为空时 capture 用 DSL 根节点名兜底，再取不到用 layerId）
+  - 设计页名 -DesignPageName（命令行或项目登记表；为空时 capture 用 DSL 根节点名兜底，再取不到用 layerId）
 - **产物**：
   - Generated/runs/<Target>/dsl.snapshot.json
   - coverage-report.json（节点覆盖/重复 ref/断裂父子链）
