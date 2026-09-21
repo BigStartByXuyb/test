@@ -110,7 +110,7 @@ if ($layoutDoc -and $ownPageNode) {
     Write-Output ("Layout: 全文件登记页面 " + (@($layoutDoc.SelectNodes('//Page')).Count) + " 张；本页菜单项 " + (@($ownPageNode.SelectNodes('.//MenuItem')).Count) + " 个")
 }
 else {
-    Write-Output "Layout: 未读取到本页注册（Layout.xml 缺失记 WARN，缺少本页 <Page> 记 FAIL，见上面的清单）"
+    Write-Output "Layout: 未读取到本页注册（Layout.xml 缺失记 WARN，缺少本页 <Page> 记 FAIL，见下面的清单）"
 }
 
 if ($fail.Count) {
