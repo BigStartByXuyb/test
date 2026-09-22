@@ -1423,7 +1423,6 @@ function main() {
       iconMapAudit,
       mapping,
       layoutMenuItems: manifest.menuItems,
-      layoutStatus: manifest.layoutStatus,
       langPaths,
       langSpec,
       pageLangName: manifest.pageLangName,

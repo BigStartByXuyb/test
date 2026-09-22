@@ -34,7 +34,7 @@ Bundle 的页面 XML 步骤恒为 `--fresh`，因此**没有合并语义**：`op
 
 **另有必填输入文件**（第 3 节的可选字段不包含它们，见 §3.1）：`svgPath` 与 `iconMapPath`——两者的**文件始终必填**（脚本无条件做存在性检查），页面没有图标槽位时 `iconMapPath` 给一份合法的空 `icons[]` 即可；`mappingPath`（**所有模式**必填，mapping 的工作落盘路径）；新建页面还要 `dslPath` + `visibilityPath`。
 
-**Layout 清单字段（所有页面必填，无缺省）**：`menuItems`（数组）、`layoutStatus`（`complete` / `none` / `pending`）、`layoutEvidence`（含整数 `matchedBottomBarItems` 与 `unresolvedBottomBarItems`）。Bundle 对每个页面都调 `gen-mtslg-layout.js`，该脚本对这三者的要求与页面有没有底部栏无关，因此**没有底部栏的页面也必须显式给出** `menuItems: []` + `layoutStatus: "none"` + 两个计数为 0（`layoutStatus="none"` 时其余字段必须全为 0）。有底部栏时按 `gen-mtslg-layout-manifest.js` 的机械推导结果填写，且必须满足 `menuItems.length + residentGroupItems === matchedBottomBarItems`；常驻分组的实例数由 `validateResidentGroupEvidence()` 校验（`fail("layoutEvidence.residentGroupItems=" + declared + …)`），MenuItem 不得包含常驻分组实例（`fail("MenuItems 不得包含右下角常驻分组内的实例：…")`）。
+**Layout 清单字段（所有页面必填，无缺省）**：`menuItems`（数组）、`layoutStatus`（`complete` / `none` / `pending`）、`layoutEvidence`（含整数 `matchedBottomBarItems` 与 `unresolvedBottomBarItems`）。Bundle 对每个页面都调 `gen-mtslg-layout.js`，该脚本对这三者的要求与页面有没有底部栏无关，因此**没有底部栏的页面也必须显式给出** `menuItems: []` + `layoutStatus: "none"` + 两个计数为 0（`layoutStatus="none"` 时其余字段必须全为 0）；"没有底部栏"以推导脚本的判定为准——`menuItems.length + residentGroupItems === 0`，即既没有菜单项、也没有右下角常驻分组，两种状态都由 `layoutStatus` 表达，且 `none` 的页面同样要在 `Resources/Layout/Layout.xml` 里注册本页 `<Page>`（`<Menu>` 为空）。有底部栏时按 `gen-mtslg-layout-manifest.js` 的机械推导结果填写，且必须满足 `menuItems.length + residentGroupItems === matchedBottomBarItems`；常驻分组的实例数由 `validateResidentGroupEvidence()` 校验（`fail("layoutEvidence.residentGroupItems=" + declared + …)`），MenuItem 不得包含常驻分组实例（`fail("MenuItems 不得包含右下角常驻分组内的实例：…")`）。
 
 ## 3. 常用可选字段（缺省即有默认值）
 

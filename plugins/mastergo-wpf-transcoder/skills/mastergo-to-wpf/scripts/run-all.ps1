@@ -629,7 +629,9 @@ foreach ($step in $Steps) {
                     '--out', $LayoutManifestJson,
                     '--report', (Join-Path $Inputs "$Target.layout-manifest.report.json")) | Out-Null
                 $layout = Get-Content -LiteralPath $LayoutManifestJson -Raw -Encoding UTF8 | ConvertFrom-Json
-                # complete 与 none 都是合法终态；none 表示本页没有底部栏（Bundle 侧据此跳过 Layout <Page> 注册）。
+                # complete 与 none 都是合法终态。none 的触发条件是推导脚本的
+                # 「menuItems + residentGroupItems === 0」（本页既无菜单项、也无右下角常驻分组）；
+                # Layout.xml 仍以空 <Menu> 注册本页，后续 Bundle 与 verify 都按"必须有本页注册"检查。
                 if ($layout.layoutStatus -notin @('complete', 'none')) { throw "Layout 清单不完整: layoutStatus=$($layout.layoutStatus)（应为 complete 或 none；日志: $log）" }
                 if ($layout.layoutEvidence.unresolvedBottomBarItems -ne 0) { throw "底部栏有 $($layout.layoutEvidence.unresolvedBottomBarItems) 个未命中变体的实例（日志: $log）" }
                 $note = "菜单项 $(@($layout.menuItems).Count) 个"
