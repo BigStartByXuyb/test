@@ -349,14 +349,17 @@ function main() {
       if (!pagePattern.test(existing)) {
         fail("Layout.xml 中相同 Target 的 Page 节点结构无效: " + manifest.pageTarget);
       }
-      // 替换场景：pagePattern 从 "<Page" 开始匹配，原行首缩进会保留；而渲染出来的 page 块
-      // 自带固定基础缩进（Page 2 / Menu 4 / MenuItem 6）。因此必须把**块内每一行**按原 Page
-      // 行的行首缩进整体重排：只处理首行会让子节点比父节点还浅（Page 6 / Menu 4 / MenuItem 6），
-      // 每次重跑就产生一次纯空白 diff（内容没变、文件却变）。逐行先去掉那 2 格基础缩进，再加回
-      // 原 Page 行的缩进；替换用函数式形式，避免 page 正文里的 `$` 被当成替换模式。
+      // 替换场景：pagePattern 从 "<Page" 开始匹配，所以 <Page> 之前的行前缀会留在原文件里，
+      // 而渲染出来的 page 块自带固定基础缩进（Page 2 / Menu 4 / MenuItem 6）。这里把块内每一行
+      // 统一"去掉基础缩进 → 加回原缩进"，保持文件原有层级；只处理首行会让子节点比父节点还浅
+      // （Page 6 / Menu 4 / MenuItem 6），每次重跑都产生纯空白 diff。
+      // 前缀必须**纯空白**才当缩进：紧凑写法（<Pages><Page …></Page></Pages> 同行）下前缀里带着
+      // 其它标签，复制进块内会凭空多出 <Pages>、产物不再是良构 XML —— 这种情况一律按无缩进处理。
+      // 拼接用下标切片（不再把 page 当 String.replace 的替换串），顺带消掉正文 `$` 被当替换模式的隐患。
       const match = pagePattern.exec(existing);
       const lineStart = existing.lastIndexOf("\n", match.index - 1) + 1;
-      const pageIndent = existing.slice(lineStart, match.index);
+      const rawPrefix = existing.slice(lineStart, match.index);
+      const pageIndent = /^[ \t]*$/.test(rawPrefix) ? rawPrefix : "";
       const indentedPage = page.split("\n")
         // 首行不加前缀：它前面那一段（existing.slice(0, match.index)）已经带着原缩进。
         .map((line, index) => (index === 0 ? "" : pageIndent) + line.replace(/^[ \t]{0,2}/, ""))

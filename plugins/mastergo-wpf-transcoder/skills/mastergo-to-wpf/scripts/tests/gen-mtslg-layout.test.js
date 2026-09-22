@@ -224,6 +224,34 @@ assert.doesNotMatch(text, /Name="旧页面"/);
     "同一页面重复注册必须字节幂等（否则每次重跑都会产生纯空白 diff）");
 }
 
+// 紧凑写法（<Page> 不在行首：<Pages><Page …></Page></Pages> 写在同一行）：替换时不得把
+// <Page> 之前那一行的其它文本当成缩进复制进块内——那会凭空多出 <Pages>，产物不再是良构 XML。
+{
+  const compactManifest = path.join(root, "compact.json");
+  const compactLayout = path.join(root, "CompactLayout.xml");
+  fs.writeFileSync(compactManifest, JSON.stringify({
+    layoutPath: compactLayout,
+    pageTarget: "CompactPage",
+    pageLangName: "CompactPageTitle",
+    layoutStatus: "complete",
+    layoutEvidence: { matchedBottomBarItems: 1, unresolvedBottomBarItems: 0 },
+    menuItems: [{ name: "第一项", icon: "", topLeftContent: "F1", index: 1 }]
+  }, null, 2), "utf8");
+  fs.writeFileSync(compactLayout, [
+    "<Layout>",
+    "  <Body><Pages><Page Target=\"CompactPage\"><Menu /></Page></Pages></Body>",
+    "</Layout>",
+    ""
+  ].join("\n"), "utf8");
+  const compactRun = spawnSync(process.execPath, [script, "--manifest", compactManifest, "--overwrite"], { encoding: "utf8" });
+  assert.strictEqual(compactRun.status, 0, compactRun.stderr);
+  const compactText = fs.readFileSync(compactLayout, "utf8");
+  assert.strictEqual((compactText.match(/<Pages>/g) || []).length, 1,
+    "紧凑写法下替换不得复制行内其它文本（<Pages> 必须只出现一次）:\n" + compactText);
+  assert.strictEqual((compactText.match(/<Page\s+[^>]*Target=/g) || []).length, 1,
+    "替换后本页 <Page> 必须只有一个:\n" + compactText);
+}
+
 // 右下角常驻分组（右侧底部-常驻button）内的实例不生成 MenuItem：
 // matchedBottomBarItems 仍统计全部命中变体，常驻分组内的数量单独登记进 residentGroupItems。
 const residentManifest = path.join(root, "resident-group.json");
