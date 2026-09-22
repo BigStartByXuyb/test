@@ -914,3 +914,32 @@ console.log("PASS 页面节点 ID 口径（派生 + 唯一 + 稳定）一致性�
     "page-build-rules.md 必须写明 MenuItem 的 Icon 来自台账（layout 脚本的 iconEntryOf）");
 }
 console.log("PASS 判定表不得自行枚举真值源（iconPolicy / 变体名 / 模式值 / 标记词）一致性回归测试");
+
+// 底部栏变体清单：feishu-layout-mapping.md 是**唯一**逐一描述各变体槽位结构的文档
+// （映射表 `layoutRules.bottomBar.variants` 只登记 topLeftContent），所以这里不禁枚举，
+// 而是要求"枚举与映射表一一对应"——总数要对、每个变体名要逐字出现、每个小节都要是真实变体。
+// 简写（`DI 显示-0/1000/…`）会让映射表新增变体时无人发现，因此也在禁止之列。
+{
+  const mapData = JSON.parse(fs.readFileSync(MAP, "utf8"));
+  const layoutDoc = fs.readFileSync(
+    path.join(__dirname, "..", "..", "references", "adapters", "mtslg-iocontrol", "feishu-layout-mapping.md"), "utf8");
+  const variants = Object.keys(mapData.layoutRules.bottomBar.variants);
+  assert.ok(variants.length > 0, "映射表必须登记 layoutRules.bottomBar.variants");
+
+  const countMatch = /`layoutRules\.bottomBar\.variants`\s*共\s*(\d+)\s*个/.exec(layoutDoc);
+  assert.ok(countMatch, "feishu-layout-mapping.md 必须写明 layoutRules.bottomBar.variants 的总数（门禁据此核对）");
+  assert.strictEqual(Number(countMatch[1]), variants.length,
+    "底部栏变体总数与映射表不一致：文档写 " + countMatch[1] + "，映射表是 " + variants.length);
+
+  for (const name of variants) {
+    assert.ok(layoutDoc.includes(name),
+      "feishu-layout-mapping.md 必须逐字列出映射表里的底部栏变体（不得用 DI 显示-0/1000/… 这类简写）: " + name);
+  }
+  const sections = [...layoutDoc.matchAll(/^### 变体：(.+)$/gm)].map((m) => m[1].trim());
+  assert.ok(sections.length > 0, "feishu-layout-mapping.md 必须保留「### 变体：X」小节");
+  for (const name of sections) {
+    assert.ok(variants.includes(name),
+      "feishu-layout-mapping.md 描述了映射表里不存在的底部栏变体（改名或删除后未同步）: " + name);
+  }
+}
+console.log("PASS 底部栏变体清单（feishu-layout-mapping.md ↔ map.layoutRules.bottomBar.variants）一致性回归测试");
