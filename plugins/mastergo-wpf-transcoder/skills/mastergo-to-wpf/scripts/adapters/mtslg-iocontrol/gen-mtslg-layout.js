@@ -8,6 +8,8 @@ const fs = require("fs");
 const path = require("path");
 // 跨脚本共用工具的唯一实现（见 scripts/lib/script-helpers.js；禁止在本脚本再抄一份）。
 const { fail, xmlAttr, backupFile } = require(path.join(__dirname, "..", "..", "lib", "script-helpers.js"));
+// 映射表读取的唯一实现（含共享类型域的 extends 合并）：scripts/lib/load-template-map.js
+const { loadTemplateMap } = require(path.join(__dirname, "..", "..", "lib", "load-template-map.js"));
 
 // MenuItem 属性顺序：与页面 XML 同一约定
 //   Name → Icon → TopLeftContent/Index → LangName → PageName/IO* → UserRightId → IconWidth/IconHeight
@@ -39,7 +41,7 @@ let MENU_ITEM_FLAG_ATTRS = DEFAULT_MENU_ITEM_FLAG_ATTRS;
 function loadMenuItemFlagAttrs(mapPath) {
   if (!mapPath) return DEFAULT_MENU_ITEM_FLAG_ATTRS;
   let templateMap;
-  try { templateMap = JSON.parse(fs.readFileSync(mapPath, "utf8")); }
+  try { templateMap = loadTemplateMap(mapPath); }
   catch (error) { fail("读取模板表失败: " + mapPath + " - " + error.message); }
   const flags = templateMap.layoutRules && templateMap.layoutRules.bottomBar
     ? templateMap.layoutRules.bottomBar.menuItemFlags : null;
@@ -63,7 +65,7 @@ function applyMenuItemFlagAttrs(flagAttrs) {
 function loadMenuAlwaysAttrs(mapPath) {
   if (!mapPath) return DEFAULT_MENU_ITEM_ALWAYS_ATTRS;
   let templateMap;
-  try { templateMap = JSON.parse(fs.readFileSync(mapPath, "utf8")); }
+  try { templateMap = loadTemplateMap(mapPath); }
   catch (error) { fail("读取模板表失败: " + mapPath + " - " + error.message); }
   const spec = templateMap.layoutRules && templateMap.layoutRules.bottomBar;
   if (!spec || !Array.isArray(spec.menuItemAlwaysWrittenAttrs)) return DEFAULT_MENU_ITEM_ALWAYS_ATTRS;

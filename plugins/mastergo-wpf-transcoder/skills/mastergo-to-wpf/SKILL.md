@@ -98,7 +98,7 @@ pwsh -NoProfile -File <skill>\scripts\entry\run-all.ps1 -List -Format json -OutF
 - **页面节点 ID**：`MX_` + `sha256(页面键 + 节点 ref)` 前 32 位；禁止用遍历序号当节点身份，人工维护约定随属性一起写在 mapping → `mtslg-mode.md` 第 2 节
 - **图标是页面级资源**：本页 `Icons.xaml` 的键必须页面内唯一、并被本页（含 Layout 菜单项）引用；禁止由图层 ID / 坐标 / 外观拼名（如 `MGIcon_<layer-id>`）。**哪些图形要登记由 `discover` 步骤机械给出**（候选的 `registration.register` / `mustName`，判据实现 `scripts/adapters/mtslg-iocontrol/lib/icon-registration-policy.js`），命名表与它**必须一一对应**（漏定名 / 多定名都失败，`build-icon-ledger.mjs` 双向门禁）→ `references/adapters/mtslg-iocontrol/page-build-rules.md` 第 2 节
 - **页面输出目录**：一页一目录（页面 XML / Icon / 语言字典同页目录，Layout 项目级共享）+ 运行目录解析优先级 → `references/adapters/mtslg-iocontrol/page-build-rules.md` 第 1 节
-- **组件族细则**：表格族 `tableTemplates` 按结构签名命中并发射 `DataGrid`（列定义来自 `columnTemplate`，行是数据不发射控件）；相机族 `cameraTemplates` 内部文本整体 omit；`TextBlock` 的 `FontWeight`、`Align`（恒写且只有 `TextBlock` 有：设计稿 `textAlign=right` → `Right`，其余含缺失 → `Left` 默认左对齐；`Align=Right` 时 `Left` 的口径变成"以控件右上角为原点量到父容器外框右边缘的距离"）与换行（`&#x0a;`、`U+2028`）都有确定口径 → `feishu-component-library-mapping.md` + 映射表 `mtslg-iocontrol-map.json`
+- **组件族细则**：表格族 `tableTemplates` 按结构签名命中并发射 `DataGrid`（列定义来自 `columnTemplate`，行是数据不发射控件）；相机族 `cameraTemplates` 内部文本整体 omit；`TextBlock` 的 `FontWeight`、`Align`（恒写且只有 `TextBlock` 有：设计稿 `textAlign=right` → `Right`，其余含缺失 → `Left` 默认左对齐；`Align=Right` 时 `Left` 的口径变成"以控件右上角为原点量到父容器外框右边缘的距离"）与换行（`&#x0a;`、`U+2028`）都有确定口径 → `feishu-component-library-mapping.md` + 共享类型表 `references/component-types.json`（各模板族的 `match` / `variants`）
 - **页面级 / 项目级边界**：页面 XML、本页 Icon、本页语言字典、本页 View/ViewModel、本页 mapping 与审计是页面级（跨页不得同名、不得互相引用）；`Resources/Layout/Layout.xml`、`.csproj`、`framework.config.json` 是项目级，本页只增量写自己的注册
 - **不得把 WPF 私有协议写进 IOContorl**：如 `s:Action`、WPF `PageName`、ResourceDictionary 或绑定语法
 
@@ -114,6 +114,6 @@ pwsh -NoProfile -File <skill>\scripts\entry\run-all.ps1 -List -Format json -OutF
 
 - 本路线必读：`references/adapters/mtslg-iocontrol/mtslg-mode.md`（页面格式、坐标、ID、merge、验证）。
 - 触发才读：`references/adapters/mtslg-iocontrol/pipeline-contract.md`（跑流水线时）；`references/adapters/mtslg-iocontrol/page-build-rules.md`（处理图标命名/几何来源、多语言译文与词典、输出目录、可见性 omit 角色、辅助脚本触发时）；设计稿含顶部栏/底部栏或快捷键，或本次要创建/修改 Layout 注册 → `references/adapters/mtslg-iocontrol/feishu-layout-mapping.md`；要写或改 Bundle 清单 → `references/adapters/mtslg-iocontrol/bundle-manifest.md`。
-- **默认不预读**：`references/adapters/mtslg-iocontrol/feishu-component-library-mapping.md` 与 `references/adapters/mtslg-iocontrol/mtslg-iocontrol-map.json`——组件匹配、`ControlType`、槽位与属性白名单由 `resolve-mtslg-template-mapping.js` / `gen-mtslg-mapping-from-dsl.js` 在生成期按映射表执行。只有脚本报出 `pending` / `unmappedComponents` / `templateConflicts` 时，才按关键词定点查（不通读）。
+- **默认不预读**：`references/adapters/mtslg-iocontrol/feishu-component-library-mapping.md`、共享类型表 `references/component-types.json` 与路线映射表 `references/adapters/mtslg-iocontrol/mtslg-iocontrol-map.json`——组件匹配、`ControlType`、槽位与属性白名单由 `resolve-mtslg-template-mapping.js` / `gen-mtslg-mapping-from-dsl.js` 在生成期按映射表执行；两个 JSON 都只经 `scripts/lib/load-template-map.js` 读取。只有脚本报出 `pending` / `unmappedComponents` / `templateConflicts` 时，才按关键词定点查（不通读）。
 - 按需：`references/project-adapter-initialization.md`（项目首次适配）、`references/mastergo-component-mapping-rules.md`（两条作业共用的来源链规则）、`references/style-library-profiles.md`（多套样式/主题/图标库并存时）。
 - 停用：`references/adapters/mw-wpf/**`（作业 A 资料）不读，也不作为 XML 事实源。

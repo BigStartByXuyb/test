@@ -1002,8 +1002,8 @@ console.log("PASS 契约机器可读入口（入口文档 ↔ run-all.ps1 -OutFi
     assert.ok(!docFormat.includes(phrase),
       "规范不得再写绝对化的「" + phrase + "」——键种类只以映射表为准、文中取值仅为例示，两者并存");
   }
-  assert.ok(docFormat.includes("一律以映射表各族的 `match` 为准"),
-    "规范必须写明「键的种类/属性名一律以映射表各族的 match 为准」");
+  assert.ok(docFormat.includes("一律以共享类型表各族的 `match` 为准"),
+    "规范必须写明「键的种类/属性名一律以共享类型表各族的 match 为准」");
   assert.ok(docFormat.includes("只为例示"),
     "规范必须写明文中出现的键取值只为例示、须与映射表同步");
   const generatorBlind = skillLines(docFormat).filter((line) => line.includes("看不到生成器"));

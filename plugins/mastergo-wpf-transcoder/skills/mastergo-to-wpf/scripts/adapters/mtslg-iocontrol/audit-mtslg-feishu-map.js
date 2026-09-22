@@ -2,6 +2,9 @@
 "use strict";
 
 const fs = require("fs");
+const path = require("path");
+// 映射表读取的唯一实现（含共享类型域的 extends 合并）：scripts/lib/load-template-map.js
+const { loadTemplateMap } = require(path.join(__dirname, "..", "..", "lib", "load-template-map.js"));
 
 // 组件库映射文档（人读的、也是飞书在线文档的离线副本）↔ 映射表（机器真值源）的覆盖审计。
 //
@@ -230,7 +233,7 @@ function main() {
   }
   const report = auditMappingCoverage(
     fs.readFileSync(docPath, "utf8"),
-    JSON.parse(fs.readFileSync(mapPath, "utf8"))
+    loadTemplateMap(mapPath)
   );
   console.log(JSON.stringify(report, null, 2));
   if (report.undocumented.length || report.unregisteredFamilies.length ||

@@ -45,7 +45,8 @@ flowchart LR
   E --> F[页面图标映射 JSON]
   C --> G[组件映射 mapping 生成]
   F --> G
-  H[正式映射表 mtslg-iocontrol-map.json] --> G
+  H[共享类型表 component-types.json] --> G
+  H2[路线映射表 mtslg-iocontrol-map.json] --> G
   G --> I[模板解析: 槽位与固定字段 / 表格结构签名 → DataGrid + 列定义]
   I --> Q[容器嵌套重挂: 按坐标完全包含重挂容器子控件]
   Q --> J[语言键派生 + LangName 绑定]
@@ -101,7 +102,9 @@ flowchart LR
 
 | 层 | 位置（仓库内路径一律以插件根为基准） | 作用 |
 |---|---|---|
-| 组件结构与固定字段 | `skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/mtslg-iocontrol-map.json` | **机器可读事实源**：`controlTypes`、`controlTypeRequiredAttrs`、`controlTypeAttrDefaults`、`buttonFamily`、`layoutRules`、各模板族 |
+| 组件集 / 变体 / 槽位（跨路线共用） | `skills/mastergo-to-wpf/references/component-types.json` | **机器可读事实源**：各模板族（`match`、`variants`）、跨路线共用的 `layoutRules` |
+| 路线写入规则 | `skills/mastergo-to-wpf/references/adapters/<路线>/<路线>-map.json` | **机器可读事实源**：`controlTypes`、`controlTypeRequiredAttrs`、`controlTypeAttrDefaults`、`buttonFamily` 等该路线的写法；用 `extends` 指向共享类型表 |
+| 映射表读取 | `skills/mastergo-to-wpf/scripts/lib/load-template-map.js` | **唯一读取入口**：合并 `extends` 后形状与拆分前一致；脚本不得自行 `JSON.parse` |
 | 组件映射说明 | `skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/feishu-component-library-mapping.md` | 模板与槽位的人读口径（与在线阅读副本同步） |
 | 页面壳层与 Layout | `skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/feishu-layout-mapping.md` | MenuItem 常驻属性、Index、设计稿标记（与在线阅读副本同步） |
 | 页面格式与验证 | `skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/mtslg-mode.md` | 坐标、TextBlock 尺寸、运行时约束、验证流程 |
@@ -165,10 +168,10 @@ DSL/mapping 文案 ──► 英文等译文由 AI 产出 translations 清单并
 | 需求 | 改哪里 |
 |---|---|
 | 新增组件/变体模板 | 按 `skills/mastergo-iocontrol-document-format/SKILL.md` 的「新增/修改映射的同步清单」整批完成：映射表 + 映射文档（变体必须写成 `MasterGo 变体：…` 或 `### 固定模板：…` 标题，审计按这些结构化写法解析）+ 回归用例，最后跑覆盖审计与全量回归（哪些审计字段会拦下改动，以 `audit-mtslg-feishu-map.js` 的退出判据为唯一真值源，本表不复制清单） |
-| 新增控件类型的固定字段 | `controlTypeRequiredAttrs`（+ `controlTypeAttrDefaults`）；发射与校验自动跟随 |
+| 新增控件类型的固定字段 | 路线映射表的 `controlTypeRequiredAttrs`（+ `controlTypeAttrDefaults`）；发射与校验自动跟随 |
 | 新增页面 | 写 bundle 输入清单（`dslPath`/`visibilityPath`/`iconMapPath`/`menuItems`…）→ 跑 `gen-mastergo-page-bundle.js` |
 | 新增语言 | manifest 的 `languages.locales` + 对应译文清单 |
-| 新增 Layout 行为 | `layoutRules.bottomBar`（含 `menuItemFlags`）+ `feishu-layout-mapping.md` |
+| 新增 Layout 行为 | 共享类型表的 `layoutRules.bottomBar`（含 `menuItemFlags`）+ 路线映射表 + `feishu-layout-mapping.md` |
 | 新增校验 | 加到 `validate-iocontrol-provenance.js` / `check-iocontrol-coords.js`，并补 fixture |
 
 ## 10. 环境与运行
