@@ -12,7 +12,7 @@
 
     例：
         pwsh -NoProfile -File _tool\run-all.ps1 -List
-        pwsh -NoProfile -File _tool\run-all.ps1 -List -Format json   # 12 步契约（输入/产物/失败/续跑），供文档生成使用
+        pwsh -NoProfile -File _tool\run-all.ps1 -List -Format json   # 12 步清单（人读；中文经 stdout 可能被控制台代码页损坏）
         pwsh -NoProfile -File _tool\run-all.ps1 -List -Format json -OutFile <临时json>   # 同上，但写文件（UTF-8），Node 侧只读文件、不读 stdout
         pwsh -NoProfile -File _tool\run-all.ps1 -ProjectRoot <项目> -Target <页面Target> -LayerId <图层id> -StopAfter discover
         pwsh -NoProfile -File _tool\run-all.ps1 -ProjectRoot <项目> -Target <页面Target> -Progress layout          # 图标台账/译文改好之后
@@ -66,7 +66,7 @@ $TemplateMap = Join-Path $SkillRoot 'references\adapters\mtslg-iocontrol\mtslg-i
 
 # 步骤表：Id / 名称 / 说明 / 契约（输入 → 产物 → 失败 → 怎么修）。
 # 前置依赖由下方 switch（按步骤名硬编码）表达，这里不重复声明。
-# 契约字段是「一键流水线」文档的唯一真值源：`-List -Format json` 输出它们，
+    # 契约字段是「一键流水线」文档的唯一真值源：`-List -Format json -OutFile <文件>` 输出它们，
 # references/adapters/mtslg-iocontrol/pipeline-contract.md 由 scripts/gen-pipeline-contract.mjs 生成，
 # 回归测试重新生成并比对——文档里的步骤表不再手写，避免"文档说一套、脚本做一套"。
 $Steps = @(
@@ -184,7 +184,7 @@ if ($List) {
         $Steps | ForEach-Object { '{0,2}  {1,-10} {2}' -f $_.Id, $_.Name, $_.Title }
         Write-Output ''
         Write-Output '用法: -Progress <步骤> / -StopAfter <步骤>，可写步骤号或步骤名。'
-        Write-Output '契约（输入/产物/失败/怎么修）：-List -Format json，或看 references/adapters/mtslg-iocontrol/pipeline-contract.md'
+        Write-Output '契约（输入/产物/失败/怎么修）：-List -Format json -OutFile <文件>（写文件、UTF-8；stdout 会被控制台代码页损坏），或看 references/adapters/mtslg-iocontrol/pipeline-contract.md'
     }
     exit 0
 }

@@ -2,7 +2,8 @@
 "use strict";
 
 // 一键流水线契约文档的防漂移回归：
-// 步骤契约（输入 / 产物 / 失败 / 怎么修）的唯一真值源是 run-all.ps1 的 `$Steps`（`-List -Format json` 暴露），
+// 步骤契约（输入 / 产物 / 失败 / 怎么修）的唯一真值源是 run-all.ps1 的 `$Steps`
+// （经 `-List -Format json -OutFile <文件>` 暴露，见 lib/pipeline-steps.js），
 // 文档 pipeline-contract.md 由 gen-pipeline-contract.mjs 生成。这里重新生成并比对，手改文档（或改了脚本忘记重新生成）
 // 都会失败——避免回到"SKILL.md 与参考文档各写一份流水线说明、改一处漏一处"的老问题。
 

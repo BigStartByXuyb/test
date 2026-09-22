@@ -217,5 +217,5 @@ pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -ProjectRoot <项目> -Target 
 pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -ProjectRoot <项目> -Target <Target>              # 一次跑完 12 步
 pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -ProjectRoot <项目> -Target <Target> -Progress <步骤名> # 失败后从该步继续
 pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -ProjectRoot <项目> -Target <Target> -Overwrite # 仅用户明确要求替换时
-pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -List -Format json                            # 本文件的机器可读来源
+pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -List -Format json -OutFile <文件>              # 本文件的机器可读来源（写文件，UTF-8）
 ```

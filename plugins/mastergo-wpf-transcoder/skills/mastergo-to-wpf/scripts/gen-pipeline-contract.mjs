@@ -3,7 +3,8 @@
 //
 // 为什么要有这个脚本：步骤契约（输入 / 产物 / 失败 / 怎么修）原本写在 SKILL.md 与参考文档里，
 // 与 run-all.ps1 的实际行为各写一份，改一处就会漂移。现在真值源只有一个 —— run-all.ps1 的 `$Steps`
-// （经 `-List -Format json` 暴露），本脚本把它渲染成 references/adapters/mtslg-iocontrol/pipeline-contract.md，
+// （经 `-List -Format json -OutFile <文件>` 暴露：stdout 会被控制台代码页把中文替换成 U+FFFD，
+// 所以机器可读通道必须走文件；读取实现在 lib/pipeline-steps.js），本脚本把它渲染成 references/adapters/mtslg-iocontrol/pipeline-contract.md，
 // 回归测试用 `--check` 重新生成并比对，文档不再是手写自由发挥的产物。
 //
 // 用法：
@@ -90,7 +91,7 @@ function render(steps) {
   lines.push("pwsh -NoProfile -File <skill>\\scripts\\run-all.ps1 -ProjectRoot <项目> -Target <Target>              # 一次跑完 12 步");
   lines.push("pwsh -NoProfile -File <skill>\\scripts\\run-all.ps1 -ProjectRoot <项目> -Target <Target> -Progress <步骤名> # 失败后从该步继续");
   lines.push("pwsh -NoProfile -File <skill>\\scripts\\run-all.ps1 -ProjectRoot <项目> -Target <Target> -Overwrite # 仅用户明确要求替换时");
-  lines.push("pwsh -NoProfile -File <skill>\\scripts\\run-all.ps1 -List -Format json                            # 本文件的机器可读来源");
+  lines.push("pwsh -NoProfile -File <skill>\\scripts\\run-all.ps1 -List -Format json -OutFile <文件>              # 本文件的机器可读来源（写文件，UTF-8）");
   lines.push("```");
   lines.push("");
   return lines.join("\n");

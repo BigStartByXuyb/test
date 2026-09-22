@@ -75,7 +75,7 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -ProjectRoot <项目> -Target <Target>                       # 一次跑完 12 步
 pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -ProjectRoot <项目> -Target <Target> -Progress <步骤名>     # 失败后从该步继续
 pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -ProjectRoot <项目> -Target <Target> -Overwrite            # 仅用户明确要求替换时
-pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -List -Format json                                        # 12 步契约（机器可读）
+pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -List -Format json -OutFile <文件>                         # 12 步契约（机器可读：写文件，UTF-8）
 ```
 
 ### 模型必须提供的三类页面级输入（语义判断不进脚本）
