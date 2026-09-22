@@ -254,6 +254,6 @@
 | `sync-to-mt.ps1` | 安全同步：备份+回滚+拒绝副本路径+svn 摘要 | 新 |
 | `classify-mastergo-groups.js` | Group 名称→语义 role 分类 | 双模式共用 |
 | `cap-window.ps1` | 截图验证（`-Method printwindow` 默认，`screen` 为屏幕抓取兜底；运行宿主与输出路径由适配记录提供） | 双模式共用 |
-| `discover-mtslg-page-icon-map.js` | 从当前页面 mapping 的真实 PATH/SVG 发现候选，保留已确认资源键并输出 `candidates/unmapped` 审计 | 双模式共用 |
+| `discover-mtslg-page-icon-map.js` | 从当前页面 mapping 的真实 PATH/SVG 发现候选，保留已确认资源键，输出 `candidates/unmapped` 审计与**登记结论**（每条候选的 `registration.register`/`basis`/`source` + `mustName`；判据实现 `scripts/lib/icon-registration-policy.js`，取值读映射表的 `iconPolicy` 与 `layoutRules.bottomBar`） | 双模式共用 |
 | `gen-mtslg-page-icons.js` | 从发现结果和逐项确认的图标映射生成当前页面 Icon 文件；未确认候选不发射 | 双模式共用 |
 | `gen-mtslg-page-lang.js` | 从语言清单发射当前页面的 `{name}_{LOCALE}.xaml` 多语言字典，强制各语言 key 完全一致 | MTSLG |

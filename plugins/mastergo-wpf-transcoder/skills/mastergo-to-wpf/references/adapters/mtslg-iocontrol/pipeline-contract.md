@@ -24,7 +24,7 @@ pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -ProjectRoot <项目> -Target 
 | 3 | `svg` | extractSvg 图标几何 |
 | 4 | `visibility` | 显隐事实提取 |
 | 5 | `mapping` | mapping 草稿（按当前台账） |
-| 6 | `discover` | 图标候选发现 + 打印待命名清单 |
+| 6 | `discover` | 图标候选发现 + 登记结论 + 打印待命名清单 |
 | 7 | `ledger` | 由命名表生成图标台账 + 图标几何来源核对 |
 | 8 | `layout` | Layout 清单机械推导（底部栏 MenuItem） |
 | 9 | `inputs` | 校验译文并生成 Bundle 清单 |
@@ -107,16 +107,18 @@ pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -ProjectRoot <项目> -Target 
 - **怎么修**：
   - 只补输入（用 manifest.excludeInstances 隔离该实例、把偏差写进待确认），不改 mapping 产物；重跑：-Progress mapping
 
-### 6. `discover` —— 图标候选发现 + 打印待命名清单
+### 6. `discover` —— 图标候选发现 + 登记结论 + 打印待命名清单
 
 - **输入**：
-  - extractSvg.json + mapping 草稿 + dsl.snapshot.json
+  - extractSvg.json + mapping 草稿 + dsl.snapshot.json + 正式映射表（登记判据的取值来源）
 - **产物**：
-  - Generated/_inputs/<Target>.icon-candidates.json（待命名清单：候选下标/归属控件/层名/尺寸）
+  - Generated/_inputs/<Target>.icon-candidates.json（待命名清单：候选下标/归属控件/层名/尺寸/registration 登记结论）
+  - mustName：命名表必须恰好覆盖的候选下标（= registration.register=true）
 - **失败语义**：
-  - 缺 svg 或 mapping（前置步骤未跑）
+  - 缺 svg / mapping / 映射表（前置步骤未跑）
+  - 候选命中未登记的变体（registration.basis=unregistered-variant：映射表缺登记）
 - **怎么修**：
-  - 先补跑前置步骤，再重跑：-Progress discover
+  - 先补跑前置步骤，再重跑：-Progress discover；登记结论由 discover 机械判定（判据实现 scripts/lib/icon-registration-policy.js），不要回文档自行推断。若报"变体未在映射表登记"：按 references/adapters/mtslg-iocontrol 的同步清单补齐映射表登记，重跑 -Progress mapping
 
 ### 7. `ledger` —— 由命名表生成图标台账 + 图标几何来源核对
 
@@ -129,10 +131,12 @@ pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -ProjectRoot <项目> -Target 
 - **失败语义**：
   - 缺命名表（未加 -AllowEmptyLedger）
   - icons[] 为空
+  - 命名表漏定名（mustName 里的候选没定名）
+  - 命名表多定名（登记了 registration.register=false 的候选）
   - sourceId 指向页面根或被多条共用
   - 缺 extractSvg 条目且未声明 fromDsl
 - **怎么修**：
-  - 在命名表里定名或标 fromDsl，重跑：-Progress ledger；本页确实无图标槽位时加 -AllowEmptyLedger
+  - 按候选清单的 mustName 补齐或删掉多余条目，重跑：-Progress ledger；本页确实无图标槽位时加 -AllowEmptyLedger（登记与命名表一一对应，门禁会点名具体下标与判据）
 
 ### 8. `layout` —— Layout 清单机械推导（底部栏 MenuItem）
 

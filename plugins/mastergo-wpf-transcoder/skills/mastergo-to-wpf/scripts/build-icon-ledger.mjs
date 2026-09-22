@@ -3,6 +3,10 @@
 //
 // 命名表（页面级产物，不是脚本内置）：{ "6": { "name": "PreAlignmentGeometry", "comment": "预对位" }, ... }
 // 键 = candidates 数组下标；只登记「真正被 Icon 槽位引用」的图形。
+//
+// 登记结论双向门禁：候选清单的 registration.register 由 discover 机械判定（判据唯一实现在
+// lib/icon-registration-policy.js），这里只做对账——少定名（register=true 却没进命名表）与
+// 多定名（register=false 却进了命名表）都直接失败。这两类错误以前只能靠事后语义审计发现。
 import fs from "node:fs";
 
 const [candidatesFile, outFile, namingFile] = process.argv.slice(2);
@@ -25,6 +29,32 @@ if (approved.size === 0) throw new Error("命名表为空：本页若确实没�
 
 const data = JSON.parse(fs.readFileSync(candidatesFile, "utf8"));
 const candidates = Array.isArray(data.candidates) ? data.candidates : [];
+const registrationAvailable = data.registrationAvailable !== false &&
+  candidates.every(candidate => candidate && candidate.registration && typeof candidate.registration.register === "boolean");
+
+// 对账：命名表必须恰好覆盖 discover 判定为「要登记」的候选。
+// 缺结论（未传 --dsl / 旧候选清单）时拒绝生成——没有判据就生成台账，等于把判定又交回人脑。
+if (!registrationAvailable) {
+  throw new Error("候选清单没有登记结论（registration）：请在 run-all 的 discover 步骤用当前 DSL 快照重新生成候选清单"
+    + "（判据实现 scripts/lib/icon-registration-policy.js，禁止手工判断哪条要登记）");
+}
+const mustName = candidates
+  .map((candidate, index) => (candidate.registration.register === true ? index : -1))
+  .filter(index => index >= 0);
+const missingNames = mustName.filter(index => !approved.has(index));
+const unneededNames = [...approved.keys()].filter(index => !mustName.includes(index));
+if (missingNames.length) {
+  throw new Error("台账缺少图标：候选下标 " + missingNames.join(", ") + " 被 Icon 槽位引用，但命名表没有定名"
+    + missingNames.map(index => "\n  #" + index + " basis=" + candidates[index].registration.basis +
+      " source=" + candidates[index].registration.source +
+      " owner=" + (candidates[index].ownerText || candidates[index].ownerRef || "")).join(""));
+}
+if (unneededNames.length) {
+  throw new Error("台账多出图标：候选下标 " + unneededNames.join(", ") + " 没有被任何 Icon 槽位引用，不能登记（登记了就是 Icons.xaml 里的死资源）"
+    + unneededNames.map(index => "\n  #" + index + " basis=" + candidates[index].registration.basis +
+      " source=" + candidates[index].registration.source +
+      " node=" + candidates[index].nodeName).join(""));
+}
 
 const icons = [];
 for (const [index, naming] of approved) {

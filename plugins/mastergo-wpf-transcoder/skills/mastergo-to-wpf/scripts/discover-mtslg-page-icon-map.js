@@ -18,7 +18,16 @@
  * Usage:
  *   node discover-mtslg-page-icon-map.js --svg extractSvg.json \
  *     --mapping mapping.json --confirmed icon-map.json --out icon-map.json \
- *     [--dsl dsl.snapshot.json]
+ *     --template-map mtslg-iocontrol-map.json [--dsl dsl.snapshot.json]
+ *
+ * 登记结论（registration）：每条候选直接给出「要不要进本页图标台账」的结论，模型不再回文档推判定表：
+ *   registration.register —— true=必须进台账并定名；false=不要说它被 Icon 槽位引用
+ *   registration.basis    —— 判据名（icon-policy-* / bottom-bar-* / host-shell / decorative /
+ *                            camera-viewport-internal / no-icon-slot / unregistered-variant）
+ *   registration.source   —— 结论的真值源（映射表里的具体登记项 / 宿主壳标记词实现）
+ * 判据唯一实现在 scripts/lib/icon-registration-policy.js；本脚本只负责把候选与真值源喂进去。
+ * 输出里的 mustName 是「命名表必须覆盖的候选下标」（= register=true 的候选），
+ * build-icon-ledger.mjs 按它做双向门禁（漏定名 / 多定名都失败）。
  *
  * 台账提示（ledgerFields）：每条候选给出「写台账时照抄」的字段，值全部由机器读取（本脚本不猜、
  * 不拼路径），人只负责填 name / comment 与语义判断（是否同一个图标、要不要合并、是否装饰）：
@@ -42,9 +51,11 @@ const path = require("path");
 const { readJson } = require(path.join(__dirname, "lib", "script-helpers.js"));
 // 图标归属判据的唯一实现（见 scripts/lib/icon-ownership.js；禁止在本脚本再抄一份）。
 const ICON_OWNERSHIP = require(path.join(__dirname, "lib", "icon-ownership.js"));
+// 登记判据的唯一实现（见 scripts/lib/icon-registration-policy.js；禁止在本脚本再抄一份）。
+const ICON_REGISTRATION = require(path.join(__dirname, "lib", "icon-registration-policy.js"));
 
 function usage() {
-  console.error("Usage: node discover-mtslg-page-icon-map.js --svg <extractSvg.json> --mapping <mapping.json> [--confirmed <icon-map.json>] [--dsl <dsl.snapshot.json>] --out <page-icon-map.json>");
+  console.error("Usage: node discover-mtslg-page-icon-map.js --svg <extractSvg.json> --mapping <mapping.json> --template-map <mtslg-iocontrol-map.json> [--confirmed <icon-map.json>] [--dsl <dsl.snapshot.json>] --out <page-icon-map.json>");
   process.exit(2);
 }
 
@@ -57,7 +68,7 @@ function args(argv) {
     if (!value || value.startsWith("--")) usage();
     result[key.slice(2)] = value;
   }
-  if (!result.svg || !result.mapping || !result.out) usage();
+  if (!result.svg || !result.mapping || !result["template-map"] || !result.out) usage();
   return result;
 }
 
@@ -96,20 +107,6 @@ function exactExtractEntry(svgs, ref, tree) {
     targetPathRefs: [ref],
   });
   return owners[0] || null;
-}
-
-// 可选 --dsl：给台账提示补「祖先朝向」与「图形 bbox 兜底」。只用于提示，不参与归属判定。
-function buildLedgerDslIndex(snapshot) {
-  const byRef = new Map();
-  const parentOf = new Map();
-  const root = snapshot && snapshot.dsl && Array.isArray(snapshot.dsl.nodes) ? snapshot.dsl.nodes[0] : null;
-  (function visitLedgerNode(node, parentRef) {
-    if (!node || typeof node.id !== "string") return;
-    byRef.set(node.id, node);
-    parentOf.set(node.id, parentRef);
-    for (const child of node.children || []) visitLedgerNode(child, node.id);
-  })(root, null);
-  return { byRef, parentOf };
 }
 
 function ledgerHasOrientation(node) {
@@ -152,7 +149,15 @@ function main() {
   const svgData = readJson(input.svg, "extractSvg JSON");
   const mapping = readJson(input.mapping, "page mapping JSON");
   const confirmed = input.confirmed ? readJson(input.confirmed, "confirmed page icon map") : { icons: [] };
-  const dslIndex = input.dsl ? buildLedgerDslIndex(readJson(input.dsl, "DSL snapshot")) : null;
+  const templateMap = readJson(input["template-map"], "mtslg-iocontrol map");
+  const snapshot = input.dsl ? readJson(input.dsl, "DSL snapshot") : null;
+  const dslIndex = snapshot ? ICON_REGISTRATION.buildDslIndex(snapshot) : null;
+  // 登记结论依赖真实节点树：只有 --merge 续用旧台账的路径会不传 --dsl，那种路径不产结论。
+  const registration = snapshot ? ICON_REGISTRATION.buildRegistrationPolicy({ templateMap, mapping, snapshot }) : null;
+  if (!registration) {
+    console.error("警告：未传 --dsl，本次不产出登记结论（registration）——只有 --merge 续用旧台账才会走到这里；"
+      + "新建页面必须传 dsl.snapshot.json，否则台账门禁无判据可用。");
+  }
   if (!Array.isArray(svgData.svgs)) throw new Error("extractSvg JSON must contain svgs[]");
   if (!Array.isArray(mapping.sourceNodes)) throw new Error("page mapping JSON must contain sourceNodes[]");
   if (!Array.isArray(confirmed.icons)) throw new Error("confirmed page icon map must contain icons[]");
@@ -223,6 +228,8 @@ function main() {
     candidate.parentRef = parentRef;
     candidate.parentType = (parentSource && parentSource.type) || (parentDsl && parentDsl.type) || null;
     candidate.siblingPathCount = siblingPathCount;
+    // 登记结论：直接给答案，不让调用方回文档推判定表（判据唯一实现在 lib/icon-registration-policy.js）。
+    if (registration) candidate.registration = registration.evaluate(node.ref);
     candidate.ledgerFields = {
       sourceId: sourceId || null,
       sourceRef: node.ref,
@@ -240,10 +247,31 @@ function main() {
     candidates.push(candidate);
   }
 
+  const registered = candidates.filter(candidate => candidate.registration && candidate.registration.register === true);
+  // 命中的实例其变体在映射表里查不到：说明 mapping 与映射表不一致（缺登记或用了旧 mapping），
+  // 不能当成"不用登记"蒙过去——登记判据没有依据，必须先把登记补齐再重跑。
+  const review = candidates.filter(candidate => candidate.registration && candidate.registration.basis === "unregistered-variant");
+  const byBasis = {};
+  for (const candidate of candidates) {
+    const basis = candidate.registration ? candidate.registration.basis : "registration-unavailable";
+    byBasis[basis] = (byBasis[basis] || 0) + 1;
+  }
   const output = {
+    registrationAvailable: Boolean(registration),
     icons: confirmed.icons,
+    // 命名表必须**恰好**覆盖这些候选（register=true 的下标）——build-icon-ledger.mjs 按它双向门禁。
+    mustName: registered.map(candidate => candidates.indexOf(candidate)),
     candidates,
-    unmapped: candidates.filter((candidate) => candidate.status === "unmapped")
+    unmapped: candidates.filter((candidate) => candidate.status === "unmapped"),
+    registrationSummary: {
+      register: registered.length,
+      skip: candidates.length - registered.length,
+      review: review.length,
+      byBasis,
+      notes: registration
+        ? "结论来自 scripts/lib/icon-registration-policy.js（iconPolicy 与 layoutRules.bottomBar 取映射表登记值）"
+        : "本次未传 --dsl，没有登记结论"
+    }
   };
   fs.mkdirSync(require("path").dirname(input.out), { recursive: true });
   fs.writeFileSync(input.out, JSON.stringify(output, null, 2) + "\n", "utf8");
@@ -251,6 +279,18 @@ function main() {
   const needBake = candidates.filter(candidate => candidate.ledgerFields.bakeAncestorTransform === true).length;
   console.log(`Discovered ${candidates.length} page icon candidate(s); ${output.icons.length} confirmed;`
     + ` 台账提示：待命名 ${output.unmapped.length} 条，需 fromDsl 合成 ${needSynthesis} 条，需烘焙祖先朝向 ${needBake} 条：${input.out}`);
+  console.log(`登记结论：需登记 ${output.registrationSummary.register} 条（下标 ${output.mustName.join(",") || "无"}），`
+    + `不登记 ${output.registrationSummary.skip} 条；判据明细 `
+    + `${Object.entries(byBasis).map(([basis, count]) => basis + "=" + count).join(" ") || "无"}`);
+  if (review.length) {
+    for (const candidate of review) {
+      console.error(`登记判据缺依据：${candidate.sourceRef} 所属实例的变体 ${candidate.registration.family}.${candidate.registration.variant}`
+        + ` 在映射表里查不到（${candidate.registration.source}）`);
+    }
+    console.error(`共 ${review.length} 条候选的变体未在映射表登记：先按 references/adapters/mtslg-iocontrol 的同步清单补齐登记，`
+      + `再重跑 -Progress mapping / discover（不要当成"不用登记"继续生成）`);
+    process.exitCode = 1;
+  }
 }
 
 try { main(); }

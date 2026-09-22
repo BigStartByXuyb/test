@@ -14,6 +14,20 @@ const mappingFile = path.join(dir, "mapping.json");
 const confirmedFile = path.join(dir, "confirmed.json");
 const outFile = path.join(dir, "page-icon-map.json");
 
+// 登记结论的判据取值全部来自映射表，所以 discover 必须带 --template-map；
+// 这里用一张最小映射表覆盖判据会读到的字段（真实取值以 references 下的正式映射表为准）。
+const mapFile = path.join(dir, "template-map.json");
+fs.writeFileSync(mapFile, JSON.stringify({
+  layoutRules: {
+    bottomBar: {
+      residentGroupPattern: "常驻(button|按钮|分组)",
+      decorativeNamePattern: "背景|分割",
+      variants: { "首页-长方形": { topLeftContent: "none" } }
+    }
+  }
+}), "utf8");
+const mapArg = ["--template-map", mapFile];
+
 fs.writeFileSync(svgFile, JSON.stringify({ svgs: [
   { id: "shell/top", name: "顶部状态栏", svg: "<svg><path d=\"M0,0 L1,1\"/></svg>" },
   { id: "page/known", name: "向上", svg: "<svg><path d=\"M1,1 L2,2\"/></svg>" }
@@ -26,7 +40,7 @@ fs.writeFileSync(confirmedFile, JSON.stringify({ icons: [
   { sourceId: "page/known", name: "UpGeometry", comment: "向上", sourceRef: "page/known/path" }
 ] }), "utf8");
 
-const result = spawnSync(process.execPath, [script, "--svg", svgFile, "--mapping", mappingFile, "--confirmed", confirmedFile, "--out", outFile], { encoding: "utf8" });
+const result = spawnSync(process.execPath, [script, "--svg", svgFile, "--mapping", mappingFile, "--confirmed", confirmedFile].concat(mapArg).concat(["--out", outFile]), { encoding: "utf8" });
 assert.strictEqual(result.status, 0, result.stderr);
 const output = JSON.parse(fs.readFileSync(outFile, "utf8"));
 assert.deepStrictEqual(output.icons, JSON.parse(fs.readFileSync(confirmedFile, "utf8")).icons);
@@ -57,7 +71,7 @@ fs.writeFileSync(treeMappingFile, JSON.stringify({ sourceNodes: [
   { ref: "tree/root/1066:329573", type: "PATH", name: "路径 203", svgName: "向上", parentRef: "tree/root/icon-group" }
 ] }), "utf8");
 const treeResult = spawnSync(process.execPath,
-  [script, "--svg", treeSvgFile, "--mapping", treeMappingFile, "--out", treeOutFile],
+  [script, "--svg", treeSvgFile, "--mapping", treeMappingFile].concat(mapArg).concat(["--out", treeOutFile]),
   { encoding: "utf8" });
 assert.strictEqual(treeResult.status, 0, treeResult.stderr);
 const treeOutput = JSON.parse(fs.readFileSync(treeOutFile, "utf8"));
@@ -116,7 +130,7 @@ fs.writeFileSync(hintMappingFile, JSON.stringify({
 }), "utf8");
 
 const hintResult = spawnSync(process.execPath,
-  [script, "--svg", hintSvgFile, "--mapping", hintMappingFile, "--dsl", hintDslFile, "--out", hintOutFile],
+  [script, "--svg", hintSvgFile, "--mapping", hintMappingFile, "--dsl", hintDslFile].concat(mapArg).concat(["--out", hintOutFile]),
   { encoding: "utf8" });
 assert.strictEqual(hintResult.status, 0, hintResult.stderr);
 const hintOutput = JSON.parse(fs.readFileSync(hintOutFile, "utf8"));
@@ -146,7 +160,7 @@ assert.deepStrictEqual(downCandidate.ledgerFields.iconSize, { width: 35, height:
 assert.strictEqual(downCandidate.reason, "no-exact-extractSvg-entry");
 
 const hintNoDslResult = spawnSync(process.execPath,
-  [script, "--svg", hintSvgFile, "--mapping", hintMappingFile, "--out", hintOutNoDsl],
+  [script, "--svg", hintSvgFile, "--mapping", hintMappingFile].concat(mapArg).concat(["--out", hintOutNoDsl]),
   { encoding: "utf8" });
 assert.strictEqual(hintNoDslResult.status, 0, hintNoDslResult.stderr);
 const hintNoDsl = JSON.parse(fs.readFileSync(hintOutNoDsl, "utf8"));
@@ -188,7 +202,7 @@ fs.writeFileSync(multiMappingFile, JSON.stringify({
   nodes: [{ sourceRef: "page/root/wrap/btn-x", controlType: "IconButton", sourceText: "双侧箭头", attrs: {} }]
 }), "utf8");
 const multiResult = spawnSync(process.execPath,
-  [script, "--svg", hintSvgFile, "--mapping", multiMappingFile, "--dsl", multiDslFile, "--out", multiOutFile],
+  [script, "--svg", hintSvgFile, "--mapping", multiMappingFile, "--dsl", multiDslFile].concat(mapArg).concat(["--out", multiOutFile]),
   { encoding: "utf8" });
 assert.strictEqual(multiResult.status, 0, multiResult.stderr);
 const multiOutput = JSON.parse(fs.readFileSync(multiOutFile, "utf8"));
@@ -205,6 +219,125 @@ for (const candidate of multiOutput.candidates) {
     "iconSize 取台账登记节点（父层）的 bbox");
   assert.strictEqual(candidate.ownerRef, "page/root/wrap/btn-x");
   assert.strictEqual(candidate.ownerText, "双侧箭头");
+}
+
+// ---- 登记结论回归：discover 必须直接给出「要不要进本页台账」的答案（register/basis），
+//      调用方不再回 page-build-rules.md 的判定表推一遍。覆盖 9 类位置：
+//      模板族有图标槽位 / 该槽位没有图标 / 图标由目标项目提供 / 相机视口内部 /
+//      底部栏菜单项 / 常驻分组 / 宿主公共栏 / 背景装饰 / 未命中任何发射点。
+{
+  const regMapFile = path.join(dir, "template-map.registration.json");
+  fs.writeFileSync(regMapFile, JSON.stringify({
+    layoutRules: {
+      bottomBar: {
+        residentGroupPattern: "常驻(button|按钮|分组)",
+        decorativeNamePattern: "背景|分割",
+        variants: { "首页-长方形": { topLeftContent: "none" }, "方-icon": { topLeftContent: "none" } }
+      }
+    },
+    componentTemplates: { variants: {
+      "轴操作": { controlType: "IconButton", iconPolicy: "single-path" },
+      "加减快捷键-无标题": { controlType: "IconButton", iconPolicy: "none" }
+    } },
+    rightSidebarTemplates: { variants: {
+      exit: { controlType: "IconButton", iconPolicy: "runtime", runtimeIcon: "ExitGeometry" }
+    } },
+    cameraTemplates: {
+      innerTextPolicy: { decision: "omit", role: "camera-viewport-internal" },
+      variants: { "集成图像": { controlType: "Camera", iconPolicy: "none" } }
+    }
+  }), "utf8");
+
+  const regPath = (id, name) => ({ id, type: "PATH", name, layoutStyle: { width: 20, height: 20 } });
+  const regGroup = (id, name, children) => ({ id, type: "GROUP", name, children });
+  const regInst = (id, name, children) => ({ id, type: "INSTANCE", name, children });
+  const regRefs = [];
+  const regDslFile = path.join(dir, "dsl.registration.json");
+  fs.writeFileSync(regDslFile, JSON.stringify({ dsl: { nodes: [
+    { id: "reg/root", type: "COMPONENT", name: "测试页", children: [
+      regInst("reg/root/axis", "轴操作", [regGroup("reg/root/axis/g", "图标组", [regPath("reg/root/axis/g/p", "路径")])]),
+      regInst("reg/root/plus", "加减快捷键-无标题", [regGroup("reg/root/plus/g", "图标组", [regPath("reg/root/plus/g/p", "路径")])]),
+      regInst("reg/root/exit", "exit", [regGroup("reg/root/exit/g", "图标组", [regPath("reg/root/exit/g/p", "路径")])]),
+      regInst("reg/root/camera", "集成图像", [regGroup("reg/root/camera/g", "网格", [regPath("reg/root/camera/g/p", "路径")])]),
+      regInst("reg/root/topbar", "顶部栏", [regPath("reg/root/topbar/p", "路径")]),
+      regInst("reg/root/bg", "界面背景", [regPath("reg/root/bg/p", "矩形 16")]),
+      regInst("reg/root/unknown", "未登记组件", [regPath("reg/root/unknown/p", "路径")]),
+      regInst("reg/root/menuitem", "首页-长方形", [
+        regInst("reg/root/menuitem/icon", "图标", [regPath("reg/root/menuitem/icon/p", "路径")])
+      ]),
+      regInst("reg/root/resident", "右侧底部-常驻button", [
+        regInst("reg/root/resident/btn", "方-icon", [regGroup("reg/root/resident/btn/g", "图标组", [regPath("reg/root/resident/btn/g/p", "路径")])])
+      ])
+    ] }
+  ] } }), "utf8");
+  (function collect(node, parentRef) {
+    regRefs.push({ ref: node.id, type: node.type, name: node.name, parentRef: parentRef });
+    for (const child of node.children || []) collect(child, node.id);
+  })(JSON.parse(fs.readFileSync(regDslFile, "utf8")).dsl.nodes[0], null);
+
+  const regMappingFile = path.join(dir, "mapping.registration.json");
+  fs.writeFileSync(regMappingFile, JSON.stringify({
+    sourceNodes: regRefs,
+    nodes: [],
+    resolvedTemplates: [
+      { template: "componentTemplates", variant: "轴操作", instanceRef: "reg/root/axis" },
+      { template: "componentTemplates", variant: "加减快捷键-无标题", instanceRef: "reg/root/plus" },
+      { template: "rightSidebarTemplates", variant: "exit", instanceRef: "reg/root/exit" },
+      { template: "cameraTemplates", variant: "集成图像", instanceRef: "reg/root/camera" }
+    ]
+  }), "utf8");
+
+  const regOutFile = path.join(dir, "page-icon-map.registration.json");
+  const regResult = spawnSync(process.execPath,
+    [script, "--svg", svgFile, "--mapping", regMappingFile, "--dsl", regDslFile,
+      "--template-map", regMapFile, "--out", regOutFile],
+    { encoding: "utf8" });
+  assert.strictEqual(regResult.status, 0, regResult.stderr);
+  const reg = JSON.parse(fs.readFileSync(regOutFile, "utf8"));
+  assert.strictEqual(reg.registrationAvailable, true);
+  const expectation = {
+    "reg/root/axis/g/p": { register: true, basis: "icon-policy-single-path" },
+    "reg/root/plus/g/p": { register: false, basis: "icon-policy-none" },
+    "reg/root/exit/g/p": { register: false, basis: "icon-policy-runtime" },
+    "reg/root/camera/g/p": { register: false, basis: "camera-viewport-internal" },
+    "reg/root/topbar/p": { register: false, basis: "host-shell" },
+    "reg/root/bg/p": { register: false, basis: "decorative" },
+    "reg/root/unknown/p": { register: false, basis: "no-icon-slot" },
+    "reg/root/menuitem/icon/p": { register: true, basis: "bottom-bar-menu-item" },
+    "reg/root/resident/btn/g/p": { register: false, basis: "bottom-bar-resident" }
+  };
+  assert.strictEqual(reg.candidates.length, Object.keys(expectation).length);
+  for (const candidate of reg.candidates) {
+    const want = expectation[candidate.sourceRef];
+    assert.ok(want, "候选不该出现在预期之外: " + candidate.sourceRef);
+    assert.strictEqual(candidate.registration.register, want.register,
+      candidate.sourceRef + " 的登记结论错误（basis=" + candidate.registration.basis + "）");
+    assert.strictEqual(candidate.registration.basis, want.basis, candidate.sourceRef + " 的判据名错误");
+    if (want.basis === "no-icon-slot") {
+      // 没有任何发射点引用它 → 结论不依据任何登记项，source 必须是 null（不是编一个来源）。
+      assert.strictEqual(candidate.registration.source, null);
+    } else {
+      assert.ok(typeof candidate.registration.source === "string" && candidate.registration.source,
+        candidate.sourceRef + " 必须给出结论的真值源（registration.source）");
+    }
+  }
+  // mustName 是命名表必须覆盖的下标；底部栏菜单项要登记，常驻分组 / 宿主栏 / 相机内部都不要。
+  const expectNames = reg.candidates.filter((candidate) => expectation[candidate.sourceRef].register);
+  assert.deepStrictEqual(reg.mustName,
+    expectNames.map((candidate) => reg.candidates.indexOf(candidate)),
+    "mustName 必须等于 registration.register=true 的候选下标");
+  assert.strictEqual(reg.registrationSummary.register, 2);
+  assert.strictEqual(reg.registrationSummary.skip, 7);
+  // 未传 --dsl（--merge 续用旧台账的路径）不产结论，但必须显式说明，不能默默当成"不用登记"。
+  const regNoDslOut = path.join(dir, "page-icon-map.registration-no-dsl.json");
+  const regNoDsl = spawnSync(process.execPath,
+    [script, "--svg", svgFile, "--mapping", regMappingFile, "--template-map", regMapFile, "--out", regNoDslOut],
+    { encoding: "utf8" });
+  assert.strictEqual(regNoDsl.status, 0, regNoDsl.stderr);
+  assert.match(regNoDsl.stderr, /未传 --dsl/);
+  const regNoDslDoc = JSON.parse(fs.readFileSync(regNoDslOut, "utf8"));
+  assert.strictEqual(regNoDslDoc.registrationAvailable, false);
+  assert.ok(regNoDslDoc.candidates.every((candidate) => candidate.registration === undefined));
 }
 
 console.log("PASS page icon discovery regression test");

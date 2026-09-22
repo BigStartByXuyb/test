@@ -82,7 +82,7 @@ pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -List -Format json            
 
 | 输入 | 位置 | 内容 |
 |---|---|---|
-| 图标命名表 | `Generated/_inputs/<Target>.icon-naming.json` | 候选下标 → 英文资源名（`…Geometry`）+ 中文注释（可选 `fromDsl`） |
+| 图标命名表 | `Generated/_inputs/<Target>.icon-naming.json` | 候选下标 → 英文资源名（`…Geometry`）+ 中文注释（可选 `fromDsl`）；下标**只能**取候选清单的 `mustName`（= `discover` 判定的要登记项，多一个少一个都失败） |
 | 译文清单 | `Generated/_inputs/<Target>.lang-translations.json` | 中文 → 英文译文；脚本不做翻译、不调机翻服务 |
 | 术语表 | `Generated/_inputs/<Target>.lang-glossary.json` | 无英文语义或单字符文案的稳定标识符 |
 
@@ -96,7 +96,7 @@ pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -List -Format json            
 - **多语言全量产键**：设计稿给出的每个文本 `Value` 都产键挂 `LangName`；唯一不产键的是映射表在值槽位登记 `langRefPolicy: "none"` 的节点（当前只有选择框 `Value`），槽位豁免记入 `valueLangExempt` → `references/adapters/mtslg-iocontrol/page-build-rules.md` 第 3 节
 - **可见性 omit 有两条路径**：明确 hidden，以及角色驱动 omit；角色集合 `OMIT_ROLES` 与 `OMIT_REASONS` 的真值源是 `scripts/validate-iocontrol-provenance.js`，新增角色必须同时登记该集合 → `references/adapters/mtslg-iocontrol/page-build-rules.md` 第 5 节
 - **页面节点 ID**：`MX_` + `sha256(页面键 + 节点 ref)` 前 32 位；禁止用遍历序号当节点身份，人工维护约定随属性一起写在 mapping → `mtslg-mode.md` 第 2 节
-- **图标是页面级资源**：本页 `Icons.xaml` 的键必须页面内唯一、并被本页（含 Layout 菜单项）引用；禁止由图层 ID / 坐标 / 外观拼名（如 `MGIcon_<layer-id>`）→ `references/adapters/mtslg-iocontrol/page-build-rules.md` 第 2 节
+- **图标是页面级资源**：本页 `Icons.xaml` 的键必须页面内唯一、并被本页（含 Layout 菜单项）引用；禁止由图层 ID / 坐标 / 外观拼名（如 `MGIcon_<layer-id>`）。**哪些图形要登记由 `discover` 步骤机械给出**（候选的 `registration.register` / `mustName`，判据实现 `scripts/lib/icon-registration-policy.js`），命名表与它**必须一一对应**（漏定名 / 多定名都失败，`build-icon-ledger.mjs` 双向门禁）→ `references/adapters/mtslg-iocontrol/page-build-rules.md` 第 2 节
 - **页面输出目录**：一页一目录（页面 XML / Icon / 语言字典同页目录，Layout 项目级共享）+ 运行目录解析优先级 → `references/adapters/mtslg-iocontrol/page-build-rules.md` 第 1 节
 - **组件族细则**：表格族 `tableTemplates` 按结构签名命中并发射 `DataGrid`（列定义来自 `columnTemplate`，行是数据不发射控件）；相机族 `cameraTemplates` 内部文本整体 omit；`TextBlock` 的 `FontWeight` 与换行（`&#x0a;`、`U+2028`）都有确定口径 → `feishu-component-library-mapping.md` + 映射表 `mtslg-iocontrol-map.json`
 - **页面级 / 项目级边界**：页面 XML、本页 Icon、本页语言字典、本页 View/ViewModel、本页 mapping 与审计是页面级（跨页不得同名、不得互相引用）；`Resources/Layout/Layout.xml`、`.csproj`、`framework.config.json` 是项目级，本页只增量写自己的注册

@@ -101,18 +101,18 @@ $Steps = @(
         Recovery = @('只补输入（用 manifest.excludeInstances 隔离该实例、把偏差写进待确认），不改 mapping 产物；重跑：-Progress mapping')
     },
     [pscustomobject]@{
-        Id = 6; Name = 'discover'; Title = '图标候选发现 + 打印待命名清单'
-        Inputs   = @('extractSvg.json + mapping 草稿 + dsl.snapshot.json')
-        Outputs  = @('Generated/_inputs/<Target>.icon-candidates.json（待命名清单：候选下标/归属控件/层名/尺寸）')
-        Failures = @('缺 svg 或 mapping（前置步骤未跑）')
-        Recovery = @('先补跑前置步骤，再重跑：-Progress discover')
+        Id = 6; Name = 'discover'; Title = '图标候选发现 + 登记结论 + 打印待命名清单'
+        Inputs   = @('extractSvg.json + mapping 草稿 + dsl.snapshot.json + 正式映射表（登记判据的取值来源）')
+        Outputs  = @('Generated/_inputs/<Target>.icon-candidates.json（待命名清单：候选下标/归属控件/层名/尺寸/registration 登记结论）', 'mustName：命名表必须恰好覆盖的候选下标（= registration.register=true）')
+        Failures = @('缺 svg / mapping / 映射表（前置步骤未跑）', '候选命中未登记的变体（registration.basis=unregistered-variant：映射表缺登记）')
+        Recovery = @('先补跑前置步骤，再重跑：-Progress discover；登记结论由 discover 机械判定（判据实现 scripts/lib/icon-registration-policy.js），不要回文档自行推断。若报"变体未在映射表登记"：按 references/adapters/mtslg-iocontrol 的同步清单补齐映射表登记，重跑 -Progress mapping')
     },
     [pscustomobject]@{
         Id = 7; Name = 'ledger'; Title = '由命名表生成图标台账 + 图标几何来源核对'
         Inputs   = @('候选清单', '命名表 Generated/_inputs/<Target>.icon-naming.json（人工/AI 语义输入）')
         Outputs  = @('图标台账 Generated/_inputs/<Target>.icon-map.json', 'verify-icon-source 的几何来源核对结果')
-        Failures = @('缺命名表（未加 -AllowEmptyLedger）', 'icons[] 为空', 'sourceId 指向页面根或被多条共用', '缺 extractSvg 条目且未声明 fromDsl')
-        Recovery = @('在命名表里定名或标 fromDsl，重跑：-Progress ledger；本页确实无图标槽位时加 -AllowEmptyLedger')
+        Failures = @('缺命名表（未加 -AllowEmptyLedger）', 'icons[] 为空', '命名表漏定名（mustName 里的候选没定名）', '命名表多定名（登记了 registration.register=false 的候选）', 'sourceId 指向页面根或被多条共用', '缺 extractSvg 条目且未声明 fromDsl')
+        Recovery = @('按候选清单的 mustName 补齐或删掉多余条目，重跑：-Progress ledger；本页确实无图标槽位时加 -AllowEmptyLedger（登记与命名表一一对应，门禁会点名具体下标与判据）')
     },
     [pscustomobject]@{
         Id = 8; Name = 'layout'; Title = 'Layout 清单机械推导（底部栏 MenuItem）'
@@ -595,8 +595,11 @@ foreach ($step in $Steps) {
                 Invoke-StepCommand -Label 'discover' -LogFile $log -File 'node' -Arguments @(
                     (Join-Path $ScriptsFolder 'discover-mtslg-page-icon-map.js'), '--svg', $SvgJson,
                     '--mapping', $mappingForDiscover, '--confirmed', $confirmed,
-                    '--dsl', $SnapshotJson, '--out', $CandidateJson) | Out-Null
-                $note = "待命名清单: $CandidateJson（候选数见日志 $log）"
+                    '--template-map', $TemplateMap, '--dsl', $SnapshotJson, '--out', $CandidateJson) | Out-Null
+                # 登记结论由 discover 机械判定：这里把结论摘要带进步骤 note，模型不必再去翻文档判定表。
+                $candidateDoc = Get-Content -LiteralPath $CandidateJson -Raw -Encoding UTF8 | ConvertFrom-Json
+                $registerCount = @($candidateDoc.mustName).Count
+                $note = "待命名清单: $CandidateJson（需登记 $registerCount 条，候选 $(@($candidateDoc.candidates).Count) 条；下标 $((@($candidateDoc.mustName) -join ','))）"
             }
             'ledger' {
                 # 台账由「候选清单 + 命名表」机械生成（命名表是人在 discover 之后产出的语义输入）。
@@ -609,7 +612,7 @@ foreach ($step in $Steps) {
                 }
                 elseif (-not (Test-Path -LiteralPath $LedgerJson)) {
                     if (-not $AllowEmptyLedger) {
-                        throw "缺少命名表 $NamingJson：请把候选清单里被 Icon 槽位引用的图形定名写进命名表（格式见 references/adapters/mtslg-iocontrol/pipeline-contract.md 第 7 步；若本页确实没有图标槽位，加 -AllowEmptyLedger）"
+                        throw "缺少命名表 $NamingJson：请按候选清单 $CandidateJson 的 registration.register=true（mustName 下标）逐条定名写进命名表（格式见 references/adapters/mtslg-iocontrol/pipeline-contract.md 第 7 步；若本页确实没有图标槽位，加 -AllowEmptyLedger）"
                     }
                     New-Item -ItemType Directory -Force -Path $Inputs | Out-Null
                     '{ "icons": [], "candidates": [], "unmapped": [] }' | Set-Content -LiteralPath $LedgerJson -Encoding UTF8

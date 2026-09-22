@@ -1293,6 +1293,7 @@ function main() {
       "--svg", svgPath,
       "--mapping", mappingPath,
       "--confirmed", iconMapPath,
+      "--template-map", templateMapPath,
       "--out", tempIconMap
     ].concat(iconDslPath ? ["--dsl", iconDslPath] : []));
     // 组件级「运行时提供图标」（映射表 iconPolicy=runtime）：Icon 是目标项目已存在的资源键，
