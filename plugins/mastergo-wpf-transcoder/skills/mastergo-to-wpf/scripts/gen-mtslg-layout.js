@@ -349,9 +349,19 @@ function main() {
       if (!pagePattern.test(existing)) {
         fail("Layout.xml 中相同 Target 的 Page 节点结构无效: " + manifest.pageTarget);
       }
-      // 替换场景：pagePattern 从 "<Page" 开始匹配，原行首缩进会保留，
-      // 因此这里去掉 page 首行自带的缩进，避免出现 4 空格的双重缩进。
-      output = existing.replace(pagePattern, page.replace(/^[ \t]{0,2}/, ""));
+      // 替换场景：pagePattern 从 "<Page" 开始匹配，原行首缩进会保留；而渲染出来的 page 块
+      // 自带固定基础缩进（Page 2 / Menu 4 / MenuItem 6）。因此必须把**块内每一行**按原 Page
+      // 行的行首缩进整体重排：只处理首行会让子节点比父节点还浅（Page 6 / Menu 4 / MenuItem 6），
+      // 每次重跑就产生一次纯空白 diff（内容没变、文件却变）。逐行先去掉那 2 格基础缩进，再加回
+      // 原 Page 行的缩进；替换用函数式形式，避免 page 正文里的 `$` 被当成替换模式。
+      const match = pagePattern.exec(existing);
+      const lineStart = existing.lastIndexOf("\n", match.index - 1) + 1;
+      const pageIndent = existing.slice(lineStart, match.index);
+      const indentedPage = page.split("\n")
+        // 首行不加前缀：它前面那一段（existing.slice(0, match.index)）已经带着原缩进。
+        .map((line, index) => (index === 0 ? "" : pageIndent) + line.replace(/^[ \t]{0,2}/, ""))
+        .join("\n");
+      output = existing.slice(0, match.index) + indentedPage + existing.slice(match.index + match[0].length);
       backup = backupFile(layoutPath);
     } else {
       output = insertNewPage(existing, page, manifest.pageTarget);

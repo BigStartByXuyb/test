@@ -181,6 +181,49 @@ assert.strictEqual((text.match(/<Page\s+Target="F2NewPage"/g) || []).length, 1);
 assert.match(text, /Name="第一项" Icon="FirstGeometry" TopLeftContent="F1" Index="1" LangName="" PageName="" IOCommand="" IOVisible="" IOEnable="" IconWidth="35" IconHeight="33"/);
 assert.doesNotMatch(text, /Name="旧页面"/);
 
+// 替换已有页面块：块内各行的缩进必须跟随该页在原文件里的深度，且重复注册字节幂等。
+// 背景：渲染出来的页块自带固定基础缩进（Page 2 / Menu 4 / MenuItem 6），替换时若只去掉首行
+// 缩进、不管其余行，就会出现「Page 缩进 6、Menu 缩进 4」的父子错位——内容没变、文件却每次重跑
+// 都产生一次纯空白 diff（1.0.277 之前 F2LaserFocus 的实际现象）。
+{
+  const indentManifest = path.join(root, "indent.json");
+  const indentLayout = path.join(root, "IndentLayout.xml");
+  fs.writeFileSync(indentManifest, JSON.stringify({
+    layoutPath: indentLayout,
+    pageTarget: "IndentPage",
+    pageLangName: "IndentPageTitle",
+    layoutStatus: "complete",
+    layoutEvidence: { matchedBottomBarItems: 1, unresolvedBottomBarItems: 0 },
+    menuItems: [{ name: "第一项", icon: "", topLeftContent: "F1", index: 1 }]
+  }, null, 2), "utf8");
+  // 该页位于 <Body><Pages> 下 → 原文件里 <Page> 的缩进是 6 格
+  fs.writeFileSync(indentLayout, [
+    "<Layout>",
+    "  <Body>",
+    "    <Pages>",
+    "      <Page Target=\"IndentPage\"><Menu /></Page>",
+    "    </Pages>",
+    "  </Body>",
+    "</Layout>",
+    ""
+  ].join("\n"), "utf8");
+  let indentRun = spawnSync(process.execPath, [script, "--manifest", indentManifest, "--overwrite"], { encoding: "utf8" });
+  assert.strictEqual(indentRun.status, 0, indentRun.stderr);
+  const indentFirst = fs.readFileSync(indentLayout, "utf8");
+  const indentLines = indentFirst.split("\n");
+  const indentOf = (line) => (line.match(/^[ \t]*/) || [""])[0].length;
+  const indentPageLine = indentLines.find((line) => line.includes('<Page Target="IndentPage"'));
+  const indentMenuLine = indentLines.find((line) => line.trim() === "<Menu>");
+  const indentItemLine = indentLines.find((line) => line.includes("<MenuItem "));
+  assert.strictEqual(indentOf(indentPageLine), 6, "<Page> 必须保持原文件里的缩进深度");
+  assert.strictEqual(indentOf(indentMenuLine), 8, "<Menu> 必须比 <Page> 深两格");
+  assert.strictEqual(indentOf(indentItemLine), 10, "<MenuItem> 必须比 <Menu> 深两格");
+  indentRun = spawnSync(process.execPath, [script, "--manifest", indentManifest, "--overwrite"], { encoding: "utf8" });
+  assert.strictEqual(indentRun.status, 0, indentRun.stderr);
+  assert.strictEqual(fs.readFileSync(indentLayout, "utf8"), indentFirst,
+    "同一页面重复注册必须字节幂等（否则每次重跑都会产生纯空白 diff）");
+}
+
 // 右下角常驻分组（右侧底部-常驻button）内的实例不生成 MenuItem：
 // matchedBottomBarItems 仍统计全部命中变体，常驻分组内的数量单独登记进 residentGroupItems。
 const residentManifest = path.join(root, "resident-group.json");
