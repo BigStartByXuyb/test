@@ -1020,3 +1020,36 @@ console.log("PASS 契约机器可读入口（入口文档 ↔ run-all.ps1 -OutFi
     "「匹配键」小节内不得再用「「匹配键」一节」指代自己（自指会让该句的作用范围出现两读）");
 }
 console.log("PASS 匹配键口径单读法 + 同一条规则单处陈述（mastergo-iocontrol-document-format/SKILL.md）");
+
+// ---------- 11. TextBlock Align 口径：映射表 ↔ 生成器 ↔ 人读文档 ----------
+// 背景：新增属性最典型的两处漂移是「映射表登记了、生成器没读」和「实现改了、文档没写」。
+// 这里把三个面钉在一起：登记点（textBlockAlign + controlTypeRequiredAttrs）、实现（生成器读
+// 设计稿 textAlign 并按 leftMatch 取值）、人读（mtslg-mode / 组件库映射文档 + 硬门禁索引）。
+{
+  const mapData = JSON.parse(fs.readFileSync(MAP, "utf8"));
+  const align = mapData.textBlockAlign;
+  assert.ok(align, "映射表必须登记 textBlockAlign（TextBlock 的 Align 口径）");
+  assert.strictEqual(align.attr, "Align", "textBlockAlign.attr 必须是 Align");
+  assert.strictEqual(align.policy, "always", "Align 是恒写属性：textBlockAlign.policy 必须是 always");
+  assert.ok((align.leftMatch || []).map((item) => String(item).toLowerCase()).includes("left"),
+    "textBlockAlign.leftMatch 必须包含 left（左对齐的唯一判据）");
+  assert.ok(align.leftValue && align.rightValue && align.leftValue !== align.rightValue,
+    "textBlockAlign 必须登记两个不同取值（leftValue / rightValue）");
+  const requiredTextBlock = ((mapData.controlTypeRequiredAttrs || {}).TextBlock) || [];
+  assert.ok(requiredTextBlock.includes(align.attr),
+    "Align 恒写 → 必须登记在 controlTypeRequiredAttrs.TextBlock 里（否则校验器不会要求它）");
+  const mappingGenerator = fs.readFileSync(path.join(__dirname, "..", "gen-mtslg-mapping-from-dsl.js"), "utf8");
+  for (const token of ["textBlockAlign", "textAlignByRef", "attrs[alignAttr]"]) {
+    assert.ok(mappingGenerator.includes(token),
+      "gen-mtslg-mapping-from-dsl.js 必须保留 Align 发射实现: " + token);
+  }
+  for (const [file, text] of [["mtslg-mode.md", modeDoc], ["feishu-component-library-mapping.md", feishuMapping]]) {
+    assert.ok(text.includes("Align"), file + " 必须写明 TextBlock 的 Align 口径");
+    assert.ok(text.includes("Left") && text.includes("Right"),
+      file + " 必须写明 Align 的两种取值 Left / Right");
+    assert.ok(text.includes("textAlign"), file + " 必须写明 Align 的真值源是设计稿 textAlign");
+  }
+  assert.ok(mainSkill.includes("Align"),
+    "mastergo-to-wpf/SKILL.md 的硬门禁索引必须点名 Align（否则执行者不知道它有条确定口径）");
+}
+console.log("PASS TextBlock Align 口径（映射表 textBlockAlign ↔ 生成器发射 ↔ 人读文档）一致性回归测试");

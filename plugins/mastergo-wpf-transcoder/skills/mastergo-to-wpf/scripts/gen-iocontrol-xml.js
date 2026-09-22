@@ -40,7 +40,7 @@
  *   带 Icon 却没有 iconSize 视为映射不完整，直接失败，禁止猜图标尺寸。
  *
  * TextBlock 固定属性：Height 固定 40；Width 固定 "NaN"（不用设计稿文本 bbox 宽度），
- * FontSize 仍取 DSL 字体事实。
+ * FontSize 仍取 DSL 字体事实；Align 恒写（DSL 节点 textAlign=left → "Left"，其余 → "Right"）。
  *
  * merge 语义（改现有页面的强制模式）：
  *   1. 几何（Left/Top/Width/Height）按映射更新；
@@ -175,7 +175,7 @@ const DEFAULT_BUTTON_FAMILY = {
 const DEFAULT_CONTROL_TYPE_REQUIRED_ATTRS = {
   GroupBox: ['Style', 'Header', 'LangName', 'IOName', 'IOEnable', 'IOVisible', 'MinValue', 'MaxValue'],
   Border: ['Style', 'Value', 'IOEnable', 'IOVisible'],
-  TextBlock: ['Style', 'Value', 'LangName', 'IOName', 'IOEnable', 'IOVisible', 'IsAutoRead', 'Foreground', 'FontSize'],
+  TextBlock: ['Style', 'Value', 'LangName', 'IOName', 'IOEnable', 'IOVisible', 'IsAutoRead', 'Foreground', 'FontSize', 'Align'],
   Button: ['Style', 'Value', 'LangName', 'PageName', 'IOCommand', 'IOEnable', 'IOVisible'],
   StatusButton: ['Style', 'Value', 'LangName', 'PageName', 'IOCommand', 'IOEnable', 'IOVisible'],
   IconButton: ['Style', 'Value', 'LangName', 'PageName', 'Icon', 'TopLeftContent', 'IsShowStatus', 'IsNeedRedMark', 'IOCommand', 'IOEnable', 'IOVisible', 'IconHeight', 'IconWidth'],
@@ -464,7 +464,7 @@ const ATTR_ORDER = [
   'UserRightId',
   'IsAutoRead', 'IsAutoWrite', 'IsAutoRefresh', 'IsWriteIO', 'IsSave',
   'IsShowDialog', 'DialogMessage', 'IsShowStatus', 'IsNeedRedMark', 'StatusBrush',
-  'Foreground', 'FontSize', 'FontWeight', 'Orientation', 'ItemsSourceFile', 'DisplayMemberPath',
+  'Foreground', 'FontSize', 'FontWeight', 'Align', 'Orientation', 'ItemsSourceFile', 'DisplayMemberPath',
   'SelectedValuePath', 'Filter', 'DefaultValue', 'MinValue', 'MaxValue', 'MinRange',
   'MaxRange', 'DecimalPlaces', 'Keypad', 'MaxLength', 'DisableRow', 'DesignPanelID',
   'ParameterName',

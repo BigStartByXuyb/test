@@ -117,7 +117,7 @@ const PAGE_ATTR_ORDER = [
   'UserRightId',
   'IsAutoRead', 'IsAutoWrite', 'IsAutoRefresh', 'IsWriteIO', 'IsSave',
   'IsShowDialog', 'DialogMessage', 'IsShowStatus', 'IsNeedRedMark', 'StatusBrush',
-  'Foreground', 'FontSize', 'Orientation', 'ItemsSourceFile', 'DisplayMemberPath',
+  'Foreground', 'FontSize', 'Align', 'Orientation', 'ItemsSourceFile', 'DisplayMemberPath',
   'SelectedValuePath', 'Filter', 'DefaultValue', 'MinValue', 'MaxValue', 'MinRange',
   'MaxRange', 'DecimalPlaces', 'Keypad', 'MaxLength', 'DisableRow', 'DesignPanelID',
   'ParameterName',
@@ -139,6 +139,10 @@ assertAttrOrder(statusTag, PAGE_ATTR_ORDER, 'StatusButton');
 assertAttrOrder(textTag, PAGE_ATTR_ORDER, 'TextBlock');
 assert.match(textTag, /Width="NaN"/, 'TextBlock 的 Width 必须固定为 NaN');
 assert.match(textTag, /Height="40"/, 'TextBlock 的 Height 必须固定为 40');
+// Align 是 TextBlock 的必写字段（映射表 textBlockAlign / controlTypeRequiredAttrs）：渲染层按映射透传，
+// 映射缺失时按必写字段口径写空占位；对齐语义由 mapping 生成器按设计稿 textAlign 决定，不在这里猜。
+assert.match(textTag, /Align="(Left|Right|)"/,
+  'TextBlock 必须发射 Align 且取值只能是 Left / Right（映射缺失时空占位）');
 
 // ---- 每个 ControlType 的固定必写字段（设计方模板）：缺来源一律写空字符串占位 ----
 assert.match(textTag, /Style=""/, 'TextBlock 必须发射空 Style 占位');

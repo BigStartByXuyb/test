@@ -93,7 +93,7 @@ description: 强制规范 MasterGo → MTSLG IOContorl 映射文档的写法，�
 ## XML 书写规则
 
 - `ControlType`、节点数量、父子关系和槽位顺序由固定模板决定。
-- `Value`、`IOName`、`IOCommand`、`IOEnable`、`IOState`、`LangName`、`Left`、`Top`、`Width`、`Height`、`FontSize` 等由对应 MasterGo 节点或已确认配置填充。
+- `Value`、`IOName`、`IOCommand`、`IOEnable`、`IOState`、`LangName`、`Left`、`Top`、`Width`、`Height`、`FontSize`、`Align`（文本对齐，恒写）等由对应 MasterGo 节点或已确认配置填充。
 - XML 字段顺序沿用文档中相邻模板，不要无理由重新排序。
 - 固定模板中已声明的可选字段，MasterGo 未提供时保留对应 XML 属性并输出空字符串值；不在固定模板中的字段不得新增。不得猜值或把缺失字段扩展成新的节点。
 - 没有可靠映射时标记“待确认/未映射”，不得静默降级为普通 Button、Border、Canvas 或近似控件。

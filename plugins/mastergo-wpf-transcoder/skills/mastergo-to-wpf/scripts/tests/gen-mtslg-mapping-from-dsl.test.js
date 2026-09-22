@@ -497,6 +497,47 @@ assert.strictEqual(byText.get('fw:root/bold').attrs.FontSize, '16');
 
 console.log('PASS MTSLG DSL-to-mapping TextBlock FontWeight regression test');
 
+// ---- TextBlock Align：恒写、二元取值（真值源 = 设计稿 TEXT 节点级 textAlign；非 left 一律 Right）----
+// 规则登记在映射表 textBlockAlign；目标框架只认 Left / Right，因此 center / 未知取值 / 字段缺失
+// 都必须落到 Right，不允许出现第三种值，也不允许漏写该属性（它在 controlTypeRequiredAttrs 里）。
+const withAlign = (node, textAlign) => Object.assign(node, { textAlign });
+const alignDsl = {
+  styles: {},
+  nodes: [{
+    type: 'INSTANCE', id: 'al:root', name: '对齐页',
+    layoutStyle: { width: 800, height: 600, relativeX: 0, relativeY: 0 },
+    componentInfo: {},
+    children: [
+      withAlign(textNode('al:root/left', 'al:root', '左对齐', 20, 300), 'left'),
+      withAlign(textNode('al:root/upper', 'al:root', '大写左', 20, 330), ' LEFT '),
+      withAlign(textNode('al:root/right', 'al:root', '右对齐', 20, 360), 'right'),
+      withAlign(textNode('al:root/center', 'al:root', '居中', 20, 390), 'center'),
+      withAlign(textNode('al:root/justify', 'al:root', '两端对齐', 20, 420), 'justify'),
+      textNode('al:root/missing', 'al:root', '无对齐字段', 20, 450),
+    ],
+  }],
+};
+const alignMapping = runMappingCase('textblock-align', alignDsl, []);
+const alignByRef = new Map(alignMapping.nodes
+  .filter(node => node.controlType === 'TextBlock')
+  .map(node => [node.sourceRef, node.attrs.Align]));
+assert.strictEqual(alignByRef.get('al:root/left'), 'Left', 'textAlign=left 必须发射 Align="Left"');
+assert.strictEqual(alignByRef.get('al:root/upper'), 'Left',
+  'textAlign 的取值先归一（去空白 + 转小写）再判定，大小写不能影响结果');
+assert.strictEqual(alignByRef.get('al:root/right'), 'Right', 'textAlign=right 必须发射 Align="Right"');
+assert.strictEqual(alignByRef.get('al:root/center'), 'Right',
+  '设计稿居中对齐按二元口径落到 Right——目标框架只有 Left / Right，不发射第三种值');
+assert.strictEqual(alignByRef.get('al:root/justify'), 'Right',
+  '未知对齐取值同样按右对齐，不得凭空造值');
+assert.strictEqual(alignByRef.get('al:root/missing'), 'Right',
+  '设计稿没有 textAlign 时按默认右对齐；Align 是恒写字段，不允许漏写');
+for (const node of alignMapping.nodes.filter(item => item.controlType === 'TextBlock')) {
+  assert.ok(node.attrs.Align === 'Left' || node.attrs.Align === 'Right',
+    '每个 TextBlock 都必须恒写 Align 且取值只能是 Left / Right: ' + JSON.stringify(node.attrs));
+}
+
+console.log('PASS MTSLG DSL-to-mapping TextBlock Align regression test');
+
 // ---- 相机视口（cameraTemplates）：ControlType=Camera、不写 Style、DesignPanelID/Value 空串占位 ----
 const cameraDsl = {
   styles: {},

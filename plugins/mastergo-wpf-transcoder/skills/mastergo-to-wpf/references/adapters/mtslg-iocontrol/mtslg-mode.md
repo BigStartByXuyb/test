@@ -105,6 +105,8 @@
 - 无 Viewbox、无缩放、无星号数学、无"三类固定不缩放"——`gen-iocontrol-xml.js` 全自动完成，禁止手工重写坐标。
 - 取数后先核对完整 DSL 根节点 `dsl.nodes[0].layoutStyle.width/height` 与已确认目标画布尺寸一致。不一致或根节点尺寸缺失时先与用户确认页面区域，不能继续生成。
 
+- **`Align` 恒写（真值源 = 设计稿 TEXT 节点 `textAlign`）**：`TextBlock` 的 `Align` 属于 `controlTypeRequiredAttrs` 恒写字段，取值只有 `Left` / `Right`：设计稿 `textAlign` 归一（去空白 + 转小写）后命中 `left` 就发射 `Left`，其余（`right` / `center` / 字段缺失 / 其它取值）一律发射 `Right`——设计稿没有给出左对齐就按右对齐。目标框架只认这两种取值，不得出现第三种。规则真值源是映射表 `textBlockAlign`（`leftMatch` / `leftValue` / `rightValue` / `policy`），正文不另立枚举。
+
 ## 4. ControlType 摘要（完整表见 mtslg-iocontrol-map.json）
 
 | 类别 | ControlType |
