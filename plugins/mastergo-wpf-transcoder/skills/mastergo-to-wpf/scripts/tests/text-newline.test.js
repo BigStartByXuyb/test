@@ -101,7 +101,7 @@ const mapping = {
     dslWidth: 75,
     id: "MG_0001",
     xmlId: "MG_0001",
-    attrs: { Value: sourceText, FontSize: "16", LangName: "DemoSaveLaser" }
+    attrs: { Value: sourceText, FontSize: "16", LangName: "DemoSaveLaser", Align: "Left" }
   }]
 };
 const mappingFile = path.join(dir, "Demo.mapping.json");

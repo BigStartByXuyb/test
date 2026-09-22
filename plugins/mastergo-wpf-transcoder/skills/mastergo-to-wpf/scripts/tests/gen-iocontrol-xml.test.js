@@ -76,7 +76,7 @@ fs.writeFileSync(buttonMapping, JSON.stringify({
     {
       ref: 'label', sourceRef: 'label', sourceParent: 'root', id: 'TXT_1', xmlId: 'TXT_1',
       controlType: 'TextBlock', absX: 200, absY: 292, w: 80, h: 22,
-      sourceText: '速度', valueSource: 'dsl.text', attrs: { Value: '速度' }
+      sourceText: '速度', valueSource: 'dsl.text', attrs: { Value: '速度', Align: 'Left' }
     }
   ]
 }, null, 2));
@@ -140,9 +140,9 @@ assertAttrOrder(textTag, PAGE_ATTR_ORDER, 'TextBlock');
 assert.match(textTag, /Width="NaN"/, 'TextBlock 的 Width 必须固定为 NaN');
 assert.match(textTag, /Height="40"/, 'TextBlock 的 Height 必须固定为 40');
 // Align 是 TextBlock 的必写字段（映射表 textBlockAlign / controlTypeRequiredAttrs）：渲染层按映射透传，
-// 映射缺失时按必写字段口径写空占位；对齐语义由 mapping 生成器按设计稿 textAlign 决定，不在这里猜。
-assert.match(textTag, /Align="(Left|Right|)"/,
-  'TextBlock 必须发射 Align 且取值只能是 Left / Right（映射缺失时空占位）');
+// 且**必须**是 Left / Right —— Align 不走「必写字段取不到来源写空串」那条通用通路（渲染层 fail-closed）。
+assert.match(textTag, /Align="Left"/,
+  'TextBlock 必须按映射发射 Align（这里映射给的是 Left）');
 
 // ---- 每个 ControlType 的固定必写字段（设计方模板）：缺来源一律写空字符串占位 ----
 assert.match(textTag, /Style=""/, 'TextBlock 必须发射空 Style 占位');
@@ -416,7 +416,7 @@ function orderTextNode(ref, xmlId, text, x, y) {
   return {
     ref: ref, sourceRef: ref, sourceParent: 'root', id: xmlId, xmlId: xmlId,
     controlType: 'TextBlock', absX: x, absY: y, w: 80, h: 40,
-    sourceText: text, valueSource: 'dsl.text', attrs: { Value: text }
+    sourceText: text, valueSource: 'dsl.text', attrs: { Value: text, Align: 'Left' }
   };
 }
 fs.writeFileSync(orderMapping, JSON.stringify({
@@ -545,7 +545,7 @@ fs.writeFileSync(mergeRowMapping, JSON.stringify({
   ],
   // 故意把下拉框排在前（严格 Top 顺序），断言 merge 后按视觉行重排
   nodes: [
-    { ref: 'exist', sourceRef: 'exist', sourceParent: 'root', id: 'MROW_EXIST', xmlId: 'MROW_EXIST', controlType: 'TextBlock', absX: 100, absY: 202, w: 80, h: 40, sourceText: '既有标签', valueSource: 'dsl.text', attrs: { Value: '既有标签' } },
+    { ref: 'exist', sourceRef: 'exist', sourceParent: 'root', id: 'MROW_EXIST', xmlId: 'MROW_EXIST', controlType: 'TextBlock', absX: 100, absY: 202, w: 80, h: 40, sourceText: '既有标签', valueSource: 'dsl.text', attrs: { Value: '既有标签', Align: 'Left' } },
     { ref: 'combo', sourceRef: 'combo', sourceParent: 'root', id: 'MROW_COMBO', xmlId: 'MROW_COMBO', controlType: 'ComboBox', absX: 766, absY: 232, w: 120, h: 40, attrs: { Value: 'Auto' } },
     orderTextNode('l3', 'MROW_L3', '光源通道', 687, 244)
   ]
@@ -722,7 +722,7 @@ fs.writeFileSync(langMappingPath, JSON.stringify({
     absX: 200, absY: 292, w: 80, h: 16, expectedLeft: 200, expectedTop: 100,
     expectedWidth: 'NaN', expectedHeight: 40, dslWidth: 80, sourceRef: 'txt1',
     sourceText: '新标签', valueSource: 'dsl.text',
-    attrs: { Value: '新标签', LangName: 'F2DemoNewLabel', ControlType: 'TextBlock' }
+    attrs: { Value: '新标签', LangName: 'F2DemoNewLabel', ControlType: 'TextBlock', Align: 'Left' }
   }]
 }, null, 2));
 const langRun = spawnSync(process.execPath,

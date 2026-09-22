@@ -350,6 +350,15 @@ function validate(xmlPath, manifestPath, options) {
         if (omitted.has(attr)) continue;
         // LangName 例外：动态值等 noLangRefs 豁免节点不挂 LangName，也不写空占位。
         if (attr === 'LangName') continue;
+        // Align 例外：目标框架只认 Left / Right，因此不存在"空值占位"这一档——映射缺失或第三种值
+        // 都按错误拦下（否则「只认两种取值」这条口径在这份产物上无法验证）。
+        if (attr === 'Align') {
+          if (x[attr] !== 'Left' && x[attr] !== 'Right') {
+            errors.push('[' + n.xmlId + '] TextBlock 的 Align 必须是 "Left" / "Right"（当前 ' +
+              JSON.stringify(x[attr] === undefined ? null : x[attr]) + '）');
+          }
+          continue;
+        }
         if (x[attr] === undefined) {
           errors.push('[' + n.xmlId + '] ' + controlType + ' 缺少必写属性 ' + attr + '（取不到来源时必须写空值占位）');
         }

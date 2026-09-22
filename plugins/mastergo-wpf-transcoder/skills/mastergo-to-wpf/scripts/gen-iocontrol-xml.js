@@ -40,7 +40,8 @@
  *   带 Icon 却没有 iconSize 视为映射不完整，直接失败，禁止猜图标尺寸。
  *
  * TextBlock 固定属性：Height 固定 40；Width 固定 "NaN"（不用设计稿文本 bbox 宽度），
- * FontSize 仍取 DSL 字体事实；Align 恒写（DSL 节点 textAlign=left → "Left"，其余 → "Right"）。
+ * FontSize 仍取 DSL 字体事实；Align 恒写且只有 TextBlock 有（DSL 节点 textAlign=right → "Right"，
+ * 其余含缺失 → "Left" 默认左对齐）。
  *
  * merge 语义（改现有页面的强制模式）：
  *   1. 几何（Left/Top/Width/Height）按映射更新；
@@ -303,6 +304,17 @@ function applyRequiredAttrs(node, attrMap) {
     if (omitted.has(key)) continue;                 // 变体登记 omitRequiredAttrs：该字段不发射
     // LangName 例外：只有多语言绑定层给出真实 key 时才挂，动态值等豁免节点不写空占位。
     if (key === 'LangName') continue;
+    // Align 例外：目标框架只认 "Left" / "Right"，映射缺失或写了第三种值都是映射不完整——
+    // 直接失败，不允许落到下面那条通用空串占位（否则「只认两种取值」会被 Align="" 破掉）。
+    if (key === 'Align') {
+      const alignValue = attrMap[key];
+      if (alignValue !== 'Left' && alignValue !== 'Right') {
+        throw new Error('映射门禁失败: TextBlock ' + (node.ref || node.xmlId || '') +
+          ' 的 Align 必须是 "Left" / "Right"（当前 ' + JSON.stringify(alignValue === undefined ? null : alignValue) +
+          '）；对齐取值由设计稿 textAlign 决定，字段缺失按默认 Left，不写空占位、不允许第三种值');
+      }
+      continue;
+    }
     if (attrMap[key] === undefined || attrMap[key] === null) {
       attrMap[key] = Object.prototype.hasOwnProperty.call(defaults, key) ? String(defaults[key]) : '';
     }

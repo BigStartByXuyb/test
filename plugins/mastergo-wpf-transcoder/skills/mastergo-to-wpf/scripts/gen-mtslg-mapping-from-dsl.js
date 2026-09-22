@@ -116,26 +116,32 @@ const textAlignByRef = new Map();
 // 映射表登记的 TextBlock FontWeight 规则：值取设计稿的字体样式名（fontStyle），
 // normal（样式名命中 normalStyleNames，或样式名缺失时 weight 命中 normalValues）不写该属性。
 const fontWeightRule = templateMap.textBlockFontWeight || {};
-// 映射表登记的 TextBlock Align 规则：值取设计稿 TEXT 节点级 textAlign，只有左对齐发射 Left，
-// 其余（right / center / 字段缺失）一律 Right——设计稿没给左对齐就按右对齐。
+// 映射表登记的 TextBlock Align 规则（只有 TextBlock 有这个属性）：值取设计稿 TEXT 节点级
+// textAlign，命中 right 发射 Right，其余（left / center / 字段缺失）一律 Left——默认左对齐。
 const alignRule = templateMap.textBlockAlign || {};
 // 表格族规则块（结构签名命中 + 列定义模板 + 行内容处置），真值来源是映射表 tableTemplates。
 const tableTemplate = MAP_RULES.parseTableTemplate(templateMap);
 const fontWeightAttr = typeof fontWeightRule.attr === "string" && fontWeightRule.attr ? fontWeightRule.attr : "FontWeight";
 const alignAttr = typeof alignRule.attr === "string" && alignRule.attr ? alignRule.attr : "Align";
-const alignLeftValue = typeof alignRule.leftValue === "string" && alignRule.leftValue ? alignRule.leftValue : "Left";
 const alignRightValue = typeof alignRule.rightValue === "string" && alignRule.rightValue ? alignRule.rightValue : "Right";
+const alignDefaultValue = typeof alignRule.defaultValue === "string" && alignRule.defaultValue ? alignRule.defaultValue : "Left";
 // 登记点校验：Align 恒写（policy=always）是唯一开放口径——改成条件发射必须先改这里与本文档口径，
 // 否则映射表写一个 typo 就会静默变成"有时不发射"。
 if (alignRule.policy !== undefined && alignRule.policy !== "always") {
   throw new Error("映射表 textBlockAlign.policy 目前只支持 \"always\"（TextBlock 的 Align 恒写）: " + alignRule.policy);
 }
+// 取值校验：目标框架只认 Left / Right 两种，登记成第三种就必须当场失败，不能发射出去。
+for (const value of [alignRightValue, alignDefaultValue]) {
+  if (value !== "Left" && value !== "Right") {
+    throw new Error("映射表 textBlockAlign 的取值只能是 \"Left\" / \"Right\": " + value);
+  }
+}
 const alignControlTypes = new Set(
   Array.isArray(alignRule.controlTypes) && alignRule.controlTypes.length
     ? alignRule.controlTypes.map(String) : ["TextBlock"]
 );
-const alignLeftMatch = new Set(
-  (Array.isArray(alignRule.leftMatch) && alignRule.leftMatch.length ? alignRule.leftMatch : ["left"])
+const alignRightMatch = new Set(
+  (Array.isArray(alignRule.rightMatch) && alignRule.rightMatch.length ? alignRule.rightMatch : ["right"])
     .map(function (value) { return String(value).trim().toLowerCase(); })
 );
 const fontWeightControlTypes = new Set(
@@ -681,11 +687,11 @@ function addText(ref) {
   } else if (styleName === undefined && weight !== undefined && !fontWeightNormalValues.has(weight.toLowerCase())) {
     attrs[fontWeightAttr] = weight;
   }
-  // Align 恒写：设计稿 TEXT 节点 textAlign 命中 leftMatch → Left，其余（right / center / 缺失）→ Right。
-  // 规则登记在映射表 textBlockAlign；这里只按登记取值发射，不再二次判断对齐语义。
+  // Align 恒写：设计稿 TEXT 节点 textAlign 命中 rightMatch → Right，其余（left / center / 缺失）
+  // → Left（默认左对齐）。只有 TextBlock 有该属性；规则登记在映射表 textBlockAlign，这里只按表发射。
   if (alignControlTypes.has("TextBlock")) {
-    attrs[alignAttr] = alignLeftMatch.has(String(textAlignByRef.get(ref) || "").toLowerCase())
-      ? alignLeftValue : alignRightValue;
+    attrs[alignAttr] = alignRightMatch.has(String(textAlignByRef.get(ref) || "").toLowerCase())
+      ? alignRightValue : alignDefaultValue;
   }
   const xmlId = addNode(ref, "TextBlock", attrs, { xmlId: allocateId(ref) });
   textAudit.push({ sourceRef: ref, sourceText: s.text, visibility: true, role: "content", decision: "emit", outputRefs: [xmlId] });

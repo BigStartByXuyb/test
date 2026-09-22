@@ -1031,13 +1031,36 @@ console.log("PASS 匹配键口径单读法 + 同一条规则单处陈述（maste
   assert.ok(align, "映射表必须登记 textBlockAlign（TextBlock 的 Align 口径）");
   assert.strictEqual(align.attr, "Align", "textBlockAlign.attr 必须是 Align");
   assert.strictEqual(align.policy, "always", "Align 是恒写属性：textBlockAlign.policy 必须是 always");
-  assert.ok((align.leftMatch || []).map((item) => String(item).toLowerCase()).includes("left"),
-    "textBlockAlign.leftMatch 必须包含 left（左对齐的唯一判据）");
-  assert.ok(align.leftValue && align.rightValue && align.leftValue !== align.rightValue,
-    "textBlockAlign 必须登记两个不同取值（leftValue / rightValue）");
-  const requiredTextBlock = ((mapData.controlTypeRequiredAttrs || {}).TextBlock) || [];
-  assert.ok(requiredTextBlock.includes(align.attr),
+  assert.ok((align.rightMatch || []).map((item) => String(item).toLowerCase()).includes("right"),
+    "textBlockAlign.rightMatch 必须包含 right（右对齐是唯一被识别的显式取值）");
+  assert.strictEqual(align.rightValue, "Right", "textBlockAlign.rightValue 必须是 Right");
+  assert.strictEqual(align.defaultValue, "Left",
+    "设计稿没有给出右对齐时按默认左对齐：textBlockAlign.defaultValue 必须是 Left");
+  assert.ok((align.controlTypes || []).length === 1 && align.controlTypes[0] === "TextBlock",
+    "Align 只有 TextBlock 有：textBlockAlign.controlTypes 必须恰好是 [TextBlock]");
+  const requiredAttrs = mapData.controlTypeRequiredAttrs || {};
+  assert.ok((requiredAttrs.TextBlock || []).includes(align.attr),
     "Align 恒写 → 必须登记在 controlTypeRequiredAttrs.TextBlock 里（否则校验器不会要求它）");
+  for (const [type, attrs] of Object.entries(requiredAttrs)) {
+    if (type.startsWith("_") || type === "TextBlock" || !Array.isArray(attrs)) continue;
+    assert.ok(!attrs.includes(align.attr),
+      "Align 只有 TextBlock 有，其它 ControlType 的必写字段集不得登记它: " + type);
+  }
+  for (const [type, spec] of Object.entries(mapData.controlTypes || {})) {
+    if (!spec || typeof spec !== "object" || !Array.isArray(spec.attrs)) continue;
+    if (type === "TextBlock") continue;
+    assert.ok(!spec.attrs.includes(align.attr),
+      "Align 只有 TextBlock 有，其它 ControlType 的属性表不得登记它: " + type);
+  }
+  // 同一属性在「全局透传清单」与「按类型允许集」两处都要在，否则把 businessAttrs 当注册表的读者会漏掉它。
+  assert.ok((mapData.businessAttrs || []).includes(align.attr),
+    "Align 必须与同类显示属性（Foreground / FontSize / FontWeight）一起登记进 businessAttrs");
+  // 渲染层与校验层都必须把「只认 Left / Right」变成可验证的不变量：不允许落到通用空串占位。
+  const xmlGenerator = fs.readFileSync(path.join(__dirname, "..", "gen-iocontrol-xml.js"), "utf8");
+  assert.ok(xmlGenerator.includes("的 Align 必须是 \"Left\" / \"Right\""),
+    "gen-iocontrol-xml.js 必须对 TextBlock 的 Align 取值 fail-closed（不许空占位 / 第三种值）");
+  assert.ok(validator.includes("TextBlock 的 Align 必须是 \"Left\" / \"Right\""),
+    "validate-iocontrol-provenance.js 必须把 Align 取值作为错误拦下");
   const mappingGenerator = fs.readFileSync(path.join(__dirname, "..", "gen-mtslg-mapping-from-dsl.js"), "utf8");
   for (const token of ["textBlockAlign", "textAlignByRef", "attrs[alignAttr]"]) {
     assert.ok(mappingGenerator.includes(token),
@@ -1048,6 +1071,7 @@ console.log("PASS 匹配键口径单读法 + 同一条规则单处陈述（maste
     assert.ok(text.includes("Left") && text.includes("Right"),
       file + " 必须写明 Align 的两种取值 Left / Right");
     assert.ok(text.includes("textAlign"), file + " 必须写明 Align 的真值源是设计稿 textAlign");
+    assert.ok(text.includes("默认左对齐"), file + " 必须写明设计稿没有给出右对齐时按默认左对齐");
   }
   assert.ok(mainSkill.includes("Align"),
     "mastergo-to-wpf/SKILL.md 的硬门禁索引必须点名 Align（否则执行者不知道它有条确定口径）");
