@@ -91,15 +91,9 @@ function buildVariantOwners(templateMap) {
   return owners;
 }
 
-// 文档 token 的判据全部来自映射表（不手写清单），按顺序判定：
-//   ① 命中 variants            → covered（文档→表这条能落地）
-//   ② 命中 unconfirmedVariants → unconfirmed（映射表自己登记为「待确认」，不算错）
-//   ③ 是某个变体名的子串        → labels（尺寸/分组这类片段：整数、小数、文字、晶圆图…）
-//   ④ kind=label（`结构分支=` 这类纯结构名）→ labels
-//      kind=section（章节名）且同组里有解析得通的 token → labels
-//      （《单选+多选》《右侧栏》这类章节标题本来就不等于任何变体名，只要它所在的组件集章节
-//       确实登记了变体，就说明这个标题是标签；反过来，整组一个变体都解析不到 → 该章节是孤儿，报错）
-//   ⑤ 其余                     → unregisteredVariants（文档写了映射表没有的变体值/组件集，退 2）
+// token 判据见上方 extractDocumentedRules 的「三分类表」，本函数只实现它，不再复述规则。
+// 实现要点只有一条：kind=section 的 token 需要一个**锚点** —— 它所在的那一组里至少有一个 token
+// 解析成了变体或待确认变体；有锚点算标签，没锚点才是孤儿章节（报 unregisteredVariants）。
 function classifyDocTokens(groups, templateMap) {
   const owners = buildVariantOwners(templateMap);
   const pendingOwners = new Map();
