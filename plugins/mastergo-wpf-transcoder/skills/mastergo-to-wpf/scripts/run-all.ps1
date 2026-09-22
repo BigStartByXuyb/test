@@ -269,6 +269,17 @@ function Invoke-Registry {
     return $output
 }
 
+# 本页现状摘要（build-run-summary.mjs）：每步成功后刷新一次，替代消费方手写探针去数一遍产物。
+# 它只读登记表里已登记的产物并复校 sha256，所以生成失败就意味着"登记表与磁盘不一致"——
+# 这里必须当场失败，不能留一份看着像本次、其实掺着旧数据的摘要。
+function Update-RunSummary {
+    $output = & node (Join-Path $PSScriptRoot 'build-run-summary.mjs') `
+        '--project-root' $ProjectRoot '--target' $Target '--quiet' 2>&1 | Out-String
+    if ($LASTEXITCODE -ne 0) {
+        throw ("本页现状摘要生成失败（登记表与磁盘不一致）`n" + (($output.Trim() -split "`n" | Select-Object -Last 8) -join "`n"))
+    }
+}
+
 # 逐阶段输入复校：每一步在消费前，把它**实际消费的、且本次运行已登记的**产物按登记表复校 sha256。
 # 只在"已登记"时校验——新开运行的早期步骤尚未登记，不受影响；而手工改过中间产物再续跑会被当场拒掉
 # （与"消费只按登记取"是同一条契约，见 bundle-manifest.md 第 7 节）。
@@ -689,6 +700,8 @@ foreach ($step in $Steps) {
         Invoke-Registry @('step', '--run', $RunJson, '--id', "$($step.Id)", '--name', $step.Name,
             '--status', 'ok', '--seconds', "$seconds", '--note', $note,
             '--log', (Join-Path $Work ('steps\{0:D2}-{1}.log' -f $step.Id, $step.Name))) | Out-Null
+        # 本页现状摘要随每步刷新：必须在本步登记之后，否则摘要里的步骤列表会永远少一步。
+        Update-RunSummary
         $results.Add([pscustomobject]@{ Id = $step.Id; Name = $step.Name; Status = 'ok'; Seconds = $seconds; Note = $note })
         Write-Output ("      ok  {0}s  {1}" -f $seconds, $note)
     }
