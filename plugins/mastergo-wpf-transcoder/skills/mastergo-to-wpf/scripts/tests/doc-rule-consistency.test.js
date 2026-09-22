@@ -1024,7 +1024,8 @@ console.log("PASS 匹配键口径单读法 + 同一条规则单处陈述（maste
 // ---------- 11. TextBlock Align 口径：映射表 ↔ 生成器 ↔ 人读文档 ----------
 // 背景：新增属性最典型的两处漂移是「映射表登记了、生成器没读」和「实现改了、文档没写」。
 // 这里把三个面钉在一起：登记点（textBlockAlign + controlTypeRequiredAttrs）、实现（生成器读
-// 设计稿 textAlign 并按 leftMatch 取值）、人读（mtslg-mode / 组件库映射文档 + 硬门禁索引）。
+// 设计稿 textAlign 并按 rightMatch / rightValue / defaultValue 取值）、人读（mtslg-mode /
+// 组件库映射文档 + 硬门禁索引）。
 {
   const mapData = JSON.parse(fs.readFileSync(MAP, "utf8"));
   const align = mapData.textBlockAlign;
@@ -1061,6 +1062,8 @@ console.log("PASS 匹配键口径单读法 + 同一条规则单处陈述（maste
     "gen-iocontrol-xml.js 必须对 TextBlock 的 Align 取值 fail-closed（不许空占位 / 第三种值）");
   assert.ok(validator.includes("TextBlock 的 Align 必须是 \"Left\" / \"Right\""),
     "validate-iocontrol-provenance.js 必须把 Align 取值作为错误拦下");
+  assert.ok(validator.includes("Align 只有 TextBlock 有"),
+    "validate-iocontrol-provenance.js 必须拦下非 TextBlock 节点携带 Align 的产物（只 TextBlock 有该参数）");
   const mappingGenerator = fs.readFileSync(path.join(__dirname, "..", "gen-mtslg-mapping-from-dsl.js"), "utf8");
   for (const token of ["textBlockAlign", "textAlignByRef", "attrs[alignAttr]"]) {
     assert.ok(mappingGenerator.includes(token),

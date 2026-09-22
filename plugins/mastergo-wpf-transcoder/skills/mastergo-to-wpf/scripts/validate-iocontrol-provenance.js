@@ -364,6 +364,11 @@ function validate(xmlPath, manifestPath, options) {
         }
       }
     }
+    // Align 只有 TextBlock 有：其它 ControlType（merge 保留的既有属性、手写 mapping）出现该属性一律报错，
+    // 否则「只有 TextBlock 有 Align」这条需求在产物侧无法验证。
+    if (controlType !== 'TextBlock' && x.Align !== undefined) {
+      errors.push('[' + n.xmlId + '] Align 只有 TextBlock 有，' + controlType + ' 不得携带该属性');
+    }
     if (BUTTON_FAMILY_CONTROL_TYPES.includes(controlType)) {
       for (const attr of BUTTON_ALWAYS_ATTRS) {
         if (omitted.has(attr)) continue;
