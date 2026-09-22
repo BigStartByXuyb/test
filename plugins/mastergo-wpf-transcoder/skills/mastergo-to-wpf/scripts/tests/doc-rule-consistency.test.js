@@ -882,3 +882,35 @@ console.log("PASS 文本换行口径（textNewlinePolicy）一致性回归测试
     "mtslg-mode.md 必须写明 LangName 跟随设计稿覆盖");
 }
 console.log("PASS 页面节点 ID 口径（派生 + 唯一 + 稳定）一致性回归测试");
+
+// 文档不得自行枚举真值源里的清单——枚举必然与 map / 脚本漂移。
+// 背景：2026-09-22 那几轮语义审计反复抓到的都是这一类（判定表把 iconPolicy 的取值抄了一份、
+// 抄了一份底部栏变体名、把 residentGroupPattern 的模式值写死、重复列了 omit 角色清单），
+// 而同仓库早有同名原则（fontWeight 的 normal 名单、ID 前缀），只是没有覆盖到判定表那一节。
+// 正确写法是"给结论 + 指向真值源"，所以这里把这几类字面量机械挡住。
+{
+  const rulesText = fs.readFileSync(PAGE_BUILD_RULES, "utf8");
+  const forbidden = [
+    ["single-path", "iconPolicy 的取值", "mtslg-iocontrol-map.json 各变体的 iconPolicy"],
+    ["pair-per-button", "iconPolicy 的取值", "mtslg-iocontrol-map.json 各变体的 iconPolicy"],
+    ["常驻(button", "residentGroupPattern 的模式值", "mtslg-iocontrol-map.json 的 layoutRules.bottomBar.residentGroupPattern"],
+    ["常驻(按钮", "residentGroupPattern 的模式值", "mtslg-iocontrol-map.json 的 layoutRules.bottomBar.residentGroupPattern"],
+    ["DI 显示-", "底部栏变体名", "mtslg-iocontrol-map.json 的 layoutRules.bottomBar.variants"],
+    ["DO 显示-", "底部栏变体名", "mtslg-iocontrol-map.json 的 layoutRules.bottomBar.variants"],
+    ["非首页-", "底部栏变体名", "mtslg-iocontrol-map.json 的 layoutRules.bottomBar.variants"],
+    ['"顶部栏", "底部"', "宿主壳标记词清单", "scripts/lib/mastergo-rules.js 的 HOST_SHELL_NAME_MARKERS"],
+  ];
+  for (const [needle, what, source] of forbidden) {
+    assert.ok(!rulesText.includes(needle),
+      "page-build-rules.md 不得自行枚举" + what + "（会与真值源漂移）：删掉 " + JSON.stringify(needle) +
+      "，改为指向 " + source);
+  }
+  // 反向：判定表必须把两族的判据都指向 map，而不是只描述一族。
+  assert.ok(rulesText.includes("layoutRules.bottomBar"),
+    "page-build-rules.md 的图标判定表必须点名布局族 layoutRules.bottomBar");
+  assert.ok(/判定时照\s*`mtslg-iocontrol-map\.json`/.test(rulesText),
+    "page-build-rules.md 必须写明各族匹配键以 mtslg-iocontrol-map.json 的 match 为准");
+  assert.ok(rulesText.includes("iconEntryOf"),
+    "page-build-rules.md 必须写明 MenuItem 的 Icon 来自台账（layout 脚本的 iconEntryOf）");
+}
+console.log("PASS 判定表不得自行枚举真值源（iconPolicy / 变体名 / 模式值 / 标记词）一致性回归测试");

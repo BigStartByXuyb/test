@@ -33,12 +33,12 @@
 
 | 实例属于哪一族 | 怎么认出它 | 图标要不要登记 |
 |---|---|---|
-| **组件模板族** | 按**该族自己 `match` 块登记的键**匹配。各族的键**并不统一**（`property` / `componentSet` / `structural` 三种形态都有），**判定时照 `mtslg-iocontrol-map.json` 里该族的 `match` 读，不要按"族"概括、也不要以本表为准** | 看该实例命中的**变体登记的 `iconPolicy`**：`single-path` → 是；`pair-per-button` → 是（一按钮两图形各自成条）；`runtime` → 否（`Icon` 是目标项目已有资源键，本页不生成，台账也不该有，有也会被 Bundle 剔除并记进审计 `runtimeIcons`，例：ENTER / EXIT）；`none` → 否 |
-| **布局族**（`layoutRules.bottomBar`，16 个变体：`首页-长方形` / `非首页-长方形` / `方-icon` / `方-icon+文案` / `非首页-F` / `非首页-文案` / `非首页- F` / `DI 显示-0…5000` / `DO 显示-0…2000` …） | 按**组件名**匹配（`match.componentName = true`；底部栏实例的属性里没有变体信息，只能按名字认） | **这一族不登记 `iconPolicy`，别去查它**。是否出图标取决于**该变体内有没有 Icon 槽位**：变体里挂了 icon 子实例（如 `非首页-长方形` 内含 `INSTANCE "icon"`）或直接绘制 PATH（如 `DI 显示-0` 内含 `PATH "联集 241"`）→ **是**；变体里只有背景 + 文本/F 键（如 `非首页-F`、`非首页-文案`）→ **没有图标可登记**。实测同一页 10 个 MenuItem 里 2 个无图标，正是命中了这类变体 |
-| **右下角常驻分组**（容器组件名匹配 `residentGroupPattern = 常驻(button|按钮|分组)`，例：`右侧底部-常驻button`） | 容器名命中该模式 | **布局层面**：里面的实例不生成 MenuItem、不占 Index。**图标层面**：里面的按钮复用的仍是**布局族的变体**（实测该容器里是 `底部栏/方-icon` ×2 + `方-icon+文案` ×2 共 4 个），所以按上一行判——分组归属本身不决定登记与否 |
-| 宿主公共栏（顶部状态栏、顶部栏）的图形 | 文本属 `role=host-shell`（见第 5 节） | 否 |
-| 相机视口内部绘制（`role=camera-viewport-internal`）的图形 | 见第 5 节 | 否：相机视口是整体，内部网格 / 坐标 / 通道名 / 拟合结果一律不处理，只发射外层 `Camera` 控件 |
-| 其它 omit `role`（`page-title` / `excluded-component` / `unmapped-component` / `table-data-cell`） | 见第 5 节 omit 角色表 | 否 |
+| **组件模板族**（映射表里带 `match` 的各族） | 按**该族自己 `match` 块登记的键**匹配。各族的键**并不统一**，**判定时照 `mtslg-iocontrol-map.json` 里该族的 `match` 读，本表不复制这份清单** | 看该实例命中的**变体登记的 `iconPolicy`**——取值与含义以 map 为准，本表不复制。只需知道：按 `iconPolicy` 判为"本页不生成"的那些，不应出现在台账里（Bundle 会剔除并记进审计 `runtimeIcons`）。**多个图形挂同一按钮**的变体要各自成条，不合并 |
+| **布局族**（`layoutRules.bottomBar`） | 按**组件名**匹配（该族 `match` 声明的键；底部栏实例的属性里没有变体信息，只能按名字认）。**变体名与数量以 map 为准，本表不复制** | **这一族不登记 `iconPolicy`，别去查它**。是否出图标取决于**该变体的实例子树里有没有图形槽位**：挂了 icon 子实例、或直接绘制 PATH → **要登记**；只有背景 + 文本 / F 键 → **没有图标可登记**。判据是"有没有图形槽位"，与变体叫什么名字无关 |
+| **右下角常驻分组** | 容器组件名命中 map 的 `layoutRules.bottomBar.residentGroupPattern`（模式值以 map 为准） | **布局层面**：里面的实例不生成 MenuItem、不占 Index。**图标层面**：里面的按钮复用的仍是**布局族的变体**，所以按上一行判——分组归属本身不决定登记与否 |
+| 宿主公共栏的图形 | 其文本属 omit 角色 `host-shell`（判定方式见第 5 节） | 否 |
+| 相机视口内部绘制的图形 | 其文本属 omit 角色 `camera-viewport-internal`（见第 5 节） | 否：相机视口是整体，内部网格 / 坐标 / 通道名 / 拟合结果一律不处理，只发射外层 `Camera` 控件 |
+| 其它 omit `role` 的图形 | 角色清单与含义见第 5 节 omit 角色表（该表与 `validate-iocontrol-provenance.js` 的 `OMIT_ROLES` 之间有门禁同步，本表不复制） | 否 |
 
 **MenuItem 的图标从哪来**（决定了"要不要登记"为什么重要）：`gen-mtslg-layout-manifest.js` 的 `iconEntryOf()` 拿菜单项实例的 DSL 节点，在**本页图标台账**里按 `ref` → `sourceId` → 几何键查条目，查到就用台账条目的 `name` 写进 `Icon="..."`——**台账里没有就没有 Icon**。
 
@@ -151,7 +151,7 @@ Bundle 的固定调用顺序：模板解析 → **容器嵌套重挂（`apply-co
 | 角色 | 含义 |
 |---|---|
 | `page-title` | 页面根级 / 工件级大标题 |
-| `host-shell` | 宿主公共栏的**文本**：顶部宿主栏的区域文本，以及**底部栏的菜单文案**（底部栏文案由 Layout `MenuItem` 的 Name 承载，不产页面内容节点）。**只管文本**——底部栏 MenuItem 的**图标**是页面级资源，要登记进本页台账与 `Icons.xaml`，见第 2 节判定表。判定方式：`scripts/lib/mastergo-rules.js` 的 `HOST_SHELL_NAME_MARKERS = ["顶部栏", "底部", "常驻信息"]`，由 `isInHostShell` **沿祖先链**逐级取名字，**任一祖先的名字包含标记词即命中**（不是比对某个固定图层名）。实测命中的祖先名字是 `背景常驻信息`（含"常驻信息"）、`顶部栏`（含"顶部栏"）、`底部button`（底部栏容器）、`右侧底部-常驻button`（右下角常驻分组）。调用点只有 `gen-mtslg-mapping-from-dsl.js`（写文本 role）与 `apply-container-containment.js`（容器归属）——**图标发现与生成那条路不读这个标记**，所以"祖先名含底部 → 文本 omit"不会连带把底部栏图标排除 |
+| `host-shell` | 宿主公共栏的**文本**：顶部宿主栏的区域文本，以及**底部栏的菜单文案**（底部栏文案由 Layout `MenuItem` 的 Name 承载，不产页面内容节点）。**只管文本**——底部栏 MenuItem 的**图标**是页面级资源，要登记进本页台账与 `Icons.xaml`，见第 2 节判定表。判定方式：标记词清单登记在 `scripts/lib/mastergo-rules.js` 的 `HOST_SHELL_NAME_MARKERS`（清单以该常量为准，本表不复制），由 `isInHostShell` **沿祖先链逐级取名字**，**任一祖先的名字包含标记词即命中**——不是比对某个固定图层名，所以"名字里带某个词"本身就是命中条件。调用点只有 `gen-mtslg-mapping-from-dsl.js`（写文本 role）与 `apply-container-containment.js`（容器归属）——**图标发现与生成那条路不读这个标记**，所以"祖先名命中标记 → 文本 omit"不会连带把底部栏图标排除 |
 | `excluded-component` | 被 `manifest.excludeInstances` 隔离的组件内部文本 |
 | `unmapped-component` | 未命中正式模板的组件内部文本 |
 | `camera-viewport-internal` | 相机视口内部整体渲染内容（映射表 `cameraTemplates.innerTextPolicy`） |
