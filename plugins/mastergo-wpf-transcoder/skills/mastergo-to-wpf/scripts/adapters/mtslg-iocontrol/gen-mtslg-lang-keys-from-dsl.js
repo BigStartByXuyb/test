@@ -65,7 +65,7 @@ const fs = require("fs");
 const path = require("path");
 // 跨脚本共用工具的唯一实现（见 scripts/lib/script-helpers.js；禁止在本脚本再抄一份）。
 // langValueText（字典值的换行 + 空白处理）由共享库提供唯一实现，本脚本不再自带一份。
-const { readJson, failWithPrefix, normalizeNewlines, langValueText } = require(path.join(__dirname, "lib", "script-helpers.js"));
+const { readJson, failWithPrefix, normalizeNewlines, langValueText } = require(path.join(__dirname, "..", "..", "lib", "script-helpers.js"));
 const fail = failWithPrefix("语言键派生失败");
 
 const KEY_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;

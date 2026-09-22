@@ -8,8 +8,8 @@
 const fs = require("fs");
 const path = require("path");
 // 跨脚本共用工具的唯一实现（见 scripts/lib/script-helpers.js；禁止在本脚本再抄一份）。
-const { fail, xmlAttr, xmlDocText, backupFile } = require(path.join(__dirname, "lib", "script-helpers.js"));
-const { inferHostPaths: inferHostPathsShared } = require(path.join(__dirname, "lib", "project-csproj.js"));
+const { fail, xmlAttr, xmlDocText, backupFile } = require(path.join(__dirname, "..", "lib", "script-helpers.js"));
+const { inferHostPaths: inferHostPathsShared } = require(path.join(__dirname, "..", "lib", "project-csproj.js"));
 
 function usage() {
   console.error("用法: node gen-mw-wpf-page.js --manifest <page.json> [--overwrite]");

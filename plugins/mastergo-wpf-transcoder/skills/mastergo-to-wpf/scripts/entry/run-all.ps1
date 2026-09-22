@@ -11,13 +11,13 @@
         某步失败时脚本打印该步日志路径并停止，修好输入后从该步继续即可。
 
     例：
-        pwsh -NoProfile -File _tool\run-all.ps1 -List
-        pwsh -NoProfile -File _tool\run-all.ps1 -List -Format json   # 12 步清单（人读；中文经 stdout 可能被控制台代码页损坏）
-        pwsh -NoProfile -File _tool\run-all.ps1 -List -Format json -OutFile <临时json>   # 同上，但写文件（UTF-8），Node 侧只读文件、不读 stdout
-        pwsh -NoProfile -File _tool\run-all.ps1 -ProjectRoot <项目> -Target <页面Target> -LayerId <图层id> -StopAfter discover
-        pwsh -NoProfile -File _tool\run-all.ps1 -ProjectRoot <项目> -Target <页面Target> -Progress layout          # 图标台账/译文改好之后
-        pwsh -NoProfile -File _tool\run-all.ps1 -ProjectRoot <项目> -Target <页面Target> -Progress bundle -Overwrite
-        pwsh -NoProfile -File _tool\run-all.ps1 -ProjectRoot <项目> -Target <页面Target> -Progress verify
+        pwsh -NoProfile -File <skill>\scripts\entry\run-all.ps1 -List
+        pwsh -NoProfile -File <skill>\scripts\entry\run-all.ps1 -List -Format json   # 12 步清单（人读；中文经 stdout 可能被控制台代码页损坏）
+        pwsh -NoProfile -File <skill>\scripts\entry\run-all.ps1 -List -Format json -OutFile <临时json>   # 同上，但写文件（UTF-8），Node 侧只读文件、不读 stdout
+        pwsh -NoProfile -File <skill>\scripts\entry\run-all.ps1 -ProjectRoot <项目> -Target <页面Target> -LayerId <图层id> -StopAfter discover
+        pwsh -NoProfile -File <skill>\scripts\entry\run-all.ps1 -ProjectRoot <项目> -Target <页面Target> -Progress layout          # 图标台账/译文改好之后
+        pwsh -NoProfile -File <skill>\scripts\entry\run-all.ps1 -ProjectRoot <项目> -Target <页面Target> -Progress bundle -Overwrite
+        pwsh -NoProfile -File <skill>\scripts\entry\run-all.ps1 -ProjectRoot <项目> -Target <页面Target> -Progress verify
 #>
 [CmdletBinding()]
 param(
@@ -48,26 +48,18 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
-# 两种布局都要能跑：
-#   插件布局   <plugin>/skills/mastergo-to-wpf/scripts/run-all.ps1  → 脚本目录的父目录就是 skill 根
-#   项目布局   <project>/_tool/run-all.ps1                          → skill 在 _tool\mastergo-to-wpf
-$pluginLayout = -not (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'mastergo-to-wpf'))
-if (-not $SkillRoot) {
-    $SkillRoot = if ($pluginLayout) { Split-Path -Parent $PSScriptRoot } else { Join-Path $PSScriptRoot 'mastergo-to-wpf' }
-}
-if (-not $ProjectRoot) {
-    # 插件布局下工作目录就是目标项目；项目布局下是脚本目录的父目录。
-    $ProjectRoot = if ($pluginLayout) { (Get-Location).Path } else { Split-Path -Parent $PSScriptRoot }
-}
+# 布局：本文件在 <skill>/scripts/entry/ 下，脚本根是它的父目录，skill 根再上一层；工作目录即目标项目。
+if (-not $SkillRoot) { $SkillRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }
+if (-not $ProjectRoot) { $ProjectRoot = (Get-Location).Path }
 if (-not (Test-Path -LiteralPath $ProjectRoot)) { New-Item -ItemType Directory -Force -Path $ProjectRoot | Out-Null }
 $ProjectRoot = (Resolve-Path -LiteralPath $ProjectRoot).Path
-$ScriptsFolder = Join-Path $SkillRoot 'scripts'
+$ScriptsFolder = Split-Path -Parent $PSScriptRoot
 $TemplateMap = Join-Path $SkillRoot 'references\adapters\mtslg-iocontrol\mtslg-iocontrol-map.json'
 
 # 步骤表：Id / 名称 / 说明 / 契约（输入 → 产物 → 失败 → 怎么修）。
 # 前置依赖由下方 switch（按步骤名硬编码）表达，这里不重复声明。
 # 契约字段是「一键流水线」文档的唯一真值源：`-List -Format json -OutFile <文件>` 输出它们，
-# references/adapters/mtslg-iocontrol/pipeline-contract.md 由 scripts/gen-pipeline-contract.mjs 生成，
+# references/adapters/mtslg-iocontrol/pipeline-contract.md 由 scripts/core/gen-pipeline-contract.mjs 生成，
 # 回归测试重新生成并比对——文档里的步骤表不再手写，避免"文档说一套、脚本做一套"。
 $Steps = @(
     [pscustomobject]@{
@@ -111,8 +103,8 @@ $Steps = @(
         # 草稿 mapping 只有 componentInstances（没有 resolvedTemplates），登记判据按与解析器同一份
         # 判据从中取变体；两种形状都要支持，否则第 6 步的结论会全落到位置兜底。
         Outputs  = @('Generated/_inputs/<Target>.icon-candidates.json（待命名清单：候选下标/归属控件/层名/尺寸/registration 登记结论）', 'mustName：命名表必须恰好覆盖的候选下标（= registration.register=true）')
-        Failures = @('缺 svg / mapping / 映射表（前置步骤未跑）', '登记判据缺依据（registration.basis 的取值以判据实现 scripts/lib/icon-registration-policy.js 为准：变体未登记，或变体已登记但漏登记 iconPolicy）')
-        Recovery = @('先补跑前置步骤，再重跑：-Progress discover；登记结论由 discover 机械判定（判据实现 scripts/lib/icon-registration-policy.js），不要回文档自行推断。遇"登记判据缺依据"按 registration.source 分头修——缺变体补变体、缺 iconPolicy 补字段（整批同步清单见 skills/mastergo-iocontrol-document-format/SKILL.md 的「新增/修改映射的同步清单」），改完重跑 -Progress mapping')
+        Failures = @('缺 svg / mapping / 映射表（前置步骤未跑）', '登记判据缺依据（registration.basis 的取值以判据实现 scripts/adapters/mtslg-iocontrol/lib/icon-registration-policy.js 为准：变体未登记，或变体已登记但漏登记 iconPolicy）')
+        Recovery = @('先补跑前置步骤，再重跑：-Progress discover；登记结论由 discover 机械判定（判据实现 scripts/adapters/mtslg-iocontrol/lib/icon-registration-policy.js），不要回文档自行推断。遇"登记判据缺依据"按 registration.source 分头修——缺变体补变体、缺 iconPolicy 补字段（整批同步清单见 skills/mastergo-iocontrol-document-format/SKILL.md 的「新增/修改映射的同步清单」），改完重跑 -Progress mapping')
     },
     [pscustomobject]@{
         Id = 7; Name = 'ledger'; Title = '由命名表生成图标台账 + 图标几何来源核对'
@@ -282,12 +274,12 @@ function Assert-File {
     if (-not (Test-Path -LiteralPath $Path)) { throw $Message }
 }
 
-# ---------- 运行登记表（run registry，scripts/lib/run-registry.js 的唯一实现经 CLI 调用）----------
+# ---------- 运行登记表（run registry，scripts/lib/run-registry.js 的唯一实现经 scripts/core/run-registry.mjs CLI 调用）----------
 # 目的：每一步产出的文件在**产出它的那一步**就登记（路径 + sha256 + size + mtime），
 # 后续步骤只按登记表取路径并校 hash；磁盘上未登记的旧同名文件（legacy shadow）一律拒绝。
 function Invoke-Registry {
     param([string[]] $Arguments)
-    $output = & node (Join-Path $PSScriptRoot 'run-registry.mjs') @Arguments 2>&1 | Out-String
+    $output = & node (Join-Path $ScriptsFolder 'core/run-registry.mjs') @Arguments 2>&1 | Out-String
     if ($LASTEXITCODE -ne 0) {
         throw ("运行登记表操作失败: " + ($Arguments -join ' ') + "`n" + ($output.Trim() -split "`n" | Select-Object -Last 6 | Out-String))
     }
@@ -298,7 +290,7 @@ function Invoke-Registry {
 # 它只读登记表里已登记的条目并复校 sha256；失败即说明本次摘要取不到可信数据，
 # 必须当场失败（失败原因见输出，不在这里替它断言是哪一种）。
 function Update-RunSummary {
-    $output = & node (Join-Path $PSScriptRoot 'build-run-summary.mjs') `
+    $output = & node (Join-Path $ScriptsFolder 'core/build-run-summary.mjs') `
         '--project-root' $ProjectRoot '--target' $Target '--quiet' 2>&1 | Out-String
     if ($LASTEXITCODE -ne 0) {
         throw ("本页现状摘要生成失败`n" + (($output.Trim() -split "`n" | Select-Object -Last 8) -join "`n"))
@@ -576,12 +568,12 @@ foreach ($step in $Steps) {
         switch ($step.Name) {
             'fetch' {
                 Invoke-StepCommand -Label 'getDsl' -LogFile $log -File 'node' -Arguments @(
-                    (Join-Path $ScriptsFolder 'call-mastergo-mcp.js'), '--tool', 'getDsl',
+                    (Join-Path $ScriptsFolder 'core/call-mastergo-mcp.js'), '--tool', 'getDsl',
                     '--fileId', $FileId, '--layerId', $LayerId, '--format', 'json', '--out', $GetDslJson) | Out-Null
             }
             'capture' {
                 Invoke-StepCommand -Label 'Capture' -LogFile $log -File 'pwsh' -Arguments @(
-                    '-NoProfile', '-File', (Join-Path $ScriptsFolder 'mastergo-dsl-pipeline.ps1'),
+                    '-NoProfile', '-File', (Join-Path $ScriptsFolder 'core/mastergo-dsl-pipeline.ps1'),
                     '-Action', 'Capture', '-InputFile', $GetDslJson, '-Out', $RunDir,
                     '-FileId', $FileId, '-LayerId', $LayerId, '-Ui', $Ui, '-PageName', $DesignPageName) | Out-Null
                 $coverage = Get-Content -LiteralPath $CoverageJson -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -590,13 +582,13 @@ foreach ($step in $Steps) {
             }
             'svg' {
                 Invoke-StepCommand -Label 'extractSvg' -LogFile $log -File 'node' -Arguments @(
-                    (Join-Path $ScriptsFolder 'call-mastergo-mcp.js'), '--tool', 'extractSvg',
+                    (Join-Path $ScriptsFolder 'core/call-mastergo-mcp.js'), '--tool', 'extractSvg',
                     '--fileId', $FileId, '--layerId', $LayerId, '--page', '0', '--pageSize', '100',
                     '--out', $SvgJson) | Out-Null
             }
             'visibility' {
                 Invoke-StepCommand -Label 'visibility' -LogFile $log -File 'node' -Arguments @(
-                    (Join-Path $ScriptsFolder 'resolve-mastergo-visibility.js'), '--input', $SnapshotJson,
+                    (Join-Path $ScriptsFolder 'core/resolve-mastergo-visibility.js'), '--input', $SnapshotJson,
                     '--out', $VisibilityJson) | Out-Null
             }
             'mapping' {
@@ -607,7 +599,7 @@ foreach ($step in $Steps) {
                     $ledgerForDraft = $CandidateJson
                 }
                 Invoke-StepCommand -Label 'mapping draft' -LogFile $log -File 'node' -Arguments @(
-                    (Join-Path $ScriptsFolder 'gen-mtslg-mapping-from-dsl.js'), '--dsl', $SnapshotJson,
+                    (Join-Path $ScriptsFolder 'adapters/mtslg-iocontrol/gen-mtslg-mapping-from-dsl.js'), '--dsl', $SnapshotJson,
                     '--visibility', $VisibilityJson, '--template-map', $TemplateMap,
                     '--icon-map', $ledgerForDraft, '--out', $DraftMappingJson) | Out-Null
             }
@@ -615,7 +607,7 @@ foreach ($step in $Steps) {
                 $mappingForDiscover = if (Test-Path -LiteralPath $DraftMappingJson) { $DraftMappingJson } else { $MappingAuditJson }
                 $confirmed = if (Test-Path -LiteralPath $LedgerJson) { $LedgerJson } else { $CandidateJson }
                 Invoke-StepCommand -Label 'discover' -LogFile $log -File 'node' -Arguments @(
-                    (Join-Path $ScriptsFolder 'discover-mtslg-page-icon-map.js'), '--svg', $SvgJson,
+                    (Join-Path $ScriptsFolder 'adapters/mtslg-iocontrol/discover-mtslg-page-icon-map.js'), '--svg', $SvgJson,
                     '--mapping', $mappingForDiscover, '--confirmed', $confirmed,
                     '--template-map', $TemplateMap, '--dsl', $SnapshotJson, '--out', $CandidateJson) | Out-Null
                 # 登记结论由 discover 机械判定：这里把结论摘要带进步骤 note，模型不必再去翻文档判定表。
@@ -627,10 +619,10 @@ foreach ($step in $Steps) {
                 # 台账由「候选清单 + 命名表」机械生成（命名表是人在 discover 之后产出的语义输入）。
                 if (Test-Path -LiteralPath $NamingJson) {
                     Invoke-StepCommand -Label 'build icon ledger' -LogFile $log -File 'node' -Arguments @(
-                        (Join-Path $PSScriptRoot 'build-icon-ledger.mjs'), $CandidateJson, $LedgerJson, $NamingJson) | Out-Null
+                    (Join-Path $ScriptsFolder 'adapters/mtslg-iocontrol/build-icon-ledger.mjs'), $CandidateJson, $LedgerJson, $NamingJson) | Out-Null
                     # 生成后立刻核对几何来源：sourceId 指向页面根 / 被多条共用 / 缺 extractSvg 条目且未声明 fromDsl
                     Invoke-StepCommand -Label 'verify icon source' -LogFile (Join-Path $StepLogs '07-ledger-verify-icon-source.log') -File 'node' -Arguments @(
-                        (Join-Path $PSScriptRoot 'verify-icon-source.mjs'), $CandidateJson, $SnapshotJson, $SvgJson, '--naming', $NamingJson) | Out-Null
+                    (Join-Path $ScriptsFolder 'adapters/mtslg-iocontrol/verify-icon-source.mjs'), $CandidateJson, $SnapshotJson, $SvgJson, '--naming', $NamingJson) | Out-Null
                 }
                 elseif (-not (Test-Path -LiteralPath $LedgerJson)) {
                     if (-not $AllowEmptyLedger) {
@@ -648,7 +640,7 @@ foreach ($step in $Steps) {
             }
             'layout' {
                 Invoke-StepCommand -Label 'layout manifest' -LogFile $log -File 'node' -Arguments @(
-                    (Join-Path $ScriptsFolder 'gen-mtslg-layout-manifest.js'), '--dsl', $SnapshotJson,
+                    (Join-Path $ScriptsFolder 'adapters/mtslg-iocontrol/gen-mtslg-layout-manifest.js'), '--dsl', $SnapshotJson,
                     '--icon-map', $LedgerJson, '--map', $TemplateMap,
                     '--page-target', $Target, '--page-lang-name', "${Target}PageTitle",
                     '--layout-path', 'Resources/Layout/Layout.xml',
@@ -663,9 +655,8 @@ foreach ($step in $Steps) {
                 $note = "菜单项 $(@($layout.menuItems).Count) 个"
             }
             'inputs' {
-                # build-bundle-manifest.mjs 是 run-all 的同级辅助脚本（插件布局在 scripts/、项目布局在 _tool/），
-                # 因此这里用 $PSScriptRoot；skill 自带脚本一律用 $ScriptsFolder。
-                $args = @((Join-Path $PSScriptRoot 'build-bundle-manifest.mjs'), $LayoutManifestJson, $BundleJson, $ProjectRoot, $Ui)
+                # 所有 skill 自带脚本一律用 Join-Path $ScriptsFolder 分桶定位。
+                $args = @((Join-Path $ScriptsFolder 'adapters/mtslg-iocontrol/build-bundle-manifest.mjs'), $LayoutManifestJson, $BundleJson, $ProjectRoot, $Ui)
                 # 采集输入只从运行登记表取（并写进清单让 Bundle 复校），不再让清单自己拼顶层路径。
                 $args += @('--run-json', $RunJson)
                 if ($PageTitleText) { $args += @('--page-title', $PageTitleText) }
@@ -673,7 +664,7 @@ foreach ($step in $Steps) {
                 Invoke-StepCommand -Label 'bundle manifest' -LogFile $log -File 'node' -Arguments $args | Out-Null
             }
             'bundle' {
-                $args = @((Join-Path $ScriptsFolder 'gen-mastergo-page-bundle.js'), '--manifest', $BundleJson)
+                $args = @((Join-Path $ScriptsFolder 'entry/gen-mastergo-page-bundle.js'), '--manifest', $BundleJson)
                 if ($Overwrite) { $args += '--overwrite' }
                 Invoke-StepCommand -Label 'bundle' -LogFile $log -File 'node' -Arguments $args | Out-Null
             }
@@ -717,7 +708,7 @@ foreach ($step in $Steps) {
             }
             'verify' {
                 Invoke-StepCommand -Label 'verifications' -LogFile $log -File 'pwsh' -Arguments @(
-                    '-NoProfile', '-File', (Join-Path $PSScriptRoot 'run-verifications.ps1'),
+                    '-NoProfile', '-File', (Join-Path $ScriptsFolder 'adapters/mtslg-iocontrol/run-verifications.ps1'),
                     '-ProjectRoot', $ProjectRoot, '-SkillRoot', $SkillRoot, '-Page', $Target) | Out-Null
                 $note = 'provenance / 坐标 / Icon / 结构 全部通过'
             }
@@ -762,7 +753,7 @@ foreach ($step in $Steps) {
         if ($Overwrite) { $resumeArgs += '-Overwrite' }
         if ($AllowEmptyLedger) { $resumeArgs += '-AllowEmptyLedger' }
         if ($ConfigPath) { $resumeArgs += "-ConfigPath `"$ConfigPath`"" }
-        Write-Output ("   修好后从这一步继续：pwsh -NoProfile -File _tool\run-all.ps1 {0} -Progress {1}" -f ($resumeArgs -join ' '), $step.Name)
+    Write-Output ("   修好后从这一步继续：pwsh -NoProfile -File <skill>\scripts\entry\run-all.ps1 {0} -Progress {1}" -f ($resumeArgs -join ' '), $step.Name)
         Write-Output ''
         Write-Output '--- 本区间进度 ---'
         $results | ForEach-Object { '{0,2} {1,-10} {2,-7} {3,6}s' -f $_.Id, $_.Name, $_.Status, $_.Seconds }
@@ -795,7 +786,7 @@ if ($EndStep.Id -eq 6) {
     # 这一步只能读已存在的草稿：产物化的 Generated\<Target>.mapping.json 与 layout-manifest 分别到第 10 / 8 步才有。
     # 带 --page-name 时该脚本会用生成器的同一套派生链，列出「派生不出语义键、必须补术语表」的文案——
     # 漏掉它们只会到第 11 步门禁才失败，整段返工。
-    $LangCmd = "node `"$PSScriptRoot\list-lang-sources.mjs`" `"$DraftMappingJson`" --page-name $Target"
+    $LangCmd = "node `"$(Join-Path $ScriptsFolder 'adapters/mtslg-iocontrol/list-lang-sources.mjs')`" `"$DraftMappingJson`" --page-name $Target"
     if (Test-Path -LiteralPath $TranslationsJson) { $LangCmd += " --translations `"$TranslationsJson`"" }
     if (Test-Path -LiteralPath $GlossaryJson) { $LangCmd += " --glossary `"$GlossaryJson`"" }
     Write-Output ("  3) 枚举本页文案，并同一次列出「必须补术语表」的文案：")

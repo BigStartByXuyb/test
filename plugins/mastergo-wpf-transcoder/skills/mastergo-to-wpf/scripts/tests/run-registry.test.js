@@ -12,7 +12,7 @@ const os = require("os");
 const path = require("path");
 const { spawnSync } = require("child_process");
 
-const cli = path.join(__dirname, "..", "run-registry.mjs");
+const cli = path.join(__dirname, "..", "core", "run-registry.mjs");
 const registry = require(path.join(__dirname, "..", "lib", "run-registry.js"));
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "mastergo-run-registry-"));

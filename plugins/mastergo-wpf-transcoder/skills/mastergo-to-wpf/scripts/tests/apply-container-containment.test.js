@@ -9,7 +9,7 @@ const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
 
-const script = path.join(__dirname, '..', 'apply-container-containment.js');
+const script = path.join(__dirname, '..', 'adapters/mtslg-iocontrol', 'apply-container-containment.js');
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'containment-'));
 
 const templateMap = path.join(dir, 'map.json');

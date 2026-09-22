@@ -19,11 +19,14 @@ import { fileURLToPath } from "node:url";
 
 // 步骤契约的读取只有一份实现（lib/pipeline-steps.js，走 run-all.ps1 -OutFile 的文件通道，
 // 绕开控制台代码页）；本脚本与回归测试都从这里取，避免"生成器读一套、测试读另一套"。
-const { loadPipelineSteps } = createRequire(import.meta.url)("./lib/pipeline-steps.js");
+const { loadPipelineSteps } = createRequire(import.meta.url)("../lib/pipeline-steps.js");
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const SKILL_ROOT = path.resolve(HERE, "..");
-const RUN_ALL = path.join(HERE, "run-all.ps1");
+// 本文件在 scripts/core/ 下：脚本根是它的父目录，skill 根再上一层；
+// 编排入口 run-all.ps1 在 scripts/entry/。
+const SCRIPTS_ROOT = path.resolve(HERE, "..");
+const SKILL_ROOT = path.resolve(SCRIPTS_ROOT, "..");
+const RUN_ALL = path.join(SCRIPTS_ROOT, "entry", "run-all.ps1");
 const DEFAULT_OUT = path.join(SKILL_ROOT, "references", "adapters", "mtslg-iocontrol", "pipeline-contract.md");
 
 function parseArgs(argv) {

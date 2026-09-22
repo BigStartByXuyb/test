@@ -1,5 +1,5 @@
 $ErrorActionPreference = 'Stop'
-$runAll = Join-Path $PSScriptRoot '..\run-all.ps1'
+$runAll = Join-Path $PSScriptRoot '..\entry\run-all.ps1'
 $root = Join-Path ([IO.Path]::GetTempPath()) "mastergo-resume-identity-$([guid]::NewGuid().ToString('N'))"
 
 function Assert-True {

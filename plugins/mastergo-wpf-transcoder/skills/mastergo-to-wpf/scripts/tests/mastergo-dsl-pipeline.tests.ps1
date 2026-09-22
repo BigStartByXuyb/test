@@ -1,5 +1,5 @@
 $ErrorActionPreference = 'Stop'
-$pipeline = Join-Path $PSScriptRoot '..\mastergo-dsl-pipeline.ps1'
+$pipeline = Join-Path $PSScriptRoot '..\core\mastergo-dsl-pipeline.ps1'
 $skill = Join-Path $PSScriptRoot '..\..\SKILL.md'
 $root = Join-Path ([IO.Path]::GetTempPath()) "mastergo-dsl-capture-$([guid]::NewGuid().ToString('N'))"
 

@@ -8,7 +8,7 @@ const path = require("path");
 const {
   loadTemplateMap,
   resolveTemplateMapping
-} = require("../resolve-mtslg-template-mapping.js");
+} = require("../adapters/mtslg-iocontrol/resolve-mtslg-template-mapping.js");
 
 const mapPath = path.join(__dirname, "..", "..", "references", "adapters", "mtslg-iocontrol", "mtslg-iocontrol-map.json");
 const templateMap = loadTemplateMap(mapPath);

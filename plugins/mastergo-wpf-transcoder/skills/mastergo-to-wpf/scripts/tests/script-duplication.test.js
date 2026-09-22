@@ -14,7 +14,7 @@ const path = require("path");
 const { spawnSync } = require("child_process");
 
 const SCRIPT_DIR = path.join(__dirname, "..");
-const AUDIT = path.join(SCRIPT_DIR, "audit-script-duplication.js");
+const AUDIT = path.join(SCRIPT_DIR, "core", "audit-script-duplication.js");
 const REGISTRY = path.join(SCRIPT_DIR, "lib", "script-reuse-registry.json");
 
 function runAudit(args) {
@@ -58,15 +58,24 @@ assert.match(noReason.stderr, /必须写 reason/);
 
 // 6) 共享模块必须真的被需要的脚本 require（抽了 lib 又抄回脚本里 = 违规）。
 const requiredBy = [
-  ["lib/project-csproj.js", ["gen-mastergo-page-bundle.js", "gen-mw-wpf-page.js"]],
-  ["lib/iocontrol-map-rules.js", ["gen-iocontrol-xml.js", "validate-iocontrol-provenance.js"]],
-  ["lib/mastergo-rules.js", ["gen-mtslg-mapping-from-dsl.js", "apply-container-containment.js"]],
+  ["lib/project-csproj.js", ["entry/gen-mastergo-page-bundle.js", "host/gen-mw-wpf-page.js"]],
+  ["adapters/mtslg-iocontrol/lib/iocontrol-map-rules.js",
+    ["adapters/mtslg-iocontrol/gen-iocontrol-xml.js", "adapters/mtslg-iocontrol/validate-iocontrol-provenance.js"]],
+  ["adapters/mtslg-iocontrol/lib/icon-ownership.js",
+    ["adapters/mtslg-iocontrol/gen-mtslg-mapping-from-dsl.js", "adapters/mtslg-iocontrol/discover-mtslg-page-icon-map.js"]],
+  ["adapters/mtslg-iocontrol/lib/icon-registration-policy.js",
+    ["adapters/mtslg-iocontrol/discover-mtslg-page-icon-map.js", "adapters/mtslg-iocontrol/build-icon-ledger.mjs"]],
+  ["lib/mastergo-rules.js",
+    ["adapters/mtslg-iocontrol/gen-mtslg-mapping-from-dsl.js", "adapters/mtslg-iocontrol/apply-container-containment.js"]],
   ["lib/script-helpers.js", [
-    "gen-mastergo-page-bundle.js", "gen-mw-wpf-page.js", "gen-mtslg-layout.js",
-    "gen-mtslg-layout-manifest.js", "gen-mtslg-page-icons.js", "discover-mtslg-page-icon-map.js",
-    "gen-mtslg-lang-keys-from-dsl.js", "gen-mtslg-page-lang.js", "resolve-mastergo-visibility.js",
-    "resolve-mtslg-template-mapping.js", "gen-mtslg-mapping-from-dsl.js",
-    "apply-container-containment.js", "check-iocontrol-coords.js", "validate-iocontrol-provenance.js"
+    "entry/gen-mastergo-page-bundle.js", "host/gen-mw-wpf-page.js",
+    "adapters/mtslg-iocontrol/gen-mtslg-layout.js", "adapters/mtslg-iocontrol/gen-mtslg-layout-manifest.js",
+    "adapters/mtslg-iocontrol/gen-mtslg-page-icons.js", "adapters/mtslg-iocontrol/discover-mtslg-page-icon-map.js",
+    "adapters/mtslg-iocontrol/gen-mtslg-lang-keys-from-dsl.js", "adapters/mtslg-iocontrol/gen-mtslg-page-lang.js",
+    "core/resolve-mastergo-visibility.js",
+    "adapters/mtslg-iocontrol/resolve-mtslg-template-mapping.js", "adapters/mtslg-iocontrol/gen-mtslg-mapping-from-dsl.js",
+    "adapters/mtslg-iocontrol/apply-container-containment.js", "adapters/mtslg-iocontrol/check-iocontrol-coords.js",
+    "adapters/mtslg-iocontrol/validate-iocontrol-provenance.js"
   ]]
 ];
 for (const [libRelative, scripts] of requiredBy) {

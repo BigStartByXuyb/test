@@ -14,7 +14,7 @@ const MAP_RULES = require('./lib/iocontrol-map-rules');
 // 数值解析的唯一实现（见 scripts/lib/script-helpers.js；本校验器与坐标核对器共用同一口径）。
 // 文案比对归一（解码字符引用 + 换行归一成 LF）的唯一实现，见 scripts/lib/script-helpers.js。
 const { numberOrNull: num, normalizeForCompare, omittedAttrs,
-  parentOuterRightEdge, textBlockLeftValue, isRightAlignedTextBlock } = require('./lib/script-helpers');
+  parentOuterRightEdge, textBlockLeftValue, isRightAlignedTextBlock } = require('../../lib/script-helpers');
 
 // 按钮族固定参数：真值来源为模板表 mtslg-iocontrol-map.json 的 buttonFamily；
 // 传入 --map 时读取该表，未传入或表缺字段时退回内置默认（与表内容一致）。

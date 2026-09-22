@@ -4,7 +4,7 @@
 const assert = require("assert");
 const fs = require("fs");
 const path = require("path");
-const { auditMappingCoverage } = require("../audit-mtslg-feishu-map.js");
+const { auditMappingCoverage } = require("../adapters/mtslg-iocontrol/audit-mtslg-feishu-map.js");
 
 const docPath = path.join(__dirname, "..", "..", "references", "adapters", "mtslg-iocontrol", "feishu-component-library-mapping.md");
 const mapPath = path.join(__dirname, "..", "..", "references", "adapters", "mtslg-iocontrol", "mtslg-iocontrol-map.json");

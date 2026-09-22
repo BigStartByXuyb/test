@@ -49,7 +49,7 @@
 const fs = require("fs");
 const path = require("path");
 // 跨脚本共用工具的唯一实现（见 scripts/lib/script-helpers.js；禁止在本脚本再抄一份）。
-const { readJson } = require(path.join(__dirname, "lib", "script-helpers.js"));
+const { readJson } = require(path.join(__dirname, "..", "..", "lib", "script-helpers.js"));
 // 图标归属判据的唯一实现（见 scripts/lib/icon-ownership.js；禁止在本脚本再抄一份）。
 const ICON_OWNERSHIP = require(path.join(__dirname, "lib", "icon-ownership.js"));
 // 登记判据的唯一实现（见 scripts/lib/icon-registration-policy.js；禁止在本脚本再抄一份）。

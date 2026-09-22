@@ -11,7 +11,7 @@ const os = require("os");
 const path = require("path");
 const { spawnSync } = require("child_process");
 
-const script = path.join(__dirname, "..", "scan-icon-coords.js");
+const script = path.join(__dirname, "..", "adapters/mtslg-iocontrol", "scan-icon-coords.js");
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "mastergo-icon-coords-"));
 
 // 1) 现行形态 + 一个未归一化的图标（最小坐标 -40）

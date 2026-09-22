@@ -10,21 +10,24 @@ const path = require("path");
 const { spawnSync } = require("child_process");
 
 const SCRIPT_DIR = __dirname;
-const XML_SCRIPT = path.join(SCRIPT_DIR, "gen-iocontrol-xml.js");
-const ICON_SCRIPT = path.join(SCRIPT_DIR, "gen-mtslg-page-icons.js");
-const LAYOUT_SCRIPT = path.join(SCRIPT_DIR, "gen-mtslg-layout.js");
-const HOST_SCRIPT = path.join(SCRIPT_DIR, "gen-mw-wpf-page.js");
-const PROVENANCE_SCRIPT = path.join(SCRIPT_DIR, "validate-iocontrol-provenance.js");
-const COORDS_SCRIPT = path.join(SCRIPT_DIR, "check-iocontrol-coords.js");
-const MAPPING_SCRIPT = path.join(SCRIPT_DIR, "gen-mtslg-mapping-from-dsl.js");
-const TEMPLATE_RESOLVER_SCRIPT = path.join(SCRIPT_DIR, "resolve-mtslg-template-mapping.js");
-const ICON_DISCOVERY_SCRIPT = path.join(SCRIPT_DIR, "discover-mtslg-page-icon-map.js");
-const CONTAINMENT_SCRIPT = path.join(SCRIPT_DIR, "apply-container-containment.js");
-const LANG_SCRIPT = path.join(SCRIPT_DIR, "gen-mtslg-page-lang.js");
-const LANG = require("./gen-mtslg-page-lang");
-const LANG_KEYS_SCRIPT = path.join(SCRIPT_DIR, "gen-mtslg-lang-keys-from-dsl.js");
-const LANG_KEYS = require("./gen-mtslg-lang-keys-from-dsl");
-const DEFAULT_TEMPLATE_MAP = path.resolve(SCRIPT_DIR, "..", "references", "adapters", "mtslg-iocontrol", "mtslg-iocontrol-map.json");
+// 脚本按职责分桶：本文件在 entry/，生成器分别在 adapters/<路线>/ 与 host/。
+const ADAPTER_IOCONTROL_DIR = path.join(SCRIPT_DIR, "..", "adapters", "mtslg-iocontrol");
+const HOST_DIR = path.join(SCRIPT_DIR, "..", "host");
+const XML_SCRIPT = path.join(ADAPTER_IOCONTROL_DIR, "gen-iocontrol-xml.js");
+const ICON_SCRIPT = path.join(ADAPTER_IOCONTROL_DIR, "gen-mtslg-page-icons.js");
+const LAYOUT_SCRIPT = path.join(ADAPTER_IOCONTROL_DIR, "gen-mtslg-layout.js");
+const HOST_SCRIPT = path.join(HOST_DIR, "gen-mw-wpf-page.js");
+const PROVENANCE_SCRIPT = path.join(ADAPTER_IOCONTROL_DIR, "validate-iocontrol-provenance.js");
+const COORDS_SCRIPT = path.join(ADAPTER_IOCONTROL_DIR, "check-iocontrol-coords.js");
+const MAPPING_SCRIPT = path.join(ADAPTER_IOCONTROL_DIR, "gen-mtslg-mapping-from-dsl.js");
+const TEMPLATE_RESOLVER_SCRIPT = path.join(ADAPTER_IOCONTROL_DIR, "resolve-mtslg-template-mapping.js");
+const ICON_DISCOVERY_SCRIPT = path.join(ADAPTER_IOCONTROL_DIR, "discover-mtslg-page-icon-map.js");
+const CONTAINMENT_SCRIPT = path.join(ADAPTER_IOCONTROL_DIR, "apply-container-containment.js");
+const LANG_SCRIPT = path.join(ADAPTER_IOCONTROL_DIR, "gen-mtslg-page-lang.js");
+const LANG = require("../adapters/mtslg-iocontrol/gen-mtslg-page-lang.js");
+const LANG_KEYS_SCRIPT = path.join(ADAPTER_IOCONTROL_DIR, "gen-mtslg-lang-keys-from-dsl.js");
+const LANG_KEYS = require("../adapters/mtslg-iocontrol/gen-mtslg-lang-keys-from-dsl.js");
+const DEFAULT_TEMPLATE_MAP = path.resolve(SCRIPT_DIR, "..", "..", "references", "adapters", "mtslg-iocontrol", "mtslg-iocontrol-map.json");
 const NEW_PAGE_MAPPING_TAG = "新页面完整DSL映射";
 
 // MTSLG 页面产物路径约定（与目标项目真实结构一致）：
@@ -44,12 +47,12 @@ function pageLangPaths(pageName, locales) {
 }
 
 // 跨脚本共用工具的唯一实现（见 scripts/lib/script-helpers.js；禁止在本脚本再抄一份）。
-const { fail, xmlAttr, readJson, backupFile } = require(path.join(SCRIPT_DIR, "lib", "script-helpers.js"));
+const { fail, xmlAttr, readJson, backupFile } = require(path.join(SCRIPT_DIR, "..", "lib", "script-helpers.js"));
 // 坐标核对输入的构建唯一实现（见 scripts/lib/coord-nodes.js）。
-const { buildCoordNodes } = require(path.join(SCRIPT_DIR, "lib", "coord-nodes.js"));
-const { inferHostPaths } = require(path.join(SCRIPT_DIR, "lib", "project-csproj.js"));
+const { buildCoordNodes } = require(path.join(SCRIPT_DIR, "..", "lib", "coord-nodes.js"));
+const { inferHostPaths } = require(path.join(SCRIPT_DIR, "..", "lib", "project-csproj.js"));
 // 运行登记表的唯一实现（见 scripts/lib/run-registry.js；禁止在本脚本再抄一份）。
-const RUN_REGISTRY = require(path.join(SCRIPT_DIR, "lib", "run-registry.js"));
+const RUN_REGISTRY = require(path.join(SCRIPT_DIR, "..", "lib", "run-registry.js"));
 
 function parseArgs(argv) {
   let manifestPath = null;

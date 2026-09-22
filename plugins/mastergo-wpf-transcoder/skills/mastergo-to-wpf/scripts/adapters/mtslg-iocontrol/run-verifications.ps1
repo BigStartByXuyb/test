@@ -7,14 +7,9 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-# 两种布局都要能跑：插件布局（脚本在 <plugin>/skills/mastergo-to-wpf/scripts/）与项目布局（<project>/_tool/）。
-$pluginLayout = -not (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'mastergo-to-wpf'))
-if (-not $SkillRoot) {
-    $SkillRoot = if ($pluginLayout) { Split-Path -Parent $PSScriptRoot } else { Join-Path $ProjectRoot '_tool\mastergo-to-wpf' }
-}
-if (-not $ProjectRoot) {
-    $ProjectRoot = if ($pluginLayout) { (Get-Location).Path } else { Split-Path -Parent $PSScriptRoot }
-}
+# 本文件在 <skill>/scripts/adapters/mtslg-iocontrol/ 下：skill 根是上三层，工作目录即目标项目。
+if (-not $SkillRoot) { $SkillRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) }
+if (-not $ProjectRoot) { $ProjectRoot = (Get-Location).Path }
 if (-not $Page) {
     $registry = Join-Path $ProjectRoot 'docs\page-registry.json'
     if (-not (Test-Path -LiteralPath $registry)) { throw "缺少 $registry，无法确定页面名；请用 -Page 指定" }
@@ -42,18 +37,18 @@ function Invoke-Step {
 }
 
 Invoke-Step -Name 'provenance' -File '1-provenance.log' -Body {
-    node (Join-Path $SkillRoot 'scripts\validate-iocontrol-provenance.js') --xml $pageXml --mapping $mapping --map $templateMap
+    node (Join-Path $PSScriptRoot 'validate-iocontrol-provenance.js') --xml $pageXml --mapping $mapping --map $templateMap
 }
 
 Invoke-Step -Name 'coords' -File '2-coords.log' -Body {
     $coords = Join-Path $ProjectRoot 'Generated\_work\coords.json'
-    # 外层辅助脚本与 run-verifications.ps1 同目录（插件布局在 scripts/、项目布局在 _tool/）
+    # 这几个校验脚本与 run-verifications.ps1 同目录。
     node (Join-Path $PSScriptRoot 'check-coords.mjs') $mapping $coords | Out-Null
-    node (Join-Path $SkillRoot 'scripts\check-iocontrol-coords.js') --xml $pageXml --nodes $coords
+    node (Join-Path $PSScriptRoot 'check-iocontrol-coords.js') --xml $pageXml --nodes $coords
 }
 
 Invoke-Step -Name 'icon-coords' -File '3-icon-coords.log' -Body {
-    node (Join-Path $SkillRoot 'scripts\scan-icon-coords.js') $iconXaml
+    node (Join-Path $PSScriptRoot 'scan-icon-coords.js') $iconXaml
 }
 
 Invoke-Step -Name 'structure' -File '4-structure.log' -Body {

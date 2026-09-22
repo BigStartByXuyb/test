@@ -58,7 +58,7 @@ function parseArgs(argv) {
 }
 
 // 跨脚本共用工具的唯一实现（见 scripts/lib/script-helpers.js；禁止在本脚本再抄一份）。
-const fail = require(require("path").join(__dirname, "lib", "script-helpers.js")).failAndExit(2);
+const fail = require(require("path").join(__dirname, "..", "lib", "script-helpers.js")).failAndExit(2);
 
 let args;
 try { args = parseArgs(process.argv.slice(2)); }

@@ -3,7 +3,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { validate, validateTextAudit } = require('../validate-iocontrol-provenance');
+const { validate, validateTextAudit } = require('../adapters/mtslg-iocontrol/validate-iocontrol-provenance');
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'iocontrol-provenance-'));
 const xmlPath = path.join(dir, 'bad.xml');
@@ -195,7 +195,7 @@ if (!numericTextResult.errors.some(x => /TextBlock 的 expectedWidth 必须固�
 // 按钮族规则改为读模板表（--map）：表里要求额外属性时，校验必须跟着变严
 const assert = require('assert');
 const { spawnSync } = require('child_process');
-const cliScript = path.join(__dirname, '..', 'validate-iocontrol-provenance.js');
+const cliScript = path.join(__dirname, '..', 'adapters/mtslg-iocontrol', 'validate-iocontrol-provenance.js');
 const cliXmlPath = path.join(dir, 'button-cli.xml');
 const cliMappingPath = path.join(dir, 'button-cli-mapping.json');
 const cliTemplateMapPath = path.join(dir, 'button-cli-template-map.json');

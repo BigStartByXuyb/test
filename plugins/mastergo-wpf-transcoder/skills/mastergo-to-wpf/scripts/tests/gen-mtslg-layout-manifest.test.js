@@ -7,7 +7,7 @@ const os = require("os");
 const path = require("path");
 const { spawnSync } = require("child_process");
 
-const script = path.join(__dirname, "..", "gen-mtslg-layout-manifest.js");
+const script = path.join(__dirname, "..", "adapters/mtslg-iocontrol", "gen-mtslg-layout-manifest.js");
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "mtslg-layout-manifest-"));
 
 function text(text, id) {
@@ -260,7 +260,7 @@ assert.strictEqual(unknownManifest.layoutEvidence.unresolvedBottomBarItems, 1,
 assert.match(unknownManifest.layoutEvidence.note, /未登记按钮/, "证据里要能看出是哪个实例没识别");
 assert.deepStrictEqual(unknownManifest.menuItems.map((item) => item.sourceRef), ["42:8/bar/1"]);
 // Layout 生成器：未决项非 0 时直接拒绝，避免静默少一个按钮
-const layoutScript = path.join(__dirname, "..", "gen-mtslg-layout.js");
+const layoutScript = path.join(__dirname, "..", "adapters/mtslg-iocontrol", "gen-mtslg-layout.js");
 const unknownLayoutRun = spawnSync(process.execPath, [layoutScript, "--manifest", unknownOut, "--map", path.join(root, "map.json")], { encoding: "utf8" });
 assert.notStrictEqual(unknownLayoutRun.status, 0, "存在未决底部栏组件时必须拒绝生成 Layout");
 assert.match(unknownLayoutRun.stderr + unknownLayoutRun.stdout, /未决底部栏组件/, "失败信息必须指出未决底部栏组件");

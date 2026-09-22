@@ -15,9 +15,9 @@ const { loadPipelineSteps } = require(path.join(__dirname, "..", "lib", "pipelin
 
 const SCRIPTS = path.join(__dirname, "..");
 const SKILL = path.join(SCRIPTS, "..");
-const GENERATOR = path.join(SCRIPTS, "gen-pipeline-contract.mjs");
+const GENERATOR = path.join(SCRIPTS, "core", "gen-pipeline-contract.mjs");
 const CONTRACT_DOC = path.join(SKILL, "references", "adapters", "mtslg-iocontrol", "pipeline-contract.md");
-const RUN_ALL = path.join(SCRIPTS, "run-all.ps1");
+const RUN_ALL = path.join(SCRIPTS, "entry", "run-all.ps1");
 
 const runAllSource = fs.readFileSync(RUN_ALL, "utf8");
 const contractDoc = fs.readFileSync(CONTRACT_DOC, "utf8");

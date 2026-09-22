@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
 
-const { buildCoordNodes } = createRequire(import.meta.url)("./lib/coord-nodes.js");
+const { buildCoordNodes } = createRequire(import.meta.url)("../../lib/coord-nodes.js");
 
 const [mappingFile, outFile] = process.argv.slice(2);
 if (!mappingFile || !outFile) {

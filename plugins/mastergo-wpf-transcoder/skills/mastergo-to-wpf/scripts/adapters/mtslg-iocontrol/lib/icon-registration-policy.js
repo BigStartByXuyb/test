@@ -30,7 +30,7 @@
 //     unregistered-variant            命中实例但映射表里查不到该变体 → 不登记并列入人工核对（映射表缺登记）
 //     variant-without-icon-policy     变体已登记、但漏登记 iconPolicy → 不登记并列入人工核对（映射表漏字段）
 
-const { isHostShellName } = require("./mastergo-rules.js");
+const { isHostShellName } = require("../../../lib/mastergo-rules.js");
 // 变体归属判据的唯一实现（见 resolve-mtslg-template-mapping.js；缺失时 componentInstances 没有 variant 字段）。
 const { resolveInstanceVariant } = require("../resolve-mtslg-template-mapping.js");
 

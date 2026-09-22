@@ -29,7 +29,7 @@
 - 没有目标项目键时，允许使用页面内唯一的临时 Geometry 键，状态标记 `provisional` 并保留 `sourceId` / `sourceRef`；临时键必须写入 mapping/manifest。
 - 只有未被任何实际 Icon 槽位引用的 PATH 候选才进入 `candidates` / `unmapped`，不进入 XAML。XAML 注释只写中文名称，溯源与 `keyStatus` 写入 mapping/manifest。
 
-**哪些图形要进本页台账（结论由脚本给出，本表只解释依据）**：判据是「该图形是否被本页某个 Icon 槽位引用」。这条结论由 `discover-mtslg-page-icon-map.js` **机械给出**：每条候选带 `registration.register`（要不要登记）、`registration.basis`（判据名）、`registration.source`（真值源里的具体登记项），输出的 `mustName` 就是命名表**必须恰好覆盖**的候选下标；`build-icon-ledger.mjs` 按它双向门禁——漏定名（槽位引用了却没登记）与多定名（没有任何槽位引用却登记，变成 `Icons.xaml` 里的死资源）都直接失败。判据的唯一实现在 `scripts/lib/icon-registration-policy.js`，取值全部读 `mtslg-iocontrol-map.json`（各变体的 `iconPolicy`、`layoutRules.bottomBar` 下的变体名 / 常驻分组模式 / 装饰名模式）与 `scripts/lib/mastergo-rules.js` 的宿主壳标记词：**本表不复制这些清单，也不要求人工再推一遍**。
+**哪些图形要进本页台账（结论由脚本给出，本表只解释依据）**：判据是「该图形是否被本页某个 Icon 槽位引用」。这条结论由 `discover-mtslg-page-icon-map.js` **机械给出**：每条候选带 `registration.register`（要不要登记）、`registration.basis`（判据名）、`registration.source`（真值源里的具体登记项），输出的 `mustName` 就是命名表**必须恰好覆盖**的候选下标；`build-icon-ledger.mjs` 按它双向门禁——漏定名（槽位引用了却没登记）与多定名（没有任何槽位引用却登记，变成 `Icons.xaml` 里的死资源）都直接失败。判据的唯一实现在 `scripts/adapters/mtslg-iocontrol/lib/icon-registration-policy.js`，取值全部读 `mtslg-iocontrol-map.json`（各变体的 `iconPolicy`、`layoutRules.bottomBar` 下的变体名 / 常驻分组模式 / 装饰名模式）与 `scripts/lib/mastergo-rules.js` 的宿主壳标记词：**本表不复制这些清单，也不要求人工再推一遍**。
 
 结论只有两条依据（"谁会把图形写进产物"），理解这两条即可：
 
@@ -137,7 +137,7 @@ Bundle 的固定调用顺序：模板解析 → **容器嵌套重挂（`apply-co
 
 ## 5. 可见性 omit 角色
 
-`decision=omit` 有两条路径，真值源都是 `scripts/validate-iocontrol-provenance.js`：
+`decision=omit` 有两条路径，真值源都是 `scripts/adapters/mtslg-iocontrol/validate-iocontrol-provenance.js`：
 
 - **明确 hidden**：`visibility=false` 的文本按可见性 omit，`omitReason='hidden'`（登记在 `OMIT_REASONS`）。
 - **角色驱动 omit**：可见文本按 `role` 省略，`role` 必须落在 `OMIT_ROLES` 集合内；不在集合内时校验直接拒绝。新增任何一种 omit 角色都必须同时登记进该集合，并在本节同步说明。
@@ -147,7 +147,7 @@ Bundle 的固定调用顺序：模板解析 → **容器嵌套重挂（`apply-co
 | 角色 | 含义 |
 |---|---|
 | `page-title` | 页面根级 / 工件级大标题 |
-| `host-shell` | 宿主公共栏的**文本**：顶部宿主栏的区域文本，以及**底部栏的菜单文案**（底部栏文案由 Layout `MenuItem` 的 Name 承载，不产页面内容节点）。**只管文本**——底部栏 MenuItem 的**图标**是页面级资源，要登记进本页台账与 `Icons.xaml`，见第 2 节。判定方式：标记词清单登记在 `scripts/lib/mastergo-rules.js` 的 `HOST_SHELL_NAME_MARKERS`（清单以该常量为准，本表不复制），由 `isInHostShell` **沿祖先链逐级取名字**，**任一祖先的名字包含标记词即命中**——不是比对某个固定图层名，所以"名字里带某个词"本身就是命中条件。调用点有 `gen-mtslg-mapping-from-dsl.js`（写文本 role）、`apply-container-containment.js`（容器归属）与登记判据 `scripts/lib/icon-registration-policy.js`（宿主公共栏的**图形**不登记）。**顺序是关键**：登记判据先判模板族与布局族的变体命中，宿主壳标记只在**不属于模板族也不属于布局族**时才生效——所以"祖先名命中标记 → 文本 omit"不会连带把底部栏菜单图标排除（右下角常驻分组另由 `layoutRules.bottomBar.residentGroupPattern` 判成不登记） |
+| `host-shell` | 宿主公共栏的**文本**：顶部宿主栏的区域文本，以及**底部栏的菜单文案**（底部栏文案由 Layout `MenuItem` 的 Name 承载，不产页面内容节点）。**只管文本**——底部栏 MenuItem 的**图标**是页面级资源，要登记进本页台账与 `Icons.xaml`，见第 2 节。判定方式：标记词清单登记在 `scripts/lib/mastergo-rules.js` 的 `HOST_SHELL_NAME_MARKERS`（清单以该常量为准，本表不复制），由 `isInHostShell` **沿祖先链逐级取名字**，**任一祖先的名字包含标记词即命中**——不是比对某个固定图层名，所以"名字里带某个词"本身就是命中条件。调用点有 `gen-mtslg-mapping-from-dsl.js`（写文本 role）、`apply-container-containment.js`（容器归属）与登记判据 `scripts/adapters/mtslg-iocontrol/lib/icon-registration-policy.js`（宿主公共栏的**图形**不登记）。**顺序是关键**：登记判据先判模板族与布局族的变体命中，宿主壳标记只在**不属于模板族也不属于布局族**时才生效——所以"祖先名命中标记 → 文本 omit"不会连带把底部栏菜单图标排除（右下角常驻分组另由 `layoutRules.bottomBar.residentGroupPattern` 判成不登记） |
 | `excluded-component` | 被 `manifest.excludeInstances` 隔离的组件内部文本 |
 | `unmapped-component` | 未命中正式模板的组件内部文本 |
 | `camera-viewport-internal` | 相机视口内部整体渲染内容（映射表 `cameraTemplates.innerTextPolicy`） |

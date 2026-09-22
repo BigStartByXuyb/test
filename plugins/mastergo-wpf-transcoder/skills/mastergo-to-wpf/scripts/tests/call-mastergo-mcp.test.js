@@ -8,7 +8,7 @@ const os = require("os");
 const path = require("path");
 const { spawnSync } = require("child_process");
 
-const script = path.join(__dirname, "..", "call-mastergo-mcp.js");
+const script = path.join(__dirname, "..", "core", "call-mastergo-mcp.js");
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "mastergo-mcp-call-"));
 
 const PAYLOAD_MARKER = "PAYLOAD_MARKER_SHOULD_NOT_APPEAR_IN_CONTEXT";

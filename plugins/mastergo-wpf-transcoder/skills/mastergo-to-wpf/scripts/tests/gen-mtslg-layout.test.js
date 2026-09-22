@@ -7,7 +7,7 @@ const os = require("os");
 const path = require("path");
 const { spawnSync } = require("child_process");
 
-const script = path.join(__dirname, "..", "gen-mtslg-layout.js");
+const script = path.join(__dirname, "..", "adapters/mtslg-iocontrol", "gen-mtslg-layout.js");
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "mtslg-layout-"));
 const manifest = path.join(root, "layout.json");
 const layout = path.join(root, "Layout.xml");

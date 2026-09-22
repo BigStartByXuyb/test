@@ -17,10 +17,11 @@ const { spawnSync } = require("child_process");
 const SCRIPT_DIR = path.join(__dirname, "..");
 const HELPERS = path.join(SCRIPT_DIR, "lib", "script-helpers.js");
 const MAP = path.join(SCRIPT_DIR, "..", "references", "adapters", "mtslg-iocontrol", "mtslg-iocontrol-map.json");
-const LANG_KEYS = path.join(SCRIPT_DIR, "gen-mtslg-lang-keys-from-dsl.js");
-const PAGE_LANG = path.join(SCRIPT_DIR, "gen-mtslg-page-lang.js");
-const XML_SCRIPT = path.join(SCRIPT_DIR, "gen-iocontrol-xml.js");
-const PROVENANCE = path.join(SCRIPT_DIR, "validate-iocontrol-provenance.js");
+const ADAPTER = path.join(SCRIPT_DIR, "adapters", "mtslg-iocontrol");
+const LANG_KEYS = path.join(ADAPTER, "gen-mtslg-lang-keys-from-dsl.js");
+const PAGE_LANG = path.join(ADAPTER, "gen-mtslg-page-lang.js");
+const XML_SCRIPT = path.join(ADAPTER, "gen-iocontrol-xml.js");
+const PROVENANCE = path.join(ADAPTER, "validate-iocontrol-provenance.js");
 
 const { normalizeNewlines, langValueText, decodeXmlEntities, normalizeForCompare, xmlAttr, xmlElementText } = require(HELPERS);
 

@@ -119,9 +119,9 @@ description: 强制规范 MasterGo → MTSLG IOContorl 映射文档的写法，�
 
 新增、修改或删除**任意一条映射**时，下列位置要在同一批改动里保持一致；只改其中一处就等于制造漂移，而漂移不会立刻报错，只会在后续页面生成时才暴露。第 1~5 项是硬性要求；第 6 项按发版节奏处理，不阻塞本次改动：
 
-1. **机器真值源**：`skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/mtslg-iocontrol-map.json`（以插件根为基准）——模板族结构、`match`（一族一键，键的种类以各族 `match` 为准；`componentName` 只用于 Layout 层的底部栏）、`variants` 真实属性值、`controlTypeRequiredAttrs` 必写字段、按钮族 `iconSize` 等。同一个「匹配属性名 + 属性值」只能登记在一个模板族。**新增的是"族"（带 `variants` 的新 `*Templates`）时，下面两项一并完成，缺一项就不算同步完成**：① 在 `skills/mastergo-to-wpf/scripts/gen-mtslg-mapping-from-dsl.js` 写出该族的发射分支（`match.family === …`），并把族名登记进该文件的 `SUPPORTED_TEMPLATE_FAMILIES`；② 跑 `skills/mastergo-to-wpf/scripts/tests/template-family-coverage.test.js`——它与映射表**双向**比对族集合，并逐个确认非兜底族真有发射分支（只登记不写分支同样失败）。覆盖审计看不到生成器这一层，所以它不能替代这两项。
+1. **机器真值源**：`skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/mtslg-iocontrol-map.json`（以插件根为基准）——模板族结构、`match`（一族一键，键的种类以各族 `match` 为准；`componentName` 只用于 Layout 层的底部栏）、`variants` 真实属性值、`controlTypeRequiredAttrs` 必写字段、按钮族 `iconSize` 等。同一个「匹配属性名 + 属性值」只能登记在一个模板族。**新增的是"族"（带 `variants` 的新 `*Templates`）时，下面两项一并完成，缺一项就不算同步完成**：① 在 `skills/mastergo-to-wpf/scripts/adapters/mtslg-iocontrol/gen-mtslg-mapping-from-dsl.js` 写出该族的发射分支（`match.family === …`），并把族名登记进该文件的 `SUPPORTED_TEMPLATE_FAMILIES`；② 跑 `skills/mastergo-to-wpf/scripts/tests/template-family-coverage.test.js`——它与映射表**双向**比对族集合，并逐个确认非兜底族真有发射分支（只登记不写分支同样失败）。覆盖审计看不到生成器这一层，所以它不能替代这两项。
 2. **人读口径**：本规范约束的映射文档 `skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/feishu-component-library-mapping.md`——按上面的层级、匹配规则、固定模板和 XML 格式补齐同一条映射。
-3. **覆盖审计对文档的写法要求**：审计脚本 `skills/mastergo-to-wpf/scripts/audit-mtslg-feishu-map.js` 的文档侧期望值**全部从映射文档解析**，不再有手写清单（因此新增/改名/删除族或变体时**不需要**去改审计脚本）。它认这些结构化写法：`MasterGo 变体：A、B、C` 行、`### 固定模板：<键>=<值>` 与 `### 待确认变体：…` 标题（值里用 `、，,/` 列举）。标题键分四类：`变体=` / `属性 1=` / `按钮类型=` 段是**变体值**（解析不到映射表就是文档凭空多写，报 `unregisteredVariants`）；`组件集=` / `聚合集合=` / `独立组件=` 段是**章节名**（解析不到时看同组有没有别的变体锚定，整组都没有才报孤儿章节）；`结构分支=` 段是**结构分支名**，一律算标签、不参与变体判定（映射表的每个变体仍必须出现在文档正文，`undocumented` 方向照查，所以它不是绕过路径）；**其余未登记的键（如 `父节点=`）一律把取值报进 `unregisteredVariants`**，提示改成合规标题。因此**新增组件集/变体时必须在这份文档里用上述形式写明**，否则该变体在"文档 → 映射表"方向不可见；只写在散文里会被当成标签，解析不到就被 `unregisteredVariants` 报出。凡本 Skill、映射文档或其他脚本里**逐个列举变体/组件名**的地方（含本节与「匹配键」一节的举例），都按同一批改动同步；能改成"以映射表 `variants` / `match` 为准"的表述就不要复制清单。
+3. **覆盖审计对文档的写法要求**：审计脚本 `skills/mastergo-to-wpf/scripts/adapters/mtslg-iocontrol/audit-mtslg-feishu-map.js` 的文档侧期望值**全部从映射文档解析**，不再有手写清单（因此新增/改名/删除族或变体时**不需要**去改审计脚本）。它认这些结构化写法：`MasterGo 变体：A、B、C` 行、`### 固定模板：<键>=<值>` 与 `### 待确认变体：…` 标题（值里用 `、，,/` 列举）。标题键分四类：`变体=` / `属性 1=` / `按钮类型=` 段是**变体值**（解析不到映射表就是文档凭空多写，报 `unregisteredVariants`）；`组件集=` / `聚合集合=` / `独立组件=` 段是**章节名**（解析不到时看同组有没有别的变体锚定，整组都没有才报孤儿章节）；`结构分支=` 段是**结构分支名**，一律算标签、不参与变体判定（映射表的每个变体仍必须出现在文档正文，`undocumented` 方向照查，所以它不是绕过路径）；**其余未登记的键（如 `父节点=`）一律把取值报进 `unregisteredVariants`**，提示改成合规标题。因此**新增组件集/变体时必须在这份文档里用上述形式写明**，否则该变体在"文档 → 映射表"方向不可见；只写在散文里会被当成标签，解析不到就被 `unregisteredVariants` 报出。凡本 Skill、映射文档或其他脚本里**逐个列举变体/组件名**的地方（含本节与「匹配键」一节的举例），都按同一批改动同步；能改成"以映射表 `variants` / `match` 为准"的表述就不要复制清单。
 4. **回归用例**：在 `skills/mastergo-to-wpf/scripts/tests/` 下按需补断言（文档覆盖、模板匹配、按钮族图标字段口径、TextBlock 尺寸、坐标等）。
 5. **版本号**：`.claude-plugin/plugin.json` 递增；不要在上一轮 CI 未结束时连续推送。
 6. **在线同步副本**：发版前把映射文档同步到对应的飞书在线文档（按标题检索定位、不写死地址、整篇重建并记录 revision）。同步工具是可选项、不是交付链路的运行依赖：本机没有该工具时，在交付说明里标注"在线文档未同步"即可，不阻塞本次改动。
@@ -131,7 +131,7 @@ description: 强制规范 MasterGo → MTSLG IOContorl 映射文档的写法，�
 改完后按顺序自检，任何一步非零退出都必须修完再提交：
 
 ```text
-node skills/mastergo-to-wpf/scripts/audit-mtslg-feishu-map.js \
+node skills/mastergo-to-wpf/scripts/adapters/mtslg-iocontrol/audit-mtslg-feishu-map.js \
      skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/feishu-component-library-mapping.md \
      skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/mtslg-iocontrol-map.json
 node --test "skills/mastergo-to-wpf/scripts/tests/*.test.js"

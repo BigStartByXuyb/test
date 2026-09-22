@@ -4,7 +4,7 @@
 const fs = require("fs");
 const path = require("path");
 // 跨脚本共用工具的唯一实现（见 scripts/lib/script-helpers.js；禁止在本脚本再抄一份）。
-const helpers = require(path.join(__dirname, "lib", "script-helpers.js"));
+const helpers = require(path.join(__dirname, "..", "..", "lib", "script-helpers.js"));
 const fail = helpers.failWithPrefix("MTSLG 模板映射失败");
 const normalizeToken = helpers.normalizeToken;
 

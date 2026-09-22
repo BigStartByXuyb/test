@@ -1,18 +1,18 @@
 # MW WPF 页面壳生成器
 
-scripts/gen-mw-wpf-page.js 用一个页面清单生成独立页面的固定 WPF 宿主壳：
+scripts/host/gen-mw-wpf-page.js 用一个页面清单生成独立页面的固定 WPF 宿主壳：
 
 - UI/<area>/View/<Page>View.xaml
 - UI/<area>/View/<Page>View.xaml.cs
 - UI/<area>/ViewModel/<Page>ViewModel.cs
 
-脚本同时将这些文件，以及清单中声明的 Icon Page 和页面 XML Content，补入目标旧式 .csproj。需要一次生成 XML、Icon、Layout、WPF 宿主和审计文件时，使用 scripts/gen-mastergo-page-bundle.js；页面 XML 的控件内容和 Icon Geometry 不在本脚本中猜测，分别由 IOContorl XML 和页面 Icon 生成器从 MasterGo DSL 发射。
+脚本同时将这些文件，以及清单中声明的 Icon Page 和页面 XML Content，补入目标旧式 .csproj。需要一次生成 XML、Icon、Layout、WPF 宿主和审计文件时，使用 scripts/entry/gen-mastergo-page-bundle.js；页面 XML 的控件内容和 Icon Geometry 不在本脚本中猜测，分别由 IOContorl XML 和页面 Icon 生成器从 MasterGo DSL 发射。
 
 **code-behind 挂在同页 View.xaml 下**：注册 `.csproj` 时，`<Page>View.xaml` 与它的 `<Compile>View.xaml.cs` 写成一组嵌套条目——Compile 条目带 `<DependentUpon>View.xaml</DependentUpon>`，形态与在 Visual Studio 里把 `.xaml.cs` 拖到 `.xaml` 上之后 VS 写出的**完全一致**（Solution Explorer 里表现为 `View.xaml` 一个节点、展开出 `.xaml.cs`），不需要人工拖拽。ViewModel 没有 `.xaml` 主文件，仍发射平级 `<Compile Include="…" />`。只有 code-behind 恰好等于「View 路径 + `.cs`」时才写 `DependentUpon`；清单显式给出的 `viewPath`/`codeBehindPath` 不成对时不猜主文件。重新生成时，已存在的平级 `<Compile Include="…xaml.cs" />` 会被**就地升级**成该嵌套块（幂等：不新增、不重复）。
 
 **生成的 View 不合并页面 Icon 资源字典**：`<Page>View.xaml` 只由 `UserControl` 头 + `<Grid>` 里的 `uidesign:PageDesign` 组成，**不生成** `<UserControl.Resources><ResourceDictionary Source="/<程序集>;component/Resources/Pages/<页面名>/<页面名>Icons.xaml" /></UserControl.Resources>` 这一段。页面 Icon 文件本身仍照常生成，并按 Icon Page 注册进 `.csproj`；宿主脚本不写页面级资源合并声明。
 
-**脚本层面的精确事实与两路线的差异**：`scripts/gen-mw-wpf-page.js` 的 `renderView` **没有路线分支**——它对两条路线都恒不发射这段合并声明。因此：
+**脚本层面的精确事实与两路线的差异**：`scripts/host/gen-mw-wpf-page.js` 的 `renderView` **没有路线分支**——它对两条路线都恒不发射这段合并声明。因此：
 
 - 对**作业 B（`mtslg-iocontrol`，当前唯一启用）**：这就是最终形态，View 只输出 `UserControl` 头 + `PageDesign`；
 - 对**作业 A（`mw-wpf`，停用中）**：这是**缺口**。作业 A 页面用 `{StaticResource …Geometry}` 引用图标，`StaticResource` 加载期解析，页面自身没有合并点就会抛 `XamlParseException`（框架规则 R5）。**作业 A 重新启用前，必须给该脚本增加路线分支（或由另一生成器）为作业 A 补上本页 Icon 字典的合并点，并做加载验证**——只在文档里写"复核"不足以修复。
@@ -121,7 +121,7 @@ public class <Page>ViewModel : IOScreen, IPage
 
 ## 执行
 
-    node scripts/gen-mw-wpf-page.js --manifest .\page.json
+    node scripts/host/gen-mw-wpf-page.js --manifest .\page.json
 
 已有宿主文件不会静默覆盖。明确需要重新生成时，**必须同时满足两个条件**：清单里 `operation` 为 `replace-existing`，并显式加 `--overwrite`（只加 `--overwrite` 而清单 `operation` 仍是新建模式时，脚本会直接失败并提示 `operation=replace-existing`）：
 
@@ -130,6 +130,6 @@ public class <Page>ViewModel : IOScreen, IPage
       ...其余清单字段...
     }
 
-    node scripts/gen-mw-wpf-page.js --manifest .\page.json --overwrite
+    node scripts/host/gen-mw-wpf-page.js --manifest .\page.json --overwrite
 
 覆盖前会为已有宿主文件和被修改的 .csproj 创建 `.bak-<时间戳>` 备份；**同一目标文件只保留最近 2 份**，更早的副本在下次备份时自动删除（保留份数是 `lib/script-helpers.js` 的 `MAX_BACKUPS`，Bundle / Layout / 宿主壳三处共用同一实现）。

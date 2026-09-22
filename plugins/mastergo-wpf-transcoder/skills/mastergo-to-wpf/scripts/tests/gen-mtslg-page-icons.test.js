@@ -5,7 +5,7 @@ const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
 
-const script = path.join(__dirname, '..', 'gen-mtslg-page-icons.js');
+const script = path.join(__dirname, '..', 'adapters/mtslg-iocontrol', 'gen-mtslg-page-icons.js');
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mastergo-icons-'));
 const svgFile = path.join(dir, 'extractSvg.json');
 const mapFile = path.join(dir, 'icon-map.json');

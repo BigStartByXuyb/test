@@ -14,8 +14,8 @@ const path = require("path");
 const MAP = path.join(__dirname, "..", "..", "references", "adapters", "mtslg-iocontrol", "mtslg-iocontrol-map.json");
 const DOC_FORMAT_SKILL = path.join(__dirname, "..", "..", "..", "mastergo-iocontrol-document-format", "SKILL.md");
 const MAIN_SKILL = path.join(__dirname, "..", "..", "SKILL.md");
-const GENERATOR = path.join(__dirname, "..", "gen-iocontrol-xml.js");
-const VALIDATOR = path.join(__dirname, "..", "validate-iocontrol-provenance.js");
+const GENERATOR = path.join(__dirname, "..", "adapters/mtslg-iocontrol", "gen-iocontrol-xml.js");
+const VALIDATOR = path.join(__dirname, "..", "adapters/mtslg-iocontrol", "validate-iocontrol-provenance.js");
 const FEISHU_MAPPING = path.join(__dirname, "..", "..", "references", "adapters", "mtslg-iocontrol", "feishu-component-library-mapping.md");
 const MODE_DOC = path.join(__dirname, "..", "..", "references", "adapters", "mtslg-iocontrol", "mtslg-mode.md");
 const PAGE_BUILD_RULES = path.join(__dirname, "..", "..", "references", "adapters", "mtslg-iocontrol", "page-build-rules.md");
@@ -129,7 +129,7 @@ for (const [label, text] of [
   ["mtslg-mode.md", modeDoc],
   ["feishu-component-library-mapping.md", feishuMapping],
   ["mtslg-iocontrol-map.json（controlTypeRequiredAttrs._note）", JSON.stringify(map)],
-  ["gen-mtslg-lang-keys-from-dsl.js 头注释", fs.readFileSync(path.join(__dirname, "..", "gen-mtslg-lang-keys-from-dsl.js"), "utf8")],
+  ["gen-mtslg-lang-keys-from-dsl.js 头注释", fs.readFileSync(path.join(__dirname, "..", "adapters/mtslg-iocontrol", "gen-mtslg-lang-keys-from-dsl.js"), "utf8")],
 ]) {
   assert.ok(text.includes("产键挂") || text.includes("都产键"),
     label + " 必须写明全量多语言口径（每个设计文本 Value 都产键挂 LangName）");
@@ -181,7 +181,7 @@ assert.ok(!(required.TextBlock || []).includes("FontWeight"),
   "FontWeight 是命中才写的条件属性，不得进入 controlTypeRequiredAttrs 恒写集合");
 // 映射生成器必须从映射表读规则并实现「样式名优先 + weight 回退」；
 // 发射器只需把 FontWeight 纳入固定属性顺序（值由 mapping 携带）。
-const fontGenerator = fs.readFileSync(path.join(__dirname, "..", "gen-mtslg-mapping-from-dsl.js"), "utf8");
+const fontGenerator = fs.readFileSync(path.join(__dirname, "..", "adapters/mtslg-iocontrol", "gen-mtslg-mapping-from-dsl.js"), "utf8");
 assert.ok(fontGenerator.includes("textBlockFontWeight") && fontGenerator.includes("designFontStyleName"),
   "映射生成器必须消费 textBlockFontWeight 并解析设计稿字体样式名（designFontStyleName）");
 assert.ok(/ATTR_ORDER[\s\S]{0,600}FontWeight/.test(generator),
@@ -393,7 +393,7 @@ for (const rel of MUST_STATE_NO_PARENT_MATCH_KEY) {
 // 就会出现「文档说调用方法、脚本还在发 TODO」的两读。
 const SHELL_DOC = path.join(__dirname, "..", "..", "references", "adapters", "mw-wpf", "page-shell-generator.md");
 const shellDoc = fs.readFileSync(SHELL_DOC, "utf8");
-const hostGenerator = fs.readFileSync(path.join(__dirname, "..", "gen-mw-wpf-page.js"), "utf8");
+const hostGenerator = fs.readFileSync(path.join(__dirname, "..", "host", "gen-mw-wpf-page.js"), "utf8");
 assert.ok(shellDoc.includes("按钮处理方法（一钮一方法）"), "页面壳文档必须登记「按钮处理方法（一钮一方法）」小节");
 for (const token of ["langName", "MenuItem", "MenuItemIndex"]) {
   assert.ok(shellDoc.includes(token), "页面壳文档必须写明按钮方法名取值链里的 " + token);
@@ -469,10 +469,10 @@ console.log("PASS 已作废表述（父节点语义匹配键 / parentVariants）
 // 单一真值源是映射表 tableTemplates；生成器 / 发射器 / 校验器 / 编排器 / 四份文档必须同口径。
 // 背景：表格在组件库里没有组件集（设计稿里只是 GROUP），命中口径、列几何与行数据处置
 // 一处分叉就会出现「文档说发射控件、脚本说行是数据」这类两读，因此在这里逐项钉死。
-const mappingGenerator = fs.readFileSync(path.join(__dirname, "..", "gen-mtslg-mapping-from-dsl.js"), "utf8");
-const bundleGenerator = fs.readFileSync(path.join(__dirname, "..", "gen-mastergo-page-bundle.js"), "utf8");
+const mappingGenerator = fs.readFileSync(path.join(__dirname, "..", "adapters/mtslg-iocontrol", "gen-mtslg-mapping-from-dsl.js"), "utf8");
+const bundleGenerator = fs.readFileSync(path.join(__dirname, "..", "entry", "gen-mastergo-page-bundle.js"), "utf8");
 const coordNodesLib = fs.readFileSync(path.join(__dirname, "..", "lib", "coord-nodes.js"), "utf8");
-const mapRules = fs.readFileSync(path.join(__dirname, "..", "lib", "iocontrol-map-rules.js"), "utf8");
+const mapRules = fs.readFileSync(path.join(__dirname, "..", "adapters", "mtslg-iocontrol", "lib", "iocontrol-map-rules.js"), "utf8");
 
 const tableFamily = map.tableTemplates;
 assert.ok(tableFamily, "映射表必须登记 tableTemplates");
@@ -514,7 +514,7 @@ assert.ok(tableFamily.valuePolicy && tableFamily.valuePolicy.attr === "Value", "
 assert.strictEqual(tableFamily.valuePolicy.allowEmpty, true, "当前阶段允许（并要求）空串占位 + valuePending 待绑定提示");
 
 // 规则块必须由共享解析器读取（禁止各脚本再抄一份默认值）。
-assert.ok(mapRules.includes("parseTableTemplate"), "lib/iocontrol-map-rules.js 必须提供 parseTableTemplate 共享解析");
+  assert.ok(mapRules.includes("parseTableTemplate"), "adapters/mtslg-iocontrol/lib/iocontrol-map-rules.js 必须提供 parseTableTemplate 共享解析");
 assert.ok(mappingGenerator.includes("parseTableTemplate") && mappingGenerator.includes("structuralTableMatches"),
   "映射生成器必须按映射表结构签名命中表格");
 for (const token of ["columnTemplate", "innerTextPolicy", "tableAudits", "nearestColumnIndex"]) {
@@ -636,8 +636,8 @@ console.log("PASS 表格族（tableTemplates 结构签名 + DataGrid 列定义�
 // 背景：设计换行（U+2028）原先被原样写进 XML 属性、却被语言字典压成空格，
 // 同一份文案因此有两个版本，运行时按 LangName 取字典时两行文案退化成一行。
 const HELPERS = path.join(__dirname, "..", "lib", "script-helpers.js");
-const PAGE_LANG = path.join(__dirname, "..", "gen-mtslg-page-lang.js");
-const LANG_KEYS_SCRIPT = path.join(__dirname, "..", "gen-mtslg-lang-keys-from-dsl.js");
+const PAGE_LANG = path.join(__dirname, "..", "adapters/mtslg-iocontrol", "gen-mtslg-page-lang.js");
+const LANG_KEYS_SCRIPT = path.join(__dirname, "..", "adapters/mtslg-iocontrol", "gen-mtslg-lang-keys-from-dsl.js");
 const helpers = fs.readFileSync(HELPERS, "utf8");
 const pageLang = fs.readFileSync(PAGE_LANG, "utf8");
 
@@ -737,8 +737,8 @@ assert.ok(modeDoc.includes("压成空格会让两行文案退化成一行"),
 // 这段断言防止文档再写回旧链路（旧链路的手写生成器痕迹止于 Generated/F2/build-mapping.js）。
 {
   const readme = fs.readFileSync(path.join(__dirname, "..", "..", "..", "..", "README.md"), "utf8");
-  const mappingGenerator = fs.readFileSync(path.join(__dirname, "..", "gen-mtslg-mapping-from-dsl.js"), "utf8");
-  const bundle = fs.readFileSync(path.join(__dirname, "..", "gen-mastergo-page-bundle.js"), "utf8");
+  const mappingGenerator = fs.readFileSync(path.join(__dirname, "..", "adapters/mtslg-iocontrol", "gen-mtslg-mapping-from-dsl.js"), "utf8");
+  const bundle = fs.readFileSync(path.join(__dirname, "..", "entry", "gen-mastergo-page-bundle.js"), "utf8");
 
   // 脚本侧事实：生成器发射算法 Tag；Bundle 以生成的 mapping 覆盖 mappingPath。
   assert.ok(mappingGenerator.includes("新页面完整DSL映射"),
@@ -841,7 +841,7 @@ assert.ok(modeDoc.includes("压成空格会让两行文案退化成一行"),
   assert.ok(/TD-047~064/.test(guide), "guide 第六节的编号区间必须回到 TD-047~064");
   // 生成器只认 contentInsetStyle：不得保留"用非空 style 当查表键"的回退。
   const mappingGenerator = fs.readFileSync(
-    path.join(__dirname, "..", "gen-mtslg-mapping-from-dsl.js"), "utf8");
+    path.join(__dirname, "..", "adapters/mtslg-iocontrol", "gen-mtslg-mapping-from-dsl.js"), "utf8");
   assert.ok(!/contentInsetStyle\s*\|\|\s*spec\.style/.test(mappingGenerator),
     "映射生成器不得保留 contentInsetStyle || style 的回退路径（会让旧口径静默通过）");
   assert.ok(/attrs\.Style = spec\.style === undefined \|\| spec\.style === null \? "" : spec\.style/.test(mappingGenerator),
@@ -868,7 +868,7 @@ console.log("PASS 文本换行口径（textNewlinePolicy）一致性回归测试
 // 「同一个控件」的唯一钥匙。用遍历序号当身份会随兄弟增删整体位移，随机 GUID 则每次重跑都变，
 // 两者都会让 merge 静默配错、让工程师代码引用失效。真值源是生成器的 allocateId。
 {
-  const idGen = fs.readFileSync(path.join(__dirname, "..", "gen-mtslg-mapping-from-dsl.js"), "utf8");
+  const idGen = fs.readFileSync(path.join(__dirname, "..", "adapters/mtslg-iocontrol", "gen-mtslg-mapping-from-dsl.js"), "utf8");
   assert.ok(idGen.includes("allocateId") && idGen.includes("ID_PAGE_KEY"),
     "映射生成器必须用 allocateId + 页面键派生页面节点 ID");
   assert.ok(!/`MG_\$\{String\(outputNodes\.length/.test(idGen) && !/`MGText_\$\{String\(textAudit\.length/.test(idGen),
@@ -980,7 +980,7 @@ console.log("PASS 底部栏变体清单（feishu-layout-mapping.md ↔ map.layou
   }
   assert.ok(checked > 0, "入口文档必须至少给出一处契约命令示例（本门禁据此核对）");
   // 实现侧同样钉住：参数、落盘编码、唯一读取实现三件套缺一不可。
-  const runAll = fs.readFileSync(path.join(__dirname, "..", "run-all.ps1"), "utf8");
+  const runAll = fs.readFileSync(path.join(__dirname, "..", "entry", "run-all.ps1"), "utf8");
   assert.ok(runAll.includes("[string] $OutFile"), "run-all.ps1 必须提供 -OutFile 参数");
   assert.ok(runAll.includes("Set-Content -LiteralPath $OutFile -Value $json -Encoding UTF8"),
     "run-all.ps1 的 -OutFile 必须用 Set-Content -Encoding UTF8 落盘（PS7 下无 BOM）");
@@ -1061,14 +1061,14 @@ console.log("PASS 匹配键口径单读法 + 同一条规则单处陈述（maste
   assert.ok((mapData.businessAttrs || []).includes(align.attr),
     "Align 必须与同类显示属性（Foreground / FontSize / FontWeight）一起登记进 businessAttrs");
   // 渲染层与校验层都必须把「只认 Left / Right」变成可验证的不变量：不允许落到通用空串占位。
-  const xmlGenerator = fs.readFileSync(path.join(__dirname, "..", "gen-iocontrol-xml.js"), "utf8");
+  const xmlGenerator = fs.readFileSync(path.join(__dirname, "..", "adapters/mtslg-iocontrol", "gen-iocontrol-xml.js"), "utf8");
   assert.ok(xmlGenerator.includes("的 Align 必须是 \"Left\" / \"Right\""),
     "gen-iocontrol-xml.js 必须对 TextBlock 的 Align 取值 fail-closed（不许空占位 / 第三种值）");
   assert.ok(validator.includes("TextBlock 的 Align 必须是 \"Left\" / \"Right\""),
     "validate-iocontrol-provenance.js 必须把 Align 取值作为错误拦下");
   assert.ok(validator.includes("Align 只有 TextBlock 有"),
     "validate-iocontrol-provenance.js 必须拦下非 TextBlock 节点携带 Align 的产物（只 TextBlock 有该参数）");
-  const mappingGenerator = fs.readFileSync(path.join(__dirname, "..", "gen-mtslg-mapping-from-dsl.js"), "utf8");
+  const mappingGenerator = fs.readFileSync(path.join(__dirname, "..", "adapters/mtslg-iocontrol", "gen-mtslg-mapping-from-dsl.js"), "utf8");
   for (const token of ["textBlockAlign", "textAlignByRef", "attrs[alignAttr]"]) {
     assert.ok(mappingGenerator.includes(token),
       "gen-mtslg-mapping-from-dsl.js 必须保留 Align 发射实现: " + token);
@@ -1096,30 +1096,30 @@ console.log("PASS 匹配键口径单读法 + 同一条规则单处陈述（maste
       "lib/script-helpers.js 必须保留 " + token + "（Left 口径的判据与计算的唯一实现）");
   }
   // 分支判据只允许用共用函数（不得各写一份 Align 比较）。
-  for (const rel of ["apply-container-containment.js", "gen-iocontrol-xml.js",
-    "validate-iocontrol-provenance.js", "lib/coord-nodes.js"]) {
+  for (const rel of ["adapters/mtslg-iocontrol/apply-container-containment.js", "adapters/mtslg-iocontrol/gen-iocontrol-xml.js",
+    "adapters/mtslg-iocontrol/validate-iocontrol-provenance.js", "lib/coord-nodes.js"]) {
     const consumer = fs.readFileSync(path.join(__dirname, "..", rel), "utf8");
     assert.ok(consumer.includes("isRightAlignedTextBlock"),
       rel + " 必须用共享的 isRightAlignedTextBlock 判分支（不得自己拼 Align 比较）");
   }
   // 坐标核对输入只有一份实现：Bundle 与 check-coords.mjs 都调 lib/coord-nodes.js。
-  for (const rel of ["gen-mastergo-page-bundle.js", "check-coords.mjs"]) {
+  for (const rel of ["entry/gen-mastergo-page-bundle.js", "adapters/mtslg-iocontrol/check-coords.mjs"]) {
     const consumer = fs.readFileSync(path.join(__dirname, "..", rel), "utf8");
     assert.ok(consumer.includes("buildCoordNodes"),
       rel + " 必须调用 lib/coord-nodes.js 的 buildCoordNodes（坐标核对输入不得内联一份）");
   }
   // 旧的附加标记（leftBasis / TEXT_BLOCK_RIGHT_LEFT_BASIS）不得残留：判据只认节点 Align 属性。
-  for (const rel of ["lib/script-helpers.js", "lib/coord-nodes.js", "gen-mtslg-mapping-from-dsl.js",
-    "apply-container-containment.js", "gen-iocontrol-xml.js", "validate-iocontrol-provenance.js",
-    "check-coords.mjs", "gen-mastergo-page-bundle.js"]) {
+  for (const rel of ["lib/script-helpers.js", "lib/coord-nodes.js", "adapters/mtslg-iocontrol/gen-mtslg-mapping-from-dsl.js",
+    "adapters/mtslg-iocontrol/apply-container-containment.js", "adapters/mtslg-iocontrol/gen-iocontrol-xml.js", "adapters/mtslg-iocontrol/validate-iocontrol-provenance.js",
+    "adapters/mtslg-iocontrol/check-coords.mjs", "entry/gen-mastergo-page-bundle.js"]) {
     const source = fs.readFileSync(path.join(__dirname, "..", rel), "utf8");
     assert.ok(!source.includes("leftBasis") && !source.includes("TEXT_BLOCK_RIGHT_LEFT_BASIS"),
       rel + " 不得残留 leftBasis / TEXT_BLOCK_RIGHT_LEFT_BASIS（已改用节点 Align 判据）");
   }
   // 左对齐口径也必须真的走那个共用实现（否则"唯一实现"只是注释）：生产者与 provenance 校验器
   // 共四处调用点都要传 align: "Left"。
-  for (const rel of ["gen-mtslg-mapping-from-dsl.js", "apply-container-containment.js", "gen-iocontrol-xml.js",
-    "validate-iocontrol-provenance.js"]) {
+  for (const rel of ["adapters/mtslg-iocontrol/gen-mtslg-mapping-from-dsl.js", "adapters/mtslg-iocontrol/apply-container-containment.js", "adapters/mtslg-iocontrol/gen-iocontrol-xml.js",
+    "adapters/mtslg-iocontrol/validate-iocontrol-provenance.js"]) {
     const consumer = fs.readFileSync(path.join(__dirname, "..", rel), "utf8");
     assert.ok(consumer.includes('align: "Left"') || consumer.includes("align: 'Left'"),
       rel + " 的左对齐 Left 必须调用共用的 textBlockLeftValue（align: Left），不得各写一份公式");

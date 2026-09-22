@@ -7,7 +7,7 @@ const os = require("os");
 const path = require("path");
 const { spawnSync } = require("child_process");
 
-const script = path.join(__dirname, "..", "gen-mastergo-page-bundle.js");
+const script = path.join(__dirname, "..", "entry", "gen-mastergo-page-bundle.js");
 const scriptText = fs.readFileSync(script, "utf8");
 assert.match(
   scriptText,
@@ -879,7 +879,7 @@ assert.match(langOffAudit.languageDisabledReason, /确认不做多语言/);
 // ---- 运行登记表绑定（B）：采集输入只认登记表，且拒绝旧同名影子文件 ----
 // 背景：采集产物改成按页归档（Generated/runs/<Target>/）后，消费端一度仍在读顶层 Generated/*.json，
 // 而顶层恰好留着上一次运行的旧文件 → 静默用了旧数据。这里逐条锁住新行为。
-const registryCli = path.join(__dirname, "..", "run-registry.mjs");
+const registryCli = path.join(__dirname, "..", "core", "run-registry.mjs");
 const registryTarget = "LangRegistry";
 const registryRunDir = path.join(project, "Generated", "runs", registryTarget);
 fs.mkdirSync(registryRunDir, { recursive: true });

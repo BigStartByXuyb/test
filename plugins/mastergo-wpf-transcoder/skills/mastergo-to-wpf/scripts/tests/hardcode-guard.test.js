@@ -16,9 +16,19 @@ const path = require("path");
 const SCRIPTS = path.join(__dirname, "..");
 const SKILL = path.join(SCRIPTS, "..");
 
-const scriptFiles = fs.readdirSync(SCRIPTS, { withFileTypes: true })
-  .filter((entry) => entry.isFile() && /\.(ps1|js|mjs)$/.test(entry.name))
-  .map((entry) => path.join(SCRIPTS, entry.name));
+// 交付链路脚本按职责分桶（core/ · host/ · adapters/*/ · entry/），必须递归枚举；
+// 不含 lib/（共享实现）与 tests/（用例）。只扫同一层会漏掉大部分脚本，门禁会静默失效。
+const SKIP_DIRS = new Set(["lib", "tests", "node_modules"]);
+const scriptFiles = [];
+(function walk(dir) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (entry.isDirectory()) {
+      if (!SKIP_DIRS.has(entry.name)) walk(path.join(dir, entry.name));
+      continue;
+    }
+    if (/\.(ps1|js|mjs)$/.test(entry.name)) scriptFiles.push(path.join(dir, entry.name));
+  }
+})(SCRIPTS);
 assert.ok(scriptFiles.length > 10, "必须能枚举到插件脚本");
 
 // MasterGo 文件 id 是 15 位数字；图层 id 形如 79:149312。两者都不得写进脚本。
@@ -56,7 +66,7 @@ for (const file of scriptFiles) {
 }
 
 // run-all.ps1：-FileId 不得有默认值，也不得用某个具体 id 当"哨兵值"。
-const runAll = fs.readFileSync(path.join(SCRIPTS, "run-all.ps1"), "utf8");
+const runAll = fs.readFileSync(path.join(SCRIPTS, "entry", "run-all.ps1"), "utf8");
 const paramBlock = runAll.slice(0, runAll.indexOf("$ErrorActionPreference"));
 assert.ok(/\[string\]\s*\$FileId\s*(,|\r?\n)/.test(paramBlock.replace(/\[string\]\s*\$FileId\s*=/, "SENTINEL")),
   "run-all.ps1 的 -FileId 参数不得带默认值（必须由命令行或项目登记表提供）");

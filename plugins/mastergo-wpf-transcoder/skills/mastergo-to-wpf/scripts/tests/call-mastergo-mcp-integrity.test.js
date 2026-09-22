@@ -8,7 +8,7 @@ const os = require("node:os");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 const { test } = require("node:test");
-const cli = path.join(__dirname, "..", "call-mastergo-mcp.js");
+const cli = path.join(__dirname, "..", "core", "call-mastergo-mcp.js");
 const marker = "PRIVATE_DESIGN_PAYLOAD_MUST_NOT_ENTER_CONTEXT";
 
 function captureWithStub(t, config) {

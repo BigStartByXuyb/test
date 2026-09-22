@@ -1,13 +1,13 @@
 # Bundle 清单字段契约（作业 B）
 
-本文规定 `scripts/gen-mastergo-page-bundle.js --manifest <bundle.json>` 的输入契约。**真值源是脚本本身**（`normalizePageManifest` / `ensureScaffold` / `validateBundleOutputs` / `validateLangOutputs` / `main`）；本文只登记可核验的部分，脚本变更后必须同步本文。
+本文规定 `scripts/entry/gen-mastergo-page-bundle.js --manifest <bundle.json>` 的输入契约。**真值源是脚本本身**（`normalizePageManifest` / `ensureScaffold` / `validateBundleOutputs` / `validateLangOutputs` / `main`）；本文只登记可核验的部分，脚本变更后必须同步本文。
 
 **脚本锚点写法（强制）**：本文各处只写「函数名 + `fail(...)` 文案 / 关键表达式」，**不写绝对行号**——行号会随脚本增删漂移，锚点可直接在脚本里检索核对。
 
 调用方式：
 
 ```
-node scripts/gen-mastergo-page-bundle.js --manifest <bundle.json> [--overwrite]
+node scripts/entry/gen-mastergo-page-bundle.js --manifest <bundle.json> [--overwrite]
 ```
 
 `--overwrite` 仅允许用于 `operation=replace-existing`；新建页面传了会被拒绝。
@@ -134,7 +134,7 @@ Bundle **不会**把新页面的文件写进 `.csproj`（实测 `csprojChanged=F
 
 **硬规则**
 
-**本页现状摘要**（`Generated/<Target>.summary.json`）：上面这条契约的机器可读投影，由 `run-all.ps1` 每步成功后刷新（`scripts/build-run-summary.mjs`）。需要了解本页现状时读它，不要为了盘点现状再手写探针去数产物——它给身份、控件构成、`todos`（需人工/AI 动作）、`notices`（状态说明）、图标候选与台账、布局、产出清单，并在 `sources` 里逐项写明来源路径与产出步骤。它是**派生视图**：内容随每次刷新变化，因此不写回登记表，任何条目都与登记表同源同规则——未登记的一律不取，条目在消费时按登记 sha256 复校（不符即整次失败），而**本次尝试读取**的条目（登记产物或页面产出）取不到时一并记进 `unavailable`（带 `layer` 区分），而不是记 0。
+**本页现状摘要**（`Generated/<Target>.summary.json`）：上面这条契约的机器可读投影，由 `run-all.ps1` 每步成功后刷新（`scripts/core/build-run-summary.mjs`）。需要了解本页现状时读它，不要为了盘点现状再手写探针去数产物——它给身份、控件构成、`todos`（需人工/AI 动作）、`notices`（状态说明）、图标候选与台账、布局、产出清单，并在 `sources` 里逐项写明来源路径与产出步骤。它是**派生视图**：内容随每次刷新变化，因此不写回登记表，任何条目都与登记表同源同规则——未登记的一律不取，条目在消费时按登记 sha256 复校（不符即整次失败），而**本次尝试读取**的条目（登记产物或页面产出）取不到时一并记进 `unavailable`（带 `layer` 区分），而不是记 0。
 
 1. **产出即登记**：`run-all.ps1` 每一步成功后就登记该步产物（`run-registry.mjs artifact`）；中途失败也把该步状态写进 `steps`。
 2. **消费只按登记**：`build-bundle-manifest.mjs <…> <area> --run-json <run.json>` 从登记表取 `snapshot` / `visibility` / `extractSvg`，并把 `sha256` 写进清单 `runRegistry.digests`；Bundle 读清单时**复校**：路径按登记表解析、`sha256` 与 `digests` 一致、`runId` 一致。**`--run-json` 是必填**——缺了直接报错，不再回落到顶层 `Generated/*.json`（`area` 同理必填，推导只在 run-all.ps1 里做一次）。
@@ -144,4 +144,4 @@ Bundle **不会**把新页面的文件写进 `.csproj`（实测 `csprojChanged=F
    - **逐阶段输入复校**：每步消费前对它实际消费的产物复校 sha256；续跑路径上若该产物**未登记**（存在但没进本次 `run.json`），按「未登记的旧同名文件一律拒绝」直接失败。
    - **显式传入不同值 → fail-closed**：要换设计来源或运行配置就是**新开一次运行**（不带 `-Progress`），那时才按「命令行 → 项目登记表 `docs/page-registry.json` → 报错」重新解析身份；已有产物要重写时用 `-Overwrite` + 清单 `operation=replace-existing`。
    - **语义输入不受限**：标题 / 译文 / 术语表 / 图标命名在续跑里照旧可改（它们不属于 `identity`）。
-5. **手工调用**：`node scripts/run-registry.mjs init|artifact|step|path|check|outputs|show`。不带 `--key` 的 `check` 只检查本次已登记的产物，允许未完成的运行；显式 `check --key <产物键>` 必须命中 `ARTIFACT_KEYS` 且该产物已登记，否则非零退出，不能静默跳过。两种方式都复算所检查文件的 sha256，并核对旧同名文件；`--quiet` 只关闭成功摘要，不豁免任何失败。
+5. **手工调用**：`node scripts/core/run-registry.mjs init|artifact|step|path|check|outputs|show`。不带 `--key` 的 `check` 只检查本次已登记的产物，允许未完成的运行；显式 `check --key <产物键>` 必须命中 `ARTIFACT_KEYS` 且该产物已登记，否则非零退出，不能静默跳过。两种方式都复算所检查文件的 sha256，并核对旧同名文件；`--quiet` 只关闭成功摘要，不豁免任何失败。

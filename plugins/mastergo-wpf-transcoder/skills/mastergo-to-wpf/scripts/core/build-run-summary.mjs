@@ -20,8 +20,8 @@ import path from "node:path";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const registry = require("./lib/run-registry.js");
-const helpers = require("./lib/script-helpers.js");
+const registry = require("../lib/run-registry.js");
+const helpers = require("../lib/script-helpers.js");
 
 const SCHEMA_VERSION = "mastergo-run-summary/1";
 

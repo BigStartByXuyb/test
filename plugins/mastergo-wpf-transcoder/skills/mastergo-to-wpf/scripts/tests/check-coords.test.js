@@ -12,7 +12,7 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 
 const { outputOrigin } = require(path.join(__dirname, '..', 'lib', 'script-helpers.js'));
-const script = path.join(__dirname, '..', 'check-coords.mjs');
+const script = path.join(__dirname, '..', 'adapters/mtslg-iocontrol', 'check-coords.mjs');
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'check-coords-'));
 
 // ① 唯一实现本身：根级 / 贴顶边（0）/ 缺值。

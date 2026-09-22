@@ -2,7 +2,7 @@
 "use strict";
 
 const assert = require("assert");
-const { collectNodes } = require("../resolve-mastergo-visibility.js");
+const { collectNodes } = require("../core/resolve-mastergo-visibility.js");
 
 const nodes = collectNodes({
   type: "INSTANCE",

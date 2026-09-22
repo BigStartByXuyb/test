@@ -26,7 +26,7 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 
 ## 开始前门禁
 
-1. **只认一次 `getDsl`**：用 `scripts/call-mastergo-mcp.js` 调 `getDsl(fileId, layerId, format=json)` 读当前图层完整 DSL，**响应只落盘**（`<runDir>/getDsl.json`）不进上下文；不得分段读取，不得用浏览器、截图或视觉猜测替代。MCP 不可调用或 `getDsl` 报错时**停止本次转换并报告原因**，不得换成其他设计数据来源继续。`extractSvg` 是 `getDsl` 成功后的独立图标步骤（`<runDir>/extractSvg.json`），不参与页面结构。
+1. **只认一次 `getDsl`**：用 `scripts/core/call-mastergo-mcp.js` 调 `getDsl(fileId, layerId, format=json)` 读当前图层完整 DSL，**响应只落盘**（`<runDir>/getDsl.json`）不进上下文；不得分段读取，不得用浏览器、截图或视觉猜测替代。MCP 不可调用或 `getDsl` 报错时**停止本次转换并报告原因**，不得换成其他设计数据来源继续。`extractSvg` 是 `getDsl` 成功后的独立图标步骤（`<runDir>/extractSvg.json`），不参与页面结构。
 2. **不读图**：不得打开、渲染或裁剪设计稿截图/图标位图做判断题；图形形状与朝向一律由 DSL 的 `rotate` / `flipH` / `flipV` 机械烘焙得出。宿主运行截图只属「项目运行时交付」门禁，与设计稿判断无关。
 3. **不降级、不伪造**：没有正式映射的组件只进来源清单与待确认，不得改成 `Button`、`Border`、无类型容器或近似控件；存在未映射组件时不得宣称「完整可运行页面」。
 
@@ -44,7 +44,7 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 
 ## 一键流水线（12 步）
 
-**一次调用跑完全部 12 步**（默认区间第 1 → 12）；下表是这条命令**内部**的阶段划分，用来定位失败与断点续跑，**不要为每一步单独起一次 `run-all`**。常用参数只有三类（完整清单见 `scripts/run-all.ps1` 的 `param` 块）：
+**一次调用跑完全部 12 步**（默认区间第 1 → 12）；下表是这条命令**内部**的阶段划分，用来定位失败与断点续跑，**不要为每一步单独起一次 `run-all`**。常用参数只有三类（完整清单见 `scripts/entry/run-all.ps1` 的 `param` 块）：
 
 - **目标信息** `-Target` / `-LayerId` / `-FileId` / `-Ui` / `-DesignPageName`：登记表 `docs/page-registry.json` 里能命中本次页面时可省；**登记表有多页时必须用 `-Target` 或 `-LayerId` 选中本次页面**（脚本按命中选页，没命中就报错，不会取第一页顶上）；
 - **区间控制** `-Progress <步骤名>`（失败后从该步继续）/ `-StopAfter <步骤名>`（需要人工补语义输入时先跑到 `discover`）；
@@ -67,7 +67,7 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 | 11 | `gates` | 严格门禁（审计逐条断言） |
 | 12 | `verify` | 四项独立验证（provenance / 坐标 / Icon / 结构） |
 
-- **每一步的输入 / 产物 / 失败语义 / 怎么修：`references/adapters/mtslg-iocontrol/pipeline-contract.md`**。该文件由 `run-all.ps1` 的步骤定义生成（`node scripts/gen-pipeline-contract.mjs`），**真值源是脚本**；要改契约就改脚本再重新生成，手改文档会挂测试。
+- **每一步的输入 / 产物 / 失败语义 / 怎么修：`references/adapters/mtslg-iocontrol/pipeline-contract.md`**。该文件由 `run-all.ps1` 的步骤定义生成（`node scripts/core/gen-pipeline-contract.mjs`），**真值源是脚本**；要改契约就改脚本再重新生成，手改文档会挂测试。
 - 运行登记表：`<项目>/Generated/runs/<Target>/run.json`，规则是「**产出即登记、消费只按登记取、未登记的旧同名文件一律拒绝**」；清单里的采集输入（`dslPath` / `visibilityPath` / `svgPath`）都从登记表解析并校验 `sha256`。断点续跑用 `-Progress <步骤名>`（续跑的身份与登记表口径、可改语义输入见 `references/adapters/mtslg-iocontrol/bundle-manifest.md` 第 7 节）。
 - 区域前缀（`ui`）：取值链的唯一实现在 `run-all.ps1`（`-Ui` → 项目登记表 `pages[].ui` / `derivation` → Target 编号前缀 → Target 首词 → **报错**）；取不到就报错，不静默默认。`fileId` / `layerId` 同样按「命令行 → 项目登记表 → 报错」解析，插件不内置任何项目的设计来源。
 
@@ -90,13 +90,13 @@ pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -List -Format json -OutFile <�
 
 每条都是「不改就会失败」的规则；细则与真值源见对应 reference，本节不复述细节。
 
-- **Value / 坐标 / provenance**：一律由设计事实机械推导，不得语义猜测 → `mtslg-mode.md` 第 3 节 + `scripts/validate-iocontrol-provenance.js`
+- **Value / 坐标 / provenance**：一律由设计事实机械推导，不得语义猜测 → `mtslg-mode.md` 第 3 节 + `scripts/adapters/mtslg-iocontrol/validate-iocontrol-provenance.js`
 - **内容区原点 `contentOriginY = 192px`**：全局固定常量，只在页面根级扣一次 → `mtslg-mode.md` 第 3 节
 - **容器 `GroupBox` 的 `Style` 恒为空串**，原点查表键是 `contentInsetStyle` → `feishu-component-library-mapping.md` 的「组件父子相对坐标」小节
 - **多语言全量产键**：设计稿给出的每个文本 `Value` 都产键挂 `LangName`；唯一不产键的是映射表在值槽位登记 `langRefPolicy: "none"` 的节点（当前只有选择框 `Value`），槽位豁免记入 `valueLangExempt` → `references/adapters/mtslg-iocontrol/page-build-rules.md` 第 3 节
-- **可见性 omit 有两条路径**：明确 hidden，以及角色驱动 omit；角色集合 `OMIT_ROLES` 与 `OMIT_REASONS` 的真值源是 `scripts/validate-iocontrol-provenance.js`，新增角色必须同时登记该集合 → `references/adapters/mtslg-iocontrol/page-build-rules.md` 第 5 节
+- **可见性 omit 有两条路径**：明确 hidden，以及角色驱动 omit；角色集合 `OMIT_ROLES` 与 `OMIT_REASONS` 的真值源是 `scripts/adapters/mtslg-iocontrol/validate-iocontrol-provenance.js`，新增角色必须同时登记该集合 → `references/adapters/mtslg-iocontrol/page-build-rules.md` 第 5 节
 - **页面节点 ID**：`MX_` + `sha256(页面键 + 节点 ref)` 前 32 位；禁止用遍历序号当节点身份，人工维护约定随属性一起写在 mapping → `mtslg-mode.md` 第 2 节
-- **图标是页面级资源**：本页 `Icons.xaml` 的键必须页面内唯一、并被本页（含 Layout 菜单项）引用；禁止由图层 ID / 坐标 / 外观拼名（如 `MGIcon_<layer-id>`）。**哪些图形要登记由 `discover` 步骤机械给出**（候选的 `registration.register` / `mustName`，判据实现 `scripts/lib/icon-registration-policy.js`），命名表与它**必须一一对应**（漏定名 / 多定名都失败，`build-icon-ledger.mjs` 双向门禁）→ `references/adapters/mtslg-iocontrol/page-build-rules.md` 第 2 节
+- **图标是页面级资源**：本页 `Icons.xaml` 的键必须页面内唯一、并被本页（含 Layout 菜单项）引用；禁止由图层 ID / 坐标 / 外观拼名（如 `MGIcon_<layer-id>`）。**哪些图形要登记由 `discover` 步骤机械给出**（候选的 `registration.register` / `mustName`，判据实现 `scripts/adapters/mtslg-iocontrol/lib/icon-registration-policy.js`），命名表与它**必须一一对应**（漏定名 / 多定名都失败，`build-icon-ledger.mjs` 双向门禁）→ `references/adapters/mtslg-iocontrol/page-build-rules.md` 第 2 节
 - **页面输出目录**：一页一目录（页面 XML / Icon / 语言字典同页目录，Layout 项目级共享）+ 运行目录解析优先级 → `references/adapters/mtslg-iocontrol/page-build-rules.md` 第 1 节
 - **组件族细则**：表格族 `tableTemplates` 按结构签名命中并发射 `DataGrid`（列定义来自 `columnTemplate`，行是数据不发射控件）；相机族 `cameraTemplates` 内部文本整体 omit；`TextBlock` 的 `FontWeight`、`Align`（恒写且只有 `TextBlock` 有：设计稿 `textAlign=right` → `Right`，其余含缺失 → `Left` 默认左对齐；`Align=Right` 时 `Left` 的口径变成"以控件右上角为原点量到父容器外框右边缘的距离"）与换行（`&#x0a;`、`U+2028`）都有确定口径 → `feishu-component-library-mapping.md` + 映射表 `mtslg-iocontrol-map.json`
 - **页面级 / 项目级边界**：页面 XML、本页 Icon、本页语言字典、本页 View/ViewModel、本页 mapping 与审计是页面级（跨页不得同名、不得互相引用）；`Resources/Layout/Layout.xml`、`.csproj`、`framework.config.json` 是项目级，本页只增量写自己的注册

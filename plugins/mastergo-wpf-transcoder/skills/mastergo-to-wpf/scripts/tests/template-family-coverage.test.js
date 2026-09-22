@@ -16,7 +16,7 @@ const fs = require("fs");
 const path = require("path");
 
 const SCRIPTS = path.join(__dirname, "..");
-const GENERATOR = path.join(SCRIPTS, "gen-mtslg-mapping-from-dsl.js");
+const GENERATOR = path.join(SCRIPTS, "adapters", "mtslg-iocontrol", "gen-mtslg-mapping-from-dsl.js");
 const MAP = path.join(SCRIPTS, "..", "references", "adapters", "mtslg-iocontrol", "mtslg-iocontrol-map.json");
 // 兜底族：没有显式 `match.family ===` 分支，走生成器末尾的按钮组路径。
 const FALLBACK_FAMILY = "componentTemplates";

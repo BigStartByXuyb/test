@@ -20,7 +20,7 @@ import path from "node:path";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const registry = require("./lib/run-registry.js");
+const registry = require("../lib/run-registry.js");
 
 function parseArgs(argv) {
   const out = { _: [] };

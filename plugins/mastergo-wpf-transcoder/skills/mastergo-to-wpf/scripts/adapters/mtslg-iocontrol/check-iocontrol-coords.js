@@ -32,7 +32,7 @@
 
 const path = require('path');
 // 数值解析的唯一实现（见 scripts/lib/script-helpers.js；本检查器与 provenance 校验器共用同一口径）。
-const { numberOrNull: num } = require(path.join(__dirname, 'lib', 'script-helpers.js'));
+const { numberOrNull: num } = require(path.join(__dirname, '..', '..', 'lib', 'script-helpers.js'));
 
 const fs = require('fs');
 

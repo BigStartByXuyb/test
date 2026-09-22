@@ -10,8 +10,8 @@ const os = require("os");
 const path = require("path");
 const { spawnSync } = require("child_process");
 
-const script = path.join(__dirname, "..", "build-bundle-manifest.mjs");
-const registryCli = path.join(__dirname, "..", "run-registry.mjs");
+const script = path.join(__dirname, "..", "adapters/mtslg-iocontrol", "build-bundle-manifest.mjs");
+const registryCli = path.join(__dirname, "..", "core", "run-registry.mjs");
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "mastergo-bundle-manifest-"));
 const write = (relative, data) => {

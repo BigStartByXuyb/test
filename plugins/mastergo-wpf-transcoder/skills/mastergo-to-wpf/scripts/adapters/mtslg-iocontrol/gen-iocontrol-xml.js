@@ -66,7 +66,7 @@ const { validateTextAudit } = require('./validate-iocontrol-provenance');
 const MAP_RULES = require('./lib/iocontrol-map-rules');
 // XML 属性转义（含换行 → &#x0a;）的唯一实现（见 scripts/lib/script-helpers.js；禁止在本脚本再抄一份）。
 const { xmlAttr, normalizeForCompare, omittedAttrs,
-  parentOuterRightEdge, textBlockLeftValue, isRightAlignedTextBlock } = require('./lib/script-helpers');
+  parentOuterRightEdge, textBlockLeftValue, isRightAlignedTextBlock } = require('../../lib/script-helpers');
 
 // ---------- 参数 ----------
 function usage() {

@@ -91,7 +91,7 @@ fs.writeFileSync(dslPath, JSON.stringify({
 fs.writeFileSync(visibilityPath, JSON.stringify({ nodes: [] }, null, 2));
 fs.writeFileSync(iconMapPath, JSON.stringify({ icons: [] }, null, 2));
 
-const script = path.join(__dirname, '..', 'gen-mtslg-mapping-from-dsl.js');
+const script = path.join(__dirname, '..', 'adapters/mtslg-iocontrol', 'gen-mtslg-mapping-from-dsl.js');
 const templateMap = path.join(__dirname, '..', '..', 'references', 'adapters', 'mtslg-iocontrol', 'mtslg-iocontrol-map.json');
 const result = spawnSync(process.execPath, [script,
   '--dsl', dslPath,

@@ -8,7 +8,7 @@ const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 const { test } = require("node:test");
 const registry = require("../lib/run-registry.js");
-const cli = path.join(__dirname, "..", "run-registry.mjs");
+const cli = path.join(__dirname, "..", "core", "run-registry.mjs");
 
 function registeredRun(t, overrides = {}) {
   const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), "mastergo-integrity-"));

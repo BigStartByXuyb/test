@@ -7,7 +7,7 @@ const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
 
-const script = path.join(__dirname, '..', 'gen-mw-wpf-page.js');
+const script = path.join(__dirname, '..', 'host', 'gen-mw-wpf-page.js');
 const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'mw-wpf-page-'));
 const csprojPath = path.join(projectRoot, 'Demo.Pages.csproj');
 const manifestPath = path.join(projectRoot, 'page.json');

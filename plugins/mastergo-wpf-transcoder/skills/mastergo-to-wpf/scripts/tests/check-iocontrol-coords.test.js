@@ -15,7 +15,7 @@ fs.writeFileSync(nodesPath, JSON.stringify([{
   contentOriginX: 0, contentOriginY: 192
 }]));
 
-const result = spawnSync(process.execPath, [path.join(__dirname, '..', 'check-iocontrol-coords.js'), '--xml', xmlPath, '--nodes', nodesPath], { encoding: 'utf8' });
+const result = spawnSync(process.execPath, [path.join(__dirname, '..', 'adapters/mtslg-iocontrol', 'check-iocontrol-coords.js'), '--xml', xmlPath, '--nodes', nodesPath], { encoding: 'utf8' });
 if (result.status !== 0) {
   throw new Error(`absolute coordinate regression failed:\n${result.stdout}\n${result.stderr}`);
 }
@@ -38,7 +38,7 @@ fs.writeFileSync(nestedNodesPath, JSON.stringify([
   { id: 'panel', x: 600, y: 392, w: 200, h: 120, contentOriginX: 0, contentOriginY: 192 },
   { id: 'label2', x: 610, y: 412, w: 'NaN', h: 40, contentOriginX: 600, contentOriginY: 392 }
 ]));
-const nestedResult = spawnSync(process.execPath, [path.join(__dirname, '..', 'check-iocontrol-coords.js'),
+const nestedResult = spawnSync(process.execPath, [path.join(__dirname, '..', 'adapters/mtslg-iocontrol', 'check-iocontrol-coords.js'),
   '--xml', nestedXmlPath, '--nodes', nestedNodesPath], { encoding: 'utf8' });
 if (nestedResult.status !== 0) {
   throw new Error(`nested coordinate regression failed:\n${nestedResult.stdout}\n${nestedResult.stderr}`);
@@ -57,7 +57,7 @@ const stringMetricNodesPath = path.join(dir, 'string-metric-nodes.json');
 fs.writeFileSync(stringMetricNodesPath, JSON.stringify([
   { id: 'label', x: '658', y: '668', w: 'NaN', h: '40', contentOriginX: '0', contentOriginY: '192' }
 ]));
-const stringMetricResult = spawnSync(process.execPath, [path.join(__dirname, '..', 'check-iocontrol-coords.js'),
+const stringMetricResult = spawnSync(process.execPath, [path.join(__dirname, '..', 'adapters/mtslg-iocontrol', 'check-iocontrol-coords.js'),
   '--xml', metricXmlPath, '--nodes', stringMetricNodesPath], { encoding: 'utf8' });
 if (stringMetricResult.status !== 0 || !/OK id="label"/.test(stringMetricResult.stdout)) {
   throw new Error(`数值字符串度量必须按数值核对:\n${stringMetricResult.stdout}`);
@@ -67,7 +67,7 @@ const nonNumericNodesPath = path.join(dir, 'non-numeric-nodes.json');
 fs.writeFileSync(nonNumericNodesPath, JSON.stringify([
   { id: 'label', x: 'abc', y: 668, w: 'NaN', h: 40, contentOriginX: 0, contentOriginY: 192 }
 ]));
-const nonNumericResult = spawnSync(process.execPath, [path.join(__dirname, '..', 'check-iocontrol-coords.js'),
+const nonNumericResult = spawnSync(process.execPath, [path.join(__dirname, '..', 'adapters/mtslg-iocontrol', 'check-iocontrol-coords.js'),
   '--xml', metricXmlPath, '--nodes', nonNumericNodesPath], { encoding: 'utf8' });
 if (nonNumericResult.status === 0 || !/MISMATCH id="label"/.test(nonNumericResult.stdout)) {
   throw new Error(`非数值度量必须报 MISMATCH:\n${nonNumericResult.stdout}`);
@@ -77,7 +77,7 @@ const missingMetricNodesPath = path.join(dir, 'missing-metric-nodes.json');
 fs.writeFileSync(missingMetricNodesPath, JSON.stringify([
   { id: 'label', w: 'NaN', h: 40, contentOriginX: 0, contentOriginY: 192 }   // 缺 x / y
 ]));
-const missingMetricResult = spawnSync(process.execPath, [path.join(__dirname, '..', 'check-iocontrol-coords.js'),
+const missingMetricResult = spawnSync(process.execPath, [path.join(__dirname, '..', 'adapters/mtslg-iocontrol', 'check-iocontrol-coords.js'),
   '--xml', metricXmlPath, '--nodes', missingMetricNodesPath], { encoding: 'utf8' });
 if (missingMetricResult.status === 0 || !/缺少设计稿度量: x, y/.test(missingMetricResult.stdout)) {
   throw new Error(`缺少度量必须点名报 MISMATCH:\n${missingMetricResult.stdout}`);
@@ -87,7 +87,7 @@ const missingWidthNodesPath = path.join(dir, 'missing-width-nodes.json');
 fs.writeFileSync(missingWidthNodesPath, JSON.stringify([
   { id: 'label', x: 658, y: 668, h: 40, contentOriginX: 0, contentOriginY: 192 }   // 缺 w
 ]));
-const missingWidthResult = spawnSync(process.execPath, [path.join(__dirname, '..', 'check-iocontrol-coords.js'),
+const missingWidthResult = spawnSync(process.execPath, [path.join(__dirname, '..', 'adapters/mtslg-iocontrol', 'check-iocontrol-coords.js'),
   '--xml', metricXmlPath, '--nodes', missingWidthNodesPath], { encoding: 'utf8' });
 if (missingWidthResult.status === 0 || !/缺少设计稿度量: w/.test(missingWidthResult.stdout)) {
   throw new Error(`缺宽度必须点名报 MISMATCH:\n${missingWidthResult.stdout}`);
@@ -104,7 +104,7 @@ fs.writeFileSync(alignRightXmlPath, '<IOContorl ID="r1" ControlType="TextBlock" 
 fs.writeFileSync(alignRightNodesPath, JSON.stringify([
   { id: 'r1', x: 708, y: 202, w: 'NaN', h: 40, contentOriginX: 0, contentOriginY: 192, expectedLeft: 530 }
 ]));
-const alignRightResult = spawnSync(process.execPath, [path.join(__dirname, '..', 'check-iocontrol-coords.js'),
+const alignRightResult = spawnSync(process.execPath, [path.join(__dirname, '..', 'adapters/mtslg-iocontrol', 'check-iocontrol-coords.js'),
   '--xml', alignRightXmlPath, '--nodes', alignRightNodesPath], { encoding: 'utf8' });
 if (alignRightResult.status !== 0 || !/OK id="r1"/.test(alignRightResult.stdout)) {
   throw new Error(`Align=Right 的 expectedLeft 必须被核对器采用:\n${alignRightResult.stdout}\n${alignRightResult.stderr}`);
@@ -114,7 +114,7 @@ const noOverrideNodesPath = path.join(dir, 'align-right-no-override-nodes.json')
 fs.writeFileSync(noOverrideNodesPath, JSON.stringify([
   { id: 'r1', x: 708, y: 202, w: 'NaN', h: 40, contentOriginX: 0, contentOriginY: 192 }
 ]));
-const noOverrideResult = spawnSync(process.execPath, [path.join(__dirname, '..', 'check-iocontrol-coords.js'),
+const noOverrideResult = spawnSync(process.execPath, [path.join(__dirname, '..', 'adapters/mtslg-iocontrol', 'check-iocontrol-coords.js'),
   '--xml', alignRightXmlPath, '--nodes', noOverrideNodesPath], { encoding: 'utf8' });
 if (noOverrideResult.status === 0 || !/MISMATCH id="r1"/.test(noOverrideResult.stdout)) {
   throw new Error(`不给 expectedLeft 时必须按 x − 原点核对并报 MISMATCH:\n${noOverrideResult.stdout}`);

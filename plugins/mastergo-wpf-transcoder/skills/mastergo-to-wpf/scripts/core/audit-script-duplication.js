@@ -16,20 +16,25 @@
  *      （登记必须写 reason）→ 失败。处理方式：复用共享实现，或登记「为什么同名是合理的」。
  *   INFO 同名不同体且已登记：只打印清单，供人复核，不影响退出码。
  *
- * 范围：scripts/*.js（不含 scripts/lib/ 共享模块与 scripts/tests/）。
+ * 范围：scripts/ 下全部交付链路 .js（递归 core/ · host/ · adapters/ · entry/；
+ *       不含 scripts/lib/ 共享模块与 scripts/tests/ 用例）。
  * 用法：node audit-script-duplication.js [--scripts <目录>] [--registry <json>]
  * 退出码：0 = 通过；2 = 有未登记的重复实现。
  */
 
 const fs = require("fs");
 const path = require("path");
-const { fail } = require(path.join(__dirname, "lib", "script-helpers.js"));
+const { fail } = require(path.join(__dirname, "..", "lib", "script-helpers.js"));
 
 const SCRIPT_DIR = __dirname;
-const DEFAULT_REGISTRY = path.join(SCRIPT_DIR, "lib", "script-reuse-registry.json");
+// 脚本根目录：本文件在 core/ 下，交付链路脚本根是它的父目录。
+const SCRIPTS_ROOT = path.join(SCRIPT_DIR, "..");
+const DEFAULT_REGISTRY = path.join(SCRIPTS_ROOT, "lib", "script-reuse-registry.json");
+// 扫描时跳过的目录：lib/ 是共享实现（本来就该被复用），tests/ 是用例。
+const SKIP_DIRS = new Set(["lib", "tests", "node_modules"]);
 
 function parseArgs(argv) {
-  const out = { scripts: SCRIPT_DIR, registry: DEFAULT_REGISTRY };
+  const out = { scripts: SCRIPTS_ROOT, registry: DEFAULT_REGISTRY };
   for (let i = 0; i < argv.length; i += 1) {
     if (argv[i] === "--scripts") out.scripts = argv[++i];
     else if (argv[i] === "--registry") out.registry = argv[++i];
@@ -93,15 +98,35 @@ function loadRegistry(registryPath) {
   return byName;
 }
 
+// 递归列出交付链路脚本：分桶后脚本散在 core/ · host/ · adapters/*/ · entry/ 下，
+// 只扫同一层会漏掉大部分脚本（门禁会静默失效）。rel 用作报告里的定位标识。
+function listScriptFiles(root) {
+  const found = [];
+  (function walk(dir) {
+    fs.readdirSync(dir, { withFileTypes: true }).forEach(function (entry) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (SKIP_DIRS.has(entry.name)) return;
+        walk(full);
+        return;
+      }
+      if (entry.name.endsWith(".js")) {
+        found.push({ abs: full, rel: path.relative(root, full).split(path.sep).join("/") });
+      }
+    });
+  })(root);
+  return found.sort(function (a, b) { return a.rel.localeCompare(b.rel); });
+}
+
 function audit(scriptDir, registryPath) {
   const registry = loadRegistry(registryPath);
-  const files = fs.readdirSync(scriptDir).filter(function (name) { return name.endsWith(".js"); });
+  const files = listScriptFiles(scriptDir);
   const byName = new Map();
   const byBody = new Map();
-  files.forEach(function (file) {
-    functionsOf(fs.readFileSync(path.join(scriptDir, file), "utf8")).forEach(function (fn) {
+  files.forEach(function (item) {
+    functionsOf(fs.readFileSync(item.abs, "utf8")).forEach(function (fn) {
       const normalized = normalizeBody(fn.body);
-      const record = { file: file, line: fn.line, name: fn.name, args: fn.args, normalized: normalized };
+      const record = { file: item.rel, line: fn.line, name: fn.name, args: fn.args, normalized: normalized };
       if (!byName.has(fn.name)) byName.set(fn.name, []);
       byName.get(fn.name).push(record);
       if (!byBody.has(normalized)) byBody.set(normalized, []);

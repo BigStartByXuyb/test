@@ -17,7 +17,7 @@ import path from "node:path";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const runRegistry = require("./lib/run-registry.js");
+const runRegistry = require("../../lib/run-registry.js");
 
 // 参数解析：带值开关（--run-json / --page-title）的取值必须从位置参数里剔除，
 // 否则 `… <projectRoot> --run-json X` 这种少传 area 的调用会把 X 当成 area，绕过必填门禁。

@@ -12,7 +12,7 @@ const os = require("os");
 const path = require("path");
 const { spawnSync } = require("child_process");
 
-const cli = path.join(__dirname, "..", "list-lang-sources.mjs");
+const cli = path.join(__dirname, "..", "adapters/mtslg-iocontrol", "list-lang-sources.mjs");
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "mtslg-lang-sources-"));
 
 const mappingFile = path.join(root, "Demo.mapping.json");

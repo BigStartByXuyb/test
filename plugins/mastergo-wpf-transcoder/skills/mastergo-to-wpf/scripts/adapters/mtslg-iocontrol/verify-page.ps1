@@ -6,11 +6,8 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-# 默认目标项目 = 脚本目录的父目录（项目布局）或当前工作目录（插件布局）。
-if (-not $ProjectRoot) {
-    $candidate = Split-Path -Parent $PSScriptRoot
-    $ProjectRoot = if (Test-Path -LiteralPath (Join-Path $candidate 'docs\page-registry.json')) { $candidate } else { (Get-Location).Path }
-}
+# 默认目标项目 = 当前工作目录。
+if (-not $ProjectRoot) { $ProjectRoot = (Get-Location).Path }
 # 页面名从项目登记表取（脚本不写死某个页面的名字）。
 if (-not $Page) {
     $registry = Join-Path $ProjectRoot 'docs\page-registry.json'

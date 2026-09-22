@@ -34,8 +34,8 @@ const fs = require('fs');
 const path = require('path');
 // 跨脚本共用工具的唯一实现（见 scripts/lib/script-helpers.js；禁止在本脚本再抄一份）。
 const { readJson, failAndExit, parentOuterRightEdge, textBlockLeftValue,
-  isRightAlignedTextBlock } = require(path.join(__dirname, 'lib', 'script-helpers.js'));
-const { isHostShellName } = require(path.join(__dirname, 'lib', 'mastergo-rules.js'));
+  isRightAlignedTextBlock } = require(path.join(__dirname, '..', '..', 'lib', 'script-helpers.js'));
+const { isHostShellName } = require(path.join(__dirname, '..', '..', 'lib', 'mastergo-rules.js'));
 const fail = failAndExit(1);
 
 function parseArgs(argv) {

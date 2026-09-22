@@ -11,8 +11,8 @@ const path = require("path");
 const { spawnSync } = require("child_process");
 
 const scripts = path.join(__dirname, "..");
-const registryCli = path.join(scripts, "run-registry.mjs");
-const summaryCli = path.join(scripts, "build-run-summary.mjs");
+const registryCli = path.join(scripts, "core", "run-registry.mjs");
+const summaryCli = path.join(scripts, "core", "build-run-summary.mjs");
 
 const runNode = (cli, args) => spawnSync(process.execPath, [cli].concat(args), { encoding: "utf8" });
 
