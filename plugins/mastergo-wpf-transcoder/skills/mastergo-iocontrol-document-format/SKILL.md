@@ -48,7 +48,7 @@ description: 强制规范 MasterGo → MTSLG IOContorl 映射文档的写法，�
 
 组件集 ID、实例 ID、图层 ID 和设计师自定义名称只用于内部来源追踪，不参与唯一匹配。来源追踪信息用于读取证据、审计和回溯，默认不要作为“来源：MasterGo 文件……”等独立正文行写入飞书映射文档；只有全文已有同类来源字段或用户明确要求时才写入。文档里需要写明组件集的真实名称；不能只写“左右结构”“上下结构”这类缩写。
 
-**一个族一个键**：模板族实际用哪个键，登记在 `mtslg-iocontrol-map.json` 的 `match` 字段里，**一个模板族只登记一个键、解析时也只用一个**——键的种类/属性名一律以映射表各族的 `match` 为准，本规范不另立清单；本节与「匹配键」一节出现的取值只为例示、须与映射表同步（例如 `componentTemplates.match.property` = `属性 1`）。映射文档里每个族的“匹配规则”必须写明它用的是哪一种，并与映射表登记一致；不要写成“多个键任选其一”或“先按属性、取不到再按名字”这类多候选兜底。另一种键 `componentName: true`（按被引用组件的名字命中）只用于 Layout 层的底部栏，**不是组件模板族可用的键**。
+**一个族一个键**：模板族实际用哪个键，登记在 `mtslg-iocontrol-map.json` 的 `match` 字段里，**一个模板族只登记一个键、解析时也只用一个**——键的种类/属性名一律以映射表各族的 `match` 为准，本规范不另立清单；本规范里出现的具体键取值/属性名（如 `componentTemplates.match.property` = `属性 1`）只为例示、须与映射表同步。映射文档里每个族的“匹配规则”必须写明它用的是哪一种，并与映射表登记一致；不要写成“多个键任选其一”或“先按属性、取不到再按名字”这类多候选兜底。另一种键 `componentName: true`（按被引用组件的名字命中）只用于 Layout 层的底部栏，**不是组件模板族可用的键**。
 
 **底部栏不属于本规范范围**：底部栏（`layoutRules.bottomBar`）是 Layout 层规则，按页面壳层 Layout 规范 `skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/feishu-layout-mapping.md` 里登记的 `layoutRules.bottomBar.match` 匹配（当前为 `componentName: true`——底部栏实例的属性里没有变体信息，变体值就是被引用组件的名字）。本规范只约束组件库映射文档，不得把底部栏按公开属性“属性 1”登记进组件库映射文档。
 

@@ -1005,5 +1005,18 @@ console.log("PASS 契约机器可读入口（入口文档 ↔ run-all.ps1 -OutFi
   assert.strictEqual(generatorBlind.length, 1,
     "「覆盖审计看不到生成器」只允许在同步清单第 1 项写完整一处、其余位置改成引用（当前 " +
     generatorBlind.length + " 处）——同一条规则写两遍会被语义审计当冗余报出");
+  // 自指门禁：小节内不得用「本节与『匹配键』一节」这类写法指代自己所处的小节——那样"只为例示"
+  // 的作用范围会出现两读（既可能被读成本段，也可能被读成整个小节，把正式登记口径一起降格）。
+  const lines = skillLines(docFormat);
+  const sectionOf = (heading) => {
+    const start = lines.findIndex((line) => line.trim() === heading);
+    if (start < 0) return null;
+    const end = lines.findIndex((line, index) => index > start && line.startsWith("## "));
+    return lines.slice(start + 1, end < 0 ? lines.length : end);
+  };
+  const matchKeySection = sectionOf("## 匹配键");
+  assert.ok(matchKeySection, "规范必须保留「## 匹配键」小节");
+  assert.ok(!matchKeySection.some((line) => line.includes("「匹配键」一节")),
+    "「匹配键」小节内不得再用「「匹配键」一节」指代自己（自指会让该句的作用范围出现两读）");
 }
 console.log("PASS 匹配键口径单读法 + 同一条规则单处陈述（mastergo-iocontrol-document-format/SKILL.md）");
