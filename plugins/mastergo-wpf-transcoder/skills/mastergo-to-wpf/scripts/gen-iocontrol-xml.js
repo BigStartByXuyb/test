@@ -460,6 +460,19 @@ function geometryLeftOf(node, parentAbsX, insetLeft, parentOuterRightEdgeX) {
     }
     return left;
   }
+  // 左对齐（含 center）也走同一实现：originX = 输出父容器内容区原点X（parentAbsX + 内容区 inset.left）。
+  const type = node.controlType || (node.attrs && node.attrs.ControlType);
+  if (type === 'TextBlock') {
+    const leftAligned = textBlockLeftValue({
+      align: 'Left',
+      pageAbsX: node.absX,
+      originX: parentAbsX + insetLeft
+    });
+    if (leftAligned === null) {
+      throw new Error('TextBlock 的 Left 无法计算（缺 pageAbsX 或内容区原点X）: ' + node.ref);
+    }
+    return leftAligned;
+  }
   return node.absX - parentAbsX - insetLeft;
 }
 

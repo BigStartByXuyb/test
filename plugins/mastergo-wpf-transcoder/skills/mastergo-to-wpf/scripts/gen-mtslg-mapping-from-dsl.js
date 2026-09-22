@@ -624,9 +624,15 @@ function addNode(sourceRef, controlType, attrs, options = {}) {
   const geometry = options.geometryOverride || null;
   // expectedLeft 三种来源：① 显式覆盖（TextBlock Align=Right 的"到右边缘"口径，见 addText）；
   // ② 模板固定几何（表格列定义）；③ 默认：控件左边缘相对父容器左上角（根级即页面绝对 X）。
+  // TextBlock 的左对齐口径也走 lib/script-helpers.js 的共用实现（originX = 输出父容器内容区原点X；
+  // mapping 阶段 TextBlock 都在根级，故为 0）；其它 ControlType 仍是 pageAbsX − 父容器 pageAbsX。
+  const defaultLeft = controlType === "TextBlock"
+    ? textBlockLeftValue({ align: "Left", pageAbsX: s.pageAbsX, originX: parentSource ? parentSource.pageAbsX : 0 })
+    : s.pageAbsX - (parentSource ? parentSource.pageAbsX : 0);
+  if (defaultLeft === null) throw new Error("TextBlock 的 Left 无法计算（缺 pageAbsX 或内容区原点X）: " + sourceRef);
   const expectedLeft = options.expectedLeft !== undefined ? Number(options.expectedLeft)
     : geometry ? Number(geometry.left)
-      : s.pageAbsX - (parentSource ? parentSource.pageAbsX : 0);
+      : defaultLeft;
   const expectedTop = geometry ? Number(geometry.top)
     : s.pageAbsY - (parentSource ? parentSource.pageAbsY : 0) - (parentSource ? 0 : 192);
   const out = {

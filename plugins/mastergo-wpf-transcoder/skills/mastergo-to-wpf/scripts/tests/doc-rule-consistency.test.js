@@ -1097,6 +1097,15 @@ console.log("PASS 匹配键口径单读法 + 同一条规则单处陈述（maste
     assert.ok(consumer.includes("TEXT_BLOCK_RIGHT_LEFT_BASIS"),
       rel + " 必须用共享的 leftBasis 标识判断右对齐口径（不得自己拼字面量）");
   }
+  // 左对齐口径也必须真的走那个共用实现（否则"唯一实现"只是注释）：三处调用点都要传 align: "Left"。
+  for (const rel of ["gen-mtslg-mapping-from-dsl.js", "apply-container-containment.js", "gen-iocontrol-xml.js"]) {
+    const consumer = fs.readFileSync(path.join(__dirname, "..", rel), "utf8");
+    assert.ok(consumer.includes('align: "Left"') || consumer.includes("align: 'Left'"),
+      rel + " 的左对齐 Left 必须调用共用的 textBlockLeftValue（align: Left），不得各写一份公式");
+  }
+  // 映射表的 distance* 字段是登记 + 回归断言，不是运行期输入 —— 措辞必须点明，避免被读成脚本会读它。
+  assert.ok(/不是脚本的运行期输入/.test(align.note || ""),
+    "textBlockAlign.note 必须写明 distance* 是登记/回归断言口径、不是脚本的运行期输入");
   for (const [file, text] of [["mtslg-mode.md", modeDoc], ["feishu-component-library-mapping.md", feishuMapping],
     ["mastergo-to-wpf/SKILL.md", mainSkill]]) {
     assert.ok(text.includes("右边缘"), file + " 必须写明 Align=Right 时 Left 是到右边缘的距离");

@@ -241,7 +241,13 @@ if (containerSpecs.length > 0) {
       }
       expectedLeft = left;
     } else {
-      expectedLeft = bbox.x - originX - insetLeft;
+      // TextBlock 的左对齐口径同样走 lib/script-helpers.js 的共用实现（originX + insetLeft = 内容区原点X）；
+      // 其它 ControlType 保持原算术（Left = 绝对X − 容器绝对X − inset.left）。
+      const isText = (node.controlType || (node.attrs && node.attrs.ControlType)) === 'TextBlock';
+      expectedLeft = isText
+        ? textBlockLeftValue({ align: 'Left', pageAbsX: bbox.x, originX: originX + insetLeft })
+        : bbox.x - originX - insetLeft;
+      if (expectedLeft === null) fail('TextBlock 的 Left 无法计算（缺 bbox.x 或内容区原点X）: ' + ref);
     }
     const expectedTop = bbox.y - originY - insetTop - (parentIsRoot ? report.contentOriginY : 0);
     if (fromParent === target.ref && node.parent === target.ref &&

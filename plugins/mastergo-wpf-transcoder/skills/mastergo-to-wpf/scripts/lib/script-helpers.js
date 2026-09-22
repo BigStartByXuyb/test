@@ -147,7 +147,7 @@ function parentOuterRightEdge(options) {
 // provenance 校验器判断"这个节点走的是到右边缘的口径"。字面量只在这里出现一次（不在各脚本里重复）。
 const TEXT_BLOCK_RIGHT_LEFT_BASIS = "textblock.align-right.parent-outer-right-edge";
 
-// TextBlock 的 Left 取值口径（**全仓唯一实现**：映射生成器 / 容器重挂 / 坐标核对器共用同一份）：
+// TextBlock 的 Left 取值口径（**全仓唯一实现**：映射生成器 / 容器重挂 / XML 渲染 / 坐标核对器共用同一份）：
 //   Align=Left（设计稿 center 归左，见映射表 textBlockAlign）→ 控件**左边缘**到输出父容器
 //     **内容区左边缘**的距离 = pageAbsX − 内容区原点X（与既有的 Left 完全一致）；
 //   Align=Right → 以控件**右上角**为原点，量到输出父容器**外框右边缘**的距离
