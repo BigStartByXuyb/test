@@ -1,0 +1,5 @@
+{
+  "name": "ci-semantic-conflict-demo",
+  "version": "0.1.0",
+  "description": "仅用于验证 CI 语义冲突审计的测试插件。"
+}

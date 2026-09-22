@@ -17,6 +17,11 @@
       "name": "agent-plugin-publisher",
       "source": "./plugins/agent-plugin-publisher",
       "description": "将用户明确指定的本地目录按团队统一格式打包为插件。"
+    },
+    {
+      "name": "ci-semantic-conflict-demo",
+      "source": "./plugins/ci-semantic-conflict-demo",
+      "description": "仅用于验证 CI 语义冲突审计的测试插件。"
     }
   ]
 }
