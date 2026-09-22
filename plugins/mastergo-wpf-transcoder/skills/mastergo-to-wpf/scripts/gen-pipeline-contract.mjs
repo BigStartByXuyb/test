@@ -13,8 +13,12 @@
 //   node gen-pipeline-contract.mjs --print         # 打印渲染结果（不落盘）
 import fs from "node:fs";
 import path from "node:path";
-import { execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
+
+// 步骤契约的读取只有一份实现（lib/pipeline-steps.js，走 run-all.ps1 -OutFile 的文件通道，
+// 绕开控制台代码页）；本脚本与回归测试都从这里取，避免"生成器读一套、测试读另一套"。
+const { loadPipelineSteps } = createRequire(import.meta.url)("./lib/pipeline-steps.js");
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SKILL_ROOT = path.resolve(HERE, "..");
@@ -39,31 +43,8 @@ function parseArgs(argv) {
   return args;
 }
 
-// 步骤契约的唯一来源：跑脚本自己暴露的 JSON，而不是在这里再抄一份步骤表。
-function readSteps() {
-  const stdout = execFileSync(
-    process.platform === "win32" ? "pwsh" : "pwsh",
-    ["-NoProfile", "-File", RUN_ALL, "-List", "-Format", "json"],
-    { encoding: "utf8", maxBuffer: 8 * 1024 * 1024 }
-  );
-  const steps = JSON.parse(stdout.replace(/^\uFEFF/, ""));
-  if (!Array.isArray(steps) || steps.length === 0) {
-    throw new Error("run-all.ps1 -List -Format json 没有返回步骤数组");
-  }
-  for (const step of steps) {
-    for (const field of ["Id", "Name", "Title", "Inputs", "Outputs", "Failures", "Recovery"]) {
-      if (step[field] === undefined || step[field] === null) {
-        throw new Error(`步骤 ${step.Name || step.Id} 缺少契约字段 ${field}`);
-      }
-    }
-    for (const field of ["Inputs", "Outputs", "Failures", "Recovery"]) {
-      if (!Array.isArray(step[field]) || step[field].length === 0) {
-        throw new Error(`步骤 ${step.Name} 的 ${field} 必须是非空数组`);
-      }
-    }
-  }
-  return steps;
-}
+// 步骤契约的唯一来源是脚本自己暴露的步骤表，而不是在渲染器里再抄一份。
+const readSteps = () => loadPipelineSteps(RUN_ALL);
 
 function render(steps) {
   const lines = [];

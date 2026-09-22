@@ -873,6 +873,27 @@ matched.length = 0;
 matched.push(...topLevelMatches);
 const matchedRefs = new Set(matched.map(x => x.item.ref));
 
+// 模板族 ↔ 发射分支的登记表（纯数据，不参与发射，也不改变任何页面产物）。
+// 登记口径：映射表里「带 variants 的模板族」必须与这张表**双向相等**——两侧都要能对上。
+//   新增族 = 先写下面那条 `match.family === "…"` 发射分支，再把族名登记到这里；
+//   componentTemplates 是**兜底分支**（本文件末尾的按钮组路径），没有显式 `match.family ===` 条件。
+// 为什么要有这张表：没有它时，"映射表加了族、生成器没有对应分支"不会有任何报错——匹配到的实例会
+// 静默落进兜底分支按按钮组发射，产出结构错的页面。门禁在 tests/template-family-coverage.test.js：
+// 它按**源码解析**读这张表（本文件是 CLI 线性脚本，顶层即入口，require 会立刻因缺 --dsl 抛错），
+// 再与映射表双向比对，并逐个在源码里确认非兜底族的发射分支真实存在。
+const SUPPORTED_TEMPLATE_FAMILIES = [
+  "componentTemplates",
+  "rightSidebarTemplates",
+  "rightSidebarComponentTemplates",
+  "inputTemplates",
+  "selectBoxTemplates",
+  "selectionTemplates",
+  "infoGroupTemplates",
+  "cameraTemplates",
+  "mainMenuTemplates",
+  "tableTemplates"
+];
+
 for (const { item: inst, match } of matched) {
   const variant = match.variant;
   const spec = match.spec;

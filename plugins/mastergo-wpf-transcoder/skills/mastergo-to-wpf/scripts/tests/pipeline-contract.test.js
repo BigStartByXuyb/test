@@ -10,6 +10,7 @@ const assert = require("assert");
 const fs = require("fs");
 const path = require("path");
 const { execFileSync } = require("child_process");
+const { loadPipelineSteps } = require(path.join(__dirname, "..", "lib", "pipeline-steps.js"));
 
 const SCRIPTS = path.join(__dirname, "..");
 const SKILL = path.join(SCRIPTS, "..");
@@ -21,23 +22,16 @@ const runAllSource = fs.readFileSync(RUN_ALL, "utf8");
 const contractDoc = fs.readFileSync(CONTRACT_DOC, "utf8");
 
 // 1) 脚本侧：12 步、契约字段齐备、没有空字段。
-const steps = JSON.parse(execFileSync("pwsh", ["-NoProfile", "-File", RUN_ALL, "-List", "-Format", "json"], {
-  encoding: "utf8",
-  maxBuffer: 8 * 1024 * 1024,
-}));
+// 读取只有一份实现（lib/pipeline-steps.js）：走 run-all.ps1 -OutFile 的文件通道（UTF-8），
+// 契约字段齐备/非空数组由它 fail-closed 保证，这里只断言**契约本身**（步数、名字、顺序、Id 连续）。
+const steps = loadPipelineSteps(RUN_ALL);
 assert.strictEqual(steps.length, 12, "一键流水线必须是 12 步");
 const expectedNames = ["fetch", "capture", "svg", "visibility", "mapping", "discover",
   "ledger", "layout", "inputs", "bundle", "gates", "verify"];
 assert.deepStrictEqual(steps.map((step) => step.Name), expectedNames, "步骤名与顺序必须稳定（断点续跑按名字定位）");
 steps.forEach((step, index) => {
   assert.strictEqual(step.Id, index + 1, `步骤 ${step.Name} 的 Id 必须连续`);
-  for (const field of ["Title", "Inputs", "Outputs", "Failures", "Recovery"]) {
-    assert.ok(step[field], `步骤 ${step.Name} 必须提供 ${field}`);
-  }
-  for (const field of ["Inputs", "Outputs", "Failures", "Recovery"]) {
-    assert.ok(Array.isArray(step[field]) && step[field].length > 0 && step[field].every((item) => String(item).trim()),
-      `步骤 ${step.Name} 的 ${field} 必须是非空字符串数组`);
-  }
+  assert.ok(step.Title && String(step.Title).trim(), `步骤 ${step.Name} 必须提供 Title`);
   assert.ok(runAllSource.includes(`Name = '${step.Name}'`), `run-all.ps1 里必须能查到步骤 ${step.Name}`);
 });
 
@@ -70,5 +64,15 @@ assert.ok(contractDoc.includes("-Target <Target> -Progress <步骤名>"),
   "续跑示例必须带目标信息（与 SKILL.md 同一口径）");
 assert.ok(contractDoc.includes("只给 `-Progress` 时脚本取不到本次页面的来源"),
   "契约文档必须写明只给 -Progress 会取不到来源");
+
+// 4) 编码回归：把控制台输出编码设成 GBK(936) 之后再跑 --check，必须仍然 PASS。
+//    背景：契约原先是 `pwsh -List -Format json` 写 stdout 再由 Node 读——经过 GBK 控制台编码后，
+//    中文全变成替换字符 U+FFFD，而 `JSON.parse` **不会失败**，坏掉的是内容（本机必现，实测
+//    `Title` 会变成 `ȡ�� getDsl…`）。现在契约走 run-all.ps1 -OutFile 的文件通道（UTF-8），
+//    与控制台代码页无关；这条用例把它钉住，防止有人把读取改回 stdout。
+const gbkCheck = execFileSync("pwsh", ["-NoProfile", "-Command",
+  "[Console]::OutputEncoding = [Text.Encoding]::GetEncoding(936); & '" + process.execPath + "' '" + GENERATOR + "' --check"],
+  { encoding: "utf8", stdio: "pipe" });
+assert.ok(gbkCheck.includes("PASS"), "GBK(936) 控制台编码下 --check 仍必须 PASS: " + gbkCheck);
 
 console.log("PASS 一键流水线契约（run-all.ps1 $Steps ↔ pipeline-contract.md）一致性回归测试");

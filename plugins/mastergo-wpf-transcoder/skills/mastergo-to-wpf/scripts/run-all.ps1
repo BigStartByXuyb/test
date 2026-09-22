@@ -13,6 +13,7 @@
     例：
         pwsh -NoProfile -File _tool\run-all.ps1 -List
         pwsh -NoProfile -File _tool\run-all.ps1 -List -Format json   # 12 步契约（输入/产物/失败/续跑），供文档生成使用
+        pwsh -NoProfile -File _tool\run-all.ps1 -List -Format json -OutFile <临时json>   # 同上，但写文件（UTF-8），Node 侧只读文件、不读 stdout
         pwsh -NoProfile -File _tool\run-all.ps1 -ProjectRoot <项目> -Target <页面Target> -LayerId <图层id> -StopAfter discover
         pwsh -NoProfile -File _tool\run-all.ps1 -ProjectRoot <项目> -Target <页面Target> -Progress layout          # 图标台账/译文改好之后
         pwsh -NoProfile -File _tool\run-all.ps1 -ProjectRoot <项目> -Target <页面Target> -Progress bundle -Overwrite
@@ -37,7 +38,11 @@ param(
     [switch] $List,
     [ValidateSet('text', 'json')]
     [string] $Format = 'text',
-    [string] $ConfigPath = ''
+    [string] $ConfigPath = '',
+    # 只与 -List -Format json 配用：把步骤契约 JSON 写进文件（UTF-8，PS7 下无 BOM）再退出。
+    # 为什么要有它：stdout 走控制台代码页（本机 GBK），中文会被替换成 U+FFFD，Node 侧解析只能靠猜；
+    # 文件是确定编码。目标目录不存在直接失败（不替调用方建目录）。
+    [string] $OutFile = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -156,9 +161,24 @@ $Steps = @(
     }
 )
 
+if ($OutFile -and (-not $List -or $Format -ne 'json')) {
+    throw '-OutFile 只与 -List -Format json 配用（它写的是步骤契约 JSON）'
+}
+
 if ($List) {
     if ($Format -eq 'json') {
-        ConvertTo-Json -InputObject @($Steps) -Depth 6
+        $json = ConvertTo-Json -InputObject @($Steps) -Depth 6
+        if ($OutFile) {
+            $outDir = Split-Path -Parent $OutFile
+            if ($outDir -and -not (Test-Path -LiteralPath $outDir)) {
+                throw "-OutFile 的目标目录不存在: $outDir"
+            }
+            Set-Content -LiteralPath $OutFile -Value $json -Encoding UTF8
+            Write-Output "已写入步骤契约: $OutFile"
+        }
+        else {
+            $json
+        }
     }
     else {
         $Steps | ForEach-Object { '{0,2}  {1,-10} {2}' -f $_.Id, $_.Name, $_.Title }

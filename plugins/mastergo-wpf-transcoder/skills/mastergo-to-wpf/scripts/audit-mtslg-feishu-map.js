@@ -19,17 +19,20 @@ function splitVariants(text) {
     .filter(Boolean);
 }
 
-// 文档侧解析：只认结构化写法（不猜散文）。每个 token 带一个 `kind`，**判据只有一处** —— 下面这张三分类表
+// 文档侧解析：只认结构化写法（不猜散文）。每个 token 带一个 `kind`，**判据只有一处** —— 下面这张四分类表
 // （classifyDocTokens 按它判去留，本文件其它注释不再复述）：
-//   variant —— `属性 1` / `按钮类型` / `变体`：后面的值就是变体值，解析不到映射表就是文档凭空多写；
-//   section —— `组件集` / `聚合集合` / `独立组件`：后面的值是"这一节属于哪个组件集/聚合"，解析不到时
-//              要看同组里有没有别的变体锚定（有 → 算标签；整组都没有 → 孤儿章节，报错）；
-//   label   —— `结构分支`：写作规范允许的文档组织维度（结构分支名），按定义不等于任何变体名，
-//              一律算标签。父节点语义不是匹配键、规范也不再用它当标题，因此不在此列（出现即按变体值报错，
-//              提示作者改成组件集/结构分支/真实变体值标题）。
+//   variant   —— `属性 1` / `按钮类型` / `变体`：后面的值就是变体值，解析不到映射表就是文档凭空多写；
+//   section   —— `组件集` / `聚合集合` / `独立组件`：后面的值是"这一节属于哪个组件集/聚合"，解析不到时
+//                要看同组里有没有别的变体锚定（有 → 算标签；整组都没有 → 孤儿章节，报错）；
+//   label     —— `结构分支`：写作规范允许的文档组织维度（结构分支名），按定义不等于任何变体名，一律算标签。
+//                （它不是绕过路径：映射表的每个变体仍必须出现在文档正文，`undocumented` 方向照查。）
+//   forbidden —— 其余未登记的标题键（如 `父节点`）：写作规范已不再允许用它当标题，其值**一律**
+//                报 `unregisteredVariants`（连"取值恰为某变体名子串"也不放过），提示作者改成
+//                `组件集=` / `结构分支=` / 真实变体值标题。
 // 标题值的拆法：先剥掉括注说明（如「聚合集合=右侧栏（全部按钮类型变体）」里的括号），再按列举分隔符切开，
 // 每段取**最后一个** `=` 之后的内容；没有 `=` 的段继承上一段的键 ——
 // `组件集=选择框，变体=选择框-40/选择框-36` → 组件集段(选择框) + 变体段(选择框-40、选择框-36)。
+const VARIANT_KEYS = ["属性 1", "按钮类型", "变体"];
 const SECTION_KEYS = ["组件集", "聚合集合", "独立组件"];
 const LABEL_KEYS = ["结构分支"];
 
@@ -59,7 +62,9 @@ function extractDocumentedRules(markdown) {
     for (const part of raw.split(/[、，,/]/)) {
       if (part.indexOf("=") >= 0) {
         const key = part.slice(0, part.indexOf("=")).trim();
-        kind = LABEL_KEYS.includes(key) ? "label" : (SECTION_KEYS.includes(key) ? "section" : "variant");
+        kind = LABEL_KEYS.includes(key) ? "label"
+          : (SECTION_KEYS.includes(key) ? "section"
+            : (VARIANT_KEYS.includes(key) ? "variant" : "forbidden"));
         pushToken(part.slice(part.lastIndexOf("=") + 1), kind);
         continue;
       }
@@ -92,7 +97,7 @@ function buildVariantOwners(templateMap) {
   return owners;
 }
 
-// token 判据见上方 extractDocumentedRules 的「三分类表」，本函数只实现它，不再复述规则。
+// token 判据见上方 extractDocumentedRules 的「四分类表」，本函数只实现它，不再复述规则。
 // 实现要点只有一条：kind=section 的 token 需要一个**锚点** —— 它所在的那一组里至少有一个 token
 // 解析成了变体或待确认变体；有锚点算标签，没锚点才是孤儿章节（报 unregisteredVariants）。
 function classifyDocTokens(groups, templateMap) {
@@ -112,11 +117,18 @@ function classifyDocTokens(groups, templateMap) {
   const labels = [];
   const unregisteredVariants = [];
   const seen = new Set();
+  const seenForbidden = new Set();
   const unresolvedSections = [];
   for (const group of groups) {
     // 先看这一组有没有"锚"：任何一个 token 能解析成变体或待确认变体。
     const anchored = group.tokens.some(token => owners.has(token.value) || pendingOwners.has(token.value));
     for (const token of group.tokens) {
+      // 未登记的标题键（如 `父节点=`）：与"取值像不像变体""这个值是否在别处出现过"都无关，一律报——
+      // 要修的是标题写法。所以这条判定必须放在 covered/unconfirmed/seen 之前。
+      if (token.kind === "forbidden") {
+        if (!seenForbidden.has(token.value)) { seenForbidden.add(token.value); unregisteredVariants.push(token.value); }
+        continue;
+      }
       const owner = owners.get(token.value);
       if (owner) { if (!seen.has(token.value)) { seen.add(token.value); covered.push(`${owner}/${token.value}`); } continue; }
       const pendingOwner = pendingOwners.get(token.value);

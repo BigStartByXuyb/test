@@ -72,6 +72,12 @@ assert.ok(parent.unregisteredVariants.includes("左标题+右信息"),
   "`父节点=…` 标题必须被报出（提示改成组件集/结构分支/真实变体值标题）: " +
   JSON.stringify(parent.unregisteredVariants));
 
+// ⑥ 同上，但取值恰是某个变体名的子串（`输入框` ⊂ `输入框-整数-40`）——未登记键一律报，不被子串软化放过
+const docWithParentSubstring = doc + "\n## 历史父节点标题示例 2\n\n### 固定模板：父节点=输入框\n\n历史写法。\n";
+const parentSubstring = auditMappingCoverage(docWithParentSubstring, templateMap);
+assert.ok(parentSubstring.unregisteredVariants.includes("输入框"),
+  "`父节点=` 的取值即使是某变体名的子串也必须报出: " + JSON.stringify(parentSubstring.unregisteredVariants));
+
 assert.ok(!doc.includes("RightUpDownButtonStyle"), "不得保留旧的 RightUpDownButtonStyle 兼容别名");
 assert.ok(!doc.includes("或其他实际变量值"), "按钮模板必须使用明确的 startstop 变体");
 assert.ok(doc.includes("40/36/32/28"), "高度规则必须包含 28 变体");
