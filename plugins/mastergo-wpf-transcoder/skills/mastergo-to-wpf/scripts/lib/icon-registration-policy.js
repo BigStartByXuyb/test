@@ -27,9 +27,12 @@
 //     host-shell                      宿主公共栏（顶部栏/底部栏/常驻信息标记词）→ 不登记
 //     decorative                      背景/分割装饰 → 不登记
 //     no-icon-slot                    没有任何发射点引用它 → 不登记
-//     unregistered-variant            命中变体但映射表查不到该变体 → 不登记并列入人工核对
+//     unregistered-variant            命中实例但映射表里查不到该变体 → 不登记并列入人工核对（映射表缺登记）
+//     variant-without-icon-policy     变体已登记、但漏登记 iconPolicy → 不登记并列入人工核对（映射表漏字段）
 
 const { isHostShellName } = require("./mastergo-rules.js");
+// 变体归属判据的唯一实现（见 resolve-mtslg-template-mapping.js；缺失时 componentInstances 没有 variant 字段）。
+const { resolveInstanceVariant } = require("../resolve-mtslg-template-mapping.js");
 
 // 映射表里的**块名**（结构定位，不是可枚举的取值清单）。
 const CAMERA_BLOCK = "cameraTemplates";
@@ -95,10 +98,24 @@ function buildRegistrationPolicy(options) {
   const cameraRole = ((templateMap[CAMERA_BLOCK] || {}).innerTextPolicy || {}).role || CAMERA_BLOCK;
   const index = buildDslIndex(snapshot);
 
-  // 变体归属的唯一来源：mapping 的 resolvedTemplates（模板匹配的结果），不重跑匹配。
+  // 变体归属只认两处真值源，都是生成期产物、都不在这里重跑匹配：
+  //   ① mapping.resolvedTemplates —— 解析器（resolve-mtslg-template-mapping.js）跑过之后的形状；
+  //   ② mapping.componentInstances —— 生成器（gen-mtslg-mapping-from-dsl.js）直接产出的形状，
+  //      **run-all 第 6 步喂给 discover 的正是这一种（草稿 mapping）**，它没有 resolvedTemplates，
+  //      变体要用与解析器同一份判据从公开属性/组件名取（resolveInstanceVariant，禁止另写一份）。
   const instanceByRef = new Map();
   for (const entry of Array.isArray(mapping.resolvedTemplates) ? mapping.resolvedTemplates : []) {
-    if (entry && typeof entry.instanceRef === "string" && entry.instanceRef) instanceByRef.set(entry.instanceRef, entry);
+    if (!entry || typeof entry.instanceRef !== "string" || !entry.instanceRef) continue;
+    instanceByRef.set(entry.instanceRef, { template: entry.template, variant: entry.variant, instanceRef: entry.instanceRef });
+  }
+  if (instanceByRef.size === 0) {
+    for (const entry of Array.isArray(mapping.componentInstances) ? mapping.componentInstances : []) {
+      if (!entry || typeof entry.instanceRef !== "string" || !entry.instanceRef) continue;
+      const family = entry.template || "componentTemplates";
+      const block = templateMap[family];
+      const variant = block && entry.variant ? entry.variant : (block ? resolveInstanceVariant(entry, block) : null);
+      instanceByRef.set(entry.instanceRef, { template: family, variant: variant, instanceRef: entry.instanceRef });
+    }
   }
 
   function variantSpec(family, variant) {
@@ -126,7 +143,7 @@ function buildRegistrationPolicy(options) {
       }
       const policy = typeof spec.iconPolicy === "string" ? spec.iconPolicy : null;
       if (policy === null) {
-        return verdict(false, family, variant, node.id, family + ".variants." + variant + ".iconPolicy", node.name, "unregistered-variant");
+        return verdict(false, family, variant, node.id, family + ".variants." + variant + ".iconPolicy", node.name, "variant-without-icon-policy");
       }
       const decision = POLICY_DECISION[policy];
       if (decision) {

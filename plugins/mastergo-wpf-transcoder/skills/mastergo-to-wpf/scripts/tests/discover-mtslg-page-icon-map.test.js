@@ -235,14 +235,15 @@ for (const candidate of multiOutput.candidates) {
         variants: { "首页-长方形": { topLeftContent: "none" }, "方-icon": { topLeftContent: "none" } }
       }
     },
-    componentTemplates: { variants: {
+    componentTemplates: { match: { property: "属性 1" }, variants: {
       "轴操作": { controlType: "IconButton", iconPolicy: "single-path" },
       "加减快捷键-无标题": { controlType: "IconButton", iconPolicy: "none" }
     } },
-    rightSidebarTemplates: { variants: {
+    rightSidebarTemplates: { match: { property: "按钮类型" }, variants: {
       exit: { controlType: "IconButton", iconPolicy: "runtime", runtimeIcon: "ExitGeometry" }
     } },
     cameraTemplates: {
+      match: { componentSet: true },
       innerTextPolicy: { decision: "omit", role: "camera-viewport-internal" },
       variants: { "集成图像": { controlType: "Camera", iconPolicy: "none" } }
     }
@@ -328,6 +329,54 @@ for (const candidate of multiOutput.candidates) {
     "mustName 必须等于 registration.register=true 的候选下标");
   assert.strictEqual(reg.registrationSummary.register, 2);
   assert.strictEqual(reg.registrationSummary.skip, 7);
+  // 草稿形状（生成器直接产出、**没有 resolvedTemplates**）才是 run-all 第 6 步喂给 discover 的输入：
+  // 变体必须用与 resolve-mtslg-template-mapping.js 同一份判据从公开属性/组件名取，结论必须完全一致。
+  const regDraftFile = path.join(dir, "mapping.registration-draft.json");
+  fs.writeFileSync(regDraftFile, JSON.stringify({
+    sourceNodes: regRefs,
+    nodes: [],
+    componentInstances: [
+      { template: "componentTemplates", instanceRef: "reg/root/axis", properties: { "属性 1": "轴操作" }, requiredSlots: [] },
+      { template: "componentTemplates", instanceRef: "reg/root/plus", properties: { "属性 1": "加减快捷键-无标题" }, requiredSlots: [] },
+      { template: "rightSidebarTemplates", instanceRef: "reg/root/exit", properties: { "按钮类型": "exit" }, componentSet: "exit", requiredSlots: [] },
+      { template: "cameraTemplates", instanceRef: "reg/root/camera", properties: {}, componentSet: "集成图像", requiredSlots: [] }
+    ]
+  }), "utf8");
+  const regDraftOut = path.join(dir, "page-icon-map.registration-draft.json");
+  const regDraftResult = spawnSync(process.execPath,
+    [script, "--svg", svgFile, "--mapping", regDraftFile, "--dsl", regDslFile,
+      "--template-map", regMapFile, "--out", regDraftOut],
+    { encoding: "utf8" });
+  assert.strictEqual(regDraftResult.status, 0, regDraftResult.stderr);
+  const regDraft = JSON.parse(fs.readFileSync(regDraftOut, "utf8"));
+  for (const candidate of regDraft.candidates) {
+    const want = expectation[candidate.sourceRef];
+    assert.strictEqual(candidate.registration.register, want.register,
+      "草稿 mapping（componentInstances）下 " + candidate.sourceRef + " 的登记结论错误（basis=" + candidate.registration.basis + "）");
+    assert.strictEqual(candidate.registration.basis, want.basis,
+      "草稿 mapping（componentInstances）下 " + candidate.sourceRef + " 的判据名错误");
+  }
+  assert.deepStrictEqual(regDraft.mustName, reg.mustName,
+    "草稿 mapping 与解析后 mapping 的 mustName 必须一致（同一套判据，不能因为输入形状不同而变）");
+
+  // 变体已登记但漏登记 iconPolicy：另一种"判据缺依据"，必须与"变体没登记"分开报，且直接失败。
+  const noPolicyMapFile = path.join(dir, "template-map.no-policy.json");
+  fs.writeFileSync(noPolicyMapFile, JSON.stringify({
+    layoutRules: { bottomBar: { residentGroupPattern: "常驻(button|按钮|分组)", decorativeNamePattern: "背景|分割", variants: {} } },
+    componentTemplates: { match: { property: "属性 1" }, variants: { "轴操作": { controlType: "IconButton" } } }
+  }), "utf8");
+  const noPolicyOut = path.join(dir, "page-icon-map.no-policy.json");
+  const noPolicy = spawnSync(process.execPath,
+    [script, "--svg", svgFile, "--mapping", regDraftFile, "--dsl", regDslFile,
+      "--template-map", noPolicyMapFile, "--out", noPolicyOut],
+    { encoding: "utf8" });
+  assert.strictEqual(noPolicy.status, 1, "映射表漏登记 iconPolicy 时必须失败（不能静默当成不用登记）");
+  assert.match(noPolicy.stderr, /漏登记 iconPolicy/);
+  const noPolicyDoc = JSON.parse(fs.readFileSync(noPolicyOut, "utf8"));
+  const noPolicyCandidate = noPolicyDoc.candidates.find((candidate) => candidate.sourceRef === "reg/root/axis/g/p");
+  assert.strictEqual(noPolicyCandidate.registration.basis, "variant-without-icon-policy");
+  assert.strictEqual(noPolicyCandidate.registration.register, false);
+
   // 未传 --dsl（--merge 续用旧台账的路径）不产结论，但必须显式说明，不能默默当成"不用登记"。
   const regNoDslOut = path.join(dir, "page-icon-map.registration-no-dsl.json");
   const regNoDsl = spawnSync(process.execPath,

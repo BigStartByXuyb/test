@@ -23,7 +23,8 @@
  * 登记结论（registration）：每条候选直接给出「要不要进本页图标台账」的结论，模型不再回文档推判定表：
  *   registration.register —— true=必须进台账并定名；false=不要说它被 Icon 槽位引用
  *   registration.basis    —— 判据名（icon-policy-* / bottom-bar-* / host-shell / decorative /
- *                            camera-viewport-internal / no-icon-slot / unregistered-variant）
+ *                            camera-viewport-internal / no-icon-slot / unregistered-variant /
+ *                            variant-without-icon-policy）
  *   registration.source   —— 结论的真值源（映射表里的具体登记项 / 宿主壳标记词实现）
  * 判据唯一实现在 scripts/lib/icon-registration-policy.js；本脚本只负责把候选与真值源喂进去。
  * 输出里的 mustName 是「命名表必须覆盖的候选下标」（= register=true 的候选），
@@ -152,10 +153,11 @@ function main() {
   const templateMap = readJson(input["template-map"], "mtslg-iocontrol map");
   const snapshot = input.dsl ? readJson(input.dsl, "DSL snapshot") : null;
   const dslIndex = snapshot ? ICON_REGISTRATION.buildDslIndex(snapshot) : null;
-  // 登记结论依赖真实节点树：只有 --merge 续用旧台账的路径会不传 --dsl，那种路径不产结论。
+  // 登记结论依赖真实节点树：只有 Bundle 在 manifest 未提供 dslPath（续用旧台账）时会不传 --dsl，
+  // 那种路径不产结论；run-all 的一键流水线恒传 dsl.snapshot.json。
   const registration = snapshot ? ICON_REGISTRATION.buildRegistrationPolicy({ templateMap, mapping, snapshot }) : null;
   if (!registration) {
-    console.error("警告：未传 --dsl，本次不产出登记结论（registration）——只有 --merge 续用旧台账才会走到这里；"
+    console.error("警告：未传 --dsl，本次不产出登记结论（registration）——只有 Bundle 在 manifest 未提供 dslPath（续用旧台账）时才会走到这里；"
       + "新建页面必须传 dsl.snapshot.json，否则台账门禁无判据可用。");
   }
   if (!Array.isArray(svgData.svgs)) throw new Error("extractSvg JSON must contain svgs[]");
@@ -248,9 +250,10 @@ function main() {
   }
 
   const registered = candidates.filter(candidate => candidate.registration && candidate.registration.register === true);
-  // 命中的实例其变体在映射表里查不到：说明 mapping 与映射表不一致（缺登记或用了旧 mapping），
-  // 不能当成"不用登记"蒙过去——登记判据没有依据，必须先把登记补齐再重跑。
-  const review = candidates.filter(candidate => candidate.registration && candidate.registration.basis === "unregistered-variant");
+  // 命中实例、但变体或该变体的 iconPolicy 在映射表里查不到：说明映射表缺登记 / 漏字段
+  // （或用了旧 mapping），不能当成"不用登记"蒙过去——登记判据没有依据，先补齐再重跑。
+  const REVIEW_BASES = new Set(["unregistered-variant", "variant-without-icon-policy"]);
+  const review = candidates.filter(candidate => candidate.registration && REVIEW_BASES.has(candidate.registration.basis));
   const byBasis = {};
   for (const candidate of candidates) {
     const basis = candidate.registration ? candidate.registration.basis : "registration-unavailable";
@@ -284,10 +287,13 @@ function main() {
     + `${Object.entries(byBasis).map(([basis, count]) => basis + "=" + count).join(" ") || "无"}`);
   if (review.length) {
     for (const candidate of review) {
+      const cause = candidate.registration.basis === "variant-without-icon-policy"
+        ? `在映射表里漏登记 iconPolicy（变体本身已登记）`
+        : `在映射表里查不到（变体没登记）`;
       console.error(`登记判据缺依据：${candidate.sourceRef} 所属实例的变体 ${candidate.registration.family}.${candidate.registration.variant}`
-        + ` 在映射表里查不到（${candidate.registration.source}）`);
+        + ` ${cause}（${candidate.registration.source}）`);
     }
-    console.error(`共 ${review.length} 条候选的变体未在映射表登记：先按 references/adapters/mtslg-iocontrol 的同步清单补齐登记，`
+    console.error(`共 ${review.length} 条候选的登记判据缺依据：按上面每条的原因补映射表登记（缺变体补变体、缺 iconPolicy 补字段），`
       + `再重跑 -Progress mapping / discover（不要当成"不用登记"继续生成）`);
     process.exitCode = 1;
   }

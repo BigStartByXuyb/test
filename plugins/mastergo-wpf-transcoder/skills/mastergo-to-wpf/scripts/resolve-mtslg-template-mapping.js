@@ -315,5 +315,8 @@ if (require.main === module) {
 
 module.exports = {
   loadTemplateMap,
-  resolveTemplateMapping
+  resolveTemplateMapping,
+  // 变体归属判据的唯一实现：登记判据（lib/icon-registration-policy.js）也要按同一套键
+  // 从 componentInstances 取变体，禁止各写一份（缺失时 componentInstances 没有 variant 字段）。
+  resolveInstanceVariant
 };

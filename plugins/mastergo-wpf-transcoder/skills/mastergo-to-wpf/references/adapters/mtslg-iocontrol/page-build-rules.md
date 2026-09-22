@@ -39,7 +39,7 @@
 
 **MenuItem 的图标从哪来**（决定了"要不要登记"为什么重要）：`gen-mtslg-layout-manifest.js` 的 `iconEntryOf()` 拿菜单项实例的 DSL 节点，在**本页图标台账**里按 `ref` → `sourceId` → 几何键查条目，查到就用台账条目的 `name` 写进 `Icon="..."`——**台账里没有就没有 Icon**。
 
-**不要自己判、也不要靠图层名猜**：候选清单里的归属标记（`ownerControlType` 仅覆盖 IconButton / Camera 这类）**只是提示**，底部栏菜单图标不带归属标记——它们的结论由 `registration.basis` 给出（例如布局族菜单项那条写着 `layoutRules.bottomBar.variants`）。看到 `registration.register=false` 就不要登记；`registration.basis=unregistered-variant` 表示命中的变体在映射表里查不到（属映射表缺登记，先补登记再重跑，不要当成"不用登记"蒙过去）。
+**不要自己判、也不要靠图层名猜**：候选清单里的归属标记（`ownerControlType` 仅覆盖 IconButton / Camera 这类）**只是提示**，底部栏菜单图标不带归属标记——它们的结论由 `registration.basis` 给出（例如布局族菜单项那条写着 `layoutRules.bottomBar.variants`）。看到 `registration.register=false` 就不要登记。两种"判据缺依据"按 `registration.source` 分别修，**都不要当成"不用登记"蒙过去**：`unregistered-variant` = 该变体在映射表里没登记（补变体）；`variant-without-icon-policy` = 变体已登记但漏登记 `iconPolicy`（补字段）。变体归属的取法：mapping 里有 `resolvedTemplates` 就用它，否则从 `componentInstances` 按与 `resolve-mtslg-template-mapping.js` **同一份**判据取（run-all 第 6 步给 discover 的正是这份草稿 mapping）。
 
 **与第 5 节 `host-shell` 的分工（易混，明确写清）**：`host-shell` 是**文本** omit 角色，管的是顶部宿主公共栏的文本，以及**底部栏菜单的文案**（后者由 Layout `MenuItem` 的 Name 承载，不产页面内容节点）。本表管的是**图形**：底部栏 MenuItem 的图标属于页面级资源，照常登记进台账与 `Icons.xaml`。两处说的是同一条底部栏的不同侧面，不是互相排斥——不要因为文案被 omit 就认为其图标也不用登记。
 

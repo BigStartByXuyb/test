@@ -103,6 +103,8 @@ $Steps = @(
     [pscustomobject]@{
         Id = 6; Name = 'discover'; Title = '图标候选发现 + 登记结论 + 打印待命名清单'
         Inputs   = @('extractSvg.json + mapping 草稿 + dsl.snapshot.json + 正式映射表（登记判据的取值来源）')
+        # 草稿 mapping 只有 componentInstances（没有 resolvedTemplates），登记判据按与解析器同一份
+        # 判据从中取变体；两种形状都要支持，否则第 6 步的结论会全落到位置兜底。
         Outputs  = @('Generated/_inputs/<Target>.icon-candidates.json（待命名清单：候选下标/归属控件/层名/尺寸/registration 登记结论）', 'mustName：命名表必须恰好覆盖的候选下标（= registration.register=true）')
         Failures = @('缺 svg / mapping / 映射表（前置步骤未跑）', '候选命中未登记的变体（registration.basis=unregistered-variant：映射表缺登记）')
         Recovery = @('先补跑前置步骤，再重跑：-Progress discover；登记结论由 discover 机械判定（判据实现 scripts/lib/icon-registration-policy.js），不要回文档自行推断。若报"变体未在映射表登记"：按 references/adapters/mtslg-iocontrol 的同步清单补齐映射表登记，重跑 -Progress mapping')
@@ -766,9 +768,9 @@ if ($EndStep.Id -eq 6) {
     Write-Output ''
     Write-Output '下一步（语义判断，必须人工/AI 做）：'
     Write-Output ("  1) 读候选清单：$CandidateJson（含每个候选的归属控件、同级 PATH 数、图标层名与尺寸）")
-    Write-Output ("  2) 把被 Icon 槽位引用的图形定名，写进命名表：$NamingJson")
-    Write-Output ("     哪些图形算「被 Icon 槽位引用」有判定表：references/adapters/mtslg-iocontrol/page-build-rules.md 第 2 节")
-    Write-Output ("     （组件模板族看各变体登记的 iconPolicy；底部栏属布局族、按组件名匹配，是否出图标看命中变体里有没有 Icon 槽位；常驻分组只影响 Menu；宿主公共栏与相机视口内部不算）")
+    Write-Output ("  2) 把要登记的图形定名，写进命名表：$NamingJson")
+    Write-Output ("     哪些要登记已由 discover 机械判定：照候选的 registration.register=true / mustName 下标定名即可")
+    Write-Output ("     （registration.basis 写明判据、registration.source 写明真值源；判据说明见 references/adapters/mtslg-iocontrol/page-build-rules.md 第 2 节——只解释依据，不要自己再推一遍）")
     Write-Output ("     格式：[{ `"index`": <候选下标>, `"name`": `"<英文资源名>Geometry`", `"comment`": `"<中文注释>`", `"fromDsl`": <bool，可选> }, ...]")
     # 这一步只能读已存在的草稿：产物化的 Generated\<Target>.mapping.json 与 layout-manifest 分别到第 10 / 8 步才有。
     # 带 --page-name 时该脚本会用生成器的同一套派生链，列出「派生不出语义键、必须补术语表」的文案——
