@@ -765,7 +765,7 @@ if ($EndStep.Id -eq 6) {
     Write-Output ("  1) 读候选清单：$CandidateJson（含每个候选的归属控件、同级 PATH 数、图标层名与尺寸）")
     Write-Output ("  2) 把被 Icon 槽位引用的图形定名，写进命名表：$NamingJson")
     Write-Output ("     哪些图形算「被 Icon 槽位引用」有判定表：references/adapters/mtslg-iocontrol/page-build-rules.md 第 2 节")
-    Write-Output ("     （底部栏 MenuItem 算；常驻分组只影响 Menu，图形仍按各自 iconPolicy 判；宿主公共栏与相机视口内部不算）")
+    Write-Output ("     （组件模板族看各变体登记的 iconPolicy；底部栏属布局族、按组件名匹配，是否出图标看命中变体里有没有 Icon 槽位；常驻分组只影响 Menu；宿主公共栏与相机视口内部不算）")
     Write-Output ("     格式：[{ `"index`": <候选下标>, `"name`": `"<英文资源名>Geometry`", `"comment`": `"<中文注释>`", `"fromDsl`": <bool，可选> }, ...]")
     # 这一步只能读已存在的草稿：产物化的 Generated\<Target>.mapping.json 与 layout-manifest 分别到第 10 / 8 步才有。
     # 带 --page-name 时该脚本会用生成器的同一套派生链，列出「派生不出语义键、必须补术语表」的文案——
@@ -776,8 +776,8 @@ if ($EndStep.Id -eq 6) {
     Write-Output ("  3) 枚举本页文案，并同一次列出「必须补术语表」的文案：")
     Write-Output ("     $LangCmd")
     Write-Output ("     顺序：先写译文 → 加上 --translations 再跑一次这条命令。它会分两组报：")
-    Write-Output ("       「必须补术语表」= 已有译文却仍派生不出语义键（单字符之类），漏了会到第 11 步才失败；")
-    Write-Output ("       「还没有译文」= 补上合格英文译文即可，不必进术语表。")
+    Write-Output ("       「必须补术语表」= 派生不出语义键（单字符之类，与有没有译文无关），漏了会到第 11 步才失败；")
+    Write-Output ("       「还缺译文」= 补上合格英文译文即可，不必进术语表。")
     Write-Output ("     Layout 菜单名要等第 8 步产出，届时把 $LayoutManifestJson 作为第二个位置参数。")
     Write-Output ("     据此把中文→英文译文写进：$TranslationsJson")
     Write-Output ("  4) 然后继续（台账由命名表生成、并自动做图标几何来源核对）：pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -ProjectRoot `"$ProjectRoot`" -Target $Target -Progress ledger")

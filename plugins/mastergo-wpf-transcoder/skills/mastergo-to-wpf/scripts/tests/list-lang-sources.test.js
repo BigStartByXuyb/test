@@ -38,8 +38,8 @@ const run = (extra) => spawnSync(process.execPath,
 let result = run([]);
 assert.strictEqual(result.status, 0, result.stderr);
 const groups = (text) => ({
-  glossary: text.slice(text.indexOf("必须补术语表条目"), text.indexOf("还没有译文")),
-  translation: text.slice(text.indexOf("还没有译文"))
+  glossary: text.slice(text.indexOf("必须补术语表条目"), text.indexOf("还缺译文")),
+  translation: text.slice(text.indexOf("还缺译文"))
 });
 let g = groups(result.stdout);
 assert.match(g.glossary, /"X"/, "单字符 X 必须被列出：它与英文译文一致且长度为 1，派生不出语义键");

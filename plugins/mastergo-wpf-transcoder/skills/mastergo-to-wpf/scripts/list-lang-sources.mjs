@@ -5,9 +5,11 @@
 //   node list-lang-sources.mjs <mapping.json> [layout-manifest.json]
 //        [--page-name <Target>] [--translations <译文清单>] [--glossary <术语表>]
 //
-// 给了 --page-name 时，额外用真实派生器（gen-mtslg-lang-keys-from-dsl.js 的 deriveLangSpec）
-// 算出「哪些文案派生不出语义键、必须补术语表」——这些文案若不管，会落成临时键，
-// 直到第 11 步门禁才失败，导致整段返工。判定口径与生成器完全同源，不在这里另写一套规则。
+// 给了 --page-name 时，额外调用生成器自己的 deriveLangSpec 来分组（不在这里另写一套判定）。
+// 传入的就是本页现成的输入：mapping、layout 的 menuItems、以及 --translations / --glossary
+// 指向的文件（取不到时按空处理）。**没有传 `dsl` / `titleText` / `keyCatalog` / `buttonControlTypes`**，
+// 所以它只覆盖「页面节点文案 + Layout 菜单名」这两类，且不启用 keyCatalog 复用——与流水线第 9 步
+// 那次调用不是同一组入参，结论以第 9 步产出的 bundle 审计为准，这里只用于提前提示。
 import fs from "node:fs";
 import { createRequire } from "node:module";
 
@@ -95,14 +97,16 @@ if (typeof args["page-name"] === "string" && args["page-name"]) {
     const where = entry.menuIndex === undefined ? "页面节点" : "Layout 菜单项 #" + entry.menuIndex;
     return JSON.stringify(entry.text) + "   " + where + "   临时键=" + entry.key;
   };
-  console.log("--- 必须补术语表条目（已有译文却仍派生不出语义键；漏了会到第 11 步才失败）---");
+  // 标题不写"已有译文"：分组判据是生成器的 `pendingTranslations`（英文值缺失），
+  // 而像单字符这种文案本来就 CN==EN、不会进 pendingTranslations，与有没有译文清单无关。
+  console.log("--- 必须补术语表条目（派生不出语义键；漏了会到第 11 步才失败）---");
   if (!needsGlossary.length) console.log("（无）");
   else {
     for (const entry of needsGlossary) console.log(describe(entry));
     console.log("格式：" + JSON.stringify({ [needsGlossary[0].text || "文案"]: "EnglishIdentifier" }) +
       "，写进 Generated/_inputs/<Target>.lang-glossary.json");
   }
-  console.log("--- 还没有译文（补上合格英文译文后通常会自动派生，不必进术语表）---");
+  console.log("--- 还缺译文（补上合格英文译文后通常会自动派生，不必进术语表）---");
   if (!needsTranslation.length) console.log("（无）");
   else for (const entry of needsTranslation) console.log(describe(entry));
 }
