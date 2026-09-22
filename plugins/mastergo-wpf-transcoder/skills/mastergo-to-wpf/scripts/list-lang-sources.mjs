@@ -88,8 +88,8 @@ if (typeof args["page-name"] === "string" && args["page-name"]) {
   // 前者补译文即可自动派生；后者才是必须补术语表的（单字符等形态问题）。
   // 分组直接取派生器自己的报告，不再在脚本里另判一次"有没有译文"——
   // 那样会与生成器口径漂移（例如值为空串的条目：派生器按 `if (cn && en)` 视为没写）。
-  //   report.pendingTranslations：英文值缺失、退回中文占位 → 「还没有译文」
-  //   其余 provisionalKeys：有译文却仍派生不出语义键 → 「必须补术语表」
+  //   report.pendingTranslations 里有的 → 「还缺译文」（英文值缺失、退回中文占位）
+  //   其余 provisionalKeys → 「必须补术语表」（派生不出语义键）
   const pendingKeys = new Set((derived.report.pendingTranslations || []).map((entry) => entry.key));
   const needsGlossary = provisional.filter((entry) => !pendingKeys.has(entry.key));
   const needsTranslation = provisional.filter((entry) => pendingKeys.has(entry.key));

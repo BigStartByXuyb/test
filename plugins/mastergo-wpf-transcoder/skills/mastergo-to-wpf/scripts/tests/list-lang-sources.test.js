@@ -53,13 +53,13 @@ assert.strictEqual(result.status, 0, result.stderr);
 assert.match(groups(result.stdout).glossary, /（无）/, "补上术语表后「必须补术语表」组必须为空");
 
 // 3) 还没写译文时也要能分清两类：X 派生不出的原因是"单字符形态"、与有没有译文无关，
-//    必须在第一次调用就落进「必须补术语表」；中文文案只是缺译文，落「还没有译文」组。
+//    必须在第一次调用就落进「必须补术语表」；中文文案只是缺译文，落「还缺译文」组。
 //    这正是执行者最容易漏掉的那次返工：他写译文时还没跑过第 11 步。
 result = spawnSync(process.execPath, [cli, mappingFile, "--page-name", "Demo"], { encoding: "utf8" });
 assert.strictEqual(result.status, 0, result.stderr);
 g = groups(result.stdout);
 assert.match(g.glossary, /"X"/, "单字符形态与有没有译文无关，必须提示补术语表");
 assert.doesNotMatch(g.glossary, /"镜头倍率"/, "缺译文的中文文案不能混进术语表组");
-assert.match(g.translation, /"镜头倍率"/, "没有译文的中文文案应落进「还没有译文」组");
+assert.match(g.translation, /"镜头倍率"/, "没有译文的中文文案应落进「还缺译文」组");
 
 console.log("list-lang-sources: all cases passed");
