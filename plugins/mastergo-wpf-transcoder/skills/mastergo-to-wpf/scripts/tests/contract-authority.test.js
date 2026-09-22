@@ -23,8 +23,9 @@ const SKILL_ROOT = path.join(PLUGIN_ROOT, "skills", "mastergo-to-wpf");
 const SKILL_MD = path.join(SKILL_ROOT, "SKILL.md");
 const AUTHORITY_DOC = path.join(SKILL_ROOT, "references", "adapters", "mtslg-iocontrol", "bundle-manifest.md");
 const GENERATED_CONTRACT = path.join(SKILL_ROOT, "references", "adapters", "mtslg-iocontrol", "pipeline-contract.md");
-// 作业 A（mw-wpf）资料按 SKILL.md 声明停用，不参与文本门禁。
-const DISABLED_PREFIX = path.join("references", "adapters", "mw-wpf");
+// 作业 A（mw-wpf）的规则文本（模式 / 产物规则 / 适配器描述符）参与文本门禁；只有框架手册快照例外——
+// 它是从某次本地框架快照整理出的参考资料，不是本插件的规则文本（SKILL.md 已声明冲突时以本插件口径为准）。
+const MANUAL_SNAPSHOT_PREFIX = path.join("references", "adapters", "mw-wpf", "framework-manual");
 
 // 实现级判据词：出现它们就意味着在复述脚本行为，因此只允许出现在权威文档里。
 const IMPLEMENTATION_TOKENS = ["--keep", "ARTIFACT_KEYS", "LEGACY_SHADOWS", "逐字节不变", "不得补写", "run-registry.mjs"];
@@ -36,7 +37,7 @@ function collectDocs(dir, out = []) {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
         const full = path.join(dir, entry.name);
         if (entry.isDirectory()) {
-            if (full.includes(DISABLED_PREFIX)) continue;
+            if (full.includes(MANUAL_SNAPSHOT_PREFIX)) continue;
             collectDocs(full, out);
         } else if (entry.name.endsWith(".md")) {
             out.push(full);

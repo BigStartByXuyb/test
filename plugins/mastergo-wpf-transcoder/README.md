@@ -1,6 +1,6 @@
 # MasterGo WPF 转码插件
 
-用于将 MasterGo 设计稿转换为 MW WPF/XAML 和 MTSLG IOContorl XML 的 Claude Code 插件。
+用于将 MasterGo 设计稿转换为 MW WPF/XAML（作业A）和 MTSLG IOContorl XML（作业B）的 Claude Code 插件。
 
 ## Included skills
 
@@ -9,12 +9,14 @@
 
 架构与关键组成（目录分层、交付链路、规则事实源、产物布局、门禁与扩展点）见 [`ARCHITECTURE.md`](./ARCHITECTURE.md)。
 
-插件内保留两条路线的资料，但**当前版本只启用 `mtslg-iocontrol`**；`mw-wpf`（作业 A）暂不进入分流或生成流程，仅在显式重新启用前完成全篇复核：
+两条路线都启用，用 `run-all.ps1 -Mode <路线>` 选择（缺省 `mtslg-iocontrol`）。两者共用采集链路（第 1–4 步）、类型判定（共享类型表）、图标、多语言、Layout 注册与宿主壳，差别只在「同一类型怎么写」与页面发射物：
 
-- `Adapter: mw-wpf`：生成真实 MW WPF 页面、XAML、C# 宿主和项目注册。
+- `Adapter: mw-wpf`（作业A）：生成真控件 `View.xaml`（框架 `s:` 控件 + Grid 布局）、C# 宿主、本页 Icon/语言字典、Layout 注册与布局门禁；不发射 IOContorl 页面 XML。
 - `Adapter: mtslg-iocontrol`：生成完整 MTSLG IOContorl 项目结构，包括页面 XML、页面 Icon、Layout、mapping/provenance、项目配置以及目标项目要求的宿主壳；它不是 WPF 路线的降级结果，也不是附属中间产物。
 
-当前启用的 `mtslg-iocontrol` 支持真实目标项目接入、正式输出目录和运行时验证；没有目标项目时生成完整项目脚手架，只跳过编译和运行时加载验证。`mw-wpf` 路线的同等能力需在其重新启用时单独复核。
+`mtslg-iocontrol` 支持真实目标项目接入、正式输出目录和运行时验证；没有目标项目时生成完整项目脚手架，只跳过编译和运行时加载验证。作业A 同口径：没有目标项目时出静态脚手架，编译与加载验证等目标项目接入后再做。
+
+作业A 入口与验证：`pwsh -NoProfile -File <skill>/scripts/entry/run-all.ps1 -ProjectRoot <项目> -Target <页面> -Mode mw-wpf`（第 8 步推导 Grid 布局产物，第 10 步发真控件页面，第 11/12 步跑布局门禁 `check-wpf-layout.js`）。
 
 完整页面转换包含三项强制工具：
 

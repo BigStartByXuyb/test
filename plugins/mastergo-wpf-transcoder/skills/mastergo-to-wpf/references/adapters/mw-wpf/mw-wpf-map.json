@@ -12,6 +12,63 @@
     "note": "同一类型存在 IO 变体（绑 IO 点）与非 IO 变体时，MW 页面默认用 IO 变体：真实页面里输入/显示控件一律是 s:IOTextBox / s:IOComboBox / s:IOCheckBox / s:IOGroupBox。仅当设计稿该控件不绑 IO 点时用 native 变体。",
     "ioPreferred": true
   },
+  "textBinding": {
+    "note": "语言键挂到哪个属性：由 ControlType 决定默认属性，样式族可覆盖（真实页面里 RightButtonStyle / UpDownRightButtonStyle 是「图标上+文字下」，文本走 IconText，其余走 Content）。",
+    "byControlType": {
+      "IconButton": { "default": "Content", "byStyle": { "RightButtonStyle": "IconText", "UpDownRightButtonStyle": "IconText" } },
+      "StatusButton": { "default": "Value" },
+      "Button": { "default": "Content" },
+      "CheckBox": { "default": "Content" },
+      "RadioButton": { "default": "Content" },
+      "ToggleButton": { "default": "Content" },
+      "ComboBox": { "default": null },
+      "TextBox": { "default": "Text" },
+      "NumberBox": { "default": "Value" },
+      "IntNumberBox": { "default": "Value" },
+      "TextBlock": { "default": "Text" },
+      "GroupBox": { "default": "Header" },
+      "DataGrid": { "default": null }
+    }
+  },
+  "iconBinding": {
+    "note": "图形资源挂到哪个属性；图形名来自本页 Icon 台账（discover → 命名表 → 台账）。",
+    "byControlType": { "IconButton": "Icon" }
+  },
+  "frameworkTokens": {
+    "note": "框架固定区尺寸 Token（Sizes.xaml 框架级布局键，取值见 framework-manual/01-resources/colors-fonts-sizes.md）。框架固定区不发射进页面，尺寸只用于布局产物登记与 Layout 注册。",
+    "headerHeight": 85,
+    "bottomHeight": 180,
+    "sideMenuWidth": 85,
+    "statusBarHeight": 80,
+    "statusLightHeight": 70
+  },
+  "styleRules": {
+    "note": "外观只走样式族，不散写属性。选中顺序：① byVariant 命中（设计稿变体名）→ 用具名样式键；② 未命中 → 该 ControlType 的 pageDefault（具名键走页级 BasedOn，控件本身不写 Style；取 \"implicit\" 表示走框架隐式默认样式、同样不写 Style）；③ 两者都没有 → fail-closed 报出该变体待确认。命中的样式键逐一写入报告，pageDefault 兜底的记入 styleFallback 供人工评审。",
+    "pageDefault": {
+      "IconButton": "MainButtonStyle",
+      "TextBlock": "TextBlockStyle",
+      "Button": "implicit",
+      "StatusButton": "implicit",
+      "CheckBox": "implicit",
+      "ComboBox": "implicit",
+      "TextBox": "implicit",
+      "NumberBox": "NumberBoxBaseStyle",
+      "IntNumberBox": "IntNumberBoxBaseStyle",
+      "DataGrid": "DataGridBaseStyle"
+    },
+    "byVariant": {
+      "IconButton": {
+        "enter": "RightButtonStyle",
+        "exit": "RightButtonStyle",
+        "右侧栏-上下结构-icon+文案": "UpDownRightButtonStyle",
+        "右侧栏-左右结构-icon+文案": "NormalRightButtonStyle",
+        "加减快捷键-无标题": "ButtonIconStyle"
+      },
+      "GroupBox": {
+        "信息分组-模块化": "IOGroupBoxSecondary"
+      }
+    }
+  },
   "controlTypes": {
     "IconButton": {
       "element": "s:IconButton",

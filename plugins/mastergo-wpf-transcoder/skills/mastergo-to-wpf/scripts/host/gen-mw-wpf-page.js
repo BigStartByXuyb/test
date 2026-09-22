@@ -4,12 +4,20 @@
 // 生成一个独立 MW WPF 页面：View、code-behind、ViewModel，并注册到旧式 csproj。
 // code-behind 以 <DependentUpon> 挂在同页 View.xaml 下（等价于在 VS 里把 .xaml.cs 拖到 .xaml 上）。
 // 页面 XML 与 Icon Geometry 仍由各自生成器负责，本脚本只生成 WPF 宿主壳。
+//
+// 两条路线的 View 内容不同（由 manifest.route 决定）：
+//   B（mtslg-iocontrol，缺省）：View = UserControl 头 + uidesign:PageDesign（页面 XML 是真正的控件载体）。
+//   A（mw-wpf）：View = 真 WPF 控件 XAML（框架 s: 控件 + Grid 布局），由 scripts/adapters/mw-wpf/gen-mw-wpf-xaml.js
+//   按布局产物发射，并在 UserControl.Resources 合并本页 Icon 字典（A 页面用 {StaticResource …Geometry} 引用图形，
+//   页面自身没有合并点会在加载期抛 XamlParseException）。code-behind / ViewModel / csproj 注册两条路线共用。
 
 const fs = require("fs");
 const path = require("path");
 // 跨脚本共用工具的唯一实现（见 scripts/lib/script-helpers.js；禁止在本脚本再抄一份）。
 const { fail, xmlAttr, xmlDocText, backupFile } = require(path.join(__dirname, "..", "lib", "script-helpers.js"));
 const { inferHostPaths: inferHostPathsShared } = require(path.join(__dirname, "..", "lib", "project-csproj.js"));
+// A 路线页面发射的唯一实现（本脚本只负责把它接进宿主壳，不另写一套 XAML 组装）。
+const WPF_XAML = require(path.join(__dirname, "..", "adapters", "mw-wpf", "gen-mw-wpf-xaml.js"));
 
 function usage() {
   console.error("用法: node gen-mw-wpf-page.js --manifest <page.json> [--overwrite]");
@@ -63,6 +71,11 @@ function namespaceSegment(value) {
 
 function readRootNamespace(csprojText) {
   const match = csprojText.match(/<RootNamespace>\s*([^<]+?)\s*<\/RootNamespace>/i);
+  return match ? match[1].trim() : null;
+}
+
+function readAssemblyName(csprojText) {
+  const match = csprojText.match(/<AssemblyName>\s*([^<]+?)\s*<\/AssemblyName>/i);
   return match ? match[1].trim() : null;
 }
 
@@ -123,6 +136,14 @@ function loadManifest(manifestPath) {
     });
 
   const area = safeRelativePath(manifest.area, "area");
+  // 路线：缺省 B（mtslg-iocontrol）。作业A（mw-wpf）的 View 内容与页面注册项都不同。
+  const route = manifest.route || "mtslg-iocontrol";
+  if (route !== "mtslg-iocontrol" && route !== "mw-wpf") fail("未知的 route: " + route);
+  const resolveRouteInput = function (value, key) {
+    if (!value) return null;
+    return path.isAbsolute(value) ? value : path.resolve(projectRoot, value);
+  };
+  const assemblyName = manifest.assemblyName || readAssemblyName(csprojText) || rootNamespace.split(".").pop();
   if (area.split("/").some(function (part) { return !part || part === "."; })) {
     fail("area 无效: " + manifest.area);
   }
@@ -169,7 +190,8 @@ function loadManifest(manifestPath) {
   ];
   if (iconPath) files.push({ kind: "Page", relative: iconPath });
   langPaths.forEach(function (relative) { files.push({ kind: "Page", relative }); });
-  files.push({ kind: "Content", relative: pageXmlPath });
+  // 作业A 的页面不加载 IOContorl 页面 XML（控件在 View.xaml 里），因此不注册 Content 项。
+  if (route === "mtslg-iocontrol") files.push({ kind: "Content", relative: pageXmlPath });
   // 底部按钮（Layout MenuItem）→ ViewModel 的 case 列表与按钮处理方法名。
   const buttonNames = normalizeButtonNames(manifest);
   const buttonHandlers = resolveButtonHandlers(manifest, buttonNames, viewModelName);
@@ -179,6 +201,11 @@ function loadManifest(manifestPath) {
     pageName, viewName, viewModelName, xmlPageName, iconPath, pageXmlPath,
     langPaths,
     viewRelative, codeBehindRelative, viewModelRelative,
+    route, assemblyName,
+    wpfLayoutPath: resolveRouteInput(manifest.wpfLayoutPath, "wpfLayoutPath"),
+    templateTypesPath: resolveRouteInput(manifest.templateTypesPath, "templateTypesPath"),
+    routeMapPath: resolveRouteInput(manifest.routeMapPath, "routeMapPath"),
+    wpfReportPath: resolveRouteInput(manifest.wpfReportPath, "wpfReportPath"),
     buttonNames,
     buttonHandlers,
     designWidth: manifest.designWidth || 1280, designHeight: manifest.designHeight || 1024,
@@ -187,6 +214,7 @@ function loadManifest(manifestPath) {
 }
 
 function renderView(config) {
+  if (config.route === "mw-wpf") return renderWpfRouteView(config);
   const className = config.rootNamespace + "." + config.namespaceArea + ".View." + config.viewName;
   const lines = [
     "<UserControl x:Class=\"" + className + "\"",
@@ -208,6 +236,30 @@ function renderView(config) {
   lines.push("  </Grid>");
   lines.push("</UserControl>");
   return lines.join("\n") + "\n";
+}
+
+// 作业A：View 是真控件 XAML。布局产物 / 类型判定 / A 写法表都在清单里显式给出，脚本不猜路径。
+function renderWpfRouteView(config) {
+  const required = ["wpfLayoutPath", "templateTypesPath", "routeMapPath"];
+  required.forEach(function (key) {
+    if (!config[key]) fail("作业A（route=mw-wpf）清单必须提供 " + key);
+  });
+  const layout = WPF_XAML.loadLayout(config.wpfLayoutPath);
+  const typeInfo = WPF_XAML.loadTypes(config.templateTypesPath);
+  const routeMap = JSON.parse(fs.readFileSync(config.routeMapPath, "utf8"));
+  const result = WPF_XAML.renderXaml({
+    xClass: config.rootNamespace + "." + config.namespaceArea + ".View." + config.viewName,
+    iconPage: config.iconPath,
+    assembly: config.assemblyName
+  }, layout, typeInfo, routeMap);
+  config.wpfReport = result.report;
+  // 发射报告（命中的样式族 / 未命中变体 / 无语言键文本 / 跳过的框架固定区）随页面一起落盘，
+  // 供人工评审样式族选择；不写报告路径时不落盘。
+  if (config.wpfReportPath) {
+    fs.mkdirSync(path.dirname(config.wpfReportPath), { recursive: true });
+    fs.writeFileSync(config.wpfReportPath, JSON.stringify(result.report, null, 2) + "\n", "utf8");
+  }
+  return result.xaml;
 }
 
 function renderCodeBehind(config) {

@@ -31,6 +31,10 @@ param(
     [string] $Ui,
     [string] $Target,
     [string] $DesignPageName = '',
+    # 路线（适配器）：mtslg-iocontrol = 作业B（绝对坐标 IOContorl 页面 XML）；mw-wpf = 作业A（真 WPF XAML + Grid）。
+    # 各路线用哪些脚本、真值源与产物路径由 references/adapters/<路线>/adapter.json 描述符给出，本文件不写死步内路径。
+    [ValidateSet('mtslg-iocontrol', 'mw-wpf')]
+    [string] $Mode = 'mtslg-iocontrol',
     [string] $Progress = '1',
     [string] $StopAfter = '',
     [switch] $Overwrite,
@@ -54,7 +58,28 @@ if (-not $ProjectRoot) { $ProjectRoot = (Get-Location).Path }
 if (-not (Test-Path -LiteralPath $ProjectRoot)) { New-Item -ItemType Directory -Force -Path $ProjectRoot | Out-Null }
 $ProjectRoot = (Resolve-Path -LiteralPath $ProjectRoot).Path
 $ScriptsFolder = Split-Path -Parent $PSScriptRoot
-$TemplateMap = Join-Path $SkillRoot 'references\adapters\mtslg-iocontrol\mtslg-iocontrol-map.json'
+# 路线适配器描述符（唯一真值源：用哪些脚本、读哪张表、产物落在哪）：references/adapters/<路线>/adapter.json。
+# 本文件不写死任何一次改动里的具体脚本路径，步骤内一律按描述符取。
+$AdapterRoot = Join-Path $SkillRoot 'references\adapters'
+$AdapterDescriptorPath = Join-Path (Join-Path $AdapterRoot $Mode) 'adapter.json'
+if (-not (Test-Path -LiteralPath $AdapterDescriptorPath)) {
+    throw "找不到路线适配器描述符: $AdapterDescriptorPath（-Mode $Mode）"
+}
+$Adapter = Get-Content -LiteralPath $AdapterDescriptorPath -Raw -Encoding UTF8 | ConvertFrom-Json
+function Resolve-AdapterPath {
+    param([string] $Value)
+    if (-not $Value) { return $null }
+    return (Join-Path $SkillRoot $Value)
+}
+function Get-AdapterScript {
+    param([string] $Key)
+    $entry = $Adapter.scripts.PSObject.Properties[$Key]
+    $value = if ($entry) { $entry.Value } else { $null }
+    if (-not $value) { throw "描述符 $AdapterDescriptorPath 缺少 scripts.$Key" }
+    return (Join-Path $ScriptsFolder $value)
+}
+$TemplateMap = Resolve-AdapterPath $Adapter.templateMap
+$TypeMap = Resolve-AdapterPath $Adapter.typeMap
 
 # 步骤表：Id / 名称 / 说明 / 契约（输入 → 产物 → 失败 → 怎么修）。
 # 前置依赖由下方 switch（按步骤名硬编码）表达，这里不重复声明。
@@ -330,10 +355,19 @@ function Register-StepArtifacts {
         }
         'svg'        { $pairs += , @('extractSvg', $SvgJson) }
         'visibility' { $pairs += , @('visibility', $VisibilityJson) }
-        'mapping'    { $pairs += , @('mappingDraft', $DraftMappingJson) }
+        'mapping'    {
+            if ($Mode -eq 'mw-wpf') { $pairs += , @('componentTypes', $TypeAuditJson) }
+            else { $pairs += , @('mappingDraft', $DraftMappingJson) }
+        }
         'discover'   { $pairs += , @('iconCandidates', $CandidateJson) }
         'ledger'     { if (Test-Path -LiteralPath $LedgerJson) { $pairs += , @('iconMap', $LedgerJson) } }
-        'layout'     { $pairs += , @('layoutManifest', $LayoutManifestJson) }
+        'layout'     {
+            $pairs += , @('layoutManifest', $LayoutManifestJson)
+            if ($Mode -eq 'mw-wpf') { $pairs += , @('wpfLayout', $WpfLayoutJson) }
+        }
+        'bundle'     {
+            if ($Mode -eq 'mw-wpf') { $pairs += , @('wpfXaml', $WpfViewXaml) }
+        }
         'inputs'     { $pairs += , @('bundleManifest', $BundleJson) }
     }
     foreach ($pair in $pairs) {
@@ -365,6 +399,8 @@ $cliFileId = $FileId
 $cliLayerId = $LayerId
 $cliUi = $Ui
 $cliDesignPageName = $DesignPageName
+# 路线（-Mode）默认是作业B：只有显式传了才算"调用方要求改路线"，否则续跑回放冻结路线。
+$cliMode = if ($PSBoundParameters.ContainsKey('Mode')) { $Mode } else { '' }
 $Registry = Get-ProjectTarget -Root $ProjectRoot -Target $Target -LayerId $LayerId
 if ($Registry) {
     if (-not $Target) { $Target = $Registry.Target }
@@ -444,6 +480,12 @@ $LayoutManifestJson = Join-Path $Inputs "$Target.layout-manifest.json"
 $BundleJson = Join-Path $Inputs "$Target.bundle.json"
 $DraftMappingJson = Join-Path $Work "$Target.mapping.draft.json"
 $MappingAuditJson = Join-Path $Generated "$Target.mapping.json"
+# 作业A 产物：类型判定（共享类型表口径）与布局产物；两者都发射进项目 Generated 目录便于逐页复核。
+$TypeAuditJson = Join-Path $Generated "$Target.component-types.json"
+$WpfLayoutJson = Join-Path $Generated "$Target.wpf-layout.json"
+$WpfLayoutReportJson = Join-Path $Inputs "$Target.wpf-layout.report.json"
+$WpfXamlReportJson = Join-Path $Inputs "$Target.wpf-xaml.report.json"
+$WpfViewXaml = Join-Path $ProjectRoot "UI\$Ui\View\${Target}View.xaml"
 $BundleAuditJson = Join-Path $Generated "$Target.bundle.manifest.json"
 $SummaryJson = Join-Path $Generated "$Target.summary.json"
 $PageXml = Join-Path $ProjectRoot "Resources\Pages\$Target\${Target}Page.xml"
@@ -478,6 +520,8 @@ if ($StartStep.Id -gt 1) {
         [pscustomobject]@{ Field = 'layerId'; Frozen = (Get-Prop $frozen 'layerId'); Explicit = $cliLayerId; Resolved = $LayerId }
         [pscustomobject]@{ Field = 'ui'; Frozen = (Get-Prop $frozen 'ui'); Explicit = $cliUi; Resolved = $Ui }
         [pscustomobject]@{ Field = 'designPageName'; Frozen = (Get-Prop $frozen 'designPageName'); Explicit = $cliDesignPageName; Resolved = $DesignPageName }
+        # 路线也是采集身份：同一次运行里不能一半产物是页面 XML、一半是 XAML。
+        [pscustomobject]@{ Field = 'mode'; Frozen = (Get-Prop $frozen 'mode'); Explicit = $cliMode; Resolved = $Mode }
     )
     foreach ($item in $replayFields) {
         $frozenValue = if ($item.Frozen) { [string]$item.Frozen } else { '' }
@@ -498,11 +542,13 @@ if ($StartStep.Id -gt 1) {
             'layerId' { $LayerId = $frozenValue }
             'ui' { $Ui = $frozenValue; $UiSource = '运行登记表 run.json（续跑回放）' }
             'designPageName' { $DesignPageName = $frozenValue }
+            'mode' { $Mode = $frozenValue }
         }
     }
 }
 
 Write-Output ("项目: {0}" -f $ProjectRoot)
+Write-Output ("路线: {0}（{1}）" -f $Mode, $Adapter.title)
 Write-Output ("Target: {0}   LayerId: {1}   Ui: {2}{3}" -f $Target, $LayerId, $Ui,
     $(if ($UiSource) { "（来源: $UiSource）" } else { "" }))
 Write-Output ("区间: {0}({1}) → {2}({3})" -f $StartStep.Id, $StartStep.Name, $EndStep.Id, $EndStep.Name)
@@ -514,7 +560,7 @@ $warnings = New-Object System.Collections.Generic.List[string]
 # 初始化运行登记表：整段运行的第一个动作。断点续跑（-Progress > 1）时沿用已有登记表（--keep），
 # 否则新开一次运行（新 runId、清空产物登记）——避免把上一次运行登记过的产物当成本次的。
 $registryInit = @('init', '--project-root', $ProjectRoot, '--target', $Target,
-    '--file-id', $FileId, '--layer-id', $LayerId, '--ui', $Ui)
+    '--file-id', $FileId, '--layer-id', $LayerId, '--ui', $Ui, '--mode', $Mode)
 if ($DesignPageName) { $registryInit += @('--design-page', $DesignPageName) }
 if ($PageTitleText) { $registryInit += @('--page-title', $PageTitleText) }
 if (Test-Path -LiteralPath $TranslationsJson) { $registryInit += @('--translations', "Generated/_inputs/$Target.lang-translations.json") }
@@ -592,14 +638,28 @@ foreach ($step in $Steps) {
                     '--out', $VisibilityJson) | Out-Null
             }
             'mapping' {
+                # 图标台账在 mapping 步之前可能还没产出（首次运行没有命名表）：草稿输入按"台账 → 候选 → 空清单"降级，
+                # 两条路线共用这一处口径（A 的类型判定同样要读图标槽位）。
                 $ledgerForDraft = if (Test-Path -LiteralPath $LedgerJson) { $LedgerJson } else { $CandidateJson }
                 if (-not (Test-Path -LiteralPath $ledgerForDraft)) {
                     New-Item -ItemType Directory -Force -Path $Inputs | Out-Null
                     '{ "icons": [], "candidates": [], "unmapped": [] }' | Set-Content -LiteralPath $CandidateJson -Encoding UTF8
                     $ledgerForDraft = $CandidateJson
                 }
+                if ($Mode -eq 'mw-wpf') {
+                    # 作业A：类型判定只读共享类型表（设计稿组件集/变体 → ControlType + 槽位），
+                    # 不掺 IOContorl 的写入规则；属性怎么写由第 10 步按 mw-wpf-map.json 决定。
+                    Invoke-StepCommand -Label 'component types' -LogFile $log -File 'node' -Arguments @(
+                        (Get-AdapterScript 'mapping'), '--dsl', $SnapshotJson,
+                        '--visibility', $VisibilityJson, '--template-map', $TypeMap,
+                        '--icon-map', $ledgerForDraft,
+                        '--out', $TypeAuditJson) | Out-Null
+                    $types = Get-Content -LiteralPath $TypeAuditJson -Raw -Encoding UTF8 | ConvertFrom-Json
+                    $note = "节点 $(@($types.nodes).Count) 个，待确认 $(@($types.pending).Count) 个"
+                    break
+                }
                 Invoke-StepCommand -Label 'mapping draft' -LogFile $log -File 'node' -Arguments @(
-                    (Join-Path $ScriptsFolder 'adapters/mtslg-iocontrol/gen-mtslg-mapping-from-dsl.js'), '--dsl', $SnapshotJson,
+                    (Get-AdapterScript 'mapping'), '--dsl', $SnapshotJson,
                     '--visibility', $VisibilityJson, '--template-map', $TemplateMap,
                     '--icon-map', $ledgerForDraft, '--out', $DraftMappingJson) | Out-Null
             }
@@ -640,8 +700,8 @@ foreach ($step in $Steps) {
             }
             'layout' {
                 Invoke-StepCommand -Label 'layout manifest' -LogFile $log -File 'node' -Arguments @(
-                    (Join-Path $ScriptsFolder 'adapters/mtslg-iocontrol/gen-mtslg-layout-manifest.js'), '--dsl', $SnapshotJson,
-                    '--icon-map', $LedgerJson, '--map', $TemplateMap,
+                    (Get-AdapterScript 'layoutManifest'), '--dsl', $SnapshotJson,
+                    '--icon-map', $LedgerJson, '--map', $TypeMap,
                     '--page-target', $Target, '--page-lang-name', "${Target}PageTitle",
                     '--layout-path', 'Resources/Layout/Layout.xml',
                     '--out', $LayoutManifestJson,
@@ -653,6 +713,17 @@ foreach ($step in $Steps) {
                 if ($layout.layoutStatus -notin @('complete', 'none')) { throw "Layout 清单不完整: layoutStatus=$($layout.layoutStatus)（应为 complete 或 none；日志: $log）" }
                 if ($layout.layoutEvidence.unresolvedBottomBarItems -ne 0) { throw "底部栏有 $($layout.layoutEvidence.unresolvedBottomBarItems) 个未命中变体的实例（日志: $log）" }
                 $note = "菜单项 $(@($layout.menuItems).Count) 个"
+                if ($Mode -eq 'mw-wpf') {
+                    # 作业A 另做一步布局推导：分区 → 行列 → 格子（Grid 布局是 A 的坐标载体，不再是绝对坐标）。
+                    Invoke-StepCommand -Label 'wpf layout' -LogFile $log -File 'node' -Arguments @(
+                        (Get-AdapterScript 'wpfLayout'), '--types', $TypeAuditJson,
+                        '--dsl', $SnapshotJson, '--visibility', $VisibilityJson,
+                        '--map', $TemplateMap, '--page-target', $Target,
+                        '--out', $WpfLayoutJson, '--report', $WpfLayoutReportJson) | Out-Null
+                    $wpf = Get-Content -LiteralPath $WpfLayoutJson -Raw -Encoding UTF8 | ConvertFrom-Json
+                    $emitRegions = @($wpf.regions | Where-Object { $_.emit -ne $false })
+                    $note = "菜单项 $(@($layout.menuItems).Count) 个；发射分区 $($emitRegions.Count) 个 / 框架固定区 $(@($wpf.regions).Count - $emitRegions.Count) 个；待确认 $(@($wpf.pending).Count) 个"
+                }
             }
             'inputs' {
                 # 所有 skill 自带脚本一律用 Join-Path $ScriptsFolder 分桶定位。
@@ -664,11 +735,39 @@ foreach ($step in $Steps) {
                 Invoke-StepCommand -Label 'bundle manifest' -LogFile $log -File 'node' -Arguments $args | Out-Null
             }
             'bundle' {
+                if ($Mode -eq 'mw-wpf') {
+                    # 作业A 的产物装配复用同一套 Bundle（语言绑定 / 图标 / Layout 注册 / 宿主壳 / 审计），
+                    # 只是把页面发射物从 IOContorl 页面 XML 换成真控件 View.xaml（Bundle 的 route 分支）。
+                    $spec = Get-Content -LiteralPath $BundleJson -Raw -Encoding UTF8 | ConvertFrom-Json
+                    # 路线与 A 专属输入写进清单：类型判定用共享类型表，页面发射用 A 写法表 + 布局产物。
+                    $spec.route = 'mw-wpf'
+                    $spec.templateMapPath = $TypeMap
+                    $spec.routeMapPath = $TemplateMap
+                    $spec.wpfLayoutPath = $WpfLayoutJson
+                    $spec.wpfReportPath = $WpfXamlReportJson
+                    $wpfBundleJson = Join-Path $Work "$Target.bundle.wpf.json"
+                    $spec | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $wpfBundleJson -Encoding UTF8
+                    $args = @((Get-AdapterScript 'bundle'), '--manifest', $wpfBundleJson)
+                    if ($Overwrite) { $args += '--overwrite' }
+                    Invoke-StepCommand -Label 'wpf bundle' -LogFile $log -File 'node' -Arguments $args | Out-Null
+                    $note = "已发射 $WpfViewXaml 与本页 Icon/语言字典，并注册 Layout.xml"
+                    break
+                }
                 $args = @((Join-Path $ScriptsFolder 'entry/gen-mastergo-page-bundle.js'), '--manifest', $BundleJson)
                 if ($Overwrite) { $args += '--overwrite' }
                 Invoke-StepCommand -Label 'bundle' -LogFile $log -File 'node' -Arguments $args | Out-Null
             }
             'gates' {
+                if ($Mode -eq 'mw-wpf') {
+                    # 作业A 的门禁：布局（越界/空行空列/同格互斥/禁止类型/尺寸来源）+ 协议/资源键/硬编码文本。
+                    Invoke-StepCommand -Label 'wpf layout gates' -LogFile $log -File 'node' -Arguments @(
+                        (Get-AdapterScript 'wpfGate'), '--layout', $WpfLayoutJson,
+                        '--types', $TypeAuditJson, '--map', $TemplateMap,
+                        '--xaml', $WpfViewXaml,
+                        '--json', (Join-Path $Inputs "$Target.wpf-gate.json")) | Out-Null
+                    $note = '作业A 布局门禁全部通过'
+                    break
+                }
                 $coverage = Get-Content -LiteralPath $CoverageJson -Raw -Encoding UTF8 | ConvertFrom-Json
                 if ($coverage.status -ne 'complete') { throw "覆盖校验 status=$($coverage.status)" }
                 if (@($coverage.duplicateNodeRefs).Count) { throw "存在重复 ref: $($coverage.duplicateNodeRefs -join ', ')" }
@@ -707,6 +806,16 @@ foreach ($step in $Steps) {
                 $note = "门禁全部通过（警告 $($warnings.Count) 条）"
             }
             'verify' {
+                if ($Mode -eq 'mw-wpf') {
+                    # 作业A 的独立复核：门禁重跑一遍并落独立日志（结构闭环按本页 View.xaml 与布局产物校验）。
+                    Invoke-StepCommand -Label 'wpf verifications' -LogFile $log -File 'node' -Arguments @(
+                        (Get-AdapterScript 'wpfGate'), '--layout', $WpfLayoutJson,
+                        '--types', $TypeAuditJson, '--map', $TemplateMap,
+                        '--xaml', $WpfViewXaml,
+                        '--json', (Join-Path $Work "verification\$Target\wpf-gate.log")) | Out-Null
+                    $note = '作业A 布局 / 协议 / 资源键 / 文本 全部通过'
+                    break
+                }
                 Invoke-StepCommand -Label 'verifications' -LogFile $log -File 'pwsh' -Arguments @(
                     '-NoProfile', '-File', (Join-Path $ScriptsFolder 'adapters/mtslg-iocontrol/run-verifications.ps1'),
                     '-ProjectRoot', $ProjectRoot, '-SkillRoot', $SkillRoot, '-Page', $Target) | Out-Null

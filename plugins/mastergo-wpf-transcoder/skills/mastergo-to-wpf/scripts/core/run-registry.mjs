@@ -2,7 +2,7 @@
 //
 // 用法:
 //   node run-registry.mjs init --project-root <项目> --target <Target>
-//        [--file-id <id>] [--layer-id <id>] [--ui <F2>] [--design-page <设计页名>]
+//        [--file-id <id>] [--layer-id <id>] [--ui <F2>] [--design-page <设计页名>] [--mode <路线>]
 //        [--page-title <标题>] [--translations <相对路径>] [--glossary <相对路径>]
 //        [--icon-naming <相对路径>] [--out <run.json>] [--keep]
 //   node run-registry.mjs artifact --run <run.json> --key <键> --path <相对|绝对> [--step <N>]
@@ -78,6 +78,7 @@ function main() {
       layerId: args["layer-id"] && args["layer-id"] !== true ? String(args["layer-id"]) : null,
       ui: args.ui && args.ui !== true ? String(args.ui) : null,
       designPageName: args["design-page"] && args["design-page"] !== true ? String(args["design-page"]) : null,
+      mode: args.mode && args.mode !== true ? String(args.mode) : null,
       pageTitleText: args["page-title"] && args["page-title"] !== true ? String(args["page-title"]) : null,
       translations,
       glossary,

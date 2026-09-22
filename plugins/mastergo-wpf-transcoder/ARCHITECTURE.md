@@ -46,8 +46,9 @@ flowchart LR
   C --> G[组件映射 mapping 生成]
   F --> G
   H[共享类型表 component-types.json] --> G
-  H2[路线映射表 mtslg-iocontrol-map.json] --> G
+  H2[路线映射表 <路线>-map.json] --> G
   G --> I[模板解析: 槽位与固定字段 / 表格结构签名 → DataGrid + 列定义]
+  I --> I2[作业A: Grid 布局推导 wpf-layout（分区 → 行列 → 格子）]
   I --> Q[容器嵌套重挂: 按坐标完全包含重挂容器子控件]
   Q --> J[语言键派生 + LangName 绑定]
   J --> K[页面 XML 发射]
@@ -73,11 +74,12 @@ flowchart LR
 | 容器嵌套 | `apply-container-containment.js` | **Bundle 默认自动调用**（在模板解析之后、语言键派生之前）：把命中 `childPolicy=nested-page-templates` 的容器按「坐标完全包含」重挂子控件、改写 `parent`/`layoutParent` 并重算 `expectedLeft/expectedTop`；报告 `Generated/<页面名>.nesting-report.json`；`manifest.nesting.enabled=false` 可关闭 |
 | Layout | `gen-mtslg-layout-manifest.js`、`gen-mtslg-layout.js` | 机械推导 `menuItems` 清单、发射/增量更新 Layout.xml |
 | 页面发射 | `gen-iocontrol-xml.js` | 发射页面 IOContorl XML（fresh / merge） |
+| 页面发射（作业A） | `adapters/mw-wpf/gen-mw-wpf-layout.js`、`adapters/mw-wpf/gen-mw-wpf-xaml.js` | 从类型判定 + DSL 结构推导 Grid 布局产物（分区 → 行列 → 格子），再按 A 写法表发射真控件 `View.xaml`（含本页 Icon 字典合并点）；框架固定区不发射 |
 | 多语言 | `gen-mtslg-lang-keys-from-dsl.js`、`gen-mtslg-page-lang.js` | 派生语言键、发射 CN/EN 字典 |
 | 宿主 | `gen-mw-wpf-page.js` | 生成 View / code-behind / ViewModel 与 csproj 登记 |
 | 编排 | **`gen-mastergo-page-bundle.js`（主入口）** | 串起模板解析 → 容器嵌套重挂 → 语言键 → LangName → XML → 校验 → Icon → Layout → 宿主 → 最终校验 |
 | 编排（外层一键） | `run-all.ps1`、`build-icon-ledger.mjs`、`build-bundle-manifest.mjs` | 把「取数 → 快照 → extractSvg → 显隐 → mapping → 图标候选 → 台账 → Layout 清单 → Bundle 清单 → bundle → 门禁 → 验证」12 步串成一条命令；支持 `-Progress` / `-StopAfter` 断点续跑、每步落日志；`build-icon-ledger.mjs` 按页面自己的命名表生成台账，`build-bundle-manifest.mjs` 由 Layout 清单 + `.csproj` 推导 Bundle 清单 |
-| 门禁 | `validate-iocontrol-provenance.js`、`check-iocontrol-coords.js` | 来源闭环、必写字段、坐标 0 MISMATCH / 0 EXTRA；表格列定义按 `tableTemplates.columnTemplate` 的固定几何与字段集单独校验（不套 `controlTypeRequiredAttrs`） |
+| 门禁 | `validate-iocontrol-provenance.js`、`check-iocontrol-coords.js`、`adapters/mw-wpf/check-wpf-layout.js` | 作业B：来源闭环、必写字段、坐标 0 MISMATCH / 0 EXTRA；表格列定义按 `tableTemplates.columnTemplate` 的固定几何与字段集单独校验（不套 `controlTypeRequiredAttrs`）。作业A：格子越界 / 空行空列 / 同格冲突 / 禁止类型 / 协议语法 / 资源键闭环 / 硬编码文本 / 尺寸来源 |
 | 门禁（交付前后核对） | `run-verifications.ps1`、`verify-page.ps1`、`verify-icon-source.mjs`、`check-coords.mjs` | 四项独立验证（provenance / 坐标 / Icon 坐标 / 结构闭环）并落日志；结构闭环按**本页** `<Page>` 子树校验（Layout 是项目级共享文件）；图标几何来源核对（`sourceId` 指向页面根 / 被多条条目共用 / 缺 extractSvg 条目 → 必须 `fromDsl`）由 `run-all.ps1` 的 **ledger 步（第 7 步）自动调用**（`--naming` 只核对本页登记的条目）；坐标核对输入按映射重算 |
 | 审计/运维 | `audit-mtslg-feishu-map.js`、`scan-mtslg-keys.ps1`、`sync-to-mt.ps1`、`cap-window.ps1` | 文档覆盖审计、键查证、运行目录同步、视觉截图（`cap-window.ps1 -Method printwindow\|screen`） |
 | 脚本复用门禁 | `audit-script-duplication.js`（由 `tests/script-duplication.test.js` 调用） | 禁止「同一个功能写两份」：复制体（函数体完全相同）直接失败；同名函数必须在 `lib/script-reuse-registry.json` 登记原因 |

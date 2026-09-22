@@ -676,6 +676,9 @@ function addNode(sourceRef, controlType, attrs, options = {}) {
     id: xmlId,
     xmlId,
     attrs: Object.assign({}, attrs),
+    // 设计稿变体名（该实例在映射表里命中的变体值）：两条路线共用的判定结果。
+    // 作业A 用它选样式族（外观只走样式族），作业B 的写规则不从它取值。
+    ...(options.variant ? { variant: options.variant } : {}),
     ...(options.iconSize ? { iconSize: options.iconSize } : {}),
     // 槽位级多语言策略：langRefPolicy=none 表示该值不参与多语言（不产语言键、不挂 LangName）。
     ...(options.langRefPolicy ? { langRefPolicy: options.langRefPolicy } : {}),
@@ -837,7 +840,8 @@ function emitTable(inst, spec, match, columnTemplate) {
   const valuePolicy = tableTemplate.valuePolicy || {};
   const tableAttrs = {};
   if (typeof valuePolicy.attr === "string" && valuePolicy.attr) tableAttrs[valuePolicy.attr] = "";
-  const tableXmlId = addNode(tableRef, spec.controlType, tableAttrs);
+  // 表格的变体值来自结构签名（match.variant），不是外层循环的局部变量。
+  const tableXmlId = addNode(tableRef, spec.controlType, tableAttrs, { variant: match.variant });
 
   const columns = headerTexts.map((text, index) => {
     const columnAttrs = { Value: text.text };
@@ -1006,8 +1010,8 @@ for (const { item: inst, match } of matched) {
     }
     const attrs = {};
     for (const attr of cameraSpec.alwaysWrittenAttrs) attrs[attr] = "";
-    addNode(inst.ref, spec.controlType, attrs);
-    addInstance(match, inst.ref, []);
+    addNode(inst.ref, spec.controlType, attrs, { variant });
+        addInstance(match, inst.ref, []);
     // 内部 TEXT 显式 consume + omit：既不发射成页面 TextBlock，也不让它们漏进通用文本循环。
     const innerPolicy = cameraSpec.innerTextPolicy;
     if (innerPolicy.decision !== "omit") {
@@ -1048,7 +1052,8 @@ for (const { item: inst, match } of matched) {
     // 不是要翻译的固定文案 → 标记为不参与多语言，后续不产键、不挂 LangName。
     const langRefPolicy = valueSlotLangRefPolicy(spec);
     const owner = addNode(inst.ref, spec.controlType, attrs, {
-      ...(valueText ? { valueSourceRef: valueText.ref } : {}),
+          variant,
+          ...(valueText ? { valueSourceRef: valueText.ref } : {}),
       ...(iconSize ? { iconSize } : {}),
       ...(langRefPolicy ? { langRefPolicy } : {}),
       sourceSlotRefs,
@@ -1064,9 +1069,10 @@ for (const { item: inst, match } of matched) {
     const attrs = valueText ? { Value: valueText.text } : {};
     const langRefPolicy = valueSlotLangRefPolicy(spec);
     addNode(inst.ref, spec.controlType, attrs, Object.assign(
-      valueText ? { valueSourceRef: valueText.ref } : {},
-      langRefPolicy ? { langRefPolicy } : {}
-    ));
+          { variant },
+          valueText ? { valueSourceRef: valueText.ref } : {},
+          langRefPolicy ? { langRefPolicy } : {}
+        ));
     if (valueText) addValueAudit(valueText.ref, inst.ref);
     addInstance(match, inst.ref, [slot("input", inst.ref, valueText?.ref)]);
     continue;
@@ -1077,8 +1083,8 @@ for (const { item: inst, match } of matched) {
     // The resolver validates the component slot while the XML keeps runtime
     // state/value attributes empty until a real binding is confirmed.
     const attrs = {};
-    addNode(inst.ref, spec.controlType, attrs);
-    addInstance(match, inst.ref, [slot("choice", inst.ref)]);
+        addNode(inst.ref, spec.controlType, attrs, { variant });
+        addInstance(match, inst.ref, [slot("choice", inst.ref)]);
     continue;
   }
   if (match.family === "infoGroupTemplates") {
@@ -1107,8 +1113,8 @@ for (const { item: inst, match } of matched) {
     attrs.Style = spec.style === undefined || spec.style === null ? "" : spec.style;
     if (headerText) attrs.Header = headerText.text;
     addNode(inst.ref, spec.controlType || "GroupBox", attrs,
-      headerText ? { valueSourceRef: headerText.ref, contentInset: contentInset }
-        : { contentInset: contentInset });
+          headerText ? { variant, valueSourceRef: headerText.ref, contentInset: contentInset }
+            : { variant, contentInset: contentInset });
     if (headerText) addValueAudit(headerText.ref, inst.ref);
     // 槽位 sourceRef 必须是**已发射的输出节点**（= GroupBox 自己，实例 ref），
     // 标题文本作为 valueSourceRef 被消费（与 inputTemplates 的 slot 写法一致）。
@@ -1130,8 +1136,8 @@ for (const { item: inst, match } of matched) {
       const group = orderedButtons[i].ref;
       const text = firstText(group);
       const attrs = { Style: "SmallButton" };
-      if (text) attrs.Value = text.text;
-      addNode(group, "IconButton", attrs, text ? { valueSourceRef: text.ref } : {});
+            if (text) attrs.Value = text.text;
+            addNode(group, "IconButton", attrs, Object.assign({ variant }, text ? { valueSourceRef: text.ref } : {}));
       if (text) addValueAudit(text.ref, group);
       required.push(slot(buttonSlots[i].slot, group, text?.ref));
     }
@@ -1166,7 +1172,7 @@ for (const { item: inst, match } of matched) {
     const icon = iconFor(group);
     const iconSize = icon ? iconSizeFor(group) : null;
     const attrs = icon ? { Icon: icon } : {};
-    addNode(group, "IconButton", attrs, iconSize ? { iconSize } : {});
+        addNode(group, "IconButton", attrs, Object.assign({ variant }, iconSize ? { iconSize } : {}));
     required.push(slot(buttonSlots[i].slot, group));
   }
   for (const textSlot of textSlots) {

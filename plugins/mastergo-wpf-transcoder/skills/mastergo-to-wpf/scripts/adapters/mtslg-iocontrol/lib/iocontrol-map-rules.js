@@ -118,9 +118,9 @@ function parseTableTemplate(templateMap) {
       requiredAttrsPolicy: column.requiredAttrsPolicy || "column-template"
     };
   }
-  if (result.structural && !result.columnTemplate) {
-    throw new Error("映射表登记了 tableTemplates.match.structural 却没有 columnTemplate：表格列定义的几何/属性无处取值");
-  }
+  // 登记了结构签名却没有列模板时**不在这里失败**：列模板是"该路线怎么写表格"的写规则，不是判定数据。
+  // 类型判定只读共享类型表（没有列模板）；只有真正命中表格、需要发射列定义时才是错误——
+  // 那个 fail-closed 在发射分支里，错误信息同样点名列模板缺失。
   return result;
 }
 

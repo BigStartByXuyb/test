@@ -35,7 +35,9 @@ const LEGACY_SHADOWS = {
 // 登记表里的产物键（消费端只用这些键，不拼路径）
 const ARTIFACT_KEYS = [
   "getDsl", "snapshot", "coverage", "dslManifest", "timing", "visibility", "extractSvg",
-  "mappingDraft", "iconCandidates", "iconMap", "layoutManifest", "bundleManifest"
+  "mappingDraft", "iconCandidates", "iconMap", "layoutManifest", "bundleManifest",
+  // 作业A（mw-wpf）产物：类型判定 / Grid 布局产物 / 发射出的真控件 View.xaml。
+  "componentTypes", "wpfLayout", "wpfXaml"
 ];
 
 function fail(message) {
@@ -102,7 +104,7 @@ function createRegistry(options) {
     if (!registry.identity || typeof registry.identity !== "object" || Array.isArray(registry.identity)) {
       fail("续跑登记表缺少有效 identity；请从 fetch 新开运行");
     }
-    for (const field of ["fileId", "layerId", "ui", "designPageName"]) {
+    for (const field of ["fileId", "layerId", "ui", "designPageName", "mode"]) {
       const supplied = options[field];
       if (supplied === undefined || supplied === null || supplied === "") continue;
       if (supplied !== registry.identity[field]) {
@@ -121,6 +123,9 @@ function createRegistry(options) {
       startedAt: now,
       updatedAt: now,
       identity: {
+        // 路线（mtslg-iocontrol / mw-wpf）是采集身份的一部分：续跑切换路线会让同一次运行的产物
+        // 一半是页面 XML、一半是 XAML，登记表里却都记成"同一页"。
+        mode: options.mode || null,
         fileId: options.fileId || null,
         layerId: options.layerId || null,
         ui: options.ui || null,

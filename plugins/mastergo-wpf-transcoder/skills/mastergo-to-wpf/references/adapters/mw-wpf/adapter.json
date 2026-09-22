@@ -1,0 +1,29 @@
+{
+  "_meta": {
+    "mode": "mw-wpf",
+    "note": [
+      "作业A（MW WPF）路线描述符：run-all.ps1 -Mode mw-wpf 按本文件派发，不写死脚本路径。",
+      "templateMap 是本路线的写法表（ControlType → WPF/XAML 怎么写）；typeMap 是共享类型表（设计稿组件集/变体 → ControlType + 槽位），第 5 步的类型判定只用它。",
+      "artifacts 是缺省产物路径模板（<Target> 为页面名）；实际路径仍以宿主清单与项目登记表为准。"
+    ]
+  },
+  "mode": "mw-wpf",
+  "title": "作业A（MW WPF XAML 页面）",
+  "templateMap": "references/adapters/mw-wpf/mw-wpf-map.json",
+  "typeMap": "references/component-types.json",
+  "scripts": {
+    "mapping": "core/judge-component-types.js",
+    "layoutManifest": "adapters/mtslg-iocontrol/gen-mtslg-layout-manifest.js",
+    "layout": "adapters/mtslg-iocontrol/gen-mtslg-layout.js",
+    "wpfLayout": "adapters/mw-wpf/gen-mw-wpf-layout.js",
+    "wpfXaml": "adapters/mw-wpf/gen-mw-wpf-xaml.js",
+    "wpfGate": "adapters/mw-wpf/check-wpf-layout.js",
+    "verify": "adapters/mw-wpf/check-wpf-layout.js"
+  },
+  "artifacts": {
+    "types": "Generated/<Target>.component-types.json",
+    "wpfLayout": "Generated/<Target>.wpf-layout.json",
+    "wpfLayoutReport": "Generated/_inputs/<Target>.wpf-layout.report.json",
+    "view": "UI/<Area>/View/<Target>View.xaml"
+  }
+}

@@ -170,6 +170,8 @@ function main() {
   // mapping：草稿还在就用草稿（run 中途也能工作）；草稿已被 bundle 清理就取产物化的 Generated/<Target>.mapping.json。
   let mapping = take("mappingDraft", artifact("mappingDraft"), stepOf("mappingDraft"));
   if (!mapping) mapping = take("mapping", outputJson("Generated/" + target + ".mapping.json"), null);
+  // 作业A 没有 mapping 草稿：第 5 步产出的类型判定（component-types.json）就是同层的节点清单。
+  if (!mapping) mapping = take("componentTypes", artifact("componentTypes"), stepOf("componentTypes"));
   const unavailable = report.unavailable;
 
   // 图标候选：icon-candidates.json 里 candidates 与 unmapped 是重叠视图，同一条还会重复出现，

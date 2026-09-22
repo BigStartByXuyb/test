@@ -1,11 +1,16 @@
 ---
 name: mastergo-to-wpf
-description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContorl XML，并按正式组件库实例和目标项目规范生成完整页面；MW WPF 作业 A 资料暂不启用。仅在同时包含 MasterGo 设计来源与 MTSLG 转换/生成意图时触发，不用于单独修改 XML、排查 Ctrl+R、普通 WPF 调试或单独讨论 MTSLG/IOContorl/API/代码索引。
+description: 将明确要求的 MasterGo 设计稿转换为 MTSLG IOContorl XML（作业 B）或 MW WPF XAML 页面（作业 A），并按正式组件库实例和目标项目规范生成完整页面。仅在同时包含 MasterGo 设计来源与转换/生成意图时触发，不用于单独修改 XML/XAML、排查 Ctrl+R、普通 WPF 调试或单独讨论 MTSLG/IOContorl/API/代码索引。
 ---
 
 # MasterGo 转 MW 代码
 
-当前版本只启用 `mtslg-iocontrol`（作业 B）：把 MasterGo 设计稿转成 MTSLG IOContorl 页面，并按目标项目规范生成完整页面。作业 A（`mw-wpf`）资料保留在 `references/adapters/mw-wpf/` 但**停用**——不进入触发、分流或生成流程；用户要求 WPF 或目标配置声明 `mw-wpf` 时停止并报告，不得改走其他路线、不得生成混合产物。
+两条路线都启用，产物形态不同、**判定与采集链路共用**：
+
+- 作业 B `mtslg-iocontrol`（缺省）：栅格绝对坐标 + 控件属性的页面 XML；
+- 作业 A `mw-wpf`：真 WPF XAML 页面（框架 `s:` 控件 + Grid 布局），`-Mode mw-wpf` 选择。
+
+路线只决定**同一份类型判定结果怎么写**、以及步骤 5/8/10/11/12 用哪个脚本；用哪些脚本、读哪张表、产物落在哪，由 `references/adapters/<路线>/adapter.json` 描述符给出，`run-all.ps1 -Mode <路线>` 按它派发。**一次运行只走一条路线**：续跑不能换路线（换路线要从 `fetch` 新开运行），也不得生成混合产物。
 
 本文件只写**模型必须做的判断**和**每条规则的唯一入口**。脚本已 fail-closed 强制的规则不在这里复述（复述只会与脚本漂移），完整口径一律在 reference 与脚本里。
 
@@ -13,14 +18,14 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 
 - 整页转换**一条命令跑完**（`run-all.ps1`，默认第 1→12 步）；步骤、输入、产物、失败处理看 `references/adapters/mtslg-iocontrol/pipeline-contract.md`。**不需要**读 `scripts/` 下分桶目录里的源码来复述规则。
 - 只在下面三种情况读 reference：① 本文件明确写「读 X」；② 脚本报错，按 `pipeline-contract.md` 的「怎么修」定位到该 reference 的对应小节；③ 要写/改 Bundle 清单、图标命名表、译文清单，需要字段口径。
-- 未在「参考文件读取条件」里点名、且当前任务没触发的文件不要读；`references/adapters/mw-wpf/**` 属停用资料，不读。
+- 未在「参考文件读取条件」里点名、且当前任务没触发的文件不要读；作业 A 的 `references/adapters/mw-wpf/framework-manual/**` 是一次本地框架快照的参考，只在写/改 A 写法表或人工评审 A 样式族时定点查。
 
 ## 触发边界
 
 必须同时满足：
 
 1. 有 MasterGo 设计来源：链接、`fileId + layerId` 或结构化节点；
-2. 用户明确要求转换/生成 MTSLG IOContorl XML 或完整 MTSLG 页面。
+2. 用户明确要求转换/生成 MTSLG IOContorl XML、MTSLG 完整页面，或 MW WPF（XAML）页面。
 
 仅出现以下内容时不触发：单独修改已有 XML、单独排查 `Ctrl+R`、普通 WPF 调试、单独讨论 MTSLG/IOContorl API、单独维护组件库或代码索引。
 
@@ -34,6 +39,7 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 
 | 场景 | 入口 | 口径 |
 |---|---|---|
+| 选路线 | `run-all.ps1 -Mode mtslg-iocontrol`（缺省）/ `-Mode mw-wpf` | 用户要 IOContorl 页面 XML 走 B；要 WPF 页面（真控件 + Grid 布局）走 A。没明确说、也没说 WPF 时按 B，不要自选 A |
 | 修改现有页面 | 单独调 `gen-iocontrol-xml.js --merge <现有XML> <mapping.json> --out <输出>`（**不经 Bundle**） | 保留工程师已有的 `IOName`、`IOCommand`、`IOEnable` 等业务属性；**禁止对现有页面用 `--fresh`**；merge 逐条语义与「设计文本覆盖（dsl.text）」报告见 `mtslg-mode.md` 第 5 节 |
 | 新建页面 / 整套替换 | `gen-mastergo-page-bundle.js --manifest <bundle.json>`（唯一正常入口） | Bundle 的页面 XML 步骤恒为 `--fresh`，**没有合并语义**；同名目标存在时默认停止；只有用户明确要求替换 + 清单 `operation=replace-existing` + `--overwrite` 才整套替换并逐个备份。清单字段见 `references/adapters/mtslg-iocontrol/bundle-manifest.md` |
 | Bundle 被环境阻塞 | 按阻塞步骤单独调子脚本 | 只补该步，不改变上游输入口径 |
@@ -66,6 +72,8 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 | 10 | `bundle` | 生成页面 XML / Icon / Layout / 宿主壳 |
 | 11 | `gates` | 严格门禁（审计逐条断言） |
 | 12 | `verify` | 四项独立验证（provenance / 坐标 / Icon / 结构） |
+
+- **作业 A 的差异**（步骤号与名称不变，步内命令与产物不同）：第 5 步 = 共享类型判定（只读共享类型表，产出 `Generated/<Target>.component-types.json`）；第 8 步 = 共用 Layout 清单推导 **+** 布局产物推导 `Generated/<Target>.wpf-layout.json`（分区 → 行列 → 格子）；第 10 步 = 真控件 `View.xaml`（含本页 Icon 字典合并点）+ 宿主壳 + 本页 Icon/语言字典 + Layout 注册，**不发射 IOContorl 页面 XML**；第 11/12 步 = 布局门禁（越界 / 空行空列 / 同格互斥 / 禁止类型 / 尺寸来源 / 协议 / 资源键 / 硬编码文本）。第 1–4、6、7、9 步两条路线沿用同一套。
 
 - **每一步的输入 / 产物 / 失败语义 / 怎么修：`references/adapters/mtslg-iocontrol/pipeline-contract.md`**。该文件由 `run-all.ps1` 的步骤定义生成（`node scripts/core/gen-pipeline-contract.mjs`），**真值源是脚本**；要改契约就改脚本再重新生成，手改文档会挂测试。
 - 运行登记表：`<项目>/Generated/runs/<Target>/run.json`，规则是「**产出即登记、消费只按登记取、未登记的旧同名文件一律拒绝**」；清单里的采集输入（`dslPath` / `visibilityPath` / `svgPath`）都从登记表解析并校验 `sha256`。断点续跑用 `-Progress <步骤名>`（续跑的身份与登记表口径、可改语义输入见 `references/adapters/mtslg-iocontrol/bundle-manifest.md` 第 7 节）。
@@ -102,9 +110,18 @@ pwsh -NoProfile -File <skill>\scripts\entry\run-all.ps1 -List -Format json -OutF
 - **页面级 / 项目级边界**：页面 XML、本页 Icon、本页语言字典、本页 View/ViewModel、本页 mapping 与审计是页面级（跨页不得同名、不得互相引用）；`Resources/Layout/Layout.xml`、`.csproj`、`framework.config.json` 是项目级，本页只增量写自己的注册
 - **不得把 WPF 私有协议写进 IOContorl**：如 `s:Action`、WPF `PageName`、ResourceDictionary 或绑定语法
 
+作业 A（`-Mode mw-wpf`）另有这些硬门禁，细则见对应 reference：
+
+- **尺寸照设计稿，外观只走样式族**：Grid 行列 / `Margin` / 对齐取设计稿值；配色、边框、状态、模板一律用样式族键，设计稿与样式族冲突时停下报告，不得散写属性凑 → `references/adapters/mw-wpf/mw-wpf-mode.md`
+- **框架固定区不进页面**：顶部栏 / 底部栏 / 右侧栏常驻由框架渲染（尺寸用框架 Token），设计稿里的对应区域只用于生成 Layout 注册与菜单项 → `references/adapters/mw-wpf/mw-wpf-mode.md`
+- **页面必须合并本页 Icon 字典**：A 页面用 `{StaticResource …Geometry}` 引用图形，缺合并点会在加载期抛 `XamlParseException` → `references/adapters/mw-wpf/page-build-rules.md`
+- **无对应条目的类型 fail-closed**：写法表把 `Border` / `Camera` 登记为待确认，遇到即挂待确认、不发射 → `references/adapters/mw-wpf/mw-wpf-map.json`
+- **布局门禁**：`scripts/adapters/mw-wpf/check-wpf-layout.js`（越界 / 空行空列 / 同格冲突 / 禁止写法 / 协议 / 资源键 / 硬编码文本 / 尺寸来源）
+
 ## 交付与验收
 
 - 交付物：页面 XML、本页 `Icons.xaml`、`CN`/`EN` 语言字典、Layout 注册、`View.xaml` + `View.xaml.cs` + `ViewModel.cs`、目标项目要求的宿主壳、mapping/审计与交付说明。
+- 作业 A 的交付物：真控件 `View.xaml`（+ 本页 Icon 字典合并点）、`View.xaml.cs`、`ViewModel.cs`、本页 `Icons.xaml`、`CN`/`EN` 语言字典、Layout 注册、类型判定与布局产物（`Generated/<Target>.component-types.json`、`Generated/<Target>.wpf-layout.json`）与门禁报告；**不含 IOContorl 页面 XML**。
 - 静态验收顺序：`validate-iocontrol-provenance.js`（Value/来源/坐标）→ 坐标检查 → Icon 引用闭环 → 页面结构校验；`run-all.ps1` 第 11、12 步就是这套门禁。
 - 只有项目引用、真实运行时资源、可编译宿主与加载验证都通过，才能称「完整可运行页面」；**运行时交付门禁**（部署、宿主加载、`Ctrl+R`、截图核对）只在用户明确要求时执行。
 - 交付说明必须列出：待翻译条目与临时键、槽位豁免 `valueLangExempt`、中英文写法相同的键 `identicalTextKeys`、未映射组件与待配置的运行时字段。
@@ -113,7 +130,9 @@ pwsh -NoProfile -File <skill>\scripts\entry\run-all.ps1 -List -Format json -OutF
 ## 参考文件读取条件
 
 - 本路线必读：`references/adapters/mtslg-iocontrol/mtslg-mode.md`（页面格式、坐标、ID、merge、验证）。
+- 作业 A 必读：`references/adapters/mw-wpf/mw-wpf-mode.md`（页面格式、骨架、布局规则、ViewModel 契约）。
 - 触发才读：`references/adapters/mtslg-iocontrol/pipeline-contract.md`（跑流水线时）；`references/adapters/mtslg-iocontrol/page-build-rules.md`（处理图标命名/几何来源、多语言译文与词典、输出目录、可见性 omit 角色、辅助脚本触发时）；设计稿含顶部栏/底部栏或快捷键，或本次要创建/修改 Layout 注册 → `references/adapters/mtslg-iocontrol/feishu-layout-mapping.md`；要写或改 Bundle 清单 → `references/adapters/mtslg-iocontrol/bundle-manifest.md`。
+- 作业 A 触发才读：`references/adapters/mw-wpf/page-build-rules.md`（产物布局、本页 Icon 字典与合并点、多语言键、写入门禁）；要改 A 的写法或样式族 → `references/adapters/mw-wpf/mw-wpf-map.json` + `references/adapters/mw-wpf/framework-manual/`（定点查，不通读）。
 - **默认不预读**：`references/adapters/mtslg-iocontrol/feishu-component-library-mapping.md`、共享类型表 `references/component-types.json` 与路线映射表 `references/adapters/mtslg-iocontrol/mtslg-iocontrol-map.json`——组件匹配、`ControlType`、槽位与属性白名单由 `resolve-mtslg-template-mapping.js` / `gen-mtslg-mapping-from-dsl.js` 在生成期按映射表执行；两个 JSON 都只经 `scripts/lib/load-template-map.js` 读取。只有脚本报出 `pending` / `unmappedComponents` / `templateConflicts` 时，才按关键词定点查（不通读）。
 - 按需：`references/project-adapter-initialization.md`（项目首次适配）、`references/mastergo-component-mapping-rules.md`（两条作业共用的来源链规则）、`references/style-library-profiles.md`（多套样式/主题/图标库并存时）。
-- 停用：`references/adapters/mw-wpf/**`（作业 A 资料）不读，也不作为 XML 事实源。
+- 作业 A 资料里的框架手册快照（`references/adapters/mw-wpf/framework-manual/**`）不作为作业 B（页面 XML）的运行期口径依据：B 的 `GroupBox` 是空 `Style` + `IOGroupBoxSecondary` 原点，两者冲突时以 B 的口径为准。

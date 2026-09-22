@@ -672,9 +672,21 @@ function validateLangOutputs(info) {
 }
 
 function validateBundleOutputs(info) {
-  const pageXml = requireFile(info.pageXmlPath, "页面 XML");
-  if (!/<IOContorl\b/.test(pageXml) || !/<\/IOContorl>\s*$/.test(pageXml)) {
-    fail("页面 XML 根节点不符合 IOContorl 格式: " + info.pageXmlPath);
+  // 作业B 校验 IOContorl 页面 XML；作业A 没有页面 XML，改校验真控件 View（框架控件 + 本页 Icon 字典合并点）。
+  let pageXml = null;
+  if (info.wpfRoute) {
+    const view = requireFile(info.hostPaths[0], "View XAML");
+    if (!/<UserControl\b/.test(view) || /\buidesign:PageDesign\b/.test(view)) {
+      fail("作业A 的 View 必须是真控件 XAML（不得再用 PageDesign 页面壳）: " + info.hostPaths[0]);
+    }
+    if (!/<ResourceDictionary\b[^>]*Source="[^"]*Icons\.xaml"/.test(view)) {
+      fail("作业A 的 View 必须合并本页 Icon 字典（StaticResource 图形在加载期解析）: " + info.hostPaths[0]);
+    }
+  } else {
+    pageXml = requireFile(info.pageXmlPath, "页面 XML");
+    if (!/<IOContorl\b/.test(pageXml) || !/<\/IOContorl>\s*$/.test(pageXml)) {
+      fail("页面 XML 根节点不符合 IOContorl 格式: " + info.pageXmlPath);
+    }
   }
   const icon = requireFile(info.iconPath, "页面 Icon");
   if (!/<ResourceDictionary\b/.test(icon) || !/<\/ResourceDictionary>/.test(icon)) {
@@ -730,7 +742,7 @@ function validateBundleOutputs(info) {
   run(PROVENANCE_SCRIPT, ["--xml", info.pageXmlPath, "--mapping", info.mappingAudit]
     .concat(info.templateMapPath ? ["--map", info.templateMapPath] : []));
   const mapping = info.mapping;
-  if (Array.isArray(mapping.nodes) && mapping.nodes.length > 0) {
+  if (!info.wpfRoute && Array.isArray(mapping.nodes) && mapping.nodes.length > 0) {
     // 坐标核对输入的构建只有一份实现（lib/coord-nodes.js）；本脚本与 check-coords.mjs 都调用它。
     const coordsPath = path.join(info.tempRoot, "coords.json");
     fs.writeFileSync(coordsPath, JSON.stringify(buildCoordNodes(mapping, { fail: fail }), null, 2) + "\n", "utf8");
@@ -751,7 +763,7 @@ function validateBundleOutputs(info) {
   const langAbsolute = (info.langPaths || []).map(function (relative) {
     return path.join(info.projectRoot, ...relative.split("/"));
   });
-  [info.pageXmlPath, info.iconPath].concat(info.hostPaths).concat([info.layoutPath]).concat(langAbsolute).forEach(function (filePath) {
+  (info.wpfRoute ? [] : [info.pageXmlPath]).concat([info.iconPath]).concat(info.hostPaths).concat([info.layoutPath]).concat(langAbsolute).forEach(function (filePath) {
     const include = projectRelative(info.projectRoot, filePath).replace(/\\/g, "/");
     if (!csproj.toLowerCase().includes(include.toLowerCase())) {
       fail("csproj 未注册生成文件: " + include);
@@ -950,6 +962,11 @@ function main() {
   const manifestFile = path.resolve(args.manifestPath);
   const manifestDir = path.dirname(manifestFile);
   const manifest = normalizePageManifest(readJson(manifestFile));
+  // 路线：缺省 B（mtslg-iocontrol）。作业A（mw-wpf）的页面是真控件 XAML，不发射 IOContorl 页面 XML，
+  // 也不做 XML 专属的 provenance/坐标校验；语言绑定、图标、Layout 注册、宿主壳、审计全部复用本 Bundle。
+  const route = manifest.route || "mtslg-iocontrol";
+  if (route !== "mtslg-iocontrol" && route !== "mw-wpf") fail("未知的 route: " + route);
+  const wpfRoute = route === "mw-wpf";
   // 多语言是**默认能力**，不是可选项：
   //   - manifest 未提供 languages → 默认按 languages.auto=true + CN/EN 生成字典并强制 LangName 闭环；
   //   - 只有显式声明 languages=false 或 languages.disabled=true 才关闭，且必须给出 reason，
@@ -1098,6 +1115,8 @@ function main() {
     resolvePath(projectRoot, hostPaths.view, "viewPath"),
     resolvePath(projectRoot, hostPaths.codeBehind, "codeBehindPath"),
     resolvePath(projectRoot, hostPaths.viewModel, "viewModelPath")];
+  // 作业A 不产出页面 XML：目标集合里去掉它（否则会在覆盖检查里要求一个永不生成的文件）。
+  const projectTargets = wpfRoute ? outputTargets.slice(1) : outputTargets;
   const langTargets = langPaths.map(function (relative) {
     return resolvePath(projectRoot, relative, "langPath");
   });
@@ -1113,7 +1132,7 @@ function main() {
     ? path.join(generatedDir, manifest.pageName + ".lang-glossary.json") : null;
   if (langTranslationAudit) auditTargets.push(langTranslationAudit);
   if (langGlossaryAudit) auditTargets.push(langGlossaryAudit);
-  const blocked = outputTargets.concat(langTargets).concat(auditTargets).filter(fs.existsSync);
+  const blocked = projectTargets.concat(langTargets).concat(auditTargets).filter(fs.existsSync);
   if (!args.overwrite && blocked.length) {
     fail("目标文件已存在，未覆盖: " + blocked.join(", ") + "；请停止并确认是否修改已有页面");
   }
@@ -1135,7 +1154,7 @@ function main() {
   // 组件级「运行时提供图标」的剔除审计（无此类登记时为 null，不进审计文件）。
   let runtimeIconAudit = null;
   const originalCsproj = fs.readFileSync(csprojPath, "utf8");
-  const snapshots = snapshotFiles(outputTargets.concat(langTargets).concat([layoutPath, mappingAudit, iconMapAudit, bundleAudit, csprojPath])
+  const snapshots = snapshotFiles(projectTargets.concat(langTargets).concat([layoutPath, mappingAudit, iconMapAudit, bundleAudit, csprojPath])
     .concat([nestingAudit])
     .concat(scaffoldInfo.frameworkConfigPath ? [scaffoldInfo.frameworkConfigPath] : []));
 
@@ -1215,10 +1234,14 @@ function main() {
       langBindings = applyLangBindings(mapping, manifest, langSpec);
       fs.writeFileSync(tempMapping, JSON.stringify(mapping, null, 2) + "\n", "utf8");
     }
-    run(XML_SCRIPT, ["--fresh", tempMapping, "--out", tempXml].concat(
-      templateMapPath ? ["--map", templateMapPath] : []));
-    run(PROVENANCE_SCRIPT, ["--xml", tempXml, "--mapping", tempMapping].concat(
-      templateMapPath ? ["--map", templateMapPath] : []));
+    // 页面发射：作业B 发 IOContorl 页面 XML（并做 XML 专属的 provenance 校验）；作业A 不发页面 XML，
+    // 真控件 XAML 由宿主脚本在下方按布局产物与 A 写法表发射（同一份 mapping / 语言绑定结果）。
+    if (!wpfRoute) {
+      run(XML_SCRIPT, ["--fresh", tempMapping, "--out", tempXml].concat(
+        templateMapPath ? ["--map", templateMapPath] : []));
+      run(PROVENANCE_SCRIPT, ["--xml", tempXml, "--mapping", tempMapping].concat(
+        templateMapPath ? ["--map", templateMapPath] : []));
+    }
     // 传入 DSL 快照：extractSvg 因几何完全相同的复用而漏条目时，图标生成器可从 DSL 合成补上；
     // discover 也用它给候选补台账提示（祖先朝向 bakeAncestorTransform）。
     // 同上：复用 dslInputPath，避免 dslPath 被解析三次。
@@ -1313,10 +1336,18 @@ function main() {
       // 底部按钮名（Layout Menu 的 MenuItem）→ ViewModel 里 switch (message.ButtonName) 的 case 骨架
       menuItems: Array.isArray(manifest.menuItems) ? manifest.menuItems : []
     };
+    // 作业A：宿主脚本按路线发真控件 XAML —— 需要布局产物、带语言绑定的 mapping 与 A 写法表。
+    if (wpfRoute) {
+      host.route = "mw-wpf";
+      host.wpfLayoutPath = resolvePath(projectRoot, manifest.wpfLayoutPath, "wpfLayoutPath");
+      host.templateTypesPath = tempMapping;
+      host.routeMapPath = resolveInput(manifestDir, projectRoot, manifest.routeMapPath, "routeMapPath");
+      if (manifest.wpfReportPath) host.wpfReportPath = resolvePath(projectRoot, manifest.wpfReportPath, "wpfReportPath");
+    }
     fs.writeFileSync(hostManifest, JSON.stringify(host, null, 2), "utf8");
     run(HOST_SCRIPT, ["--manifest", hostManifest].concat(args.overwrite ? ["--overwrite"] : []));
 
-    copyOutput(tempXml, pageXmlPath, args.overwrite, created, backups);
+    if (!wpfRoute) copyOutput(tempXml, pageXmlPath, args.overwrite, created, backups);
     copyOutput(tempIcon, iconPath, args.overwrite, created, backups);
     langPaths.forEach(function (relative) {
       copyOutput(path.join(tempLangDir, path.basename(relative)),
@@ -1362,7 +1393,8 @@ function main() {
       langSpec,
       pageLangName: manifest.pageLangName,
       tempRoot,
-      templateMapPath
+      templateMapPath,
+      wpfRoute
     });
 
     const bundleInfo = {
