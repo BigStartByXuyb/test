@@ -44,7 +44,8 @@ function pageLangPaths(pageName, locales) {
 }
 
 // 跨脚本共用工具的唯一实现（见 scripts/lib/script-helpers.js；禁止在本脚本再抄一份）。
-const { fail, xmlAttr, readJson, backupFile, outputOrigin } = require(path.join(SCRIPT_DIR, "lib", "script-helpers.js"));
+const { fail, xmlAttr, readJson, backupFile, outputOrigin,
+  parentOuterRightEdge, textBlockLeftValue, TEXT_BLOCK_RIGHT_LEFT_BASIS } = require(path.join(SCRIPT_DIR, "lib", "script-helpers.js"));
 const { inferHostPaths } = require(path.join(SCRIPT_DIR, "lib", "project-csproj.js"));
 // 运行登记表的唯一实现（见 scripts/lib/run-registry.js；禁止在本脚本再抄一份）。
 const RUN_REGISTRY = require(path.join(SCRIPT_DIR, "lib", "run-registry.js"));
@@ -788,7 +789,30 @@ function validateBundleOutputs(info) {
           ? node.expectedHeight
           : (source.height !== undefined ? source.height : node.h),
         contentOriginX: originX,
-        contentOriginY: originY
+        contentOriginY: originY,
+        // TextBlock Align=Right 的 Left 不是 x − 原点，而是"以控件右上角为原点量到父容器外框右边缘"
+        // 的距离（口径见映射表 textBlockAlign.distance*）。这里按 lib/script-helpers.js 的同一实现
+        // 独立算出并显式传给官方核对器；其余节点仍走 x − contentOriginX。
+        ...(function () {
+          if (!isTextBlock || node.leftBasis !== TEXT_BLOCK_RIGHT_LEFT_BASIS) return {};
+          const rootSource = rootRef ? (sourceByRef.get(rootRef) || null) : null;
+          const expectedLeft = textBlockLeftValue({
+            align: "Right",
+            pageAbsX: Number(source.pageAbsX !== undefined ? source.pageAbsX : node.absX),
+            textWidth: Number(node.dslWidth !== undefined ? node.dslWidth : source.width),
+            parentOuterRightEdgeX: parentOuterRightEdge({
+              parentIsRoot: parentIsRoot,
+              parentPageAbsX: parentSource ? parentSource.pageAbsX : null,
+              parentWidth: parentSource ? parentSource.width : null,
+              rootWidth: rootSource ? rootSource.width : null
+            })
+          });
+          if (expectedLeft === null) {
+            fail("无法计算 TextBlock Align=Right 的 Left：节点 " + (node.xmlId || node.ref) +
+              " 缺少页面/父容器宽度或设计稿 bbox 宽度（不能猜）");
+          }
+          return { expectedLeft: expectedLeft };
+        })()
       };
     });
     // 坐标核对是硬门禁：必须每次都执行，禁止因为"度量不是严格数字"而整段跳过

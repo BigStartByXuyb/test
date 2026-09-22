@@ -106,6 +106,7 @@
 - 取数后先核对完整 DSL 根节点 `dsl.nodes[0].layoutStyle.width/height` 与已确认目标画布尺寸一致。不一致或根节点尺寸缺失时先与用户确认页面区域，不能继续生成。
 
 - **`Align` 恒写、只有 `TextBlock` 有（真值源 = 设计稿 TEXT 节点 `textAlign`）**：`TextBlock` 的 `Align` 属于 `controlTypeRequiredAttrs` 恒写字段，取值只有 `Left` / `Right`：设计稿 `textAlign` 归一（去空白 + 转小写）后命中 `right` 就发射 `Right`，其余（`left` / `center` / 字段缺失 / 其它取值）一律发射 `Left`——**默认左对齐**。其它 ControlType 没有这个参数，不得发射。规则真值源是映射表 `textBlockAlign`（`rightMatch` / `rightValue` / `defaultValue` / `policy`），正文不另立枚举。
+- **`Left` 的口径随 `Align` 切换（同一个属性名，两个含义）**：`Align=Left`（含设计稿 `center`）时 `Left` = 控件**左边缘**到输出父容器**内容区左边缘**的距离（与既有口径一致）；`Align=Right` 时 `Left` = 以控件**右上角**为原点，量到输出父容器**外框右边缘**的距离 = `父外框右边缘 − (控件 pageAbsX + 设计稿 bbox 宽度)`。外框右边缘：页面根 = **页面宽度**（根节点宽度）；容器 = **容器 pageAbsX + 容器宽度**（外框，不是内容区右边缘）。宽度来源固定为**设计稿 bbox 宽度**（mapping `nodes[].dslWidth`）——产物 XML 的 `Width` 仍是 `NaN`（自适应），它只参与这里的 `Left` 计算。口径真值源是映射表 `textBlockAlign.distance*`；实现在 `scripts/lib/script-helpers.js`（`parentOuterRightEdge` / `textBlockLeftValue`，生成器 / 容器重挂 / 坐标核对器 / provenance 校验器共用），mapping 节点带 `leftBasis` 标识。
 
 ## 4. ControlType 摘要（完整表见 mtslg-iocontrol-map.json）
 

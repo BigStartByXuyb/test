@@ -9,11 +9,15 @@
  *   [
  *     { "id": "dsl-node-id（与 XML 的 ID 属性一致；XML 无 ID 的节点用 ref）",
  *       "x": 10, "y": 35, "w": 160, "h": 150,          // 控件自身 page-absolute bbox，double
- *       "contentOriginX": 0, "contentOriginY": 192 },     // 该节点 XML 父容器的页面绝对坐标
+ *       "contentOriginX": 0, "contentOriginY": 192,       // 该节点 XML 父容器的页面绝对坐标
+ *       "expectedLeft": 530 },                            // 可选：Left 的显式期望值（见下）
  *     ...
  *   ]
  * 对照规则：XML.Left ≈ x - contentOriginX，XML.Top ≈ y - contentOriginY，XML.Width ≈ w，XML.Height ≈ h
  * （容差 --tolerance 默认 0.5）；NaN 只与 NaN/缺失 算匹配，NaN 与具体数值算 MISMATCH。
+ * `expectedLeft` 是可选字段：只有 TextBlock `Align="Right"` 会给 —— 它的 Left 口径是"以控件右上角
+ * 为原点量到父容器外框右边缘的距离"，不是 x − contentOriginX；给了就以它为准核对 Left（由
+ * check-coords.mjs 按 lib/script-helpers.js 的同一实现独立算出），其余字段口径不变。
  * TextBlock 的 Width 固定为 NaN（自适应），节点表按 NaN 传入即可。
  * contentOriginX/contentOriginY 的取值 = 该节点在 XML 里的父容器页面绝对坐标：
  *   - 根级节点（父容器是页面根）：X 用 0，Y 用 192（顶层公共栏 126 + 示例标题 66，只在根级扣一次）；
@@ -118,7 +122,12 @@ for (const xn of xmlNodes) {
       JSON.stringify([src.contentOriginX, src.contentOriginY]));
     continue;
   }
-  const sl = num(src.x - originX), st = num(src.y - originY), sw = num(src.w), sh = num(src.h);
+  // expectedLeft：TextBlock Align=Right 的 Left 口径不是 x − originX（而是"以控件右上角为原点量到
+  // 父容器外框右边缘的距离"），由 check-coords.mjs 用同一实现独立算出并显式给出；其余节点仍按
+  // x − contentOriginX。Top/Width/Height 口径不变。
+  const sl = src.expectedLeft !== undefined && src.expectedLeft !== null
+    ? num(src.expectedLeft) : num(src.x - originX);
+  const st = num(src.y - originY), sw = num(src.w), sh = num(src.h);
   const problems = [];
   if (!close(xl, sl, tolerance)) problems.push(`Left xml=${xl} dsl=${sl}`);
   if (!close(xt, st, tolerance)) problems.push(`Top xml=${xt} dsl=${st}`);

@@ -93,3 +93,30 @@ if (missingWidthResult.status === 0 || !/缺少设计稿度量: w/.test(missingW
   throw new Error(`缺宽度必须点名报 MISMATCH:\n${missingWidthResult.stdout}`);
 }
 console.log('PASS coordinate metric normalization + missing-metric reporting');
+
+// ---- TextBlock Align=Right：Left 由 expectedLeft 显式给出（口径：到父容器外框右边缘的距离）----
+// 节点表里 x 仍是控件自身的页面绝对 X（708），但 Align=Right 的 Left 口径不是 x − 原点，而是
+// 「父容器外框右边缘 − (x + 设计稿 bbox 宽)」= 1280 − (708 + 42) = 530；check-coords.mjs 会算好并
+// 以 expectedLeft 传给核对器。这里验证核对器 honored expectedLeft（并验证没给时仍按 x − 原点算）。
+const alignRightXmlPath = path.join(dir, 'align-right-page.xml');
+const alignRightNodesPath = path.join(dir, 'align-right-nodes.json');
+fs.writeFileSync(alignRightXmlPath, '<IOContorl ID="r1" ControlType="TextBlock" Left="530" Top="10" Width="NaN" Height="40" FontSize="16" Align="Right" />');
+fs.writeFileSync(alignRightNodesPath, JSON.stringify([
+  { id: 'r1', x: 708, y: 202, w: 'NaN', h: 40, contentOriginX: 0, contentOriginY: 192, expectedLeft: 530 }
+]));
+const alignRightResult = spawnSync(process.execPath, [path.join(__dirname, '..', 'check-iocontrol-coords.js'),
+  '--xml', alignRightXmlPath, '--nodes', alignRightNodesPath], { encoding: 'utf8' });
+if (alignRightResult.status !== 0 || !/OK id="r1"/.test(alignRightResult.stdout)) {
+  throw new Error(`Align=Right 的 expectedLeft 必须被核对器采用:\n${alignRightResult.stdout}\n${alignRightResult.stderr}`);
+}
+// 反向：不给 expectedLeft 时仍按 x − contentOriginX 核对 —— 用同一份 XML 会因 674 != 530 报 MISMATCH。
+const noOverrideNodesPath = path.join(dir, 'align-right-no-override-nodes.json');
+fs.writeFileSync(noOverrideNodesPath, JSON.stringify([
+  { id: 'r1', x: 708, y: 202, w: 'NaN', h: 40, contentOriginX: 0, contentOriginY: 192 }
+]));
+const noOverrideResult = spawnSync(process.execPath, [path.join(__dirname, '..', 'check-iocontrol-coords.js'),
+  '--xml', alignRightXmlPath, '--nodes', noOverrideNodesPath], { encoding: 'utf8' });
+if (noOverrideResult.status === 0 || !/MISMATCH id="r1"/.test(noOverrideResult.stdout)) {
+  throw new Error(`不给 expectedLeft 时必须按 x − 原点核对并报 MISMATCH:\n${noOverrideResult.stdout}`);
+}
+console.log('PASS Align=Right expectedLeft override regression test');

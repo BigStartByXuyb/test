@@ -212,4 +212,46 @@ const reportCJson = JSON.parse(fs.readFileSync(reportC, 'utf8'));
   assert.ok(reportDJson.skipped.some(item => item.ref === 'col1' && item.reason === 'already-owned-by-non-container-node'),
     '已有归属（父节点为非容器的已发射节点）的列必须被守卫拦下并记 skipped');
 
+  // ---- 场景 E：Align=Right 的 TextBlock 收进容器时，Left 按"到容器外框右边缘的距离"重算 ----
+  // 口径见映射表 textBlockAlign.distance*：Left = 容器外框右边缘 − (控件绝对X + 设计稿 bbox 宽)；
+  // Top 不受影响（仍按内容区原点 inset.top）。容器外框右边缘 = 容器绝对X + 容器宽（不是内容区右边缘）。
+  const mappingE = path.join(dir, 'mapping-e.json');
+  const outE = path.join(dir, 'out-e.json');
+  const reportE = path.join(dir, 'report-e.json');
+  fs.writeFileSync(mappingE, JSON.stringify({
+    rootRef: 'root',
+    contentOriginY: 192,
+    componentInstances: [
+      { template: 'infoGroupTemplates', componentSet: '信息分组-模块化', instanceRef: 'group' }
+    ],
+    sourceNodes: [
+      source('root', null, '页面', 0, 0, 1280, 1024),
+      source('group', 'root', '信息分组-模块化', 658, 514, 200, 160),
+      source('right-text', 'root', '右对齐标签', 682, 578, 10, 16),
+      source('left-text', 'root', '左对齐标签', 682, 620, 30, 16)
+    ],
+    nodes: [
+      node('group', 'MG_GROUP', 'GroupBox', SECONDARY_INSET),
+      Object.assign(node('right-text', 'MG_RIGHT', 'TextBlock'),
+        { attrs: { ControlType: 'TextBlock', Align: 'Right' }, dslWidth: 10 }),
+      Object.assign(node('left-text', 'MG_LEFT', 'TextBlock'),
+        { attrs: { ControlType: 'TextBlock', Align: 'Left' }, dslWidth: 30 })
+    ]
+  }, null, 2), 'utf8');
+  result = runContainment(mappingE, outE, reportE);
+  assert.strictEqual(result.status, 0, result.stderr);
+  const outEJson = JSON.parse(fs.readFileSync(outE, 'utf8'));
+  const eByRef = ref => outEJson.nodes.find(item => item.ref === ref);
+  assert.strictEqual(eByRef('right-text').layoutParent, 'group');
+  assert.strictEqual(eByRef('right-text').expectedLeft, (658 + 200) - (682 + 10),
+    'Align=Right：Left 必须是「容器外框右边缘 − (控件X + bbox宽)」= 166');
+  assert.strictEqual(eByRef('right-text').leftBasis, 'textblock.align-right.parent-outer-right-edge',
+    'Align=Right 重挂后必须保留 leftBasis 口径标识');
+  assert.strictEqual(eByRef('right-text').expectedTop, (578 - 514) - SECONDARY_INSET.top,
+    'Align=Right 只改 Left 口径，Top 仍按内容区原点');
+  assert.strictEqual(eByRef('left-text').expectedLeft, (682 - 658) - SECONDARY_INSET.left,
+    'Align=Left 仍是「左边缘到内容区左边缘」');
+  assert.strictEqual(eByRef('left-text').leftBasis, undefined,
+    'Align=Left 不得带右对齐口径标识');
+
   console.log('PASS container containment regression test');

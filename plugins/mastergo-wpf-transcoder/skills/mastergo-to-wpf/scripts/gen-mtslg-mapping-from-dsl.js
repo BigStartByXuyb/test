@@ -11,7 +11,9 @@ const path = require("path");
 // 页面节点 ID 口径的唯一真值源在 lib/page-node-id.js；本文件的 allocateId 只是它的调用点（先查重再转调）。
 const PAGE_NODE_ID = require(path.join(__dirname, "lib", "page-node-id.js"));
 // 跨脚本共用工具的唯一实现（见 scripts/lib/script-helpers.js；禁止在本脚本再抄一份）。
-const { readJson, normalizeToken: normalize, normalizeNewlines } = require(path.join(__dirname, "lib", "script-helpers.js"));
+const { readJson, normalizeToken: normalize, normalizeNewlines,
+  parentOuterRightEdge, textBlockLeftValue, TEXT_BLOCK_RIGHT_LEFT_BASIS
+} = require(path.join(__dirname, "lib", "script-helpers.js"));
 const { isHostShellName } = require(path.join(__dirname, "lib", "mastergo-rules.js"));
 // 图标归属判据的唯一实现（见 scripts/lib/icon-ownership.js；禁止在本脚本再抄一份）。
 const ICON_OWNERSHIP = require(path.join(__dirname, "lib", "icon-ownership.js"));
@@ -620,8 +622,11 @@ function addNode(sourceRef, controlType, attrs, options = {}) {
   // 几何覆盖：登记在映射表模板里的固定几何（目前只有 DataGrid 的列定义节点走这条路）。
   // 覆盖值必须来自映射表（tableTemplates.columnTemplate），节点的真实 DSL bbox 仍按 dsl* 字段保留溯源。
   const geometry = options.geometryOverride || null;
-  const expectedLeft = geometry ? Number(geometry.left)
-    : s.pageAbsX - (parentSource ? parentSource.pageAbsX : 0);
+  // expectedLeft 三种来源：① 显式覆盖（TextBlock Align=Right 的"到右边缘"口径，见 addText）；
+  // ② 模板固定几何（表格列定义）；③ 默认：控件左边缘相对父容器左上角（根级即页面绝对 X）。
+  const expectedLeft = options.expectedLeft !== undefined ? Number(options.expectedLeft)
+    : geometry ? Number(geometry.left)
+      : s.pageAbsX - (parentSource ? parentSource.pageAbsX : 0);
   const expectedTop = geometry ? Number(geometry.top)
     : s.pageAbsY - (parentSource ? parentSource.pageAbsY : 0) - (parentSource ? 0 : 192);
   const out = {
@@ -642,6 +647,7 @@ function addNode(sourceRef, controlType, attrs, options = {}) {
     h: s.height,
     expectedLeft,
     expectedTop,
+    leftBasis: options.leftBasis,
     expectedWidth: geometry ? "NaN" : (controlType === "TextBlock" ? "NaN" : s.width),
     expectedHeight: geometry ? Number(geometry.height) : (controlType === "TextBlock" ? 40 : s.height),
     widthSource: geometry ? "table.column-template"
@@ -689,11 +695,34 @@ function addText(ref) {
   }
   // Align 恒写：设计稿 TEXT 节点 textAlign 命中 rightMatch → Right，其余（left / center / 缺失）
   // → Left（默认左对齐）。只有 TextBlock 有该属性；规则登记在映射表 textBlockAlign，这里只按表发射。
+  let leftOverride;
   if (alignControlTypes.has("TextBlock")) {
-    attrs[alignAttr] = alignRightMatch.has(String(textAlignByRef.get(ref) || "").toLowerCase())
+    const alignValue = alignRightMatch.has(String(textAlignByRef.get(ref) || "").toLowerCase())
       ? alignRightValue : alignDefaultValue;
+    attrs[alignAttr] = alignValue;
+    // Align=Right 的 Left 不是"到左边缘"，而是以控件右上角为原点量到父容器外框右边缘的距离
+    // （口径登记见映射表 textBlockAlign.distance*；实现在 lib/script-helpers.js，全仓一份）。
+    // 这里父容器就是页面根（页面宽度）；被重挂进容器的情况由 apply-container-containment.js
+    // 用同一实现按最终父容器重算 —— 它在容器重挂之后才知道真实父容器。
+    if (alignValue === alignRightValue) {
+      const rootWidth = root && root.layoutStyle && typeof root.layoutStyle.width === "number"
+        ? root.layoutStyle.width : null;
+      const left = textBlockLeftValue({
+        align: "Right",
+        pageAbsX: s.pageAbsX,
+        textWidth: s.width,
+        parentOuterRightEdgeX: parentOuterRightEdge({ parentIsRoot: true, rootWidth: rootWidth })
+      });
+      if (left === null) {
+        throw new Error("TextBlock Align=Right 的 Left 无法计算（缺页面根宽度或设计稿 bbox 宽度）: " + ref);
+      }
+      leftOverride = left;
+    }
   }
-  const xmlId = addNode(ref, "TextBlock", attrs, { xmlId: allocateId(ref) });
+  const xmlId = addNode(ref, "TextBlock", attrs, Object.assign(
+    { xmlId: allocateId(ref) },
+    leftOverride !== undefined ? { expectedLeft: leftOverride, leftBasis: TEXT_BLOCK_RIGHT_LEFT_BASIS } : {}
+  ));
   textAudit.push({ sourceRef: ref, sourceText: s.text, visibility: true, role: "content", decision: "emit", outputRefs: [xmlId] });
   return xmlId;
 }

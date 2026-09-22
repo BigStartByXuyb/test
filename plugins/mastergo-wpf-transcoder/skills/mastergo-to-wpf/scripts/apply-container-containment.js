@@ -33,7 +33,8 @@
 const fs = require('fs');
 const path = require('path');
 // 跨脚本共用工具的唯一实现（见 scripts/lib/script-helpers.js；禁止在本脚本再抄一份）。
-const { readJson, failAndExit } = require(path.join(__dirname, 'lib', 'script-helpers.js'));
+const { readJson, failAndExit, parentOuterRightEdge, textBlockLeftValue,
+  TEXT_BLOCK_RIGHT_LEFT_BASIS } = require(path.join(__dirname, 'lib', 'script-helpers.js'));
 const { isHostShellName } = require(path.join(__dirname, 'lib', 'mastergo-rules.js'));
 const fail = failAndExit(1);
 
@@ -215,7 +216,33 @@ if (containerSpecs.length > 0) {
     const originY = parentIsRoot ? 0 : target.bbox.y;
     const insetLeft = parentIsRoot ? 0 : target.contentInset.left;
     const insetTop = parentIsRoot ? 0 : target.contentInset.top;
-    const expectedLeft = bbox.x - originX - insetLeft;
+    // TextBlock Align=Right：Left 不是"到左边缘"，而是以控件右上角为原点量到**父容器外框右边缘**
+    // 的距离（口径登记见映射表 textBlockAlign.distance*；实现是 lib/script-helpers.js 那一份）。
+    // 其余节点仍是"左边缘到内容区左边缘"。Top 口径不变。
+    const alignAttr = (templateMap.textBlockAlign && templateMap.textBlockAlign.attr) || 'Align';
+    const alignRightValue = (templateMap.textBlockAlign && templateMap.textBlockAlign.rightValue) || 'Right';
+    const isRightAlignedText = (node.controlType || (node.attrs && node.attrs.ControlType)) === 'TextBlock' &&
+      node.attrs && node.attrs[alignAttr] === alignRightValue;
+    let expectedLeft;
+    if (isRightAlignedText) {
+      const textWidth = node.dslWidth !== undefined ? node.dslWidth : bbox.w;
+      const left = textBlockLeftValue({
+        align: 'Right',
+        pageAbsX: bbox.x,
+        textWidth: textWidth,
+        parentOuterRightEdgeX: parentOuterRightEdge({
+          parentIsRoot: parentIsRoot,
+          parentPageAbsX: target.bbox.x,
+          parentWidth: target.bbox.w
+        })
+      });
+      if (left === null) {
+        fail('TextBlock Align=Right 的 Left 无法计算（缺父容器外框右边缘或设计稿 bbox 宽度）: ' + ref);
+      }
+      expectedLeft = left;
+    } else {
+      expectedLeft = bbox.x - originX - insetLeft;
+    }
     const expectedTop = bbox.y - originY - insetTop - (parentIsRoot ? report.contentOriginY : 0);
     if (fromParent === target.ref && node.parent === target.ref &&
         Number(node.expectedLeft) === expectedLeft && Number(node.expectedTop) === expectedTop) {
@@ -226,6 +253,7 @@ if (containerSpecs.length > 0) {
     node.layoutParent = target.ref;
     node.expectedLeft = expectedLeft;
     node.expectedTop = expectedTop;
+    if (isRightAlignedText) node.leftBasis = TEXT_BLOCK_RIGHT_LEFT_BASIS;
     report.reparented.push({
       ref: ref,
       xmlId: node.xmlId || ref,

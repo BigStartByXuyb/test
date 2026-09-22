@@ -13,7 +13,8 @@ const fs = require('fs');
 const MAP_RULES = require('./lib/iocontrol-map-rules');
 // 数值解析的唯一实现（见 scripts/lib/script-helpers.js；本校验器与坐标核对器共用同一口径）。
 // 文案比对归一（解码字符引用 + 换行归一成 LF）的唯一实现，见 scripts/lib/script-helpers.js。
-const { numberOrNull: num, normalizeForCompare, omittedAttrs } = require('./lib/script-helpers');
+const { numberOrNull: num, normalizeForCompare, omittedAttrs,
+  parentOuterRightEdge, textBlockLeftValue, TEXT_BLOCK_RIGHT_LEFT_BASIS } = require('./lib/script-helpers');
 
 // 按钮族固定参数：真值来源为模板表 mtslg-iocontrol-map.json 的 buttonFamily；
 // 传入 --map 时读取该表，未传入或表缺字段时退回内置默认（与表内容一致）。
@@ -56,6 +57,9 @@ let BUTTON_FAMILY_CONTROL_TYPES = BUTTON_FAMILY_RULES.controlTypes;
 let BUTTON_ALWAYS_ATTRS = BUTTON_FAMILY_RULES.alwaysWrittenAttrs;
 let REQUIRED_ATTRS_BY_CONTROL_TYPE = {};
 let TABLE_TEMPLATE = null;
+// TextBlock 的 Align 口径块（映射表 textBlockAlign）：这里只取 attr / rightValue 两个字段，
+// 用于判断「Align=Right 的 TextBlock 必须按到右边缘的口径算 Left」。未传表时退回与表一致的默认。
+let TEXT_BLOCK_ALIGN = { attr: 'Align', rightValue: 'Right' };
 
 function attrsFromTag(tag) {
   const attrs = {};
@@ -167,6 +171,7 @@ function validate(xmlPath, manifestPath, options) {
     BUTTON_ALWAYS_ATTRS = BUTTON_FAMILY_RULES.alwaysWrittenAttrs;
     REQUIRED_ATTRS_BY_CONTROL_TYPE = MAP_RULES.parseControlTypeRequiredAttrs(loaded) || {};
     TABLE_TEMPLATE = MAP_RULES.parseTableTemplate(loaded);
+    TEXT_BLOCK_ALIGN = (loaded && loaded.textBlockAlign) || TEXT_BLOCK_ALIGN;
   }
   const errors = [];
   let xml;
@@ -196,6 +201,8 @@ function validate(xmlPath, manifestPath, options) {
   errors.push(...validateTextAudit(manifest, entries));
   const rootRef = manifest.rootRef || (manifest.source && manifest.source.layerId) ||
     (manifest.sourceNodes.find(n => !n.parentRef) || {}).ref;
+  // 根节点来源：Align=Right 的 TextBlock 落在根级时，父容器外框右边缘 = 页面宽度（根节点宽度）。
+  const rootSource = rootRef ? (sourceMap.get(rootRef) || null) : null;
   const tags = Array.from(xml.matchAll(/<IOContorl\b[^<>]*>/g)).map(m => attrsFromTag(m[0]));
   const actual = tags.filter(a => a.ID !== '' || a.ControlType);
     const byId = new Map(actual.filter(a => a.ID).map(a => [a.ID, a]));
@@ -280,7 +287,38 @@ function validate(xmlPath, manifestPath, options) {
     const insetLeft = parentInset ? (Number(parentInset.left) || 0) : 0;
     const insetTop = parentInset ? (Number(parentInset.top) || 0) : 0;
     if (!isTableColumn) {
-      const expectedSourceLeft = Number(src.pageAbsX) - (outputParent ? Number(outputParent.pageAbsX) : 0) - insetLeft;
+      // TextBlock Align=Right 的 expectedLeft 口径不同：以控件右上角为原点，量到输出父容器
+      // **外框右边缘**的距离（口径见映射表 textBlockAlign.distance*；实现在 lib/script-helpers.js）。
+      // 判据用节点上的 leftBasis 标识（由生成器/容器重挂写入），不靠猜值。
+      const rightAlignedText = (x.ControlType === 'TextBlock') && n.leftBasis === TEXT_BLOCK_RIGHT_LEFT_BASIS;
+      // 反向门禁：Align=Right 的 TextBlock 必须带 leftBasis 标识——缺了说明它没走"到右边缘"这条口径
+      // （例如有人只改了发射值、忘了算 Left），必须当场报出来，不能靠值对不对去反推。
+      const alignAttrName = (TEXT_BLOCK_ALIGN && TEXT_BLOCK_ALIGN.attr) || 'Align';
+      const alignRightValue = (TEXT_BLOCK_ALIGN && TEXT_BLOCK_ALIGN.rightValue) || 'Right';
+      if (x.ControlType === 'TextBlock' && x[alignAttrName] === alignRightValue &&
+          n.leftBasis !== TEXT_BLOCK_RIGHT_LEFT_BASIS) {
+        errors.push('[' + n.xmlId + '] TextBlock Align=Right 必须按"到右边缘"口径算 Left（映射节点缺 leftBasis 标识）');
+      }
+      let expectedSourceLeft;
+      if (rightAlignedText) {
+        const rightEdgeX = parentOuterRightEdge({
+          parentIsRoot: parentIsRoot || !outputParent,
+          parentPageAbsX: outputParent ? Number(outputParent.pageAbsX) : null,
+          parentWidth: outputParent ? Number(outputParent.width) : null,
+          rootWidth: rootSource ? Number(rootSource.width) : null
+        });
+        expectedSourceLeft = textBlockLeftValue({
+          align: 'Right',
+          pageAbsX: Number(src.pageAbsX),
+          textWidth: Number(n.dslWidth !== undefined ? n.dslWidth : src.width),
+          parentOuterRightEdgeX: rightEdgeX
+        });
+        if (expectedSourceLeft === null) {
+          errors.push('[' + n.xmlId + '] TextBlock Align=Right 的 Left 无法复核（缺父容器外框右边缘或设计稿 bbox 宽度）');
+        }
+      } else {
+        expectedSourceLeft = Number(src.pageAbsX) - (outputParent ? Number(outputParent.pageAbsX) : 0) - insetLeft;
+      }
       const expectedSourceTop = Number(src.pageAbsY) -
         (outputParent ? Number(outputParent.pageAbsY) : 0) - (parentIsRoot || !outputParent ? originY : 0) - insetTop;
       if (!sameNumber(n.expectedLeft, expectedSourceLeft) || !sameNumber(n.expectedTop, expectedSourceTop)) {

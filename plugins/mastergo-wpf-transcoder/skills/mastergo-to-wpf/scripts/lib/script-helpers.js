@@ -126,6 +126,49 @@ function outputOrigin(options) {
   };
 }
 
+// 输出父容器的**外框右边缘** X —— TextBlock Align=Right 的 Left 口径要用它
+// （口径登记见映射表 textBlockAlign.distanceParentRightEdge）：
+//   根级节点 → 根节点宽度（页面宽度）；
+//   嵌套节点 → 父容器外框右边缘 = 父容器 pageAbsX + 父容器宽度（**不是**内容区右边缘）。
+// 取不到根宽度 / 父容器 pageAbsX / 父容器宽度 → null，由调用方 fail-closed（不猜）。
+function parentOuterRightEdge(options) {
+  const opts = options || {};
+  if (opts.parentIsRoot) {
+    const rootWidth = numberOrNull(opts.rootWidth);
+    return typeof rootWidth === "number" ? rootWidth : null;
+  }
+  const parentPageAbsX = numberOrNull(opts.parentPageAbsX);
+  const parentWidth = numberOrNull(opts.parentWidth);
+  if (typeof parentPageAbsX !== "number" || typeof parentWidth !== "number") return null;
+  return parentPageAbsX + parentWidth;
+}
+
+// TextBlock Align=Right 的 Left 口径标识：写进 mapping 节点的 leftBasis，供容器重挂 / 坐标核对器 /
+// provenance 校验器判断"这个节点走的是到右边缘的口径"。字面量只在这里出现一次（不在各脚本里重复）。
+const TEXT_BLOCK_RIGHT_LEFT_BASIS = "textblock.align-right.parent-outer-right-edge";
+
+// TextBlock 的 Left 取值口径（**全仓唯一实现**：映射生成器 / 容器重挂 / 坐标核对器共用同一份）：
+//   Align=Left（设计稿 center 归左，见映射表 textBlockAlign）→ 控件**左边缘**到输出父容器
+//     **内容区左边缘**的距离 = pageAbsX − 内容区原点X（与既有的 Left 完全一致）；
+//   Align=Right → 以控件**右上角**为原点，量到输出父容器**外框右边缘**的距离
+//     = 父外框右边缘 − (pageAbsX + 设计稿 bbox 宽度)。
+// 宽度来源固定为设计稿 bbox 宽度（mapping nodes[].dslWidth / sourceNodes[].width）；
+// 产物 XML 的 Width 仍是 NaN（自适应），宽度只参与这里的 Left 计算。
+// 任一输入取不到 → null，由调用方 fail-closed（不猜）。
+function textBlockLeftValue(options) {
+  const opts = options || {};
+  const pageAbsX = numberOrNull(opts.pageAbsX);
+  if (typeof pageAbsX !== "number") return null;
+  if (String(opts.align) !== "Right") {
+    const originX = numberOrNull(opts.originX);
+    return typeof originX === "number" ? pageAbsX - originX : null;
+  }
+  const textWidth = numberOrNull(opts.textWidth);
+  const rightEdgeX = numberOrNull(opts.parentOuterRightEdgeX);
+  if (typeof textWidth !== "number" || typeof rightEdgeX !== "number") return null;
+  return rightEdgeX - (pageAbsX + textWidth);
+}
+
 // 读 JSON：失败信息带调用方给的 label，便于定位是哪个输入坏了。
 function readJson(filePath, label) {
   try {
@@ -223,6 +266,9 @@ module.exports = {
   normalizeToken: normalizeToken,
   numberOrNull: numberOrNull,
   outputOrigin: outputOrigin,
+  parentOuterRightEdge: parentOuterRightEdge,
+  textBlockLeftValue: textBlockLeftValue,
+  TEXT_BLOCK_RIGHT_LEFT_BASIS: TEXT_BLOCK_RIGHT_LEFT_BASIS,
   readJson: readJson,
   omittedAttrs: omittedAttrs,
   backupFile: backupFile,

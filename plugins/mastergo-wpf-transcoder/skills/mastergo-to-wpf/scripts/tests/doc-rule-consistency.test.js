@@ -1078,5 +1078,28 @@ console.log("PASS 匹配键口径单读法 + 同一条规则单处陈述（maste
   }
   assert.ok(mainSkill.includes("Align"),
     "mastergo-to-wpf/SKILL.md 的硬门禁索引必须点名 Align（否则执行者不知道它有条确定口径）");
+  // Left 口径（Align=Right 时"到右边缘"）：登记字段 + 唯一实现 + 全部消费方都必须指向同一处。
+  for (const field of ["distanceAttr", "distanceLeftBasis", "distanceRightBasis", "distanceCenterPolicy",
+    "distanceWidthSource", "distanceParentRightEdge", "distanceImplementation"]) {
+    assert.ok(typeof align[field] === "string" && align[field].trim(),
+      "textBlockAlign 必须登记 " + field + "（Align=Right 时 Left 的口径）");
+  }
+  assert.strictEqual(align.distanceAttr, "Left",
+    "距离参数名固定为 Left（与 Align 同一组属性，不新增第三个属性名）");
+  const helpers = fs.readFileSync(path.join(__dirname, "..", "lib", "script-helpers.js"), "utf8");
+  for (const token of ["function parentOuterRightEdge", "function textBlockLeftValue", "TEXT_BLOCK_RIGHT_LEFT_BASIS"]) {
+    assert.ok(helpers.includes(token),
+      "lib/script-helpers.js 必须保留 " + token + "（Left 口径的唯一实现与口径标识）");
+  }
+  for (const rel of ["gen-mtslg-mapping-from-dsl.js", "apply-container-containment.js", "gen-iocontrol-xml.js",
+    "gen-mastergo-page-bundle.js", "check-coords.mjs", "validate-iocontrol-provenance.js"]) {
+    const consumer = fs.readFileSync(path.join(__dirname, "..", rel), "utf8");
+    assert.ok(consumer.includes("TEXT_BLOCK_RIGHT_LEFT_BASIS"),
+      rel + " 必须用共享的 leftBasis 标识判断右对齐口径（不得自己拼字面量）");
+  }
+  for (const [file, text] of [["mtslg-mode.md", modeDoc], ["feishu-component-library-mapping.md", feishuMapping],
+    ["mastergo-to-wpf/SKILL.md", mainSkill]]) {
+    assert.ok(text.includes("右边缘"), file + " 必须写明 Align=Right 时 Left 是到右边缘的距离");
+  }
 }
 console.log("PASS TextBlock Align 口径（映射表 textBlockAlign ↔ 生成器发射 ↔ 人读文档）一致性回归测试");

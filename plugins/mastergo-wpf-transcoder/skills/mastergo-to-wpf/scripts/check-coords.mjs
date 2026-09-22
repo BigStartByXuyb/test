@@ -9,7 +9,8 @@ import { createRequire } from "node:module";
 // 原点口径的唯一实现在 lib/script-helpers.js（与 Bundle 同一份）：0 是合法坐标，取不到父容器
 // pageAbs 时返回 null → 本脚本按"不猜原点"直接失败（历史写法 `Number(y) || 192` 会把贴页面顶边的
 // 父容器算成 192，让核对器与生成器对同一份 mapping 得出相差 192 的原点）。
-const { outputOrigin } = createRequire(import.meta.url)("./lib/script-helpers.js");
+const { outputOrigin, parentOuterRightEdge, textBlockLeftValue, TEXT_BLOCK_RIGHT_LEFT_BASIS } =
+  createRequire(import.meta.url)("./lib/script-helpers.js");
 
 const [mappingFile, outFile] = process.argv.slice(2);
 if (!mappingFile || !outFile) {
@@ -22,6 +23,8 @@ const nodes = Array.isArray(mapping.nodes) ? mapping.nodes : [];
 const sourceByRef = new Map((mapping.sourceNodes || []).map((node) => [node.ref, node]));
 const nodeByRef = new Map(nodes.map((node) => [node.ref, node]));
 const rootRef = mapping.rootRef || null;
+// 根节点来源：Align=Right 的 TextBlock 落在根级时，父容器外框右边缘 = 页面宽度（根节点宽度）。
+const rootSource = rootRef ? (sourceByRef.get(rootRef) || null) : null;
 
 // 不猜原点：输入损坏时给出可定位的失败，而不是算出一个错的原点让后面误判。
 const failOrigin = (message) => {
@@ -57,6 +60,27 @@ const out = nodes.map((node) => {
   const originX = origin.x;
   const originY = origin.y;
   const isTextBlock = (node.controlType || (node.attrs && node.attrs.ControlType)) === "TextBlock";
+  // TextBlock Align=Right：Left 的口径是"以控件右上角为原点，量到父容器外框右边缘"，不是 x − 原点。
+  // 这里按同一实现（lib/script-helpers.js）**独立重算**一遍并显式传给官方核对器，避免它按
+  // 「Left ≈ x − contentOriginX」把正确产物判成 MISMATCH。
+  const rightAlignedText = isTextBlock && node.leftBasis === TEXT_BLOCK_RIGHT_LEFT_BASIS;
+  const expectedLeft = rightAlignedText
+    ? textBlockLeftValue({
+      align: "Right",
+      pageAbsX: number(source.pageAbsX !== undefined ? source.pageAbsX : node.absX),
+      textWidth: number(node.dslWidth !== undefined ? node.dslWidth : source.width),
+      parentOuterRightEdgeX: parentOuterRightEdge({
+        parentIsRoot: parentIsRoot,
+        parentPageAbsX: parentSource ? parentSource.pageAbsX : null,
+        parentWidth: parentSource ? parentSource.width : null,
+        rootWidth: rootSource ? rootSource.width : null
+      })
+    })
+    : null;
+  if (rightAlignedText && expectedLeft === null) {
+    failOrigin("无法计算 TextBlock Align=Right 的 Left：节点 " + (node.xmlId || node.ref) +
+      " 缺少页面/父容器宽度或设计稿 bbox 宽度（不能猜）");
+  }
   if (node.nodeKind === "table-column") {
     return {
       id: node.xmlId || node.id || node.ref,
@@ -75,7 +99,9 @@ const out = nodes.map((node) => {
     w: isTextBlock ? "NaN" : number(node.expectedWidth !== undefined ? node.expectedWidth : source.width),
     h: number(node.expectedHeight !== undefined ? node.expectedHeight : source.height),
     contentOriginX: originX,
-    contentOriginY: originY
+    contentOriginY: originY,
+    // 只在 Align=Right 的 TextBlock 上出现：官方核对器优先用它当 expectedLeft。
+    ...(expectedLeft !== null ? { expectedLeft } : {})
   };
 });
 

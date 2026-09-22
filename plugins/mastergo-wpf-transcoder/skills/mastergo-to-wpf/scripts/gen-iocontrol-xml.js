@@ -65,7 +65,8 @@ const { validateTextAudit } = require('./validate-iocontrol-provenance');
 // 模板表规则块的解析唯一实现（见 scripts/lib/iocontrol-map-rules.js；禁止在本脚本再抄一份）。
 const MAP_RULES = require('./lib/iocontrol-map-rules');
 // XML 属性转义（含换行 → &#x0a;）的唯一实现（见 scripts/lib/script-helpers.js；禁止在本脚本再抄一份）。
-const { xmlAttr, normalizeForCompare, omittedAttrs } = require('./lib/script-helpers');
+const { xmlAttr, normalizeForCompare, omittedAttrs,
+  parentOuterRightEdge, textBlockLeftValue, TEXT_BLOCK_RIGHT_LEFT_BASIS } = require('./lib/script-helpers');
 
 // ---------- 参数 ----------
 function usage() {
@@ -443,8 +444,27 @@ function tableColumnGeometryOf(node) {
   };
 }
 
+// 节点 Left 的唯一取值函数：TextBlock Align=Right 走"以控件右上角为原点、量到父容器外框右边缘"的口径
+// （实现在 lib/script-helpers.js，与映射生成器 / 容器重挂 / 坐标核对器共用同一份），其余节点仍是
+// Left = absX − 父容器原点 − 内容区 inset。判据是 mapping 节点上的 leftBasis 标识，不靠猜值。
+function geometryLeftOf(node, parentAbsX, insetLeft, parentOuterRightEdgeX) {
+  if (node.leftBasis === TEXT_BLOCK_RIGHT_LEFT_BASIS) {
+    const left = textBlockLeftValue({
+      align: 'Right',
+      pageAbsX: node.absX,
+      textWidth: node.dslWidth !== undefined ? node.dslWidth : node.w,
+      parentOuterRightEdgeX: parentOuterRightEdgeX
+    });
+    if (left === null) {
+      throw new Error('TextBlock Align=Right 的 Left 无法计算（缺父容器外框右边缘或设计稿 bbox 宽度）: ' + node.ref);
+    }
+    return left;
+  }
+  return node.absX - parentAbsX - insetLeft;
+}
+
 // 就地发射节点几何：表格列定义走模板固定几何，其余节点按 DSL bbox 相对父容器计算。
-function applyNodeGeometry(node, attrMap, parentAbsX, parentAbsY, insetLeft, insetTop) {
+function applyNodeGeometry(node, attrMap, parentAbsX, parentAbsY, insetLeft, insetTop, parentRightEdgeX) {
   if (isTableColumnNode(node)) {
     const geometry = tableColumnGeometryOf(node);
     attrMap.Left = fmtNum(geometry.left);
@@ -454,7 +474,7 @@ function applyNodeGeometry(node, attrMap, parentAbsX, parentAbsY, insetLeft, ins
     else if (node.expectedWidth !== undefined && node.expectedWidth !== null) attrMap.Width = fmtNum(node.expectedWidth);
     return;
   }
-  attrMap.Left = fmtNum(node.absX - parentAbsX - insetLeft);
+  attrMap.Left = fmtNum(geometryLeftOf(node, parentAbsX, insetLeft, parentRightEdgeX));
   attrMap.Top = fmtNum(normalizedY(node.absY) - parentAbsY - insetTop);
   if (outputWidth(node) !== undefined && outputWidth(node) !== null) attrMap.Width = fmtNum(outputWidth(node));
   if (outputHeight(node) !== undefined && outputHeight(node) !== null) attrMap.Height = fmtNum(outputHeight(node));
@@ -539,7 +559,15 @@ function renderFresh() {
   lines.push('    Width="NaN"');
   lines.push('    Height="NaN">');
 
-  const emit = (node, depth, parentAbsX, parentAbsY, parentInset) => {
+  // rootRightEdgeX：Align=Right 的 TextBlock 在根级要用"页面宽度"当父容器外框右边缘。
+  const rootRightEdgeX = (() => {
+    const rootRef = mapping.rootRef || null;
+    const rootSource = (mapping.sourceNodes || []).find(s => s.ref === rootRef) ||
+      (mapping.sourceNodes || [])[0] || null;
+    return rootSource && typeof rootSource.width === 'number' ? rootSource.width : null;
+  })();
+
+  const emit = (node, depth, parentAbsX, parentAbsY, parentInset, parentRightEdgeX) => {
     const indent = '    '.repeat(depth);
     const attrMap = Object.assign({}, node.attrs || {});
     if (node.id) attrMap.ID = node.id;
@@ -549,21 +577,26 @@ function renderFresh() {
     // 与发射到 XML 的 Style 是两个字段），与 provenance 校验同口径。
     const insetLeft = parentInset ? (Number(parentInset.left) || 0) : 0;
     const insetTop = parentInset ? (Number(parentInset.top) || 0) : 0;
-    applyNodeGeometry(node, attrMap, parentAbsX, parentAbsY, insetLeft, insetTop);
+    applyNodeGeometry(node, attrMap, parentAbsX, parentAbsY, insetLeft, insetTop, parentRightEdgeX);
     applyTemplateAttrs(node, attrMap);
 
     const kids = orderChildrenByVisualRows(childMap.get(node.ref) || []);
     if (node.comment) lines.push(`${indent}<!-- ${node.comment} -->`);
     if (kids.length > 0) {
       lines.push(renderTag(attrMap, indent, indent + '    ', false, 'multi'));
-      for (const k of kids) emit(k, depth + 1, node.absX, normalizedY(node.absY), node.contentInset || null);
+      const childRightEdgeX = parentOuterRightEdge({
+        parentIsRoot: false,
+        parentPageAbsX: node.absX,
+        parentWidth: node.w
+      });
+      for (const k of kids) emit(k, depth + 1, node.absX, normalizedY(node.absY), node.contentInset || null, childRightEdgeX);
       lines.push(`${indent}</IOContorl>`);
     } else {
       lines.push(renderTag(attrMap, indent, indent + '    ', true, 'multi'));
     }
   };
   // 发射顺序：每个父容器内按"先上后下、同一视觉行先左后右"排列（只改顺序，不动坐标/属性/层级）。
-  for (const n of orderChildrenByVisualRows(rootChildren)) emit(n, 1, 0, 0, null);
+  for (const n of orderChildrenByVisualRows(rootChildren)) emit(n, 1, 0, 0, null, rootRightEdgeX);
   lines.push('</IOContorl>');
   return lines.join('\n') + '\n';
 }
@@ -670,7 +703,18 @@ function mergeMode() {
 
   function resolveParentAbs(n) {
     const p = n.parent || null;
-    if (p === null) return { x: 0, y: 0, insetLeft: 0, insetTop: 0 };
+    // rightEdgeX：Align=Right 的 TextBlock 要用的"父容器外框右边缘"——根级 = 页面宽度（根节点宽度），
+    // 嵌套 = 父容器 absX + 父容器宽度。取不到时返回 null，交给 geometryLeftOf 的共用实现 fail-closed。
+    const rootWidthOf = () => {
+      const rootRef = mapping.rootRef || null;
+      const rootSource = (mapping.sourceNodes || []).find(s => s.ref === rootRef) ||
+        (mapping.sourceNodes || [])[0] || null;
+      return rootSource && typeof rootSource.width === 'number' ? rootSource.width : null;
+    };
+    if (p === null) {
+      const rootWidth = rootWidthOf();
+      return { x: 0, y: 0, insetLeft: 0, insetTop: 0, rightEdgeX: rootWidth };
+    }
     const pn = absOf.get(p);
     if (!pn) throw new Error(`映射节点 parent 引用不存在: ${p}（来自 ref=${n.ref}）`);
     // 父节点是容器时，子坐标从内容区原点量（再扣内容区边框 + 标题条高），与 fresh 发射同口径。
@@ -680,7 +724,12 @@ function mergeMode() {
       x: pn.absX,
       y: pn.absY,
       insetLeft: inset ? (Number(inset.left) || 0) : 0,
-      insetTop: inset ? (Number(inset.top) || 0) : 0
+      insetTop: inset ? (Number(inset.top) || 0) : 0,
+      rightEdgeX: parentOuterRightEdge({
+        parentIsRoot: false,
+        parentPageAbsX: pn.absX,
+        parentWidth: parentNode ? parentNode.w : null
+      })
     };
   }
 
@@ -695,7 +744,7 @@ function mergeMode() {
     const attrMap = Object.assign({}, n.attrs || {});
     if (n.id) attrMap.ID = n.id;
     if (n.controlType) attrMap.ControlType = n.controlType;
-    applyNodeGeometry(n, attrMap, pa.x, pa.y, pa.insetLeft, pa.insetTop);
+    applyNodeGeometry(n, attrMap, pa.x, pa.y, pa.insetLeft, pa.insetTop, pa.rightEdgeX);
     applyTemplateAttrs(n, attrMap);
     rendered.set(n.ref, { n, attrMap, tokenIdx: null, matchKind: null });
   }
@@ -717,7 +766,7 @@ function mergeMode() {
       // 表格列定义按模板固定几何匹配（Left=0/Top=0），不能再用 DSL bbox 反推。
       const expected = isTableColumnNode(n)
         ? { left: Number(n.expectedLeft), top: Number(n.expectedTop) }
-        : { left: n.absX - pa.x - pa.insetLeft, top: normalizedY(n.absY) - pa.y - pa.insetTop };
+        : { left: geometryLeftOf(n, pa.x, pa.insetLeft, pa.rightEdgeX), top: normalizedY(n.absY) - pa.y - pa.insetTop };
       const hit = positionCandidates.find(p =>
         !matchedOpenIdx.has(p.i) &&
         p.controlType === n.controlType &&
@@ -846,10 +895,10 @@ function mergeMode() {
     const pa = resolveParentAbs(n);
     const attrMap2 = Object.assign({}, attrMap);
     if (isTableColumnNode(n)) {
-      applyNodeGeometry(n, attrMap2, pa.x, pa.y, 0, 0);
+      applyNodeGeometry(n, attrMap2, pa.x, pa.y, 0, 0, pa.rightEdgeX);
       applyTemplateAttrs(n, attrMap2);
     } else {
-      attrMap2.Left = fmtNum(n.absX - pa.x);
+      attrMap2.Left = fmtNum(geometryLeftOf(n, pa.x, 0, pa.rightEdgeX));
       attrMap2.Top = fmtNum(normalizedY(n.absY) - pa.y);
     }
     const indent = '    '.repeat(depthOfRef(ref));
@@ -861,10 +910,10 @@ function mergeMode() {
       if (node.id) am.ID = node.id;
       if (node.controlType) am.ControlType = node.controlType;
       if (isTableColumnNode(node)) {
-        applyNodeGeometry(node, am, pa2.x, pa2.y, 0, 0);
+        applyNodeGeometry(node, am, pa2.x, pa2.y, 0, 0, pa2.rightEdgeX);
         applyTemplateAttrs(node, am);
       } else {
-        am.Left = fmtNum(node.absX - pa2.x);
+        am.Left = fmtNum(geometryLeftOf(node, pa2.x, 0, pa2.rightEdgeX));
         am.Top = fmtNum(normalizedY(node.absY) - pa2.y);
         if (outputWidth(node) !== undefined && outputWidth(node) !== null) am.Width = fmtNum(outputWidth(node));
         if (outputHeight(node) !== undefined && outputHeight(node) !== null) am.Height = fmtNum(outputHeight(node));

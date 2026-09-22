@@ -98,7 +98,7 @@ pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -List -Format json -OutFile <�
 - **页面节点 ID**：`MX_` + `sha256(页面键 + 节点 ref)` 前 32 位；禁止用遍历序号当节点身份，人工维护约定随属性一起写在 mapping → `mtslg-mode.md` 第 2 节
 - **图标是页面级资源**：本页 `Icons.xaml` 的键必须页面内唯一、并被本页（含 Layout 菜单项）引用；禁止由图层 ID / 坐标 / 外观拼名（如 `MGIcon_<layer-id>`）。**哪些图形要登记由 `discover` 步骤机械给出**（候选的 `registration.register` / `mustName`，判据实现 `scripts/lib/icon-registration-policy.js`），命名表与它**必须一一对应**（漏定名 / 多定名都失败，`build-icon-ledger.mjs` 双向门禁）→ `references/adapters/mtslg-iocontrol/page-build-rules.md` 第 2 节
 - **页面输出目录**：一页一目录（页面 XML / Icon / 语言字典同页目录，Layout 项目级共享）+ 运行目录解析优先级 → `references/adapters/mtslg-iocontrol/page-build-rules.md` 第 1 节
-- **组件族细则**：表格族 `tableTemplates` 按结构签名命中并发射 `DataGrid`（列定义来自 `columnTemplate`，行是数据不发射控件）；相机族 `cameraTemplates` 内部文本整体 omit；`TextBlock` 的 `FontWeight`、`Align`（恒写且只有 `TextBlock` 有：设计稿 `textAlign=right` → `Right`，其余含缺失 → `Left` 默认左对齐）与换行（`&#x0a;`、`U+2028`）都有确定口径 → `feishu-component-library-mapping.md` + 映射表 `mtslg-iocontrol-map.json`
+- **组件族细则**：表格族 `tableTemplates` 按结构签名命中并发射 `DataGrid`（列定义来自 `columnTemplate`，行是数据不发射控件）；相机族 `cameraTemplates` 内部文本整体 omit；`TextBlock` 的 `FontWeight`、`Align`（恒写且只有 `TextBlock` 有：设计稿 `textAlign=right` → `Right`，其余含缺失 → `Left` 默认左对齐；`Align=Right` 时 `Left` 的口径变成"以控件右上角为原点量到父容器外框右边缘的距离"）与换行（`&#x0a;`、`U+2028`）都有确定口径 → `feishu-component-library-mapping.md` + 映射表 `mtslg-iocontrol-map.json`
 - **页面级 / 项目级边界**：页面 XML、本页 Icon、本页语言字典、本页 View/ViewModel、本页 mapping 与审计是页面级（跨页不得同名、不得互相引用）；`Resources/Layout/Layout.xml`、`.csproj`、`framework.config.json` 是项目级，本页只增量写自己的注册
 - **不得把 WPF 私有协议写进 IOContorl**：如 `s:Action`、WPF `PageName`、ResourceDictionary 或绑定语法
 

@@ -541,6 +541,24 @@ for (const node of alignMapping.nodes.filter(item => item.controlType !== 'TextB
     'Align 只有 TextBlock 有：' + node.controlType + ' 不得发射该属性');
 }
 
+// Left 口径随 Align 切换（同一参数名）：Align=Right 时是"以控件右上角为原点量到父容器外框右边缘"
+// （根级 = 页面宽度），其余（Left / center / 缺失）仍是"左边缘到内容区左边缘"。页面宽 800、节点 x=20、宽 40。
+const alignLeftByRef = new Map(alignMapping.nodes
+  .filter(item => item.controlType === 'TextBlock')
+  .map(item => [item.sourceRef, { left: item.expectedLeft, basis: item.leftBasis }]));
+for (const ref of ['al:root/right', 'al:root/upper']) {
+  assert.strictEqual(alignLeftByRef.get(ref).left, 800 - (20 + 40),
+    ref + ' 是 Align=Right：Left 必须是「页面宽度 − (控件X + 设计稿bbox宽)」= 740');
+  assert.strictEqual(alignLeftByRef.get(ref).basis, 'textblock.align-right.parent-outer-right-edge',
+    ref + ' 必须带 leftBasis 口径标识（容器重挂 / 坐标核对 / 校验器据此判定）');
+}
+for (const ref of ['al:root/left', 'al:root/center', 'al:root/justify', 'al:root/missing']) {
+  assert.strictEqual(alignLeftByRef.get(ref).left, 20,
+    ref + ' 不是右对齐：Left 仍是「控件X − 内容区原点X」（页面根原点 0）= 20');
+  assert.strictEqual(alignLeftByRef.get(ref).basis, undefined,
+    ref + ' 不得带右对齐口径标识');
+}
+
 console.log('PASS MTSLG DSL-to-mapping TextBlock Align regression test');
 
 // ---- 相机视口（cameraTemplates）：ControlType=Camera、不写 Style、DesignPanelID/Value 空串占位 ----

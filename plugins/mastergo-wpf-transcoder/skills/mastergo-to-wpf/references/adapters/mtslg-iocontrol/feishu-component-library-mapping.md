@@ -549,6 +549,7 @@ Style 与内部组件对照（只对下表列出的真实值成立）：
 ```
 
 - 文本对齐：`Align` 是恒写字段（登记在 `controlTypeRequiredAttrs.TextBlock`），**只有 `TextBlock` 有这个属性**，取值只有 `Left` / `Right` —— 设计稿 TEXT 节点的 `textAlign=right` → `Right`，其余（`left` / `center` / 字段缺失）→ `Left`（**默认左对齐**）。规则真值源是映射表 `textBlockAlign`。
+- `Align` 会同时决定 **`Left` 的口径**（同一个属性名、两个含义）：`Align=Left` 时 `Left` = 控件左边缘到父容器**内容区左边缘**的距离；`Align=Right` 时 `Left` = 以控件**右上角**为原点，量到父容器**外框右边缘**的距离 = `父外框右边缘 − (控件 pageAbsX + 设计稿 bbox 宽度)`（页面根用**页面宽度**，容器用**容器 left + width**）。宽度取设计稿 bbox 宽（产物 `Width` 仍是 `NaN`）。口径真值源是映射表 `textBlockAlign.distance*`，实现在 `scripts/lib/script-helpers.js`。
 - 独立文本节点统一映射为 `TextBlock`，不因所在组件或变体改变 ControlType。
 - 如果文本是输入框、选择框等控件内部内容，则保留为所属控件内容，不额外拆分为 TextBlock。
 - 文本的 Value、FontSize、FontWeight 和坐标必须来自对应 MasterGo 节点；所有 MTSLG TextBlock 的 Height 固定为 40、Width 固定为 `NaN`，不能用外层组件高度、文字 bbox、组件语义或文本 bbox 宽度改写这两个值（文本 bbox 宽度只作为 `dslWidth` 来源记录在 mapping 中）。
