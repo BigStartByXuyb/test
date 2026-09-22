@@ -128,6 +128,7 @@ flowchart LR
 
 - 旧路径（`Common/Pages`、`Resources/Icons`、`Resources/Files/Layout.xml`）**已废弃**。
 - `framework.config.json` 的 `pages_root` / `icons_root` / `layout_file` 必须与实际产物一致（`sync-to-mt.ps1` 依赖 `pages_root`），`key_catalog` 默认空。
+- **项目内不放工具链副本**：流水线脚本的唯一真源是本插件（`skills/mastergo-to-wpf/scripts/`）；项目里只留产物与证据，不留 `_tool/` 之类的脚本拷贝。
 
 ## 7. 门禁落点（规则正文以 SKILL.md / references 为准）
 
@@ -173,6 +174,7 @@ DSL/mapping 文案 ──► 英文等译文由 AI 产出 translations 清单并
 ## 10. 环境与运行
 
 - **PowerShell 脚本一律用 PowerShell 7（`pwsh`）**，不做 Windows PowerShell 5.1 兼容。
+- 运行入口是插件内唯一的 `skills/mastergo-to-wpf/scripts/entry/run-all.ps1`；驱动任意目标项目用 `-ProjectRoot <项目> -Target <Target>`，脚本不拷进项目。
 - Node.js 运行全部 JS 脚本；MasterGo MCP 通过 `call-mastergo-mcp.js` 调用（token 不落盘）。
 - **文档同步工具（可选，非交付链路依赖）**：把本地规则文档同步到团队在线文档时，使用本机已授权的飞书文档 CLI（可检索/读写云文档）按标题定位并比对；它不是生成或校验流程的运行依赖，环境没有该工具时跳过同步步骤，并在交付说明里标注"在线文档未同步"，不得因此阻塞页面交付。
 - 本地回归：`node --test "skills/mastergo-to-wpf/scripts/tests/*.test.js"`（跑满 `scripts/tests/` 下全部用例，含脚本复用门禁 `script-duplication.test.js`、文本换行口径 `text-newline.test.js`、文档预算 `doc-budget.test.js`、流水线契约 `pipeline-contract.test.js`）、`Get-ChildItem "skills/mastergo-to-wpf/scripts/tests/*.tests.ps1" | ForEach-Object { pwsh -NoProfile -File $_.FullName }`（`mastergo-dsl-pipeline.tests.ps1` + `run-all-resume-identity.tests.ps1`）、`node skills/mastergo-to-wpf/scripts/adapters/mtslg-iocontrol/audit-mtslg-feishu-map.js <doc> <map>`。

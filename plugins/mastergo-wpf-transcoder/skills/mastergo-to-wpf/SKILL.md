@@ -108,6 +108,7 @@ pwsh -NoProfile -File <skill>\scripts\entry\run-all.ps1 -List -Format json -OutF
 - 静态验收顺序：`validate-iocontrol-provenance.js`（Value/来源/坐标）→ 坐标检查 → Icon 引用闭环 → 页面结构校验；`run-all.ps1` 第 11、12 步就是这套门禁。
 - 只有项目引用、真实运行时资源、可编译宿主与加载验证都通过，才能称「完整可运行页面」；**运行时交付门禁**（部署、宿主加载、`Ctrl+R`、截图核对）只在用户明确要求时执行。
 - 交付说明必须列出：待翻译条目与临时键、槽位豁免 `valueLangExempt`、中英文写法相同的键 `identicalTextKeys`、未映射组件与待配置的运行时字段。
+- **项目内不放工具链副本**：脚本真源是本插件，页面项目只留产物与证据（页面 XML / Icon / 语言字典 / Layout / 宿主壳 / `Generated/`），不留 `_tool/` 之类的脚本拷贝。
 
 ## 参考文件读取条件
 
