@@ -1453,25 +1453,6 @@
       }
     }
   },
-  "textTemplates": {
-    "match": {
-      "property": "role"
-    },
-    "variants": {
-      "独立文本": {
-        "controlType": "TextBlock",
-        "style": null,
-        "iconPolicy": "none",
-        "slots": [
-          {
-            "slot": "text",
-            "controlType": "TextBlock",
-            "valueSource": "dsl.text"
-          }
-        ]
-      }
-    }
-  },
   "controlTypes": {
     "View": {
       "description": "纯容器/页签（Value=标题），可含 Index/Icon/LangName 作为页签属性",

@@ -203,8 +203,7 @@ const documentedTemplateFamilies = {
   selectionTemplates: ["单选-选中", "单选-未选择", "多选-选中", "多选-未选择"],
   infoGroupTemplates: ["信息分组-模块化"],
   mainMenuTemplates: ["主菜单button", "主菜单button-文字"],
-  tableTemplates: ["Table"],
-  textTemplates: ["独立文本"]
+  tableTemplates: ["Table"]
 };
 for (const [family, variants] of Object.entries(documentedTemplateFamilies)) {
   assert.ok(templateMap[family], "缺少正式模板族: " + family);
