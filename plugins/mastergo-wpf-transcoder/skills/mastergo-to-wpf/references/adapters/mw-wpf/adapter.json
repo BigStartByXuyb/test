@@ -12,9 +12,10 @@
   "templateMap": "references/adapters/mw-wpf/mw-wpf-map.json",
   "typeMap": "references/component-types.json",
   "scripts": {
-    "mapping": "core/judge-component-types.js",
+    "mapping": "adapters/mtslg-iocontrol/gen-mtslg-mapping-from-dsl.js",
     "layoutManifest": "adapters/mtslg-iocontrol/gen-mtslg-layout-manifest.js",
     "layout": "adapters/mtslg-iocontrol/gen-mtslg-layout.js",
+    "bundle": "entry/gen-mastergo-page-bundle.js",
     "wpfLayout": "adapters/mw-wpf/gen-mw-wpf-layout.js",
     "wpfXaml": "adapters/mw-wpf/gen-mw-wpf-xaml.js",
     "wpfGate": "adapters/mw-wpf/check-wpf-layout.js",

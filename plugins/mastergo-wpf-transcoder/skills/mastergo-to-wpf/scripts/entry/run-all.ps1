@@ -521,7 +521,9 @@ if ($StartStep.Id -gt 1) {
         [pscustomobject]@{ Field = 'ui'; Frozen = (Get-Prop $frozen 'ui'); Explicit = $cliUi; Resolved = $Ui }
         [pscustomobject]@{ Field = 'designPageName'; Frozen = (Get-Prop $frozen 'designPageName'); Explicit = $cliDesignPageName; Resolved = $DesignPageName }
         # 路线也是采集身份：同一次运行里不能一半产物是页面 XML、一半是 XAML。
-        [pscustomobject]@{ Field = 'mode'; Frozen = (Get-Prop $frozen 'mode'); Explicit = $cliMode; Resolved = $Mode }
+        # Resolved 也取 $cliMode：路线缺省值是"作业B"，用它当 Resolved 会让本次改动前建立的登记表
+        # （没有 identity.mode）在续跑时被判成"补写身份"而拒绝；缺省值与"显式传入"必须区分开。
+        [pscustomobject]@{ Field = 'mode'; Frozen = (Get-Prop $frozen 'mode'); Explicit = $cliMode; Resolved = $cliMode }
     )
     foreach ($item in $replayFields) {
         $frozenValue = if ($item.Frozen) { [string]$item.Frozen } else { '' }
@@ -586,10 +588,14 @@ foreach ($step in $Steps) {
                        Assert-RegisteredInput 'snapshot'
                        Assert-RegisteredInput 'visibility' }
         'discover'   { Assert-File $SvgJson "缺少 $SvgJson：请先跑 -Progress svg"
-                       $mappingForDiscover = if (Test-Path -LiteralPath $DraftMappingJson) { $DraftMappingJson } else { $MappingAuditJson }
+                       # 作业A 的第 5 步产物是类型判定（component-types.json）；作业B 是 mapping 草稿（回退到审计产物）。
+                       $mappingForDiscover = if ($Mode -eq 'mw-wpf') { $TypeAuditJson }
+                           elseif (Test-Path -LiteralPath $DraftMappingJson) { $DraftMappingJson }
+                           else { $MappingAuditJson }
                        Assert-File $mappingForDiscover "缺少 mapping（$DraftMappingJson 或 $MappingAuditJson）：请先跑 -Progress mapping"
                        Assert-RegisteredInput 'extractSvg'
-                       Assert-RegisteredInput 'mappingDraft' }
+                       if ($Mode -eq 'mw-wpf') { Assert-RegisteredInput 'componentTypes' }
+                       else { Assert-RegisteredInput 'mappingDraft' } }
         'ledger'     { Assert-RegisteredInput 'iconCandidates' }
         'layout'     { if (-not $AllowEmptyLedger) { Assert-File $LedgerJson "缺少图标台账 $LedgerJson（人工/AI 定名后的输入）" }
                        Assert-RegisteredInput 'snapshot'
@@ -602,7 +608,8 @@ foreach ($step in $Steps) {
                        Assert-RegisteredInput 'bundleManifest'
                        Assert-RegisteredInput 'extractSvg' }
         'gates'      { Assert-File $BundleAuditJson "缺少 Bundle 审计 $BundleAuditJson：请先跑 -Progress bundle" }
-        'verify'     { Assert-File $PageXml "缺少页面 XML $PageXml：请先跑 -Progress bundle" }
+        'verify'     { if ($Mode -eq 'mw-wpf') { Assert-File $WpfViewXaml "缺少页面 View $WpfViewXaml：请先跑 -Progress bundle" }
+                       else { Assert-File $PageXml "缺少页面 XML $PageXml：请先跑 -Progress bundle" } }
     }
 
     $log = Join-Path $StepLogs ('{0:D2}-{1}.log' -f $step.Id, $step.Name)
@@ -664,12 +671,17 @@ foreach ($step in $Steps) {
                     '--icon-map', $ledgerForDraft, '--out', $DraftMappingJson) | Out-Null
             }
             'discover' {
-                $mappingForDiscover = if (Test-Path -LiteralPath $DraftMappingJson) { $DraftMappingJson } else { $MappingAuditJson }
+                # 作业A 的第 5 步产物是类型判定（component-types.json），没有 mapping 草稿这条路径。
+                $mappingForDiscover = if ($Mode -eq 'mw-wpf') { $TypeAuditJson }
+                    elseif (Test-Path -LiteralPath $DraftMappingJson) { $DraftMappingJson }
+                    else { $MappingAuditJson }
                 $confirmed = if (Test-Path -LiteralPath $LedgerJson) { $LedgerJson } else { $CandidateJson }
                 Invoke-StepCommand -Label 'discover' -LogFile $log -File 'node' -Arguments @(
                     (Join-Path $ScriptsFolder 'adapters/mtslg-iocontrol/discover-mtslg-page-icon-map.js'), '--svg', $SvgJson,
                     '--mapping', $mappingForDiscover, '--confirmed', $confirmed,
-                    '--template-map', $TemplateMap, '--dsl', $SnapshotJson, '--out', $CandidateJson) | Out-Null
+                    # 登记判据（iconPolicy / layoutRules.bottomBar）登记在共享类型表里：作业A 的写法表没有这些键。
+                    '--template-map', $(if ($Mode -eq 'mw-wpf') { $TypeMap } else { $TemplateMap }),
+                    '--dsl', $SnapshotJson, '--out', $CandidateJson) | Out-Null
                 # 登记结论由 discover 机械判定：这里把结论摘要带进步骤 note，模型不必再去翻文档判定表。
                 $candidateDoc = Get-Content -LiteralPath $CandidateJson -Raw -Encoding UTF8 | ConvertFrom-Json
                 $registerCount = @($candidateDoc.mustName).Count
@@ -740,13 +752,16 @@ foreach ($step in $Steps) {
                     # 只是把页面发射物从 IOContorl 页面 XML 换成真控件 View.xaml（Bundle 的 route 分支）。
                     $spec = Get-Content -LiteralPath $BundleJson -Raw -Encoding UTF8 | ConvertFrom-Json
                     # 路线与 A 专属输入写进清单：类型判定用共享类型表，页面发射用 A 写法表 + 布局产物。
-                    $spec.route = 'mw-wpf'
-                    $spec.templateMapPath = $TypeMap
-                    $spec.routeMapPath = $TemplateMap
-                    $spec.wpfLayoutPath = $WpfLayoutJson
-                    $spec.wpfReportPath = $WpfXamlReportJson
+                    # ConvertFrom-Json 的对象不能再加属性，先按原字段复制成有序字典再追加。
+                    $wpfSpec = [ordered]@{}
+                    foreach ($property in $spec.PSObject.Properties) { $wpfSpec[$property.Name] = $property.Value }
+                    $wpfSpec.route = 'mw-wpf'
+                    $wpfSpec.templateMapPath = $TypeMap
+                    $wpfSpec.routeMapPath = $TemplateMap
+                    $wpfSpec.wpfLayoutPath = $WpfLayoutJson
+                    $wpfSpec.wpfReportPath = $WpfXamlReportJson
                     $wpfBundleJson = Join-Path $Work "$Target.bundle.wpf.json"
-                    $spec | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $wpfBundleJson -Encoding UTF8
+                    $wpfSpec | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $wpfBundleJson -Encoding UTF8
                     $args = @((Get-AdapterScript 'bundle'), '--manifest', $wpfBundleJson)
                     if ($Overwrite) { $args += '--overwrite' }
                     Invoke-StepCommand -Label 'wpf bundle' -LogFile $log -File 'node' -Arguments $args | Out-Null
@@ -760,9 +775,11 @@ foreach ($step in $Steps) {
             'gates' {
                 if ($Mode -eq 'mw-wpf') {
                     # 作业A 的门禁：布局（越界/空行空列/同格互斥/禁止类型/尺寸来源）+ 协议/资源键/硬编码文本。
+                    # 输入用 Bundle 定稿的 mapping（语言绑定已落在节点上），不是第 5 步的判定草稿——
+                    # 否则"有文本没语言键"会把已绑定的节点全判成缺键。
                     Invoke-StepCommand -Label 'wpf layout gates' -LogFile $log -File 'node' -Arguments @(
                         (Get-AdapterScript 'wpfGate'), '--layout', $WpfLayoutJson,
-                        '--types', $TypeAuditJson, '--map', $TemplateMap,
+                        '--types', $MappingAuditJson, '--icon-map', $LedgerJson, '--map', $TemplateMap,
                         '--xaml', $WpfViewXaml,
                         '--json', (Join-Path $Inputs "$Target.wpf-gate.json")) | Out-Null
                     $note = '作业A 布局门禁全部通过'
@@ -810,7 +827,7 @@ foreach ($step in $Steps) {
                     # 作业A 的独立复核：门禁重跑一遍并落独立日志（结构闭环按本页 View.xaml 与布局产物校验）。
                     Invoke-StepCommand -Label 'wpf verifications' -LogFile $log -File 'node' -Arguments @(
                         (Get-AdapterScript 'wpfGate'), '--layout', $WpfLayoutJson,
-                        '--types', $TypeAuditJson, '--map', $TemplateMap,
+                        '--types', $MappingAuditJson, '--icon-map', $LedgerJson, '--map', $TemplateMap,
                         '--xaml', $WpfViewXaml,
                         '--json', (Join-Path $Work "verification\$Target\wpf-gate.log")) | Out-Null
                     $note = '作业A 布局 / 协议 / 资源键 / 文本 全部通过'

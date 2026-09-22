@@ -235,7 +235,16 @@ function renderControl(node, cell, ctx, depth) {
   attrLines.forEach(function (pair) {
     lines.push(pad + "  " + pair[0] + "=\"" + xmlAttr(pair[1]) + "\"");
   });
-  lines.push(pad + "/>");
+  // 容器（写法表 holdsChildren）：子控件按嵌套 Grid 放进容器内容区，不允许平铺到外层格子里
+  // ——平铺会让"分组框里的控件"跑出分组框，语义与外观都错。
+  if (cell.children) {
+    if (!spec.holdsChildren) fail(node.controlType + " 的格子里有子控件，但写法表没有登记 holdsChildren: " + node.ref);
+    lines.push(pad + ">");
+    lines.push(renderGrid(cell.children, ctx, depth + 1));
+    lines.push(pad + "</" + element.trim() + ">");
+  } else {
+    lines.push(pad + "/>");
+  }
   return lines.join("\n");
 }
 

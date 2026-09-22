@@ -11,7 +11,7 @@
 // 退出码：0 通过；2 有 findings（门禁失败）；1 输入/契约错误。
 //
 // 条目（编号固定）
-//   R1 禁止写法：发射区出现写法表未登记或登记为待确认的类型；框架固定区里出现控件
+//   R1 禁止写法：发射区出现写法表未登记/待确认的类型（含推导阶段的待确认项）；框架固定区里出现控件
 //   R2 协议语法：XAML 里的协议属性必须是写法表登记过的形状
 //   R3 格子越界：row/column/rowSpan/columnSpan 必须落在本 region 的行列范围内
 //   R4 空行空列：没有格子覆盖、也不是被星号撑开的收尾行/列
@@ -57,10 +57,24 @@ function parseArgs(argv) {
 }
 
 function checkCells(region, map, layout) {
-  const spec = (map.controlTypes || {})[region.role === "framework-top" || region.role === "framework-bottom" ? "" : ""];
-  void spec;
   const rows = region.grid.rows.length;
   const columns = region.grid.columns.length;
+  // R8 先判：框架固定区是 emit:false，走不到下面的发射区断言，尺寸来源检查必须在这之前跑。
+  const isFramework = /^framework-/.test(region.role || "");
+  region.grid.rows.concat(region.grid.columns).forEach(function (size) {
+    if (!size || !size.source) {
+      report("R8", region.id, "行列尺寸缺少 source");
+      return;
+    }
+    // 框架固定区只在**被框架钉住的那一维**上用 Token（顶/底栏是高度、侧栏是宽度）；
+    // 另一维是自由伸展的星号，来源仍是设计稿。
+    if (isFramework && size.size === "Pixel" && size.source.indexOf("framework:") !== 0) {
+      report("R8", region.id, "框架固定区的固定尺寸必须用 framework:<Token>，当前: " + size.source);
+    }
+    if (!isFramework && size.source !== "design") {
+      report("R8", region.id, "发射区尺寸必须取设计稿（source=design），当前: " + size.source);
+    }
+  });
   const seen = new Map();
   region.grid.cells.forEach(function (cell) {
     const entry = (map.controlTypes || {})[cell.controlType];
@@ -111,20 +125,6 @@ function checkCells(region, map, layout) {
     }
   });
 
-  // R8：尺寸来源。
-  const isFramework = /^framework-/.test(region.role || "");
-  region.grid.rows.concat(region.grid.columns).forEach(function (size) {
-    if (!size || !size.source) {
-      report("R8", region.id, "行列尺寸缺少 source");
-      return;
-    }
-    if (isFramework && size.source.indexOf("framework:") !== 0) {
-      report("R8", region.id, "框架固定区尺寸必须用 framework:<Token>，当前: " + size.source);
-    }
-    if (!isFramework && size.source !== "design") {
-      report("R8", region.id, "发射区尺寸必须取设计稿（source=design），当前: " + size.source);
-    }
-  });
 }
 
 // 协议属性：写法表里登记过、且在真实页面里出现的形状（Click / PageName / IOEnable / IOVisible / IOName）。
@@ -206,6 +206,11 @@ function main() {
       return;
     }
     checkCells(region, map, layout);
+    // 容器内的子控件（格子里的嵌套 Grid）同样要过 R1/R3/R4/R5/R8：按所在分区递归校验。
+    (region.grid.cells || []).forEach(function (cell) {
+      if (!cell.children) return;
+      checkCells(Object.assign({}, region, { grid: cell.children }), map, layout);
+    });
     (region.grid.cells || []).forEach(function (cell) {
       const entry = (map.controlTypes || {})[cell.controlType];
       if (entry && entry.status !== "pending") checkProtocols(cell, entry);
@@ -214,9 +219,14 @@ function main() {
   checkStyleKeys(layout, map, iconNames, xamlText);
   checkHardcodedText(xamlText, layout, typesByRef);
 
-  const result = { status: findings.length ? "fail" : "pass", findings: findings, counts: counts };
-  // 待确认项（写法表未登记的类型等）不是门禁失败，但必须出现在报告里供交付说明引用。
-  result.pending = Array.isArray(layout.pending) ? layout.pending : [];
+  // 待确认类型（Border / Camera 这类 A 侧没有对应条目的类型）是**门禁失败**：
+  // 它们在本页确实存在，只是无处发射；页面可以继续评审，但不能当"完整交付"过门禁。
+  const pending = Array.isArray(layout.pending) ? layout.pending : [];
+  pending.forEach(function (item) {
+    report("R1", item.ref || null, "待确认项（未映射到本路线写法）：" + (item.reason || ""));
+  });
+
+  const result = { status: findings.length ? "fail" : "pass", findings: findings, counts: counts, pending: pending };
   if (args.reportPath) {
     fs.mkdirSync(path.dirname(args.reportPath), { recursive: true });
     fs.writeFileSync(args.reportPath, JSON.stringify(result, null, 2) + "\n", "utf8");

@@ -18,6 +18,8 @@ import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
 const runRegistry = require("../../lib/run-registry.js");
+// 脚手架的唯一实现：空项目在第 9 步就要有 .csproj（Bundle 第 10 步调用同一份）。
+const { ensureScaffold } = require("../../lib/project-scaffold.js");
 
 // 参数解析：带值开关（--run-json / --page-title）的取值必须从位置参数里剔除，
 // 否则 `… <projectRoot> --run-json X` 这种少传 area 的调用会把 X 当成 area，绕过必填门禁。
@@ -76,7 +78,13 @@ runRegistry.assertNoLegacyShadow(runJsonData, "snapshot", { projectRoot });
 runRegistry.assertNoLegacyShadow(runJsonData, "visibility", { projectRoot });
 runRegistry.assertNoLegacyShadow(runJsonData, "extractSvg", { projectRoot });
 
-const csprojs = fs.readdirSync(projectRoot).filter((file) => file.toLowerCase().endsWith(".csproj"));
+// 空项目（还没有 .csproj）先落脚手架：Bundle 清单要推导项目名 / 命名空间 / 注册项，
+// 而脚手架的唯一实现在 lib/project-scaffold.js（Bundle 第 10 步调用同一份）。
+let csprojs = fs.readdirSync(projectRoot).filter((file) => file.toLowerCase().endsWith(".csproj"));
+if (csprojs.length === 0) {
+  ensureScaffold({ projectRoot, name, area, projectMode: "scaffold" });
+  csprojs = fs.readdirSync(projectRoot).filter((file) => file.toLowerCase().endsWith(".csproj"));
+}
 if (csprojs.length !== 1) {
   throw new Error(`项目根下必须恰好有一个 .csproj（Bundle 会校验页面/Icon/语言/View/Layout 是否已登记），当前找到 ${csprojs.length} 个`);
 }

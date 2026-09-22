@@ -204,6 +204,7 @@
     "GroupBox": {
       "element": "s:IOGroupBox",
       "nonIoVariant": "GroupBox",
+      "holdsChildren": true,
       "manualEntry": "02-controls/io/io-group-box.md",
       "styleKeys": ["IOGroupBoxBaseStyle", "IOGroupBoxSecondary", "IOGroupBoxThirdly", "IOGroupBoxFour", "ContentGroupBoxStyle"],
       "attrs": ["Header", "IOEnable", "IOVisible", "Margin", "Style"],

@@ -47,7 +47,7 @@ function pageLangPaths(pageName, locales) {
 }
 
 // 跨脚本共用工具的唯一实现（见 scripts/lib/script-helpers.js；禁止在本脚本再抄一份）。
-const { fail, xmlAttr, readJson, backupFile } = require(path.join(SCRIPT_DIR, "..", "lib", "script-helpers.js"));
+const { fail, readJson, backupFile } = require(path.join(SCRIPT_DIR, "..", "lib", "script-helpers.js"));
 // 坐标核对输入的构建唯一实现（见 scripts/lib/coord-nodes.js）。
 const { buildCoordNodes } = require(path.join(SCRIPT_DIR, "..", "lib", "coord-nodes.js"));
 const { inferHostPaths } = require(path.join(SCRIPT_DIR, "..", "lib", "project-csproj.js"));
@@ -141,96 +141,8 @@ function projectRelative(projectRoot, filePath) {
   return path.relative(projectRoot, filePath).replace(/\\/g, "/");
 }
 
-function scaffoldName(value, fallback) {
-  const candidate = String(value || fallback || "Project").replace(/[^A-Za-z0-9_.-]/g, "_");
-  return /^[A-Za-z_]/.test(candidate) ? candidate : "Project_" + candidate;
-}
-
-function scaffoldCsproj(rootNamespace, assemblyName) {
-  return [
-    '<?xml version="1.0" encoding="utf-8"?>',
-    '<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">',
-    '  <Import Project="$(MSBuildExtensionsPath)\\$(MSBuildToolsVersion)\\Microsoft.Common.props" Condition="Exists(\'$(MSBuildExtensionsPath)\\$(MSBuildToolsVersion)\\Microsoft.Common.props\')" />',
-    '  <PropertyGroup>',
-    '    <Configuration Condition=" \'$(Configuration)\' == \'\' ">Debug</Configuration>',
-    '    <Platform Condition=" \'$(Platform)\' == \'\' ">AnyCPU</Platform>',
-    '    <OutputType>Library</OutputType>',
-    '    <RootNamespace>' + xmlAttr(rootNamespace) + '</RootNamespace>',
-    '    <AssemblyName>' + xmlAttr(assemblyName) + '</AssemblyName>',
-    '    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>',
-    '    <FileAlignment>512</FileAlignment>',
-    '    <Deterministic>true</Deterministic>',
-    '  </PropertyGroup>',
-    '  <ItemGroup>',
-    '    <Reference Include="PresentationCore" />',
-    '    <Reference Include="PresentationFramework" />',
-    '    <Reference Include="System" />',
-    '    <Reference Include="System.Core" />',
-    '    <Reference Include="System.Xaml" />',
-    '    <Reference Include="WindowsBase" />',
-    '  </ItemGroup>',
-    '  <Import Project="$(MSBuildToolsPath)\\Microsoft.CSharp.targets" />',
-    '</Project>',
-    ''
-  ].join('\n');
-}
-
-function scaffoldFrameworkConfig(manifest) {
-  return JSON.stringify({
-    schemaVersion: "mastergo-project-config/1",
-    mode: "mtslg-iocontrol",
-    scaffold: true,
-    source_root: manifest.sourceRoot || "",
-    index_root: manifest.indexRoot || "",
-    pages_root: manifest.pagesRoot || PAGE_ROOT,
-    icons_root: manifest.iconsRoot || PAGE_ROOT,
-    resource_roots: Array.isArray(manifest.resourceRoots) ? manifest.resourceRoots : [],
-    layout_file: manifest.layoutPath || DEFAULT_LAYOUT_PATH,
-    key_catalog: manifest.keyCatalog || "",
-    generated_root: manifest.generatedRoot || "Generated",
-    runtime_bindings: "pending"
-  }, null, 2) + "\n";
-}
-
-function ensureScaffold(manifest) {
-  const scaffold = manifest.scaffold === true || manifest.projectMode === "scaffold";
-  if (typeof manifest.projectRoot !== "string" || !manifest.projectRoot.trim()) {
-    fail("projectRoot 必须提供；脚手架模式也必须明确指定要创建的目标目录");
-  }
-  const projectRoot = path.resolve(manifest.projectRoot);
-  if (!fs.existsSync(projectRoot)) {
-    if (!scaffold) fail("projectRoot 不存在: " + projectRoot);
-    fs.mkdirSync(projectRoot, { recursive: true });
-  }
-  if (!scaffold) return { projectRoot, scaffold: false, frameworkConfigPath: null };
-
-  const projectName = scaffoldName(manifest.projectName || path.basename(projectRoot), "MasterGoProject");
-  const rootNamespace = manifest.rootNamespace || projectName;
-  const csprojRelative = manifest.csproj || projectName + ".csproj";
-  const csprojPath = resolvePath(projectRoot, csprojRelative, "csproj");
-  if (!fs.existsSync(csprojPath)) {
-    fs.mkdirSync(path.dirname(csprojPath), { recursive: true });
-    fs.writeFileSync(csprojPath, scaffoldCsproj(rootNamespace, projectName), "utf8");
-  }
-  manifest.csproj = csprojRelative;
-  manifest.rootNamespace = rootNamespace;
-  const configRelative = manifest.frameworkConfigPath || "framework.config.json";
-  const frameworkConfigPath = resolvePath(projectRoot, configRelative, "frameworkConfigPath");
-  if (!fs.existsSync(frameworkConfigPath)) {
-    fs.mkdirSync(path.dirname(frameworkConfigPath), { recursive: true });
-    fs.writeFileSync(frameworkConfigPath, scaffoldFrameworkConfig(manifest), "utf8");
-  }
-  manifest.frameworkConfigPath = configRelative;
-  const dirs = [
-    PAGE_ROOT, LAYOUT_DIR, pageFolderFor(manifest.name), "Generated",
-    // area 已在 validateManifest() 里 fail-closed 校验过（缺失直接报错），这里不得再给任何默认值：
-    // 兜底默认值会让"清单漏字段"变成"写到另一个区域目录"的静默错误。
-    "UI/" + String(manifest.area) + "/View",
-    "UI/" + String(manifest.area) + "/ViewModel"
-  ];
-  dirs.forEach(relative => fs.mkdirSync(path.join(projectRoot, ...relative.split("/")), { recursive: true }));
-  return { projectRoot, scaffold: true, frameworkConfigPath };
-}
+// 脚手架的唯一实现（第 9 步的清单构建器同样要用它，见 scripts/lib/project-scaffold.js）。
+const { ensureScaffold } = require(path.join(SCRIPT_DIR, "..", "lib", "project-scaffold.js"));
 
 function copyOutput(source, target, overwrite, created, backups, allowExisting) {
   fs.mkdirSync(path.dirname(target), { recursive: true });
@@ -728,10 +640,11 @@ function validateBundleOutputs(info) {
     fail("Layout.xml 缺少当前页面注册: " + info.pageTarget);
   }
   const view = requireFile(info.hostPaths[0], "View XAML");
-  if (!/<UserControl\b/.test(view) || !/<uidesign:PageDesign\b/.test(view)) {
+  // 作业B 的 View 是 PageDesign 宿主壳（控件在页面 XML 里）；作业A 的 View 是真控件页面，已在上面校验。
+  if (!info.wpfRoute && (!/<UserControl\b/.test(view) || !/<uidesign:PageDesign\b/.test(view))) {
     fail("View XAML 缺少 MaxWell PageDesign 宿主: " + info.hostPaths[0]);
   }
-  // View 不再合并页面 Icon 资源字典（宿主壳只输出 UserControl 头 + PageDesign）；
+  // 作业B 的 View 不合并页面 Icon 资源字典（宿主壳只输出 UserControl 头 + PageDesign）；
   // 页面 Icon 文件本身仍要求存在并在 .csproj 注册，因此这里不再校验 View 里的引用。
   requireFile(info.hostPaths[1], "View.xaml.cs");
   requireFile(info.hostPaths[2], "ViewModel");
@@ -739,14 +652,17 @@ function validateBundleOutputs(info) {
     requireFile(info.frameworkConfigPath, "framework.config.json");
   }
 
-  run(PROVENANCE_SCRIPT, ["--xml", info.pageXmlPath, "--mapping", info.mappingAudit]
-    .concat(info.templateMapPath ? ["--map", info.templateMapPath] : []));
-  const mapping = info.mapping;
-  if (!info.wpfRoute && Array.isArray(mapping.nodes) && mapping.nodes.length > 0) {
-    // 坐标核对输入的构建只有一份实现（lib/coord-nodes.js）；本脚本与 check-coords.mjs 都调用它。
-    const coordsPath = path.join(info.tempRoot, "coords.json");
-    fs.writeFileSync(coordsPath, JSON.stringify(buildCoordNodes(mapping, { fail: fail }), null, 2) + "\n", "utf8");
-    run(COORDS_SCRIPT, ["--xml", info.pageXmlPath, "--nodes", coordsPath]);
+  // XML 专属校验（provenance + 坐标）只在作业B 跑：作业A 没有页面 XML，其结构由布局门禁按 View.xaml 与布局产物校验。
+  if (!info.wpfRoute) {
+    run(PROVENANCE_SCRIPT, ["--xml", info.pageXmlPath, "--mapping", info.mappingAudit]
+      .concat(info.templateMapPath ? ["--map", info.templateMapPath] : []));
+    const mapping = info.mapping;
+    if (Array.isArray(mapping.nodes) && mapping.nodes.length > 0) {
+      // 坐标核对输入的构建只有一份实现（lib/coord-nodes.js）；本脚本与 check-coords.mjs 都调用它。
+      const coordsPath = path.join(info.tempRoot, "coords.json");
+      fs.writeFileSync(coordsPath, JSON.stringify(buildCoordNodes(mapping, { fail: fail }), null, 2) + "\n", "utf8");
+      run(COORDS_SCRIPT, ["--xml", info.pageXmlPath, "--nodes", coordsPath]);
+    }
   }
 
   // 多语言：各语言 key 必须完全一致，且 LangName 必须命中本页字典。
@@ -1171,7 +1087,9 @@ function main() {
     const nestingEnabled = !(manifest.nesting && manifest.nesting.enabled === false);
     let nestingReport = null;
     const nestingReportPath = path.join(tempRoot, "nesting-report.json");
-    if (nestingEnabled) {
+    // 容器嵌套重挂是**作业B 的坐标口径**（页面 XML 用绝对坐标，子控件必须按坐标包含关系重挂）；
+    // 作业A 的页面用 Grid 嵌套表达父子（布局推导自己按 bbox 定父子），因此这条路只对作业B 走。
+    if (nestingEnabled && !wpfRoute) {
       run(CONTAINMENT_SCRIPT, [
         "--mapping", tempMapping,
         "--template-map", templateMapPath,

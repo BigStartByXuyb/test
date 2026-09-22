@@ -107,6 +107,9 @@ function createRegistry(options) {
     for (const field of ["fileId", "layerId", "ui", "designPageName", "mode"]) {
       const supplied = options[field];
       if (supplied === undefined || supplied === null || supplied === "") continue;
+      // 登记表里**没有这个键**（例如 mode 是后续版本加入的身份位）→ 按缺省值续跑；
+      // 键存在但值为空是另一种语义（当时确实是匿名身份），照旧禁止在续跑里补写。
+      if (!Object.prototype.hasOwnProperty.call(registry.identity, field)) continue;
       if (supplied !== registry.identity[field]) {
         fail("续跑不能更改 identity." + field + "（包括补写未登记的身份）；" +
           "请从 fetch 新开运行（不要使用 --keep）");

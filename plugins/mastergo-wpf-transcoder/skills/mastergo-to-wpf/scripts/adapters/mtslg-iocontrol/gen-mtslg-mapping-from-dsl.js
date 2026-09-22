@@ -1097,12 +1097,16 @@ for (const { item: inst, match } of matched) {
     //   spec.contentInsetStyle —— 只用于查 styleInsets 的内部键，不发射。
     // 子控件的相对坐标原点必须能机械换算，因此这里仍 fail-closed：contentInsetStyle 未登记对应
     // styleInsets 时直接报错，不猜原点。
-    const styleInsets = templateMap.infoGroupTemplates?.styleInsets || {};
+    // 内容区原点是**路线写入规则**（作业B 的页面 XML 用坐标定位子控件），不是判定数据：
+    // 作业A 的页面用 Grid 嵌套放子控件，不用内容区原点。因此这里只在表**登记了 styleInsets 这一族**时才
+    // 要求命中（登记了却缺该键 = 真登记错误）；表整族没有该块（共享类型表）时按"该路线不用它"继续。
+    const styleInsetsDeclared = templateMap.infoGroupTemplates && templateMap.infoGroupTemplates.styleInsets;
+    const styleInsets = styleInsetsDeclared || {};
     // 只认 contentInsetStyle：不再保留"用已废弃的非空 style 当查表键"的回退路径——
     // 那条回退会让按旧口径登记的变体静默通过，并使文档承诺的 fail-closed 门禁失效。
     const insetStyle = spec.contentInsetStyle;
     const contentInset = insetStyle ? styleInsets[insetStyle] : null;
-    if (!contentInset) {
+    if (!contentInset && styleInsetsDeclared) {
       throw new Error("容器变体缺少可换算的内容区原点: template=" + match.family +
         " componentSet=" + (match.componentSet || spec.componentSet || "") +
         " contentInsetStyle=" + JSON.stringify(insetStyle ?? null) +
