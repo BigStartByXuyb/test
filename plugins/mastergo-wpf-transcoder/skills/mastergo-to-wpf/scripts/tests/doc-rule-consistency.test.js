@@ -1097,8 +1097,10 @@ console.log("PASS 匹配键口径单读法 + 同一条规则单处陈述（maste
     assert.ok(consumer.includes("TEXT_BLOCK_RIGHT_LEFT_BASIS"),
       rel + " 必须用共享的 leftBasis 标识判断右对齐口径（不得自己拼字面量）");
   }
-  // 左对齐口径也必须真的走那个共用实现（否则"唯一实现"只是注释）：三处调用点都要传 align: "Left"。
-  for (const rel of ["gen-mtslg-mapping-from-dsl.js", "apply-container-containment.js", "gen-iocontrol-xml.js"]) {
+  // 左对齐口径也必须真的走那个共用实现（否则"唯一实现"只是注释）：生产者与 provenance 校验器
+  // 共四处调用点都要传 align: "Left"。
+  for (const rel of ["gen-mtslg-mapping-from-dsl.js", "apply-container-containment.js", "gen-iocontrol-xml.js",
+    "validate-iocontrol-provenance.js"]) {
     const consumer = fs.readFileSync(path.join(__dirname, "..", rel), "utf8");
     assert.ok(consumer.includes('align: "Left"') || consumer.includes("align: 'Left'"),
       rel + " 的左对齐 Left 必须调用共用的 textBlockLeftValue（align: Left），不得各写一份公式");

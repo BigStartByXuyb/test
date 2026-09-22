@@ -317,7 +317,18 @@ function validate(xmlPath, manifestPath, options) {
           errors.push('[' + n.xmlId + '] TextBlock Align=Right 的 Left 无法复核（缺父容器外框右边缘或设计稿 bbox 宽度）');
         }
       } else {
-        expectedSourceLeft = Number(src.pageAbsX) - (outputParent ? Number(outputParent.pageAbsX) : 0) - insetLeft;
+        // TextBlock 的左对齐口径同样调共用实现复算（originX = 输出父容器内容区原点X）；
+        // 其它 ControlType 保持原算术。两条分支都用同一处实现，避免"验证器自己算一套"。
+        expectedSourceLeft = x.ControlType === 'TextBlock'
+          ? textBlockLeftValue({
+            align: 'Left',
+            pageAbsX: Number(src.pageAbsX),
+            originX: (outputParent ? Number(outputParent.pageAbsX) : 0) + insetLeft
+          })
+          : Number(src.pageAbsX) - (outputParent ? Number(outputParent.pageAbsX) : 0) - insetLeft;
+        if (expectedSourceLeft === null) {
+          errors.push('[' + n.xmlId + '] TextBlock 的左对齐 Left 无法复核（缺 pageAbsX 或内容区原点X）');
+        }
       }
       const expectedSourceTop = Number(src.pageAbsY) -
         (outputParent ? Number(outputParent.pageAbsY) : 0) - (parentIsRoot || !outputParent ? originY : 0) - insetTop;

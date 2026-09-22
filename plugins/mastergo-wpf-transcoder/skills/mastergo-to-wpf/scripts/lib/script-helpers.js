@@ -147,11 +147,16 @@ function parentOuterRightEdge(options) {
 // provenance 校验器判断"这个节点走的是到右边缘的口径"。字面量只在这里出现一次（不在各脚本里重复）。
 const TEXT_BLOCK_RIGHT_LEFT_BASIS = "textblock.align-right.parent-outer-right-edge";
 
-// TextBlock 的 Left 取值口径（**全仓唯一实现**：映射生成器 / 容器重挂 / XML 渲染 / 坐标核对器共用同一份）：
+// TextBlock 的 Left 取值口径（**全仓唯一实现**，两条分支都在这里）：
 //   Align=Left（设计稿 center 归左，见映射表 textBlockAlign）→ 控件**左边缘**到输出父容器
 //     **内容区左边缘**的距离 = pageAbsX − 内容区原点X（与既有的 Left 完全一致）；
 //   Align=Right → 以控件**右上角**为原点，量到输出父容器**外框右边缘**的距离
-//     = 父外框右边缘 − (pageAbsX + 设计稿 bbox 宽度)。
+//     = 父外框右边缘 − (pageAbsX + 设计稿 bbox 宽度)。右对齐节点在 mapping 里带 leftBasis 标识
+//     （TEXT_BLOCK_RIGHT_LEFT_BASIS），是判断"走哪条分支"的唯一判据；左对齐节点不带标识。
+// 调用方（现状，全部直接调用本函数）：生产者 = 映射生成器 / 容器重挂 / XML 渲染（两条分支都调）；
+// provenance 校验器两条分支也调本函数复算。坐标核对链路（check-coords.mjs → 官方核对器）按节点表
+// 口径核对：右对齐节点由 check-coords.mjs 用本函数独立算出 expectedLeft 显式传给核对器，其余节点
+// 仍按「x − contentOriginX」（那是核对器的输入契约，不是又写了一份 Left 公式）。
 // 宽度来源固定为设计稿 bbox 宽度（mapping nodes[].dslWidth / sourceNodes[].width）；
 // 产物 XML 的 Width 仍是 NaN（自适应），宽度只参与这里的 Left 计算。
 // 任一输入取不到 → null，由调用方 fail-closed（不猜）。
