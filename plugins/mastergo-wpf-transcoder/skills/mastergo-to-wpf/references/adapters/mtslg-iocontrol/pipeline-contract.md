@@ -141,10 +141,10 @@ pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -ProjectRoot <项目> -Target 
 - **产物**：
   - Layout 清单与推导报告 Generated/_inputs/<Target>.layout-manifest.json(.report.json)
 - **失败语义**：
-  - layoutStatus≠complete
+  - layoutStatus 不属于 complete/none
   - layoutEvidence.unresolvedBottomBarItems≠0
 - **怎么修**：
-  - 补齐底部栏变体命中后重跑：-Progress layout（校验失败表示清单不完整，不是拒绝生成页面）
+  - 补齐底部栏变体命中后重跑：-Progress layout（校验失败表示清单不完整，不是拒绝生成页面）；本页确实没有底部栏时 layoutStatus=none 是合法终态（此时 menuItems 与两个计数必须全为 0）
 
 ### 9. `inputs` —— 校验译文并生成 Bundle 清单
 

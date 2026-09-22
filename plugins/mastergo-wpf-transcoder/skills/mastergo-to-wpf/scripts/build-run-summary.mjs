@@ -92,7 +92,7 @@ function makeReaders(registryData, projectRoot, report) {
   function artifact(key) {
     const entry = registryData.artifacts && registryData.artifacts[key];
     if (!entry) {
-      report.unavailable.push({ key, reason: "本次运行尚未登记该产物（对应步骤还没跑到）" });
+      report.unavailable.push({ key, layer: "artifact", reason: "本次运行尚未登记该产物（对应步骤还没跑到）" });
       return null;
     }
     const abs = path.resolve(projectRoot, entry.path);
@@ -113,10 +113,14 @@ function makeReaders(registryData, projectRoot, report) {
   function outputFile(rel) {
     const slashed = rel.replace(/\\/g, "/");
     const record = outputs[slashed];
-    if (!record) return null;
+    if (!record) {
+      report.unavailable.push({ key: slashed, layer: "output", reason: "该产出未登记（对应步骤还没跑到）" });
+      return null;
+    }
     // 登记表自己记了 exists:false（例如收尾清理掉的 _work 文件）：不消费，也不算漂移。
     if (record.exists !== true || !record.sha256) {
       if (record.removed === true) addConsumed(slashed, "登记表已记录为已清理（removed=true）");
+      report.unavailable.push({ key: slashed, layer: "output", reason: "登记表记录该产出不存在（已清理或未产出）" });
       return null;
     }
     const abs = path.resolve(projectRoot, slashed);
@@ -183,7 +187,6 @@ function main() {
   const unconfirmed = candidateList.filter((entry) => entry.status !== "confirmed");
   const ledgerIds = new Set((ledger && ledger.icons ? ledger.icons : []).map((icon) => icon.sourceId).filter(Boolean));
   const confirmedNotLedger = candidateList.filter((entry) => entry.status === "confirmed" && !ledgerIds.has(entry.sourceId));
-  const ledgerBuilt = Boolean(artifacts.iconMap);
 
   const mappingNodes = mapping ? mapping.nodes || [] : [];
   const textAudit = mapping ? mapping.textAudit || [] : [];
@@ -223,10 +226,14 @@ function main() {
   if (pending.length) todos.push({ kind: "mapping.pending", count: pending.length, items: pending.map((p) => p.sourceRef + "（" + (p.reason || "") + "）").slice(0, 10) });
   if (unmapped.length) todos.push({ kind: "mapping.unmappedComponents", count: unmapped.length, items: unmapped.slice(0, 10) });
   if (unconfirmed.length) {
-    // 台账还没生成时这些是「待定名」；台账已生成后剩下的只是未被引用的候选，属信息项。
-    const item = { kind: "icons.unconfirmed", count: unconfirmed.length, byReason: histogram(unconfirmed, (entry) => entry.reason) };
-    if (ledgerBuilt) notices.push(item);
-    else todos.push(item);
+    // 候选的 status / reason 只取第 6 步 discover 的时点值，之后不会相对台账重算，
+    // 所以不能因为「台账文件已存在」就把它改判成信息项——那会让消费方以为图标定名无需动作。
+    todos.push({
+      kind: "icons.unconfirmed",
+      count: unconfirmed.length,
+      byReason: histogram(unconfirmed, (entry) => entry.reason),
+      note: "候选状态是第 6 步 discover 的时点值（此后不重算）；已被台账采纳的见 page.icons.ledger"
+    });
   }
   if (confirmedNotLedger.length) todos.push({ kind: "icons.confirmedNotInLedger", count: confirmedNotLedger.length });
   if (nesting && count(nesting.conflicts)) todos.push({ kind: "nesting.conflicts", count: count(nesting.conflicts) });

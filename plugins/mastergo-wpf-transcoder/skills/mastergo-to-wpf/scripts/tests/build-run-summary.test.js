@@ -126,9 +126,12 @@ const summarize = (root, extra = []) => runNode(summaryCli, ["--project-root", r
   assert.strictEqual(summary.sources.mappingDraft.step, 1);
   assert.deepStrictEqual(summary.unavailable, []);
 
-  // 台账已生成，剩下的未确认候选是信息项、差集是状态说明，两者都不该混进 todos。
-  assert.deepStrictEqual(summary.todos, []);
-  assert.deepStrictEqual(summary.notices.map((item) => item.kind), ["icons.unconfirmed", "icons.ledgerNotInPageIcons"]);
+  // 未确认候选留在 todos：它的 status 只取 discover 时点值、不会相对台账重算，
+  // 不能因为「台账文件已存在」就改判成信息项（否则消费方会以为图标定名无需动作）。
+  assert.deepStrictEqual(summary.todos.map((item) => item.kind), ["icons.unconfirmed"]);
+  assert.match(summary.todos[0].note, /第 6 步/);
+  // 台账与页面图标字典的差集是状态说明，不是待办。
+  assert.deepStrictEqual(summary.notices.map((item) => item.kind), ["icons.ledgerNotInPageIcons"]);
   // 摘要是派生视图：不得写回登记表（写进去的 sha256 下一次刷新就过期）。
   assert.strictEqual(fs.readFileSync(runFile, "utf8"), registryBefore, "摘要不得修改登记表");
   assert.strictEqual(JSON.parse(registryBefore).outputs["Generated/Demo.summary.json"], undefined,
@@ -202,6 +205,10 @@ const summarize = (root, extra = []) => runNode(summaryCli, ["--project-root", r
   assert.strictEqual(summary.pageProduct.pageXmlControlTypes, null, "未登记的页面 XML 不得被读出来");
   assert.deepStrictEqual(summary.sources, {});
   assert.strictEqual(summary.unavailable.length >= 7, true, "全部产物都该进 unavailable");
+  // "取不到"必须两层都记档：登记产物（artifact）与页面产出（output）都要出现在 unavailable，
+  // 否则消费方按 unavailable 取「不知道」的清单时会漏掉产物层，看到的只是 null。
+  assert.strictEqual(summary.unavailable.some((item) => item.layer === "artifact"), true);
+  assert.strictEqual(summary.unavailable.some((item) => item.layer === "output"), true);
 }
 
 console.log("build-run-summary: all cases passed");

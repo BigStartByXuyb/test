@@ -118,8 +118,10 @@ $Steps = @(
         Id = 8; Name = 'layout'; Title = 'Layout 清单机械推导（底部栏 MenuItem）'
         Inputs   = @('dsl.snapshot.json + 图标台账 + 正式映射表')
         Outputs  = @('Layout 清单与推导报告 Generated/_inputs/<Target>.layout-manifest.json(.report.json)')
-        Failures = @('layoutStatus≠complete', 'layoutEvidence.unresolvedBottomBarItems≠0')
-        Recovery = @('补齐底部栏变体命中后重跑：-Progress layout（校验失败表示清单不完整，不是拒绝生成页面）')
+        # layoutStatus 的合法终态有两个：complete（有底部栏，已推导）与 none（本页没有底部栏，
+        # 推导脚本在 menuItems + residentGroupItems === 0 时就是给 none，Bundle 侧也据此跳过 Layout <Page> 注册）。
+        Failures = @('layoutStatus 不属于 complete/none', 'layoutEvidence.unresolvedBottomBarItems≠0')
+        Recovery = @('补齐底部栏变体命中后重跑：-Progress layout（校验失败表示清单不完整，不是拒绝生成页面）；本页确实没有底部栏时 layoutStatus=none 是合法终态（此时 menuItems 与两个计数必须全为 0）')
     },
     [pscustomobject]@{
         Id = 9; Name = 'inputs'; Title = '校验译文并生成 Bundle 清单'
@@ -626,7 +628,8 @@ foreach ($step in $Steps) {
                     '--out', $LayoutManifestJson,
                     '--report', (Join-Path $Inputs "$Target.layout-manifest.report.json")) | Out-Null
                 $layout = Get-Content -LiteralPath $LayoutManifestJson -Raw -Encoding UTF8 | ConvertFrom-Json
-                if ($layout.layoutStatus -ne 'complete') { throw "Layout 清单不完整: layoutStatus=$($layout.layoutStatus)（日志: $log）" }
+                # complete 与 none 都是合法终态；none 表示本页没有底部栏（Bundle 侧据此跳过 Layout <Page> 注册）。
+                if ($layout.layoutStatus -notin @('complete', 'none')) { throw "Layout 清单不完整: layoutStatus=$($layout.layoutStatus)（应为 complete 或 none；日志: $log）" }
                 if ($layout.layoutEvidence.unresolvedBottomBarItems -ne 0) { throw "底部栏有 $($layout.layoutEvidence.unresolvedBottomBarItems) 个未命中变体的实例（日志: $log）" }
                 $note = "菜单项 $(@($layout.menuItems).Count) 个"
             }
