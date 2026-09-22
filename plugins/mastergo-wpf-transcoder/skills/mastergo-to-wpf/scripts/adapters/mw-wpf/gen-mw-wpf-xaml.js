@@ -248,12 +248,14 @@ function renderControl(node, cell, ctx, depth) {
   return lines.join("\n");
 }
 
-function renderGrid(grid, ctx, depth) {
+function renderGrid(grid, ctx, depth, gridAttrs) {
   requireArray(grid.rows, "grid.rows");
   requireArray(grid.columns, "grid.columns");
   requireArray(grid.cells, "grid.cells");
   const pad = indentOf(depth);
-  const lines = [pad + "<Grid>"];
+  const attrs = gridAttrs || {};
+  const attrText = Object.keys(attrs).map(function (name) { return " " + name + "=\"" + xmlAttr(attrs[name]) + "\""; }).join("");
+  const lines = [pad + "<Grid" + attrText + ">"];
   // 单行/单列不写行列定义：与真实页面一致（一维网格直接落子元素）。
   if (grid.rows.length > 1) {
     lines.push(pad + "  <Grid.RowDefinitions>");
@@ -309,6 +311,7 @@ function renderXaml(args, layout, typeInfo, map) {
   };
 
   const bodyLines = [];
+  const emitRegions = [];
   requireArray(layout.regions, "布局产物 regions");
   layout.regions.forEach(function (region) {
     if (region.emit === false) {
@@ -316,7 +319,18 @@ function renderXaml(args, layout, typeInfo, map) {
       return;
     }
     if (!region.grid) fail("发射分区缺少 grid: " + region.id);
-    bodyLines.push(renderGrid(region.grid, ctx, 1));
+    emitRegions.push(region);
+  });
+  // 多个发射分区（工作区 + 日志条）必须各占根 Grid 的一行：直接并进同一个根 Grid 会让它们叠在一格里。
+  // 行高按分区在设计稿里的纵向顺序与间距取：区间高度 = 下一个分区起点 − 本分区起点，最后一行吃剩余空间。
+  const ordered = emitRegions.slice().sort(function (a, b) { return Number(a.y || 0) - Number(b.y || 0); });
+  const rootRows = ordered.map(function (region, index) {
+    const next = ordered[index + 1];
+    if (!next) return { size: "Star", source: "design" };
+    return { size: "Pixel", value: Math.max(1, Math.round(Number(next.y || 0) - Number(region.y || 0))), source: "design" };
+  });
+  ordered.forEach(function (region, index) {
+    bodyLines.push(renderGrid(region.grid, ctx, 1, { "Grid.Row": String(index) }));
   });
 
   const head = [
@@ -333,7 +347,16 @@ function renderXaml(args, layout, typeInfo, map) {
   ];
   // 页级样式表要在 Resources 生成之前定稿，所以先渲染一遍 body 收集命中，再拼最终文本。
   const body = bodyLines.join("\n");
-  const xaml = head.join("\n") + "\n" + renderResources(ctx) + "\n  <Grid>\n" + body + "\n  </Grid>\n</UserControl>\n";
+  const rootGrid = ["  <Grid>"];
+  // 行定义按分区数给出：只有一个发射分区时不必写（与真实页面一致）。
+  if (ordered.length > 1) {
+    rootGrid.push("    <Grid.RowDefinitions>");
+    rootRows.forEach(function (size) { rootGrid.push("      " + rowDefinition(size).trim()); });
+    rootGrid.push("    </Grid.RowDefinitions>");
+  }
+  if (body) rootGrid.push(body);
+  rootGrid.push("  </Grid>");
+  const xaml = head.join("\n") + "\n" + renderResources(ctx) + "\n" + rootGrid.join("\n") + "\n</UserControl>\n";
   return { xaml: xaml, report: report };
 }
 

@@ -592,7 +592,8 @@ foreach ($step in $Steps) {
                        $mappingForDiscover = if ($Mode -eq 'mw-wpf') { $TypeAuditJson }
                            elseif (Test-Path -LiteralPath $DraftMappingJson) { $DraftMappingJson }
                            else { $MappingAuditJson }
-                       Assert-File $mappingForDiscover "缺少 mapping（$DraftMappingJson 或 $MappingAuditJson）：请先跑 -Progress mapping"
+                       # 失败信息只点名本路线真正会产出的那个文件（作业A 没有 mapping 草稿这条路径）。
+                       Assert-File $mappingForDiscover "缺少 mapping（$mappingForDiscover）：请先跑 -Progress mapping"
                        Assert-RegisteredInput 'extractSvg'
                        if ($Mode -eq 'mw-wpf') { Assert-RegisteredInput 'componentTypes' }
                        else { Assert-RegisteredInput 'mappingDraft' } }
@@ -741,7 +742,8 @@ foreach ($step in $Steps) {
                 # 所有 skill 自带脚本一律用 Join-Path $ScriptsFolder 分桶定位。
                 $args = @((Join-Path $ScriptsFolder 'adapters/mtslg-iocontrol/build-bundle-manifest.mjs'), $LayoutManifestJson, $BundleJson, $ProjectRoot, $Ui)
                 # 采集输入只从运行登记表取（并写进清单让 Bundle 复校），不再让清单自己拼顶层路径。
-                $args += @('--run-json', $RunJson)
+                # 路线随清单一起给出：空项目会在这里落脚手架，framework.config.json 的 mode 必须是本次路线。
+                $args += @('--run-json', $RunJson, '--mode', $Mode)
                 if ($PageTitleText) { $args += @('--page-title', $PageTitleText) }
                 if ($Overwrite) { $args += '--replace-existing' }
                 Invoke-StepCommand -Label 'bundle manifest' -LogFile $log -File 'node' -Arguments $args | Out-Null
@@ -872,6 +874,9 @@ foreach ($step in $Steps) {
         # 续跑命令回填本次调用的全部输入：只写 -Progress 会取不到来源；-Ui / -AllowEmptyLedger /
         # -ConfigPath 这些命令行专属输入若不复现，续跑会在不同区域前缀或不同前置条件下静默继续。
         $resumeArgs = @("-ProjectRoot `"$ProjectRoot`"", "-Target $Target")
+        # 路线必须回放：不带 -Mode 续跑会让适配器描述符按缺省路线解析（第 8 步就会报"描述符缺少 scripts.wpfLayout"，
+        # 把人引向描述符而不是命令行）。
+        $resumeArgs += "-Mode $Mode"
         if ($LayerId) { $resumeArgs += "-LayerId $LayerId" }
         if ($FileId) { $resumeArgs += "-FileId $FileId" }
         if ($Ui) { $resumeArgs += "-Ui $Ui" }

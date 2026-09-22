@@ -6,12 +6,12 @@
 // CLI
 //   node check-wpf-layout.js --layout <Generated/<页面名>.wpf-layout.json>
 //        --types <类型判定 json 或 mapping.json> --map <mw-wpf-map.json>
-//        [--xaml <发射出的 View.xaml>] [--json <报告路径>]
+//        [--xaml <发射出的 View.xaml>] [--icon-map <本页图标台账>] [--json <报告路径>]
 //
 // 退出码：0 通过；2 有 findings（门禁失败）；1 输入/契约错误。
 //
 // 条目（编号固定）
-//   R1 禁止写法：发射区出现写法表未登记/待确认的类型（含推导阶段的待确认项）；框架固定区里出现控件
+//   R1 禁止写法：发射区出现写法表未登记/待确认的类型（Border / Camera）；框架固定区里出现控件
 //   R2 协议语法：XAML 里的协议属性必须是写法表登记过的形状
 //   R3 格子越界：row/column/rowSpan/columnSpan 必须落在本 region 的行列范围内
 //   R4 空行空列：没有格子覆盖、也不是被星号撑开的收尾行/列
@@ -19,6 +19,7 @@
 //   R6 资源键闭环：{StaticResource <键>} 必须来自写法表样式族、本页 Icon 台账或 Icon 字典合并点
 //   R7 文本零硬编码中文：发射区不得出现字面中文
 //   R8 尺寸来源：框架固定区必须是 framework:<Token>，其余必须是 design
+//   R9 推导待确认：布局推导阶段挂起的节点（未归格 / 无尺寸 / 结构对不上 / 类型无处发射）逐条失败
 
 const fs = require("fs");
 const path = require("path");
@@ -206,24 +207,40 @@ function main() {
       return;
     }
     checkCells(region, map, layout);
-    // 容器内的子控件（格子里的嵌套 Grid）同样要过 R1/R3/R4/R5/R8：按所在分区递归校验。
-    (region.grid.cells || []).forEach(function (cell) {
-      if (!cell.children) return;
-      checkCells(Object.assign({}, region, { grid: cell.children }), map, layout);
-    });
+    // 容器内的子控件（格子里的嵌套 Grid）同样要过 R1/R3/R4/R5/R8：**递归**到与发射端同深度，
+    // 否则"分组框套分组框"时内层子控件会落在门禁看不到的地方。
+    const walkNested = function (grid) {
+      (grid.cells || []).forEach(function (cell) {
+        if (!cell.children) return;
+        checkCells(Object.assign({}, region, { grid: cell.children }), map, layout);
+        walkNested(cell.children);
+      });
+    };
+    walkNested(region.grid);
     (region.grid.cells || []).forEach(function (cell) {
       const entry = (map.controlTypes || {})[cell.controlType];
       if (entry && entry.status !== "pending") checkProtocols(cell, entry);
     });
   });
+  // 发射分区之间不得在纵向上重叠：重叠意味着两个分区会挤进根 Grid 的同一行（发射端已按分区顺序分行，
+  // 这里拦的是布局产物本身把两个分区放在同一段纵向区间）。
+  const emitRegions = layout.regions.filter(function (region) { return region.emit !== false && region.grid; })
+    .slice().sort(function (a, b) { return Number(a.y || 0) - Number(b.y || 0); });
+  for (let i = 1; i < emitRegions.length; i += 1) {
+    const previous = emitRegions[i - 1];
+    const current = emitRegions[i];
+    if (Number(current.y || 0) < Number(previous.y || 0) + Number(previous.h || 0)) {
+      report("R3", current.id, "发射分区与上一个分区纵向重叠（" + previous.id + "）：根 Grid 无法分行安置");
+    }
+  }
   checkStyleKeys(layout, map, iconNames, xamlText);
   checkHardcodedText(xamlText, layout, typesByRef);
 
-  // 待确认类型（Border / Camera 这类 A 侧没有对应条目的类型）是**门禁失败**：
-  // 它们在本页确实存在，只是无处发射；页面可以继续评审，但不能当"完整交付"过门禁。
+  // 推导阶段的待确认项（R9）：类型无处发射、节点没归格、节点没有尺寸、结构对不上——逐条报出来，
+  // 不能与 R1 的"写法表未登记"混在一条消息里（两类的排障方向不同）。
   const pending = Array.isArray(layout.pending) ? layout.pending : [];
   pending.forEach(function (item) {
-    report("R1", item.ref || null, "待确认项（未映射到本路线写法）：" + (item.reason || ""));
+    report("R9", item.ref || null, "推导阶段待确认：" + (item.reason || ""));
   });
 
   const result = { status: findings.length ? "fail" : "pass", findings: findings, counts: counts, pending: pending };

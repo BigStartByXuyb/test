@@ -104,6 +104,18 @@ function ensureScaffold(manifest) {
     fs.mkdirSync(path.dirname(frameworkConfigPath), { recursive: true });
     fs.writeFileSync(frameworkConfigPath, scaffoldFrameworkConfig(manifest), "utf8");
   }
+  else if (manifest.route) {
+    // 路线是目标项目的核心路由字段：脚手架配置允许在**仍是脚手架配置**（scaffold=true）时按当前路线刷新，
+    // 否则第 9 步先落盘的配置会把第 10 步的路线钉死成第一次调用时的缺省值（页面是 XAML、配置写着页面 XML）。
+    // 已接入的真实项目配置（scaffold 非 true）一律不动。
+    let existing = null;
+    try { existing = JSON.parse(fs.readFileSync(frameworkConfigPath, "utf8")); }
+    catch (error) { fail("framework.config.json 不是合法 JSON: " + frameworkConfigPath + " - " + error.message); }
+    if (existing && existing.scaffold === true && existing.mode !== manifest.route) {
+      existing.mode = manifest.route;
+      fs.writeFileSync(frameworkConfigPath, JSON.stringify(existing, null, 2) + "\n", "utf8");
+    }
+  }
   manifest.frameworkConfigPath = configRelative;
   const dirs = [
     PAGE_ROOT, LAYOUT_DIR, PAGE_ROOT + "/" + String(manifest.name), "Generated",

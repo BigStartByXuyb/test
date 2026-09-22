@@ -6,7 +6,7 @@
 //     按登记表解析 + 校验，并把 sha256 写进清单（manifest.runRegistry.digests），Bundle 会复校；
 //     没有 --run-json 直接报错（清单不允许自己拼采集输入路径）。
 // 用法: node build-bundle-manifest.mjs <layout-manifest.json> <out-bundle.json> <projectRoot> <area>
-//        --run-json <run.json> [--page-title <标题>] [--replace-existing]
+//        --run-json <run.json> [--page-title <标题>] [--mode <路线>] [--replace-existing]
 //
 // `area`（区域前缀）**必填且不做推导**：它决定 `UI/<区域>/View|ViewModel` 的输出目录，
 // 唯一实现是 run-all.ps1 的取值链（命令行 -Ui → 项目登记表 pages[].ui → derivation 的 F<n>
@@ -28,7 +28,7 @@ const flags = {};
 for (let index = 0; index < process.argv.slice(2).length; index += 1) {
   const token = process.argv.slice(2)[index];
   if (token === "--replace-existing") { flags.replaceExisting = true; continue; }
-  if (token === "--run-json" || token === "--page-title") {
+  if (token === "--run-json" || token === "--page-title" || token === "--mode") {
     const value = process.argv.slice(2)[index + 1];
     if (value === undefined || value.startsWith("--")) throw new Error(token + " 缺少取值");
     flags[token.slice(2)] = value;
@@ -40,7 +40,7 @@ for (let index = 0; index < process.argv.slice(2).length; index += 1) {
 }
 const [layoutManifestFile, outFile, projectRootArg, areaArg] = positional;
 if (!layoutManifestFile || !outFile) {
-  console.error("usage: node build-bundle-manifest.mjs <layout-manifest.json> <out-bundle.json> <projectRoot> <area> --run-json <run.json> [--page-title <标题>] [--replace-existing]");
+  console.error("usage: node build-bundle-manifest.mjs <layout-manifest.json> <out-bundle.json> <projectRoot> <area> --run-json <run.json> [--page-title <标题>] [--mode <路线>] [--replace-existing]");
   process.exit(2);
 }
 // area 必填：位置在 projectRoot 之后，因此"缺 area"优先于"缺 --run-json"报错（与参数顺序一致）。
@@ -82,7 +82,8 @@ runRegistry.assertNoLegacyShadow(runJsonData, "extractSvg", { projectRoot });
 // 而脚手架的唯一实现在 lib/project-scaffold.js（Bundle 第 10 步调用同一份）。
 let csprojs = fs.readdirSync(projectRoot).filter((file) => file.toLowerCase().endsWith(".csproj"));
 if (csprojs.length === 0) {
-  ensureScaffold({ projectRoot, name, area, projectMode: "scaffold" });
+  // 路线在脚手架阶段就要落到 framework.config.json 的 mode 字段（本脚本是空项目落盘的第一个调用点）。
+  ensureScaffold({ projectRoot, name, area, projectMode: "scaffold", route: flags.mode || null });
   csprojs = fs.readdirSync(projectRoot).filter((file) => file.toLowerCase().endsWith(".csproj"));
 }
 if (csprojs.length !== 1) {

@@ -122,41 +122,52 @@ function bandSizes(bands, axis) {
   });
 }
 
-// 一列子节点 → 嵌套 Grid（行按 y 聚类，一列一行一个格子）。
-function buildNestedGrid(entries, ref) {
-  const rows = clusterBands(entries, function (n) { return n.y; }, function (n) { return Math.max(n.h, 1); });
-  // 一行一个格子：同一行里出现多个节点时保持各自的行号（由调用方的门禁判同格冲突）。
-  return {
-    rows: bandSizes(rows, "y"),
-    columns: [{ size: "Star", source: "design" }],
-    cells: rows.map(function (band, rowIndex) {
-      const node = band.items[0];
-      return { ref: node.ref, controlType: node.controlType, row: rowIndex, column: 0, rowSpan: 1, columnSpan: 1 };
-    }),
-    _nestedOf: ref
-  };
+function containsNode(parent, child) {
+  return parent !== child &&
+    child.x >= parent.x - EPSILON && child.x + child.w <= parent.x + parent.w + EPSILON &&
+    child.y >= parent.y - EPSILON && child.y + child.h <= parent.y + parent.h + EPSILON;
 }
 
-function buildRegionGrid(entries, containers) {
-  // ① 先定父子：容器（写法表登记 holdsChildren）内部的节点进嵌套 Grid，不再参与本层行列。
-  const nestedByRef = new Map();
+// 父子树：每个节点挂到"完全包含它、且面积最小的容器"下（容器 = 写法表登记 holdsChildren 的类型）。
+// 递归由 buildGridFrom 负责，因此"分组框里再放分组框"任意层数都能落到正确的内层容器里。
+function buildContainmentTree(entries, containers, pending) {
+  const childrenOf = new Map();
+  entries.forEach(function (node) { childrenOf.set(node.ref, []); });
+  const roots = [];
   entries.forEach(function (node) {
-    if (!containers.has(node.controlType)) return;
-    const contained = entries.filter(function (other) {
-      return other !== node && !other._consumed &&
-        other.x >= node.x - EPSILON && other.x + other.w <= node.x + node.w + EPSILON &&
-        other.y >= node.y - EPSILON && other.y + other.h <= node.y + node.h + EPSILON;
+    let parent = null;
+    entries.forEach(function (candidate) {
+      if (!containers.has(candidate.controlType)) return;
+      if (!containsNode(candidate, node)) return;
+      if (!parent || candidate.w * candidate.h < parent.w * parent.h) parent = candidate;
     });
-    if (!contained.length) return;
-    contained.forEach(function (child) { child._consumed = true; });
-    nestedByRef.set(node.ref, buildNestedGrid(contained, node.ref));
+    if (!parent) { roots.push(node); return; }
+    // 非容器类型里却包着别的控件：写法表没登记它容纳子控件，不能猜 → 挂待确认。
+    childrenOf.get(parent.ref).push(node);
   });
-  // ② 本层只剩容器与独立控件（互不包含）→ 按区间重叠聚列/聚行：同一列的 x 区间重叠、同一行的 y 区间重叠。
-  const top = entries.filter(function (node) { return !node._consumed; });
+  entries.forEach(function (node) {
+    const children = childrenOf.get(node.ref);
+    if (!children.length) return;
+    if (containers.has(node.controlType)) return;
+    children.forEach(function (child) {
+      pending.push({
+        ref: child.ref,
+        reason: "被 " + node.controlType + "（" + node.ref + "）包含，但写法表未登记该类型 holdsChildren，无法嵌套发射"
+      });
+    });
+    childrenOf.set(node.ref, []);
+    children.forEach(function (child) { roots.push(child); });
+  });
+  return { roots: roots, childrenOf: childrenOf };
+}
+
+// 同层节点 → Grid（列按 x 区间重叠聚、行按起始边聚），容器节点带上自己的嵌套 Grid。
+function buildGridFrom(nodes, ctx) {
+  if (!nodes.length) return { rows: [], columns: [], cells: [] };
   // 列按 x 区间重叠聚（同一列的控件横向重叠）；行按**起始边**聚（容器跨多行是常态，
   // 按 y 区间重叠会把整页并成一行，位置就丢了）。
-  const columns = clusterByOverlap(top, function (n) { return n.x; }, function (n) { return Math.max(n.w, 1); });
-  const rows = clusterBands(top, function (n) { return n.y; }, function (n) { return Math.max(n.h, 1); });
+  const columns = clusterByOverlap(nodes, function (n) { return n.x; }, function (n) { return Math.max(n.w, 1); });
+  const rows = clusterBands(nodes, function (n) { return n.y; }, function (n) { return Math.max(n.h, 1); });
   const cells = [];
   const occupied = new Set();
   let rowSizes = bandSizes(rows, "y");
@@ -168,7 +179,7 @@ function buildRegionGrid(entries, containers) {
     if (starRow) rowSizes.push(starRow);
     return rowSizes.length - (starRow ? 2 : 1);
   };
-  top.forEach(function (node) {
+  nodes.forEach(function (node) {
     const column = bandIndex(columns, node, function (n) { return n.x; });
     const row = bandIndex(rows, node, function (n) { return n.y; });
     // 同格只放一个控件（同格多控件必须带互斥条件，那是设计稿的语义，不由推导生成）：
@@ -179,9 +190,10 @@ function buildRegionGrid(entries, containers) {
       else target = appendRow(node);
     }
     occupied.add(target + ":" + column);
+    const childNodes = ctx.childrenOf.get(node.ref) || [];
     cells.push({
       ref: node.ref, controlType: node.controlType, row: target, column: column, rowSpan: 1, columnSpan: 1,
-      ...(nestedByRef.has(node.ref) ? { children: nestedByRef.get(node.ref) } : {})
+      ...(childNodes.length ? { children: buildGridFrom(childNodes, ctx) } : {})
     });
   });
   return {
@@ -189,6 +201,11 @@ function buildRegionGrid(entries, containers) {
     columns: bandSizes(columns, "x"),
     cells: cells
   };
+}
+
+function buildRegionGrid(entries, containers, pending) {
+  const tree = buildContainmentTree(entries, containers, pending);
+  return buildGridFrom(tree.roots, { childrenOf: tree.childrenOf });
 }
 
 // 区间重叠聚类：x/y 区间相交的算同一条带。用于"互不包含"的同层节点——
@@ -274,26 +291,38 @@ function deriveLayout(options) {
     frameworkRegion("bottom-bar", "底部栏", "framework-bottom", "MaxwellFramework_BottomHeight", tokens.bottomHeight, design, "y")
   ];
   if (work.length) {
+    // 工作区与日志条必须是不重叠的纵向区间：发射端按分区顺序给根 Grid 分行，
+    // 若工作区整段盖住日志条，两行的高度就没法同时对上设计稿（门禁 R3 也会判重叠）。
+    const stripTop = strips.length ? Math.min.apply(null, strips.map(function (n) { return n.y; })) : null;
     regions.push({
       id: "work-area", name: "工作区", ref: null, role: "work-area", emit: true,
       x: 0, y: tokens.headerHeight, w: design.width,
-      h: design.height - tokens.headerHeight - tokens.bottomHeight,
-      grid: buildRegionGrid(work, containers)
+      h: (stripTop === null ? design.height - tokens.bottomHeight : stripTop) - tokens.headerHeight,
+      grid: buildRegionGrid(work, containers, pending)
     });
   }
   if (strips.length) {
+    const stripTop = Math.min.apply(null, strips.map(function (n) { return n.y; }));
+    const stripBottom = Math.max.apply(null, strips.map(function (n) { return n.y + n.h; }));
     regions.push({
       id: "log-strip", name: "日志条", ref: null, role: "log-strip", emit: true,
-      x: 0, y: strips[0].y, w: design.width, h: Math.max.apply(null, strips.map(function (n) { return n.h; })),
-      grid: buildRegionGrid(strips, containers)
+      x: 0, y: stripTop, w: design.width, h: stripBottom - stripTop,
+      grid: buildRegionGrid(strips, containers, pending)
     });
   }
-  work.concat(strips).forEach(function (node) {
-    if (node._consumed) return;
-    const placed = regions.some(function (region) {
-      return region.emit !== false && region.grid.cells.some(function (cell) { return cell.ref === node.ref; });
+  // 归位核对：发射分区里的每个节点（含嵌套 Grid 内的）都必须被某个格子引用，否则挂待确认——
+  // 嵌套是递归的，所以这里也递归收集格子里的 ref。
+  const placedRefs = new Set();
+  const collectRefs = function (grid) {
+    (grid.cells || []).forEach(function (cell) {
+      placedRefs.add(cell.ref);
+      if (cell.children) collectRefs(cell.children);
     });
-    if (!placed) pending.push({ ref: node.ref, reason: "未归入任何分区/格子" });
+  };
+  regions.filter(function (region) { return region.emit !== false; })
+    .forEach(function (region) { collectRefs(region.grid); });
+  work.concat(strips).forEach(function (node) {
+    if (!placedRefs.has(node.ref)) pending.push({ ref: node.ref, reason: "未归入任何分区/格子" });
   });
 
   return {
