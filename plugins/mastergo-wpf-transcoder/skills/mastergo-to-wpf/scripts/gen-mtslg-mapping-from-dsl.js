@@ -12,7 +12,7 @@ const path = require("path");
 const PAGE_NODE_ID = require(path.join(__dirname, "lib", "page-node-id.js"));
 // 跨脚本共用工具的唯一实现（见 scripts/lib/script-helpers.js；禁止在本脚本再抄一份）。
 const { readJson, normalizeToken: normalize, normalizeNewlines,
-  parentOuterRightEdge, textBlockLeftValue, TEXT_BLOCK_RIGHT_LEFT_BASIS
+  parentOuterRightEdge, textBlockLeftValue
 } = require(path.join(__dirname, "lib", "script-helpers.js"));
 const { isHostShellName } = require(path.join(__dirname, "lib", "mastergo-rules.js"));
 // 图标归属判据的唯一实现（见 scripts/lib/icon-ownership.js；禁止在本脚本再抄一份）。
@@ -655,7 +655,6 @@ function addNode(sourceRef, controlType, attrs, options = {}) {
     h: s.height,
     expectedLeft,
     expectedTop,
-    leftBasis: options.leftBasis,
     expectedWidth: geometry ? "NaN" : (controlType === "TextBlock" ? "NaN" : s.width),
     expectedHeight: geometry ? Number(geometry.height) : (controlType === "TextBlock" ? 40 : s.height),
     widthSource: geometry ? "table.column-template"
@@ -729,7 +728,7 @@ function addText(ref) {
   }
   const xmlId = addNode(ref, "TextBlock", attrs, Object.assign(
     { xmlId: allocateId(ref) },
-    leftOverride !== undefined ? { expectedLeft: leftOverride, leftBasis: TEXT_BLOCK_RIGHT_LEFT_BASIS } : {}
+    leftOverride !== undefined ? { expectedLeft: leftOverride } : {}
   ));
   textAudit.push({ sourceRef: ref, sourceText: s.text, visibility: true, role: "content", decision: "emit", outputRefs: [xmlId] });
   return xmlId;

@@ -471,6 +471,7 @@ console.log("PASS 已作废表述（父节点语义匹配键 / parentVariants）
 // 一处分叉就会出现「文档说发射控件、脚本说行是数据」这类两读，因此在这里逐项钉死。
 const mappingGenerator = fs.readFileSync(path.join(__dirname, "..", "gen-mtslg-mapping-from-dsl.js"), "utf8");
 const bundleGenerator = fs.readFileSync(path.join(__dirname, "..", "gen-mastergo-page-bundle.js"), "utf8");
+const coordNodesLib = fs.readFileSync(path.join(__dirname, "..", "lib", "coord-nodes.js"), "utf8");
 const mapRules = fs.readFileSync(path.join(__dirname, "..", "lib", "iocontrol-map-rules.js"), "utf8");
 
 const tableFamily = map.tableTemplates;
@@ -528,7 +529,10 @@ assert.ok(validator.includes("'" + tableFamily.innerTextPolicy.role + "'"),
   "表格行数据的 omit 角色必须登记进校验器 OMIT_ROLES: " + tableFamily.innerTextPolicy.role);
 assert.ok(validator.includes("table-column") && validator.includes("columnTemplate"),
   "校验器必须按 columnTemplate 单独校验列定义");
-assert.ok(bundleGenerator.includes("table-column"), "编排器必须为列定义提供坐标核对输入");
+// 坐标核对输入的唯一实现在 lib/coord-nodes.js（含 nodeKind=table-column 的固定几何处理），
+// 编排器与 check-coords.mjs 都调用它。
+assert.ok(coordNodesLib.includes("table-column"),
+  "坐标核对输入的实现必须为列定义单独给几何（nodeKind=table-column）");
 assert.ok(bundleGenerator.includes("tableAudits"), "编排器审计必须输出表格摘要");
 
 // 四份人读文档必须写明同一条口径。
@@ -1087,15 +1091,30 @@ console.log("PASS 匹配键口径单读法 + 同一条规则单处陈述（maste
   assert.strictEqual(align.distanceAttr, "Left",
     "距离参数名固定为 Left（与 Align 同一组属性，不新增第三个属性名）");
   const helpers = fs.readFileSync(path.join(__dirname, "..", "lib", "script-helpers.js"), "utf8");
-  for (const token of ["function parentOuterRightEdge", "function textBlockLeftValue", "TEXT_BLOCK_RIGHT_LEFT_BASIS"]) {
+  for (const token of ["function parentOuterRightEdge", "function textBlockLeftValue", "function isRightAlignedTextBlock"]) {
     assert.ok(helpers.includes(token),
-      "lib/script-helpers.js 必须保留 " + token + "（Left 口径的唯一实现与口径标识）");
+      "lib/script-helpers.js 必须保留 " + token + "（Left 口径的判据与计算的唯一实现）");
   }
-  for (const rel of ["gen-mtslg-mapping-from-dsl.js", "apply-container-containment.js", "gen-iocontrol-xml.js",
-    "gen-mastergo-page-bundle.js", "check-coords.mjs", "validate-iocontrol-provenance.js"]) {
+  // 分支判据只允许用共用函数（不得各写一份 Align 比较）。
+  for (const rel of ["apply-container-containment.js", "gen-iocontrol-xml.js",
+    "validate-iocontrol-provenance.js", "lib/coord-nodes.js"]) {
     const consumer = fs.readFileSync(path.join(__dirname, "..", rel), "utf8");
-    assert.ok(consumer.includes("TEXT_BLOCK_RIGHT_LEFT_BASIS"),
-      rel + " 必须用共享的 leftBasis 标识判断右对齐口径（不得自己拼字面量）");
+    assert.ok(consumer.includes("isRightAlignedTextBlock"),
+      rel + " 必须用共享的 isRightAlignedTextBlock 判分支（不得自己拼 Align 比较）");
+  }
+  // 坐标核对输入只有一份实现：Bundle 与 check-coords.mjs 都调 lib/coord-nodes.js。
+  for (const rel of ["gen-mastergo-page-bundle.js", "check-coords.mjs"]) {
+    const consumer = fs.readFileSync(path.join(__dirname, "..", rel), "utf8");
+    assert.ok(consumer.includes("buildCoordNodes"),
+      rel + " 必须调用 lib/coord-nodes.js 的 buildCoordNodes（坐标核对输入不得内联一份）");
+  }
+  // 旧的附加标记（leftBasis / TEXT_BLOCK_RIGHT_LEFT_BASIS）不得残留：判据只认节点 Align 属性。
+  for (const rel of ["lib/script-helpers.js", "lib/coord-nodes.js", "gen-mtslg-mapping-from-dsl.js",
+    "apply-container-containment.js", "gen-iocontrol-xml.js", "validate-iocontrol-provenance.js",
+    "check-coords.mjs", "gen-mastergo-page-bundle.js"]) {
+    const source = fs.readFileSync(path.join(__dirname, "..", rel), "utf8");
+    assert.ok(!source.includes("leftBasis") && !source.includes("TEXT_BLOCK_RIGHT_LEFT_BASIS"),
+      rel + " 不得残留 leftBasis / TEXT_BLOCK_RIGHT_LEFT_BASIS（已改用节点 Align 判据）");
   }
   // 左对齐口径也必须真的走那个共用实现（否则"唯一实现"只是注释）：生产者与 provenance 校验器
   // 共四处调用点都要传 align: "Left"。

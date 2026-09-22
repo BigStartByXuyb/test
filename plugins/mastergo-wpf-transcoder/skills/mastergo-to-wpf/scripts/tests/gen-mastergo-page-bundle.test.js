@@ -332,13 +332,15 @@ assert.deepStrictEqual(keepAudit.cleanup.work.removed, []);
 assert.ok(!keepAudit.files.find(function (entry) { return entry.kind === "work"; }).removed,
   "保留模式下不得标记 removed");
 
-// 坐标门禁必须每次都执行：旧写法在"度量不是严格数字"时整段跳过核对，而审计仍写 static: passed。
-// 现在改成：先按与 provenance 相同的 Number() 口径归一化，再无条件交给坐标核对器；
-// 缺度量由核对器点名 MISMATCH（见 check-iocontrol-coords.js）。
+// 坐标门禁必须每次都执行：不得保留「度量不可用就整段跳过」的分支。
+// 核对输入的归一化与构建的唯一实现在 lib/coord-nodes.js（Bundle 与 check-coords.mjs 共用），
+// 本脚本只负责调用它并无条件把结果交给坐标核对器；缺度量由核对器点名 MISMATCH。
 assert.doesNotMatch(scriptText, /coordNodesUsable/,
   "坐标门禁不得保留「度量不可用就整段跳过」的分支");
-assert.match(scriptText, /normalizedCoordNodes/,
-  "坐标门禁必须归一化后无条件执行核对");
+assert.match(scriptText, /buildCoordNodes\(mapping/,
+  "坐标门禁必须调用 lib/coord-nodes.js 的 buildCoordNodes 后无条件执行核对");
+assert.doesNotMatch(scriptText, /normalizedCoordNodes|coordNumber/,
+  "坐标核对输入不得在编排器里再内联一份（唯一实现在 lib/coord-nodes.js）");
 
 // 数值字符串度量（手写 / merge mapping 常见：写成 "292" 而不是 292）必须照常核对并通过。
 const stringMetricMapping = JSON.parse(

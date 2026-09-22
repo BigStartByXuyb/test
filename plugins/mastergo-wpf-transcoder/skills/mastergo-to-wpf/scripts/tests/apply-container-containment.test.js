@@ -245,13 +245,9 @@ const reportCJson = JSON.parse(fs.readFileSync(reportC, 'utf8'));
   assert.strictEqual(eByRef('right-text').layoutParent, 'group');
   assert.strictEqual(eByRef('right-text').expectedLeft, (658 + 200) - (682 + 10),
     'Align=Right：Left 必须是「容器外框右边缘 − (控件X + bbox宽)」= 166');
-  assert.strictEqual(eByRef('right-text').leftBasis, 'textblock.align-right.parent-outer-right-edge',
-    'Align=Right 重挂后必须保留 leftBasis 口径标识');
   assert.strictEqual(eByRef('right-text').expectedTop, (578 - 514) - SECONDARY_INSET.top,
     'Align=Right 只改 Left 口径，Top 仍按内容区原点');
   assert.strictEqual(eByRef('left-text').expectedLeft, (682 - 658) - SECONDARY_INSET.left,
     'Align=Left 仍是「左边缘到内容区左边缘」');
-  assert.strictEqual(eByRef('left-text').leftBasis, undefined,
-    'Align=Left 不得带右对齐口径标识');
 
   console.log('PASS container containment regression test');

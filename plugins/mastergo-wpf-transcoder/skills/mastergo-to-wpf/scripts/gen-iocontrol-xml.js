@@ -66,7 +66,7 @@ const { validateTextAudit } = require('./validate-iocontrol-provenance');
 const MAP_RULES = require('./lib/iocontrol-map-rules');
 // XML 属性转义（含换行 → &#x0a;）的唯一实现（见 scripts/lib/script-helpers.js；禁止在本脚本再抄一份）。
 const { xmlAttr, normalizeForCompare, omittedAttrs,
-  parentOuterRightEdge, textBlockLeftValue, TEXT_BLOCK_RIGHT_LEFT_BASIS } = require('./lib/script-helpers');
+  parentOuterRightEdge, textBlockLeftValue, isRightAlignedTextBlock } = require('./lib/script-helpers');
 
 // ---------- 参数 ----------
 function usage() {
@@ -198,6 +198,18 @@ const BUTTON_ICON_SIZE_ATTRS = BUTTON_FAMILY_RULES.iconSizeAttrs;
 const REQUIRED_ATTRS_BY_CONTROL_TYPE = loadControlTypeRequiredAttrs(templateMapPath);
 // 必写字段的默认值（映射无来源时使用）；未登记的字段写空字符串。
 const DEFAULT_ATTRS_BY_CONTROL_TYPE = loadControlTypeAttrDefaults(templateMapPath);
+// TextBlock 的对齐口径块（映射表 textBlockAlign）：只取 attr / rightValue 作为"是否右对齐"的判据入参。
+const TEXT_BLOCK_ALIGN = loadTextBlockAlign(templateMapPath);
+
+function loadTextBlockAlign(mapPath) {
+  const fallback = { attr: 'Align', rightValue: 'Right' };
+  if (!mapPath) return fallback;
+  let templateMap;
+  try { templateMap = JSON.parse(fs.readFileSync(mapPath, 'utf8')); }
+  catch (error) { throw new Error('读取模板表失败: ' + mapPath + ' - ' + error.message); }
+  const spec = templateMap.textBlockAlign;
+  return spec && typeof spec === 'object' ? spec : fallback;
+}
 
 function loadControlTypeAttrDefaults(mapPath) {
   const fallback = { Border: { Value: '1' } };
@@ -445,10 +457,10 @@ function tableColumnGeometryOf(node) {
 }
 
 // 节点 Left 的唯一取值函数：TextBlock Align=Right 走"以控件右上角为原点、量到父容器外框右边缘"的口径
-// （实现在 lib/script-helpers.js，与映射生成器 / 容器重挂 / 坐标核对器共用同一份），其余节点仍是
-// Left = absX − 父容器原点 − 内容区 inset。判据是 mapping 节点上的 leftBasis 标识，不靠猜值。
+// （实现在 lib/script-helpers.js，与映射生成器 / 容器重挂 / 坐标核对共用同一份），其余节点仍是
+// Left = absX − 父容器原点 − 内容区 inset。分支判据是 isRightAlignedTextBlock（节点 Align 属性）。
 function geometryLeftOf(node, parentAbsX, insetLeft, parentOuterRightEdgeX) {
-  if (node.leftBasis === TEXT_BLOCK_RIGHT_LEFT_BASIS) {
+  if (isRightAlignedTextBlock(node, TEXT_BLOCK_ALIGN)) {
     const left = textBlockLeftValue({
       align: 'Right',
       pageAbsX: node.absX,

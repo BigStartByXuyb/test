@@ -44,8 +44,9 @@ function pageLangPaths(pageName, locales) {
 }
 
 // 跨脚本共用工具的唯一实现（见 scripts/lib/script-helpers.js；禁止在本脚本再抄一份）。
-const { fail, xmlAttr, readJson, backupFile, outputOrigin,
-  parentOuterRightEdge, textBlockLeftValue, TEXT_BLOCK_RIGHT_LEFT_BASIS } = require(path.join(SCRIPT_DIR, "lib", "script-helpers.js"));
+const { fail, xmlAttr, readJson, backupFile } = require(path.join(SCRIPT_DIR, "lib", "script-helpers.js"));
+// 坐标核对输入的构建唯一实现（见 scripts/lib/coord-nodes.js）。
+const { buildCoordNodes } = require(path.join(SCRIPT_DIR, "lib", "coord-nodes.js"));
 const { inferHostPaths } = require(path.join(SCRIPT_DIR, "lib", "project-csproj.js"));
 // 运行登记表的唯一实现（见 scripts/lib/run-registry.js；禁止在本脚本再抄一份）。
 const RUN_REGISTRY = require(path.join(SCRIPT_DIR, "lib", "run-registry.js"));
@@ -727,115 +728,9 @@ function validateBundleOutputs(info) {
     .concat(info.templateMapPath ? ["--map", info.templateMapPath] : []));
   const mapping = info.mapping;
   if (Array.isArray(mapping.nodes) && mapping.nodes.length > 0) {
-    const sourceByRef = new Map((mapping.sourceNodes || []).map(function (node) { return [node.ref, node]; }));
-    // 输出节点索引：读容器的 contentInset（内容区原点）用。
-    const nodeByRef = new Map((mapping.nodes || []).map(function (node) { return [node.ref, node]; }));
-    const rootRef = mapping.rootRef || null;
-    const coordNodes = mapping.nodes.map(function (node) {
-      const source = sourceByRef.get(node.sourceRef || node.ref) || {};
-      // 坐标核对的原点 = 该节点「输出父节点」（XML 里的父容器）的页面绝对坐标，与生成器口径一致：
-      //   根级节点（父容器是页面根）→ (0, 192)，顶层公共栏 126 + 示例标题 66 只在根级扣一次；
-      //   嵌套节点 → 父容器的 (pageAbsX, pageAbsY)，生成器按父容器相对发射、不再扣 192。
-      // 注意必须用输出父节点（layoutParent / parent / DSL parentRef 的优先级，与 provenance 校验一致），
-      // 不能用 DSL 父节点：mapping 允许把语义槽位展开为同级节点，两者可能不同。
-      const outputParentRef = node.layoutParent !== undefined
-        ? node.layoutParent
-        : (node.parent !== undefined ? node.parent : (source.parentRef || null));
-      const parentSource = outputParentRef ? (sourceByRef.get(outputParentRef) || null) : null;
-      const parentIsRoot = !parentSource || (rootRef !== null && parentSource.ref === rootRef);
-      // 输出父节点是容器（GroupBox 等）时，子坐标从"内容区原点"量：父容器坐标 + 边框/标题条内边距
-      // （mapping 节点的 contentInset，来自映射表 infoGroupTemplates.styleInsets）。与生成器、校验器同口径。
-      const parentNode = outputParentRef ? nodeByRef.get(outputParentRef) : null;
-      const parentInset = !parentIsRoot && parentNode && parentNode.contentInset ? parentNode.contentInset : null;
-      // 原点口径的唯一实现在 lib/script-helpers.js（outputOrigin）：0 是合法坐标（`|| 192` 会把它吞掉，
-      // 让生成器与坐标核对器对同一份 mapping 得出相差 192 的原点）；取不到父容器 pageAbs 时
-      // 按 mtslg-mode.md 第 3 节「不猜原点」直接失败，不做 falsy 兜底。
-      const origin = outputOrigin({
-        parentIsRoot: parentIsRoot,
-        parentPageAbsX: parentSource ? parentSource.pageAbsX : null,
-        parentPageAbsY: parentSource ? parentSource.pageAbsY : null,
-        inset: parentInset
-      });
-      if (!origin) {
-        fail("无法确定输出父容器原点：节点 " + (node.ref || node.id || node.sourceRef) + " 的输出父容器 " +
-          outputParentRef + " 缺少 pageAbsX/pageAbsY（不能猜原点）");
-      }
-      const originX = origin.x;
-      const originY = origin.y;
-      const isTextBlock = (node.controlType || (node.attrs && node.attrs.ControlType)) === "TextBlock";
-      // 表格列定义（nodeKind=table-column）按映射表 columnTemplate 固定几何发射：Left=0 / Top=0 /
-      // Height=45、不写 Width。核对输入的 x/y 因此取「父容器原点」本身，w 传 "NaN"（与 XML 无 Width 对应）。
-      if (node.nodeKind === "table-column") {
-        return {
-          id: node.xmlId || node.id || node.ref,
-          x: originX,
-          y: originY,
-          w: "NaN",
-          h: node.expectedHeight,
-          contentOriginX: originX,
-          contentOriginY: originY
-        };
-      }
-      return {
-        id: node.xmlId || node.id || node.ref,
-        x: source.pageAbsX !== undefined ? source.pageAbsX : node.absX,
-        y: source.pageAbsY !== undefined ? source.pageAbsY : node.absY,
-        w: isTextBlock
-          ? "NaN"
-          : (node.expectedWidth !== undefined
-            ? node.expectedWidth
-            : (source.width !== undefined ? source.width : node.w)),
-        h: node.expectedHeight !== undefined
-          ? node.expectedHeight
-          : (source.height !== undefined ? source.height : node.h),
-        contentOriginX: originX,
-        contentOriginY: originY,
-        // TextBlock Align=Right 的 Left 不是 x − 原点，而是"以控件右上角为原点量到父容器外框右边缘"
-        // 的距离（口径见映射表 textBlockAlign.distance*）。这里按 lib/script-helpers.js 的同一实现
-        // 独立算出并显式传给官方核对器；其余节点仍走 x − contentOriginX。
-        ...(function () {
-          if (!isTextBlock || node.leftBasis !== TEXT_BLOCK_RIGHT_LEFT_BASIS) return {};
-          const rootSource = rootRef ? (sourceByRef.get(rootRef) || null) : null;
-          const expectedLeft = textBlockLeftValue({
-            align: "Right",
-            pageAbsX: Number(source.pageAbsX !== undefined ? source.pageAbsX : node.absX),
-            textWidth: Number(node.dslWidth !== undefined ? node.dslWidth : source.width),
-            parentOuterRightEdgeX: parentOuterRightEdge({
-              parentIsRoot: parentIsRoot,
-              parentPageAbsX: parentSource ? parentSource.pageAbsX : null,
-              parentWidth: parentSource ? parentSource.width : null,
-              rootWidth: rootSource ? rootSource.width : null
-            })
-          });
-          if (expectedLeft === null) {
-            fail("无法计算 TextBlock Align=Right 的 Left：节点 " + (node.xmlId || node.ref) +
-              " 缺少页面/父容器宽度或设计稿 bbox 宽度（不能猜）");
-          }
-          return { expectedLeft: expectedLeft };
-        })()
-      };
-    });
-    // 坐标核对是硬门禁：必须每次都执行，禁止因为"度量不是严格数字"而整段跳过
-    // （旧写法 Number.isFinite("292") === false 会让整段核对消失，而审计仍写 static: passed）。
-    // 度量按与 provenance 相同的 Number() 口径归一化：数值字符串（"292"）算数值；
-    // TextBlock 的宽按规则恒为 "NaN"（NaN 只与 NaN 匹配，见 check-iocontrol-coords.js）。
-    // 归一化后仍取不到值的节点不再在这里静默跳过，而是照常交给核对器 —— 由核对器
-    // 在结果里点名 MISMATCH（"缺少设计稿度量"），因此失败路径只有一条。
-    const coordNumber = function (value) {
-      if (value === undefined || value === null || value === "") return null;
-      const numeric = Number(value);
-      return Number.isFinite(numeric) ? numeric : null;
-    };
-    const normalizedCoordNodes = coordNodes.map(function (node) {
-      return Object.assign({}, node, {
-        x: coordNumber(node.x),
-        y: coordNumber(node.y),
-        w: node.w === "NaN" ? "NaN" : coordNumber(node.w),
-        h: node.h === "NaN" ? "NaN" : coordNumber(node.h)
-      });
-    });
+    // 坐标核对输入的构建只有一份实现（lib/coord-nodes.js）；本脚本与 check-coords.mjs 都调用它。
     const coordsPath = path.join(info.tempRoot, "coords.json");
-    fs.writeFileSync(coordsPath, JSON.stringify(normalizedCoordNodes), "utf8");
+    fs.writeFileSync(coordsPath, JSON.stringify(buildCoordNodes(mapping, { fail: fail }), null, 2) + "\n", "utf8");
     run(COORDS_SCRIPT, ["--xml", info.pageXmlPath, "--nodes", coordsPath]);
   }
 

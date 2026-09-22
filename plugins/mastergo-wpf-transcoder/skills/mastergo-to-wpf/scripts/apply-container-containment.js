@@ -34,7 +34,7 @@ const fs = require('fs');
 const path = require('path');
 // 跨脚本共用工具的唯一实现（见 scripts/lib/script-helpers.js；禁止在本脚本再抄一份）。
 const { readJson, failAndExit, parentOuterRightEdge, textBlockLeftValue,
-  TEXT_BLOCK_RIGHT_LEFT_BASIS } = require(path.join(__dirname, 'lib', 'script-helpers.js'));
+  isRightAlignedTextBlock } = require(path.join(__dirname, 'lib', 'script-helpers.js'));
 const { isHostShellName } = require(path.join(__dirname, 'lib', 'mastergo-rules.js'));
 const fail = failAndExit(1);
 
@@ -219,10 +219,7 @@ if (containerSpecs.length > 0) {
     // TextBlock Align=Right：Left 不是"到左边缘"，而是以控件右上角为原点量到**父容器外框右边缘**
     // 的距离（口径登记见映射表 textBlockAlign.distance*；实现是 lib/script-helpers.js 那一份）。
     // 其余节点仍是"左边缘到内容区左边缘"。Top 口径不变。
-    const alignAttr = (templateMap.textBlockAlign && templateMap.textBlockAlign.attr) || 'Align';
-    const alignRightValue = (templateMap.textBlockAlign && templateMap.textBlockAlign.rightValue) || 'Right';
-    const isRightAlignedText = (node.controlType || (node.attrs && node.attrs.ControlType)) === 'TextBlock' &&
-      node.attrs && node.attrs[alignAttr] === alignRightValue;
+    const isRightAlignedText = isRightAlignedTextBlock(node, templateMap.textBlockAlign);
     let expectedLeft;
     if (isRightAlignedText) {
       const textWidth = node.dslWidth !== undefined ? node.dslWidth : bbox.w;
@@ -259,7 +256,6 @@ if (containerSpecs.length > 0) {
     node.layoutParent = target.ref;
     node.expectedLeft = expectedLeft;
     node.expectedTop = expectedTop;
-    if (isRightAlignedText) node.leftBasis = TEXT_BLOCK_RIGHT_LEFT_BASIS;
     report.reparented.push({
       ref: ref,
       xmlId: node.xmlId || ref,

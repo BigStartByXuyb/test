@@ -14,7 +14,7 @@ const MAP_RULES = require('./lib/iocontrol-map-rules');
 // 数值解析的唯一实现（见 scripts/lib/script-helpers.js；本校验器与坐标核对器共用同一口径）。
 // 文案比对归一（解码字符引用 + 换行归一成 LF）的唯一实现，见 scripts/lib/script-helpers.js。
 const { numberOrNull: num, normalizeForCompare, omittedAttrs,
-  parentOuterRightEdge, textBlockLeftValue, TEXT_BLOCK_RIGHT_LEFT_BASIS } = require('./lib/script-helpers');
+  parentOuterRightEdge, textBlockLeftValue, isRightAlignedTextBlock } = require('./lib/script-helpers');
 
 // 按钮族固定参数：真值来源为模板表 mtslg-iocontrol-map.json 的 buttonFamily；
 // 传入 --map 时读取该表，未传入或表缺字段时退回内置默认（与表内容一致）。
@@ -289,16 +289,9 @@ function validate(xmlPath, manifestPath, options) {
     if (!isTableColumn) {
       // TextBlock Align=Right 的 expectedLeft 口径不同：以控件右上角为原点，量到输出父容器
       // **外框右边缘**的距离（口径见映射表 textBlockAlign.distance*；实现在 lib/script-helpers.js）。
-      // 判据用节点上的 leftBasis 标识（由生成器/容器重挂写入），不靠猜值。
-      const rightAlignedText = (x.ControlType === 'TextBlock') && n.leftBasis === TEXT_BLOCK_RIGHT_LEFT_BASIS;
-      // 反向门禁：Align=Right 的 TextBlock 必须带 leftBasis 标识——缺了说明它没走"到右边缘"这条口径
-      // （例如有人只改了发射值、忘了算 Left），必须当场报出来，不能靠值对不对去反推。
-      const alignAttrName = (TEXT_BLOCK_ALIGN && TEXT_BLOCK_ALIGN.attr) || 'Align';
-      const alignRightValue = (TEXT_BLOCK_ALIGN && TEXT_BLOCK_ALIGN.rightValue) || 'Right';
-      if (x.ControlType === 'TextBlock' && x[alignAttrName] === alignRightValue &&
-          n.leftBasis !== TEXT_BLOCK_RIGHT_LEFT_BASIS) {
-        errors.push('[' + n.xmlId + '] TextBlock Align=Right 必须按"到右边缘"口径算 Left（映射节点缺 leftBasis 标识）');
-      }
+      // 判据是节点属性 Align（isRightAlignedTextBlock 是唯一判据实现），与生产者同一处。
+      const rightAlignedText = x.ControlType === 'TextBlock' &&
+        isRightAlignedTextBlock({ controlType: x.ControlType, attrs: x }, TEXT_BLOCK_ALIGN);
       let expectedSourceLeft;
       if (rightAlignedText) {
         const rightEdgeX = parentOuterRightEdge({
