@@ -22,7 +22,6 @@ function extractDocumentedRules(markdown) {
     rightSidebarComponentTemplates: ["右侧栏-左右结构-icon+文案", "右侧栏-上下结构-icon+文案", "start"],
     inputTemplates: [],
     selectBoxTemplates: ["选择框-40", "选择框-36", "选择框-32", "选择框-28"],
-    selectionInfoTemplates: ["单选-选中/未选择", "多选-选中/未选中"],
     selectionTemplates: ["单选-选中", "单选-未选择", "多选-选中", "多选-未选择"],
     infoGroupTemplates: ["信息分组-模块化"],
     // 相机视口族：团队组件库「集成图像 UI汇总」画廊里的相机组件集（按组件集名命中）。

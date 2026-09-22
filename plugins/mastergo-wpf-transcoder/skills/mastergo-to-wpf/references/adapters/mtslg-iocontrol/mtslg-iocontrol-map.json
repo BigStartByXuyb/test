@@ -1136,49 +1136,6 @@
       }
     }
   },
-  "selectionInfoTemplates": {
-    "match": {
-      "property": "属性 1"
-    },
-    "variants": {
-      "单选-选中/未选择": {
-        "controlType": "RadioButton",
-        "style": null,
-        "iconPolicy": "none",
-        "slots": [
-          {
-            "slot": "choice",
-            "controlType": "RadioButton",
-            "iconPolicy": "none",
-            "valueSource": "dsl.text"
-          },
-          {
-            "slot": "text",
-            "controlType": "TextBlock",
-            "valueSource": "dsl.text"
-          }
-        ]
-      },
-      "多选-选中/未选中": {
-        "controlType": "CheckBox",
-        "style": null,
-        "iconPolicy": "none",
-        "slots": [
-          {
-            "slot": "choice",
-            "controlType": "CheckBox",
-            "iconPolicy": "none",
-            "valueSource": "dsl.text"
-          },
-          {
-            "slot": "text",
-            "controlType": "TextBlock",
-            "valueSource": "dsl.text"
-          }
-        ]
-      }
-    }
-  },
   "selectionTemplates": {
     "match": {
       "property": "属性 1"

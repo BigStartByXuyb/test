@@ -93,31 +93,11 @@ MasterGo 组件库已存在真实变体 `密码输入框`，但当前 MT3.0 IOCo
 
 只有在根组件没有裁剪需求时，才允许将语义槽位展开为同级节点。若展开为同级节点，必须显式保留等价的裁剪边界；否则超出外层组件的文字可能与相邻实例重叠。该裁剪规则优先于“平级节点”的模板书写形式。
 
-# MasterGo 组件集：选择+信息 → MTSLG 映射关系
-
-### 匹配规则
-
-组件集=选择+信息；属性 1 决定选择控件类型和选中状态：单选-选中/未选择→RadioButton，多选-选中/未选中→CheckBox。
-
-### 固定模板：组件集=选择+信息
-
-固定节点：选择控件 + TextBlock，两个平级节点。
-
-```
-<!-- 属性1=单选-选中/未选择：默认圆点 RadioButton，使用隐式 RadioButtonBaseStyle -->
-<IOContorl ID="{id_choice}" ControlType="RadioButton" Value="{checked}" IOName="{io_name}" IOCommand="{io_command}" IOEnable="{io_enable}" IOState="{io_state}" Left="{choice_left}" Top="{choice_top}" Width="{choice_width}" Height="{choice_height}" />
-<IOContorl ID="{id_text}" ControlType="TextBlock" Value="{info_value}" IOState="{text_state}" IOEnable="{text_enable}" Left="{text_left}" Top="{text_top}" Width="NaN" Height="40" FontSize="{text_font_size}" />
-
-<!-- 属性1=多选-选中/未选中：默认 CheckBox 样式 -->
-<IOContorl ID="{id_choice}" ControlType="CheckBox" Value="{checked}" IOName="{io_name}" IOCommand="{io_command}" IOEnable="{io_enable}" IOState="{io_state}" Left="{choice_left}" Top="{choice_top}" Width="{choice_width}" Height="{choice_height}" />
-<IOContorl ID="{id_text}" ControlType="TextBlock" Value="{info_value}" IOState="{text_state}" IOEnable="{text_enable}" Left="{text_left}" Top="{text_top}" Width="NaN" Height="40" FontSize="{text_font_size}" />
-```
-
 # MasterGo 组件集：单选+多选 → MTSLG 映射关系
 
 ### 匹配规则
 
-组件集=单选+多选；属性 1 决定 ControlType 和状态：`单选-选中`、`单选-未选择`→RadioButton，`多选-选中`、`多选-未选择`→CheckBox。这四个是设计稿中的真实属性值；`单选-选中/未选择`、`多选-选中/未选中` 这种带斜杠的写法属于《选择+信息》组件集，不得登记到本组件集，否则两个模板族会互相抢占。
+组件集=单选+多选；属性 1 决定 ControlType 和状态：`单选-选中`、`单选-未选择`→RadioButton，`多选-选中`、`多选-未选择`→CheckBox。这**四个**是设计稿中的真实属性值；`单选-选中/未选择`、`多选-选中/未选中` 这类带斜杠的写法不属于本组件集，不得登记到这里（登记了会去抢本族的模板），也不属于任何已登记的模板族——组件库里没有该组件集时，设计稿也不应出现这些属性值。
 
 ### 固定模板：组件集=单选+多选
 

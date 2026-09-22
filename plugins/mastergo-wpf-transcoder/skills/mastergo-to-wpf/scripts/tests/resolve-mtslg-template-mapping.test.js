@@ -200,7 +200,6 @@ const documentedTemplateFamilies = {
     "输入框-小数-40", "输入框-小数-36", "输入框-小数-32",
     "输入框-文字-40", "输入框-文字-36", "输入框-文字-32"
   ],
-  selectionInfoTemplates: ["单选-选中/未选择", "多选-选中/未选中"],
   selectionTemplates: ["单选-选中", "单选-未选择", "多选-选中", "多选-未选择"],
   infoGroupTemplates: ["信息分组-模块化"],
   mainMenuTemplates: ["主菜单button", "主菜单button-文字"],
