@@ -953,3 +953,57 @@ console.log("PASS 判定表不得自行枚举真值源（iconPolicy / 变体名 
   }
 }
 console.log("PASS 底部栏变体清单（feishu-layout-mapping.md ↔ map.layoutRules.bottomBar.variants）一致性回归测试");
+
+// ---------- 9. 契约机器可读入口只有一种写法：-List -Format json -OutFile <文件> ----------
+// 背景：步骤契约的读取从 stdout 改成 -OutFile 文件通道（stdout 会被控制台代码页把中文替换成
+// U+FFFD，而 JSON.parse 照样成功）时，实现改了、几处入口文档没改，CI 语义审计以 REVIEW 报出。
+// "改了实现、漏改入口描述"不该留给下一轮审计发现，所以固化成断言：入口文档里凡出现契约命令，
+// 必须同处给出 -OutFile；确属"只讲人读 / 说明 stdout 会损坏"的行要显式标注。
+{
+  const entryDocs = [
+    path.join(PLUGIN_ROOT, "skills", "mastergo-to-wpf", "SKILL.md"),
+    path.join(PLUGIN_ROOT, "skills", "mastergo-to-wpf", "references", "adapters", "mtslg-iocontrol", "pipeline-contract.md"),
+  ];
+  let checked = 0;
+  for (const file of entryDocs) {
+    skillLines(fs.readFileSync(file, "utf8")).forEach((line, index) => {
+      if (!line.includes("-List -Format json")) return;
+      checked += 1;
+      assert.ok(/人读|损坏/.test(line) || line.includes("-OutFile"),
+        path.relative(PLUGIN_ROOT, file) + ":" + (index + 1) +
+        " 的契约入口必须写成 -List -Format json -OutFile <文件>；只讲人读或说明 stdout 会损坏的行要显式标注「人读」/「损坏」");
+    });
+  }
+  assert.ok(checked > 0, "入口文档必须至少给出一处契约命令示例（本门禁据此核对）");
+  // 实现侧同样钉住：参数、落盘编码、唯一读取实现三件套缺一不可。
+  const runAll = fs.readFileSync(path.join(__dirname, "..", "run-all.ps1"), "utf8");
+  assert.ok(runAll.includes("[string] $OutFile"), "run-all.ps1 必须提供 -OutFile 参数");
+  assert.ok(runAll.includes("Set-Content -LiteralPath $OutFile -Value $json -Encoding UTF8"),
+    "run-all.ps1 的 -OutFile 必须用 Set-Content -Encoding UTF8 落盘（PS7 下无 BOM）");
+  const stepsLib = fs.readFileSync(path.join(__dirname, "..", "lib", "pipeline-steps.js"), "utf8");
+  for (const token of ["-OutFile", "\\uFFFD"]) {
+    assert.ok(stepsLib.includes(token),
+      "lib/pipeline-steps.js 必须保留 " + token + "（文件通道 + 编码损坏 fail-closed）");
+  }
+}
+console.log("PASS 契约机器可读入口（入口文档 ↔ run-all.ps1 -OutFile ↔ lib/pipeline-steps.js）一致性回归测试");
+
+// ---------- 10. 匹配键口径只有一种读法，且同一条规则只写一处 ----------
+// 背景：同一轮里规范一边声明"不枚举属性名"、一边给出取值例示，又在同步清单里要求"列举处须同步"，
+// 读法分叉；"覆盖审计看不到生成器"这条规则也在同一份 Skill 里写了两遍。CI 语义审计以 REVIEW 报出。
+// 这里把它们变成断言：改口径时必须同一批把这几处一起改。
+{
+  for (const phrase of ["不另行维护属性名清单", "不维护键种类清单", "不枚举属性名"]) {
+    assert.ok(!docFormat.includes(phrase),
+      "规范不得再写绝对化的「" + phrase + "」——键种类只以映射表为准、文中取值仅为例示，两者并存");
+  }
+  assert.ok(docFormat.includes("一律以映射表各族的 `match` 为准"),
+    "规范必须写明「键的种类/属性名一律以映射表各族的 match 为准」");
+  assert.ok(docFormat.includes("只为例示"),
+    "规范必须写明文中出现的键取值只为例示、须与映射表同步");
+  const generatorBlind = skillLines(docFormat).filter((line) => line.includes("看不到生成器"));
+  assert.strictEqual(generatorBlind.length, 1,
+    "「覆盖审计看不到生成器」只允许在同步清单第 1 项写完整一处、其余位置改成引用（当前 " +
+    generatorBlind.length + " 处）——同一条规则写两遍会被语义审计当冗余报出");
+}
+console.log("PASS 匹配键口径单读法 + 同一条规则单处陈述（mastergo-iocontrol-document-format/SKILL.md）");

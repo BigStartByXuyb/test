@@ -66,7 +66,7 @@ $TemplateMap = Join-Path $SkillRoot 'references\adapters\mtslg-iocontrol\mtslg-i
 
 # 步骤表：Id / 名称 / 说明 / 契约（输入 → 产物 → 失败 → 怎么修）。
 # 前置依赖由下方 switch（按步骤名硬编码）表达，这里不重复声明。
-    # 契约字段是「一键流水线」文档的唯一真值源：`-List -Format json -OutFile <文件>` 输出它们，
+# 契约字段是「一键流水线」文档的唯一真值源：`-List -Format json -OutFile <文件>` 输出它们，
 # references/adapters/mtslg-iocontrol/pipeline-contract.md 由 scripts/gen-pipeline-contract.mjs 生成，
 # 回归测试重新生成并比对——文档里的步骤表不再手写，避免"文档说一套、脚本做一套"。
 $Steps = @(

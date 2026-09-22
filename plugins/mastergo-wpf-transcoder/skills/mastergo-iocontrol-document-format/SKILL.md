@@ -48,7 +48,7 @@ description: 强制规范 MasterGo → MTSLG IOContorl 映射文档的写法，�
 
 组件集 ID、实例 ID、图层 ID 和设计师自定义名称只用于内部来源追踪，不参与唯一匹配。来源追踪信息用于读取证据、审计和回溯，默认不要作为“来源：MasterGo 文件……”等独立正文行写入飞书映射文档；只有全文已有同类来源字段或用户明确要求时才写入。文档里需要写明组件集的真实名称；不能只写“左右结构”“上下结构”这类缩写。
 
-**一个族一个键**：模板族实际用哪个键，登记在 `mtslg-iocontrol-map.json` 的 `match` 字段里，**一个模板族只登记一个键、解析时也只用一个**——键的种类以映射表各族的 `match` 为准（例如 `componentTemplates.match.property` = `属性 1`），本规范不维护键种类清单、也不枚举属性名。映射文档里每个族的“匹配规则”必须写明它用的是哪一种，并与映射表登记一致；不要写成“多个键任选其一”或“先按属性、取不到再按名字”这类多候选兜底。另一种键 `componentName: true`（按被引用组件的名字命中）只用于 Layout 层的底部栏，**不是组件模板族可用的键**。
+**一个族一个键**：模板族实际用哪个键，登记在 `mtslg-iocontrol-map.json` 的 `match` 字段里，**一个模板族只登记一个键、解析时也只用一个**——键的种类/属性名一律以映射表各族的 `match` 为准，本规范不另立清单；本节与「匹配键」一节出现的取值只为例示、须与映射表同步（例如 `componentTemplates.match.property` = `属性 1`）。映射文档里每个族的“匹配规则”必须写明它用的是哪一种，并与映射表登记一致；不要写成“多个键任选其一”或“先按属性、取不到再按名字”这类多候选兜底。另一种键 `componentName: true`（按被引用组件的名字命中）只用于 Layout 层的底部栏，**不是组件模板族可用的键**。
 
 **底部栏不属于本规范范围**：底部栏（`layoutRules.bottomBar`）是 Layout 层规则，按页面壳层 Layout 规范 `skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/feishu-layout-mapping.md` 里登记的 `layoutRules.bottomBar.match` 匹配（当前为 `componentName: true`——底部栏实例的属性里没有变体信息，变体值就是被引用组件的名字）。本规范只约束组件库映射文档，不得把底部栏按公开属性“属性 1”登记进组件库映射文档。
 
@@ -126,7 +126,7 @@ description: 强制规范 MasterGo → MTSLG IOContorl 映射文档的写法，�
 5. **版本号**：`.claude-plugin/plugin.json` 递增；不要在上一轮 CI 未结束时连续推送。
 6. **在线同步副本**：发版前把映射文档同步到对应的飞书在线文档（按标题检索定位、不写死地址、整篇重建并记录 revision）。同步工具是可选项、不是交付链路的运行依赖：本机没有该工具时，在交付说明里标注"在线文档未同步"即可，不阻塞本次改动。
 
-新增模板族时不必先判断它属于哪类写法：直接跑下面的覆盖审计，报告里的阻断字段 `unregisteredFamilies`、`unregisteredVariants`、`undocumented`、`duplicateMatchKeys` 会指出该族还差哪一项（映射表条目、映射文档条目，或文档里没用结构化写法写明），按报告补齐后再重跑，直到这四项全部为空；`unresolvedSections` 是同一问题的定位视图（孤儿章节），`labels` / `unconfirmed` 只是提示，都不单独阻断。覆盖审计只看「映射表 ↔ 映射文档」两侧，**看不到生成器那一侧**：这四项全空不等于新增族已完工，还要按第 1 项写出该族的发射分支并过 `template-family-coverage` 回归。
+新增模板族时不必先判断它属于哪类写法：直接跑下面的覆盖审计，报告里的阻断字段 `unregisteredFamilies`、`unregisteredVariants`、`undocumented`、`duplicateMatchKeys` 会指出该族还差哪一项（映射表条目、映射文档条目，或文档里没用结构化写法写明），按报告补齐后再重跑，直到这四项全部为空；`unresolvedSections` 是同一问题的定位视图（孤儿章节），`labels` / `unconfirmed` 只是提示，都不单独阻断。这四项全空**不代表**新增族已完工——生成器侧按第 1 项另跑族分支门禁。
 
 改完后按顺序自检，任何一步非零退出都必须修完再提交：
 
