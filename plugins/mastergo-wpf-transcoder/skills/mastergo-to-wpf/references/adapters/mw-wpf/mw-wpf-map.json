@@ -1,0 +1,182 @@
+{
+  "_meta": {
+    "source": "references/adapters/mw-wpf/mw-wpf-map.json",
+    "note": [
+      "作业A（mw-wpf）写法表：组件类型 → WPF/XAML 怎么写。",
+      "组件类型本身（设计稿组件集/变体 → ControlType）由共享类型表 references/component-types.json 唯一决定；本文件只登记「同一类型在 WPF 这一侧怎么写」，不重复类型判定。",
+      "element / styleKeys 取自框架手册 02-controls/<类别>/<条目>.md 的「声明」与「样式族表」（每条标注 manualEntry）；attrs 取自真实页面 ManualView.xaml（框架唯一 P2 业务页）与 AutoCutView.xaml（MaxWell.SLGPages 真实页面）。",
+      "status: ready = 手册与真实页面都有证据；manual-only = 有手册条目但真实页面未出现，首次生成需人工确认；pending = 手册无对应控件，遇到即挂待确认、不发射。"
+    ]
+  },
+  "variantRule": {
+    "note": "同一类型存在 IO 变体（绑 IO 点）与非 IO 变体时，MW 页面默认用 IO 变体：真实页面里输入/显示控件一律是 s:IOTextBox / s:IOComboBox / s:IOCheckBox / s:IOGroupBox。仅当设计稿该控件不绑 IO 点时用 native 变体。",
+    "ioPreferred": true
+  },
+  "controlTypes": {
+    "IconButton": {
+      "element": "s:IconButton",
+      "manualEntry": "02-controls/navigation/icon-button.md",
+      "styleKeys": [
+        "IconButtonBaseStyle", "MainButtonStyle", "BottomButtonSmallStyle", "BottomButtonStyle",
+        "GrayIconButtonStyle", "RightButtonStyle", "UpDownRightButtonStyle", "NormalRightButtonStyle", "ButtonIconStyle"
+      ],
+      "attrs": ["TopLeftContent", "Content", "Icon", "IconWidth", "IconText", "Style", "Background", "IOEnable", "IOVisible", "Click", "PageName"],
+      "layoutAttrs": ["Width", "Height", "Margin", "HorizontalAlignment", "VerticalAlignment", "Grid.Row", "Grid.Column", "Grid.RowSpan", "Grid.ColumnSpan"],
+      "protocols": ["Click={s:Action 动作名}", "PageName=\"Jump:…\"", "IOEnable=表达式|true", "IOVisible=表达式"],
+      "evidence": ["framework-manual/02-controls/navigation/icon-button.md", "ManualView.xaml（15 处）", "AutoCutView.xaml（6 处）"],
+      "status": "ready"
+    },
+    "StatusButton": {
+      "element": "s:StatusButton",
+      "manualEntry": "02-controls/navigation/status-button.md",
+      "styleKeys": ["StatusButtonBaseStyle", "（隐式默认样式）"],
+      "attrs": ["Value", "Style", "IOEnable", "IOVisible"],
+      "layoutAttrs": ["Width", "Height", "Margin", "Grid.Row", "Grid.Column", "Grid.RowSpan", "Grid.ColumnSpan"],
+      "protocols": ["IOEnable=表达式|true", "IOVisible=表达式"],
+      "evidence": ["framework-manual/02-controls/navigation/status-button.md"],
+      "status": "manual-only"
+    },
+    "Button": {
+      "element": "s:IOButton",
+      "manualEntry": "02-controls/io/io-button.md",
+      "styleKeys": ["（隐式默认样式，TargetType=controls:IOButton）"],
+      "attrs": ["Content", "Style", "IOEnable", "IOVisible", "Click", "PageName"],
+      "layoutAttrs": ["Width", "Height", "Margin", "Grid.Row", "Grid.Column"],
+      "protocols": ["Click={s:Action 动作名}", "PageName=\"Jump:…\"", "IOEnable=表达式|true"],
+      "evidence": ["framework-manual/02-controls/io/io-button.md"],
+      "status": "manual-only"
+    },
+    "CheckBox": {
+      "element": "CheckBox",
+      "ioVariant": "s:IOCheckBox",
+      "manualEntry": "02-controls/native/check-box.md",
+      "styleKeys": ["CheckBoxBaseStyle", "（隐式默认样式）"],
+      "attrs": ["IsChecked", "Content", "Style", "IOEnable", "IOVisible"],
+      "layoutAttrs": ["Width", "Height", "Margin", "HorizontalAlignment", "VerticalAlignment", "Grid.Row", "Grid.Column"],
+      "protocols": ["IOEnable=表达式|true", "IOVisible=表达式"],
+      "evidence": ["framework-manual/02-controls/native/check-box.md", "framework-manual/02-controls/io/io-check-box.md", "AutoCutView.xaml（s:IOCheckBox ×2）"],
+      "status": "ready"
+    },
+    "RadioButton": {
+      "element": "RadioButton",
+      "ioVariant": "s:IORadioButton",
+      "manualEntry": "02-controls/native/radio-button.md",
+      "styleKeys": ["RadioButtonBaseStyle", "MainMenuRadioButtonStyle", "RadioGroupItemBaseStyle"],
+      "attrs": ["Content", "GroupName", "IsChecked", "Style", "IOEnable", "IOVisible"],
+      "layoutAttrs": ["Width", "Height", "Margin", "Orientation", "Grid.Row", "Grid.Column"],
+      "protocols": ["IOEnable=表达式|true", "IOVisible=表达式"],
+      "evidence": ["framework-manual/02-controls/native/radio-button.md", "framework-manual/02-controls/io/io-radio-button.md"],
+      "status": "manual-only"
+    },
+    "Togglebutton": {
+      "element": "ToggleButton",
+      "ioVariant": "s:IOToggleButton",
+      "manualEntry": "02-controls/native/toggle-button.md",
+      "styleKeys": ["BaseToggleBtnStyle", "ToggleButtonGroupItemBaseStyle", "（ToggleButton 隐式默认）"],
+      "attrs": ["Content", "IsChecked", "Style", "IOEnable", "IOVisible"],
+      "layoutAttrs": ["Width", "Height", "Margin", "Grid.Row", "Grid.Column"],
+      "protocols": ["IOEnable=表达式|true", "IOVisible=表达式"],
+      "evidence": ["framework-manual/02-controls/native/toggle-button.md", "framework-manual/02-controls/io/io-toggle-button.md"],
+      "status": "manual-only"
+    },
+    "ComboBox": {
+      "element": "s:IOComboBox",
+      "nonIoVariant": "s:MultiComboBox",
+      "manualEntry": "02-controls/io/io-combo-box.md",
+      "styleKeys": ["IOComboBoxBaseStyle", "IOComboBoxToggleButton", "IOComboBoxItemBaseStyle", "IOComboBoxEditableTextBox"],
+      "attrs": ["ItemsSource", "SelectedIndex", "SelectedItem", "SelectedValuePath", "DisplayMemberPath", "s:TextBoxAttach.TagName", "Width", "HorizontalAlignment", "IsEditable"],
+      "layoutAttrs": ["Width", "Height", "Margin", "HorizontalAlignment", "VerticalAlignment", "Grid.Row", "Grid.Column", "Grid.RowSpan", "Grid.ColumnSpan"],
+      "protocols": ["IOEnable=表达式|true", "IOVisible=表达式", "i:Interaction.Triggers + i:InvokeCommandAction Command={Binding …Command}（选择变更一律 MVVM，禁代码后置）"],
+      "evidence": ["framework-manual/02-controls/io/io-combo-box.md", "framework-manual/02-controls/grid-tree/multi-combo-box.md", "AutoCutView.xaml（s:IOComboBox ×17，均带 TagName + Interaction.Triggers）"],
+      "status": "ready"
+    },
+    "TextBox": {
+      "element": "s:IOTextBox",
+      "nonIoVariant": "TextBox",
+      "manualEntry": "02-controls/io/io-text-box.md",
+      "styleKeys": ["IOTextBoxBaseStyle", "（隐式默认样式）"],
+      "attrs": ["IOName", "IOEnable", "IsAutoRead", "IsReadOnly", "Text", "Width", "Margin", "HorizontalAlignment", "VerticalAlignment"],
+      "layoutAttrs": ["Width", "Height", "Margin", "HorizontalAlignment", "VerticalAlignment", "Grid.Row", "Grid.Column", "Grid.RowSpan", "Grid.ColumnSpan"],
+      "protocols": ["只读点位：IOName=\"{x:Static …IOValueHelper.xxx}\" + IOEnable=\"false\" + IsAutoRead=\"True\"", "IOVisible=表达式"],
+      "evidence": ["framework-manual/02-controls/io/io-text-box.md", "framework-manual/02-controls/native/text-box.md", "AutoCutView.xaml（s:IOTextBox ×6，均为 IOName + IsAutoRead 只读点位）"],
+      "status": "ready"
+    },
+    "NumberBox": {
+      "element": "s:NumberBox",
+      "manualEntry": "02-controls/keypad-input/number-box.md",
+      "styleKeys": ["NumberBoxBaseStyle", "InputTextBoxBase", "UpdownButtonStyle", "LeftRightButtonStyle", "LeftRightButtonNumberBoxStyle"],
+      "attrs": ["Value", "Style", "controls:NumericKeypadAttach.IsEnabled", "IOEnable", "IOVisible"],
+      "layoutAttrs": ["Width", "Height", "Margin", "HorizontalAlignment", "VerticalAlignment", "Grid.Row", "Grid.Column"],
+      "protocols": ["IOEnable=表达式|true", "IOVisible=表达式"],
+      "evidence": ["framework-manual/02-controls/keypad-input/number-box.md"],
+      "status": "manual-only"
+    },
+    "IntNumberBox": {
+      "element": "s:IntNumberBox",
+      "manualEntry": "02-controls/keypad-input/int-number-box.md",
+      "styleKeys": ["IntNumberBoxBaseStyle", "LeftRightButtonIntNumberBoxStyle"],
+      "attrs": ["Value", "Style", "controls:NumericKeypadAttach.IsEnabled", "IOEnable", "IOVisible"],
+      "layoutAttrs": ["Width", "Height", "Margin", "HorizontalAlignment", "VerticalAlignment", "Grid.Row", "Grid.Column"],
+      "protocols": ["IOEnable=表达式|true", "IOVisible=表达式"],
+      "evidence": ["framework-manual/02-controls/keypad-input/int-number-box.md"],
+      "status": "manual-only"
+    },
+    "TextBlock": {
+      "element": "TextBlock",
+      "manualEntry": "02-controls/native/text-block.md",
+      "styleKeys": ["TextBlockStyle", "（隐式默认样式）"],
+      "attrs": ["Text", "Margin", "HorizontalAlignment", "VerticalAlignment", "FontWeight"],
+      "layoutAttrs": ["Margin", "HorizontalAlignment", "VerticalAlignment", "Grid.Row", "Grid.Column", "Grid.RowSpan", "Grid.ColumnSpan"],
+      "protocols": [],
+      "textRule": "文本一律 {DynamicResource <本页语言键>}，禁止硬编码中文（总则第 4 条）",
+      "evidence": ["framework-manual/02-controls/native/text-block.md", "AutoCutView.xaml（TextBlock ×27，全部 Text={DynamicResource}）"],
+      "status": "ready"
+    },
+    "DataGrid": {
+      "element": "DataGrid",
+      "ioVariant": "s:IODataGrid",
+      "manualEntry": "02-controls/grid-tree/data-grid.md",
+      "styleKeys": ["DataGridBaseStyle", "PrimaryDataGridStyle", "SecondaryDataGridStyle", "RowFreezableDataGridStyle"],
+      "attrs": ["ItemsSource", "AutoGenerateColumns", "CanUserAddRows", "SelectionMode", "Style"],
+      "layoutAttrs": ["Width", "Height", "Margin", "Grid.Row", "Grid.Column", "Grid.RowSpan", "Grid.ColumnSpan"],
+      "protocols": ["IOEnable=表达式|true", "IOVisible=表达式"],
+      "tableRule": "列定义来自共享类型表的表族 columnControlTypePolicy；列控件类型仍由共享类型决定，本表只登记列单元格控件怎么写（TextBlock → Text={DynamicResource}）",
+      "evidence": ["framework-manual/02-controls/grid-tree/data-grid.md", "framework-manual/02-controls/io/io-data-grid.md"],
+      "status": "manual-only"
+    },
+    "GroupBox": {
+      "element": "s:IOGroupBox",
+      "nonIoVariant": "GroupBox",
+      "manualEntry": "02-controls/io/io-group-box.md",
+      "styleKeys": ["IOGroupBoxBaseStyle", "IOGroupBoxSecondary", "IOGroupBoxThirdly", "IOGroupBoxFour", "ContentGroupBoxStyle"],
+      "attrs": ["Header", "IOEnable", "IOVisible", "Margin", "Style"],
+      "layoutAttrs": ["Margin", "HorizontalAlignment", "VerticalAlignment", "Grid.Row", "Grid.Column", "Grid.RowSpan", "Grid.ColumnSpan"],
+      "protocols": ["IOEnable=表达式|true", "IOVisible=表达式"],
+      "variantRule": "分组需要设备联锁/条件显隐（IOEnable / IOVisible）→ s:IOGroupBox；纯视觉分组 → 原生 GroupBox（两者 AutoCutView 都在用：IOGroupBox ×9、GroupBox ×2）",
+      "evidence": ["framework-manual/02-controls/io/io-group-box.md", "framework-manual/02-controls/native/group-box.md", "AutoCutView.xaml（s:IOGroupBox ×9、GroupBox ×2）"],
+      "status": "ready"
+    },
+    "Border": {
+      "element": null,
+      "manualEntry": "02-controls/attached-props/border-element.md",
+      "styleKeys": [],
+      "attrs": [],
+      "layoutAttrs": [],
+      "protocols": [],
+      "evidence": ["framework-manual/02-controls/attached-props/border-element.md"],
+      "status": "pending",
+      "note": "A 侧没有 Border 控件：框架把它做成附加属性 controls:BorderElement.*（作用在承载元素上）。共享类型表把它判为 Border 的实例，A 发射前必须由人工确认落到哪个承载元素，禁止自行挑一个控件承载。"
+    },
+    "Camera": {
+      "element": null,
+      "manualEntry": null,
+      "styleKeys": [],
+      "attrs": [],
+      "layoutAttrs": [],
+      "protocols": [],
+      "evidence": ["共享类型表 cameraTemplates.controlType=Camera（9 个变体）", "framework-manual/02-controls/ 无 Camera 条目"],
+      "status": "pending",
+      "note": "A 侧框架手册没有 Camera 条目；相机画面属框架封装能力之外，发射前必须由人工确认对应控件，禁止用 IOImage 之类近似控件顶替（总则第 6 条：框架没有的控件先问用户）。"
+    }
+  }
+}
