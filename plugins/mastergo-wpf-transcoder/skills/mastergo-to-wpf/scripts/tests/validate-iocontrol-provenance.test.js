@@ -436,3 +436,27 @@ assert.ok(!tableOk.errors.some(x => /缺少必写属性 Style/.test(x)),
   '列定义是列结构，不得按页面控件的必写字段集校验');
 
 console.log('PASS provenance table-column regression test');
+
+// ---- contentOriginY 门禁不得被 falsy 兜底绕过：显式 0 必须失败 ----
+// 背景：`(manifest.contentOrigin && manifest.contentOrigin.y) || 192` 会把非法的
+// contentOrigin:{y:0} 换成 192 静默放行（fail-open），而 0 恰恰是唯一被 falsy 吞掉的非法值。
+{
+  const base = JSON.parse(fs.readFileSync(cliMappingPath, 'utf8'));
+  const runOriginCase = (name, mutate) => {
+    const mapping = JSON.parse(JSON.stringify(base));
+    mutate(mapping);
+    const file = path.join(dir, 'origin-' + name + '.json');
+    fs.writeFileSync(file, JSON.stringify(mapping, null, 2));
+    return spawnSync(process.execPath, [cliScript, '--xml', cliXmlPath, '--mapping', file], { encoding: 'utf8' });
+  };
+  const nestedZero = runOriginCase('nested-zero', (m) => { delete m.contentOriginY; m.contentOrigin = { x: 0, y: 0 }; });
+  assert.notStrictEqual(nestedZero.status, 0, '显式 contentOrigin:{y:0} 必须失败（不能被 || 192 兜底放行）');
+  assert.match(nestedZero.stderr + nestedZero.stdout, /contentOriginY 必须固定为 192/);
+  const nestedHundred = runOriginCase('nested-hundred', (m) => { delete m.contentOriginY; m.contentOrigin = { x: 0, y: 100 }; });
+  assert.notStrictEqual(nestedHundred.status, 0, 'contentOrigin:{y:100} 必须失败');
+  const flatZero = runOriginCase('flat-zero', (m) => { m.contentOriginY = 0; });
+  assert.notStrictEqual(flatZero.status, 0, 'contentOriginY: 0 必须失败');
+  const absent = runOriginCase('absent', (m) => { delete m.contentOriginY; delete m.contentOrigin; });
+  assert.strictEqual(absent.status, 0, '完全没给 contentOriginY 时按默认 192 放行（唯一允许的兜底）: ' + absent.stderr);
+  console.log('PASS provenance contentOrigin fail-closed regression test');
+}

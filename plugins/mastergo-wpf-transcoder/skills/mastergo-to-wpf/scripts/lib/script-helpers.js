@@ -103,6 +103,29 @@ function numberOrNull(value) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+// 输出父容器的坐标原点（**全仓唯一实现**，口径见 mtslg-mode.md 第 3 节「子控件坐标相对父容器的内容区原点」）：
+//   根级节点 → (0, 192)：顶层公共栏 126 + 示例标题 66 只在根级扣一次；
+//   嵌套节点 → 父容器 pageAbs + 容器内容区 inset（两段式容器 GroupBox 的标题条/边框，来自 infoGroupTemplates.styleInsets）。
+// 两条硬口径（都是踩过的坑，别再退回）：
+//   ① 0 是合法坐标：禁止 `Number(x) || 192` 这类 falsy 兜底——它会把贴页面顶边的父容器算成 192，
+//      让生成器与坐标核对器对同一份 mapping 得出相差 192 的原点（`|| 0` 与 `|| 192` 两处曾不一致）；
+//   ② 取不到父容器 pageAbs（undefined/null/非数值）时返回 null —— 由调用方按「不猜原点」fail-closed，
+//      不要在这里猜一个默认值。
+function outputOrigin(options) {
+  const opts = options || {};
+  if (opts.parentIsRoot) return { x: 0, y: 192 };
+  const parentX = numberOrNull(opts.parentPageAbsX);
+  const parentY = numberOrNull(opts.parentPageAbsY);
+  if (typeof parentX !== "number" || typeof parentY !== "number") return null;
+  const inset = opts.inset || null;
+  const insetX = numberOrNull(inset ? inset.left : null);
+  const insetY = numberOrNull(inset ? inset.top : null);
+  return {
+    x: parentX + (typeof insetX === "number" ? insetX : 0),
+    y: parentY + (typeof insetY === "number" ? insetY : 0)
+  };
+}
+
 // 读 JSON：失败信息带调用方给的 label，便于定位是哪个输入坏了。
 function readJson(filePath, label) {
   try {
@@ -199,6 +222,7 @@ module.exports = {
   xmlElementText: xmlElementText,
   normalizeToken: normalizeToken,
   numberOrNull: numberOrNull,
+  outputOrigin: outputOrigin,
   readJson: readJson,
   omittedAttrs: omittedAttrs,
   backupFile: backupFile,

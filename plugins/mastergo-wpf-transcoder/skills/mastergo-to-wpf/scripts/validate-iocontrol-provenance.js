@@ -182,9 +182,13 @@ function validate(xmlPath, manifestPath, options) {
     return { ok: false, errors: ['映射清单缺少 sourceNodes：不能证明 mapping 本身来自真实 DSL'] };
   }
   const sourceMap = new Map(manifest.sourceNodes.map(n => [n.ref, n]));
-  const originY = Number(manifest.contentOriginY !== undefined
+  // 兜底只在"字段完全没给"（undefined/null）时发生，不能把显式的 0 换成 192：
+  // `(x || 192)` 会让非法的 contentOrigin:{y:0} 静默通过本门禁（fail-open），
+  // 而 0 恰恰是唯一会被 falsy 兜底吞掉的非法值。
+  const declaredOriginY = manifest.contentOriginY !== undefined && manifest.contentOriginY !== null
     ? manifest.contentOriginY
-    : (manifest.contentOrigin && manifest.contentOrigin.y) || 192);
+    : (manifest.contentOrigin ? manifest.contentOrigin.y : undefined);
+  const originY = Number(declaredOriginY === undefined || declaredOriginY === null ? 192 : declaredOriginY);
   if (originY !== 192) {
     errors.push('contentOriginY 必须固定为 192');
     return { ok: false, errors };

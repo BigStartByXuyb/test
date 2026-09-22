@@ -44,7 +44,7 @@ function pageLangPaths(pageName, locales) {
 }
 
 // 跨脚本共用工具的唯一实现（见 scripts/lib/script-helpers.js；禁止在本脚本再抄一份）。
-const { fail, xmlAttr, readJson, backupFile } = require(path.join(SCRIPT_DIR, "lib", "script-helpers.js"));
+const { fail, xmlAttr, readJson, backupFile, outputOrigin } = require(path.join(SCRIPT_DIR, "lib", "script-helpers.js"));
 const { inferHostPaths } = require(path.join(SCRIPT_DIR, "lib", "project-csproj.js"));
 // 运行登记表的唯一实现（见 scripts/lib/run-registry.js；禁止在本脚本再抄一份）。
 const RUN_REGISTRY = require(path.join(SCRIPT_DIR, "lib", "run-registry.js"));
@@ -746,9 +746,21 @@ function validateBundleOutputs(info) {
       // （mapping 节点的 contentInset，来自映射表 infoGroupTemplates.styleInsets）。与生成器、校验器同口径。
       const parentNode = outputParentRef ? nodeByRef.get(outputParentRef) : null;
       const parentInset = !parentIsRoot && parentNode && parentNode.contentInset ? parentNode.contentInset : null;
-      const originX = (parentSource ? (Number(parentSource.pageAbsX) || 0) : 0) + (parentInset ? (Number(parentInset.left) || 0) : 0);
-      const originY = (parentIsRoot ? 192 : (parentSource ? (Number(parentSource.pageAbsY) || 0) : 192)) +
-        (parentInset ? (Number(parentInset.top) || 0) : 0);
+      // 原点口径的唯一实现在 lib/script-helpers.js（outputOrigin）：0 是合法坐标（`|| 192` 会把它吞掉，
+      // 让生成器与坐标核对器对同一份 mapping 得出相差 192 的原点）；取不到父容器 pageAbs 时
+      // 按 mtslg-mode.md 第 3 节「不猜原点」直接失败，不做 falsy 兜底。
+      const origin = outputOrigin({
+        parentIsRoot: parentIsRoot,
+        parentPageAbsX: parentSource ? parentSource.pageAbsX : null,
+        parentPageAbsY: parentSource ? parentSource.pageAbsY : null,
+        inset: parentInset
+      });
+      if (!origin) {
+        fail("无法确定输出父容器原点：节点 " + (node.ref || node.id || node.sourceRef) + " 的输出父容器 " +
+          outputParentRef + " 缺少 pageAbsX/pageAbsY（不能猜原点）");
+      }
+      const originX = origin.x;
+      const originY = origin.y;
       const isTextBlock = (node.controlType || (node.attrs && node.attrs.ControlType)) === "TextBlock";
       // 表格列定义（nodeKind=table-column）按映射表 columnTemplate 固定几何发射：Left=0 / Top=0 /
       // Height=45、不写 Width。核对输入的 x/y 因此取「父容器原点」本身，w 传 "NaN"（与 XML 无 Width 对应）。
