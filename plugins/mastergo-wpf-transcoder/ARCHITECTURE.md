@@ -159,7 +159,7 @@ DSL/mapping 文案 ──► 英文等译文由 AI 产出 translations 清单并
 
 | 需求 | 改哪里 |
 |---|---|
-| 新增组件/变体模板 | 按 `skills/mastergo-iocontrol-document-format/SKILL.md` 的「新增/修改映射的同步清单」整批完成：映射表 + 映射文档（变体必须写成 `MasterGo 变体：…` 或 `### 固定模板：…` 标题，审计按这些结构化写法解析）+ 回归用例，最后跑覆盖审计与全量回归（`unregisteredFamilies` / `unregisteredVariants` / `undocumented` 任一非空都会被拦下） |
+| 新增组件/变体模板 | 按 `skills/mastergo-iocontrol-document-format/SKILL.md` 的「新增/修改映射的同步清单」整批完成：映射表 + 映射文档（变体必须写成 `MasterGo 变体：…` 或 `### 固定模板：…` 标题，审计按这些结构化写法解析）+ 回归用例，最后跑覆盖审计与全量回归（哪些审计字段会拦下改动，以 `audit-mtslg-feishu-map.js` 的退出判据为唯一真值源，本表不复制清单） |
 | 新增控件类型的固定字段 | `controlTypeRequiredAttrs`（+ `controlTypeAttrDefaults`）；发射与校验自动跟随 |
 | 新增页面 | 写 bundle 输入清单（`dslPath`/`visibilityPath`/`iconMapPath`/`menuItems`…）→ 跑 `gen-mastergo-page-bundle.js` |
 | 新增语言 | manifest 的 `languages.locales` + 对应译文清单 |

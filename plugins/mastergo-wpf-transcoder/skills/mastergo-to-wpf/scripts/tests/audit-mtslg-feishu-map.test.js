@@ -65,6 +65,12 @@ assert.ok(!branch.unregisteredVariants.includes("右栏图标+文案"),
   "结构分支名不得被当成变体值报错: " + JSON.stringify(branch.unregisteredVariants));
 assert.ok(branch.documented.labels.includes("右栏图标+文案"), "结构分支名必须归入 labels");
 
+// ⑤ 历史文档允许保留的 `父节点=` 标题同理（文档组织维度，不是变体值）
+const docWithParent = doc + "\n## 历史父节点标题示例\n\n### 固定模板：父节点=左标题+右信息\n\n历史写法。\n";
+const parent = auditMappingCoverage(docWithParent, templateMap);
+assert.ok(!parent.unregisteredVariants.includes("左标题+右信息"),
+  "父节点语义名不得被当成变体值报错: " + JSON.stringify(parent.unregisteredVariants));
+
 assert.ok(!doc.includes("RightUpDownButtonStyle"), "不得保留旧的 RightUpDownButtonStyle 兼容别名");
 assert.ok(!doc.includes("或其他实际变量值"), "按钮模板必须使用明确的 startstop 变体");
 assert.ok(doc.includes("40/36/32/28"), "高度规则必须包含 28 变体");
