@@ -704,7 +704,9 @@ function validateBundleOutputs(info) {
   if (!/<Layout\b/.test(layout)) {
     fail("Layout.xml 格式无效: " + info.layoutPath);
   }
-  if (info.layoutStatus !== "none" && !new RegExp("<Page\\s+[^>]*Target=[\\\"']" +
+  // 对所有 layoutStatus 一视同仁：none 的页面同样要注册（Menu 为空），
+  // 与 gen-mtslg-layout.js 的注册路径、verify-page.ps1 的"必须有本页注册"保持一致。
+  if (!new RegExp("<Page\\s+[^>]*Target=[\\\"']" +
     String(info.pageTarget).replace(/[\\^$.*+?()[\]{}|]/g, "\\$&") + "[\\\"']", "i").test(layout)) {
     fail("Layout.xml 缺少当前页面注册: " + info.pageTarget);
   }

@@ -134,7 +134,7 @@ Bundle **不会**把新页面的文件写进 `.csproj`（实测 `csprojChanged=F
 
 **硬规则**
 
-**本页现状摘要**（`Generated/<Target>.summary.json`）：上面这条契约的机器可读投影，由 `run-all.ps1` 每步成功后刷新（`scripts/build-run-summary.mjs`）。需要了解本页现状时读它，不要为了盘点现状再手写探针去数产物——它给身份、控件构成、`todos`（需人工/AI 动作）、`notices`（状态说明）、图标候选与台账、布局、产出清单，并在 `sources` 里逐项写明来源路径与产出步骤。它是**派生视图**：内容随每次刷新变化，因此不写回登记表，任何条目都与登记表同源同规则——未登记的一律不取，条目在消费时按登记 sha256 复校（不符即整次失败），取不到的无论登记产物还是页面产出都记进 `unavailable` 而不是记 0。
+**本页现状摘要**（`Generated/<Target>.summary.json`）：上面这条契约的机器可读投影，由 `run-all.ps1` 每步成功后刷新（`scripts/build-run-summary.mjs`）。需要了解本页现状时读它，不要为了盘点现状再手写探针去数产物——它给身份、控件构成、`todos`（需人工/AI 动作）、`notices`（状态说明）、图标候选与台账、布局、产出清单，并在 `sources` 里逐项写明来源路径与产出步骤。它是**派生视图**：内容随每次刷新变化，因此不写回登记表，任何条目都与登记表同源同规则——未登记的一律不取，条目在消费时按登记 sha256 复校（不符即整次失败），而**本次尝试读取**的条目（登记产物或页面产出）取不到时一并记进 `unavailable`（带 `layer` 区分），而不是记 0。
 
 1. **产出即登记**：`run-all.ps1` 每一步成功后就登记该步产物（`run-registry.mjs artifact`）；中途失败也把该步状态写进 `steps`。
 2. **消费只按登记**：`build-bundle-manifest.mjs <…> <area> --run-json <run.json>` 从登记表取 `snapshot` / `visibility` / `extractSvg`，并把 `sha256` 写进清单 `runRegistry.digests`；Bundle 读清单时**复校**：路径按登记表解析、`sha256` 与 `digests` 一致、`runId` 一致。**`--run-json` 是必填**——缺了直接报错，不再回落到顶层 `Generated/*.json`（`area` 同理必填，推导只在 run-all.ps1 里做一次）。

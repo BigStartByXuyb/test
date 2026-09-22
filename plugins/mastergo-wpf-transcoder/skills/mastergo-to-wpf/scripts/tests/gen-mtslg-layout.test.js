@@ -86,6 +86,42 @@ fs.writeFileSync(emptyNoneManifest, JSON.stringify({
 result = spawnSync(process.execPath, [script, "--manifest", emptyNoneManifest], { encoding: "utf8" });
 assert.strictEqual(result.status, 0, result.stderr);
 
+// layoutStatus=none 且 Layout.xml 已存在（登记着别的页面）：必须与 complete 走同一条注册路径
+// ——插入本页的 <Page>（Menu 为空），而不是「保留原文件、不注册」。
+// 跳过注册会让同一个 none 状态随 Layout.xml 是否存在而分叉（不存在时反而注册），
+// 而 verify-page 要求本页必须有 <Page> 注册 → 这类页面过了 bundle 却在第 12 步失败。
+const noneExistingLayout = path.join(root, "NoneExistingLayout.xml");
+fs.writeFileSync(noneExistingLayout, [
+  "<Layout>",
+  "  <Body>",
+  "    <Pages>",
+  "      <Page Target=\"OtherPage\" LangName=\"OtherPageTitle\">",
+  "        <Menu>",
+  "        </Menu>",
+  "      </Page>",
+  "    </Pages>",
+  "  </Body>",
+  "</Layout>",
+  ""
+].join("\n"), "utf8");
+const noneExistingManifest = path.join(root, "none-existing.json");
+fs.writeFileSync(noneExistingManifest, JSON.stringify({
+  layoutPath: noneExistingLayout,
+  pageTarget: "NoMenuPageExisting",
+  pageLangName: "NoMenuPageExistingTitle",
+  layoutStatus: "none",
+  layoutEvidence: { matchedBottomBarItems: 0, unresolvedBottomBarItems: 0, residentGroupItems: 0 },
+  menuItems: []
+}, null, 2), "utf8");
+result = spawnSync(process.execPath, [script, "--manifest", noneExistingManifest], { encoding: "utf8" });
+assert.strictEqual(result.status, 0, result.stderr);
+text = fs.readFileSync(noneExistingLayout, "utf8");
+assert.match(text, /Target="OtherPage"/, "既有页面必须原样保留");
+assert.match(text, /<Page Target="NoMenuPageExisting" LangName="NoMenuPageExistingTitle">/,
+  "none 页面同样必须注册本页 <Page>");
+assert.match(text, /<Page Target="NoMenuPageExisting"[\s\S]*?<Menu>\s*<\/Menu>/,
+  "none 页面注册时 Menu 必须为空");
+
 fs.writeFileSync(layout, [
   "<Layout>",
   "  <Page Target=\"ExistingPage\"><Menu><MenuItem Name=\"旧页面\" Index=\"9\" /></Menu></Page>",

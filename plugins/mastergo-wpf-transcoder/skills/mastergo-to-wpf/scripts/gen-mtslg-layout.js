@@ -333,11 +333,10 @@ function main() {
     output = renderNewLayout(manifest, page);
   } else {
     const existing = fs.readFileSync(layoutPath, "utf8");
-    if (manifest.layoutStatus === "none") {
-      // No Layout mapping for this page: preserve the existing host Layout
-      // instead of replacing an existing Page with an empty Menu.
-      output = existing;
-    } else {
+    // layoutStatus=none（本页既无菜单项、也无右下角常驻分组）与 complete 走同一条注册路径：
+    // 都写 <Page ...><Menu/></Page>，none 时 Menu 为空。原先对 none「保留原文件、不注册」会让
+    // 同一个状态随 Layout.xml 是否存在而分叉（新建时注册、已存在时不注册），
+    // 而 verify-page 要求本页必须有 <Page> 注册 → 这类页面跑不完流水线。
     const targetPattern = new RegExp("<Page\\s+[^>]*Target=[\"']" +
       xmlAttr(manifest.pageTarget).replace(/[\\^$.*+?()[\]{}|]/g, "\\$&") + "[\"']", "i");
     if (targetPattern.test(existing)) {
@@ -357,7 +356,6 @@ function main() {
     } else {
       output = insertNewPage(existing, page, manifest.pageTarget);
       backup = backupFile(layoutPath);
-    }
     }
   }
 

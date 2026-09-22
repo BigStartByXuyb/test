@@ -238,7 +238,12 @@ function main() {
   if (confirmedNotLedger.length) todos.push({ kind: "icons.confirmedNotInLedger", count: confirmedNotLedger.length });
   if (nesting && count(nesting.conflicts)) todos.push({ kind: "nesting.conflicts", count: count(nesting.conflicts) });
   if (layoutEvidence && layoutEvidence.unresolvedBottomBarItems) todos.push({ kind: "layout.unresolvedBottomBarItems", count: layoutEvidence.unresolvedBottomBarItems });
-  if (layout && layout.layoutStatus === "none") notices.push({ kind: "layout.status", note: "本页无底部栏（layoutStatus=none），这是合法终态，无需动作" });
+  if (layout && layout.layoutStatus === "none") {
+    notices.push({
+      kind: "layout.status",
+      note: "layoutStatus=none：本页既没有菜单项、也没有右下角常驻分组（推导条件 menuItems + residentGroupItems === 0），Layout.xml 里以空 <Menu> 注册本页；这是合法终态，无需动作"
+    });
+  }
   // 台账与页面图标字典的差集不是「缺图标」：部分几何由框架级资源字典提供（EXIT / ENTER 全项目从不定义
   // 却普遍被页面 Icon 引用）。只报差集并要求人工确认，不替框架断定原因。
   if (ledgerNotInPageIcons && ledgerNotInPageIcons.length) {
