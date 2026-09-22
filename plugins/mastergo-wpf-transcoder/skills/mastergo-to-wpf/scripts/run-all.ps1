@@ -106,8 +106,8 @@ $Steps = @(
         # 草稿 mapping 只有 componentInstances（没有 resolvedTemplates），登记判据按与解析器同一份
         # 判据从中取变体；两种形状都要支持，否则第 6 步的结论会全落到位置兜底。
         Outputs  = @('Generated/_inputs/<Target>.icon-candidates.json（待命名清单：候选下标/归属控件/层名/尺寸/registration 登记结论）', 'mustName：命名表必须恰好覆盖的候选下标（= registration.register=true）')
-        Failures = @('缺 svg / mapping / 映射表（前置步骤未跑）', '登记判据缺依据：registration.basis=unregistered-variant（映射表缺登记该变体）或 variant-without-icon-policy（变体已登记但漏登记 iconPolicy）')
-        Recovery = @('先补跑前置步骤，再重跑：-Progress discover；登记结论由 discover 机械判定（判据实现 scripts/lib/icon-registration-policy.js），不要回文档自行推断。两种"判据缺依据"按 registration.source 分头修——缺变体补变体、缺 iconPolicy 补字段（同步清单见 references/adapters/mtslg-iocontrol），改完重跑 -Progress mapping')
+        Failures = @('缺 svg / mapping / 映射表（前置步骤未跑）', '登记判据缺依据（registration.basis 的取值以判据实现 scripts/lib/icon-registration-policy.js 为准：变体未登记，或变体已登记但漏登记 iconPolicy）')
+        Recovery = @('先补跑前置步骤，再重跑：-Progress discover；登记结论由 discover 机械判定（判据实现 scripts/lib/icon-registration-policy.js），不要回文档自行推断。遇"登记判据缺依据"按 registration.source 分头修——缺变体补变体、缺 iconPolicy 补字段（整批同步清单见 skills/mastergo-iocontrol-document-format/SKILL.md 的「新增/修改映射的同步清单」），改完重跑 -Progress mapping')
     },
     [pscustomobject]@{
         Id = 7; Name = 'ledger'; Title = '由命名表生成图标台账 + 图标几何来源核对'

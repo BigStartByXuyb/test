@@ -116,9 +116,9 @@ pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -ProjectRoot <项目> -Target 
   - mustName：命名表必须恰好覆盖的候选下标（= registration.register=true）
 - **失败语义**：
   - 缺 svg / mapping / 映射表（前置步骤未跑）
-  - 登记判据缺依据：registration.basis=unregistered-variant（映射表缺登记该变体）或 variant-without-icon-policy（变体已登记但漏登记 iconPolicy）
+  - 登记判据缺依据（registration.basis 的取值以判据实现 scripts/lib/icon-registration-policy.js 为准：变体未登记，或变体已登记但漏登记 iconPolicy）
 - **怎么修**：
-  - 先补跑前置步骤，再重跑：-Progress discover；登记结论由 discover 机械判定（判据实现 scripts/lib/icon-registration-policy.js），不要回文档自行推断。两种"判据缺依据"按 registration.source 分头修——缺变体补变体、缺 iconPolicy 补字段（同步清单见 references/adapters/mtslg-iocontrol），改完重跑 -Progress mapping
+  - 先补跑前置步骤，再重跑：-Progress discover；登记结论由 discover 机械判定（判据实现 scripts/lib/icon-registration-policy.js），不要回文档自行推断。遇"登记判据缺依据"按 registration.source 分头修——缺变体补变体、缺 iconPolicy 补字段（整批同步清单见 skills/mastergo-iocontrol-document-format/SKILL.md 的「新增/修改映射的同步清单」），改完重跑 -Progress mapping
 
 ### 7. `ledger` —— 由命名表生成图标台账 + 图标几何来源核对
 
