@@ -14,6 +14,7 @@
 const assert = require("assert");
 const fs = require("fs");
 const path = require("path");
+const { loadTemplateMap } = require(path.join(__dirname, "..", "lib", "load-template-map.js"));
 
 const SCRIPTS = path.join(__dirname, "..");
 const GENERATOR = path.join(SCRIPTS, "adapters", "mtslg-iocontrol", "gen-mtslg-mapping-from-dsl.js");
@@ -22,7 +23,7 @@ const MAP = path.join(SCRIPTS, "..", "references", "adapters", "mtslg-iocontrol"
 const FALLBACK_FAMILY = "componentTemplates";
 
 const generatorSource = fs.readFileSync(GENERATOR, "utf8");
-const templateMap = JSON.parse(fs.readFileSync(MAP, "utf8"));
+const templateMap = loadTemplateMap(MAP);
 
 // 1) 读登记表（生成器里的 `const SUPPORTED_TEMPLATE_FAMILIES = [ ... ];`）。
 const declared = generatorSource.match(/const SUPPORTED_TEMPLATE_FAMILIES = \[([\s\S]*?)\];/);

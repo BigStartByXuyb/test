@@ -5,6 +5,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
+const { loadTemplateMap } = require(path.join(__dirname, '..', 'lib', 'load-template-map.js'));
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mastergo-mtslg-mapping-'));
 const dslPath = path.join(dir, 'dsl.snapshot.json');
@@ -864,7 +865,7 @@ function runMappingCaseExpectFailure(name, templateMapDoc) {
   ], { encoding: 'utf8' });
 }
 
-const templateMapDoc = JSON.parse(fs.readFileSync(templateMap, 'utf8'));
+const templateMapDoc = loadTemplateMap(templateMap);
 const unsupportedFamily = JSON.parse(JSON.stringify(templateMapDoc));
 unsupportedFamily.componentTemplates.variants[Object.keys(unsupportedFamily.componentTemplates.variants)[0]]
   .slots[0].langRefPolicy = 'none';

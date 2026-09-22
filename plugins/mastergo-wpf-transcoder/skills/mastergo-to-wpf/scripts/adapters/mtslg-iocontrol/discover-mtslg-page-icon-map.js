@@ -50,6 +50,8 @@ const fs = require("fs");
 const path = require("path");
 // 跨脚本共用工具的唯一实现（见 scripts/lib/script-helpers.js；禁止在本脚本再抄一份）。
 const { readJson } = require(path.join(__dirname, "..", "..", "lib", "script-helpers.js"));
+// 映射表读取的唯一实现（含共享类型域的 extends 合并）
+const { loadTemplateMap } = require(path.join(__dirname, "..", "..", "lib", "load-template-map.js"));
 // 图标归属判据的唯一实现（见 scripts/adapters/mtslg-iocontrol/lib/icon-ownership.js；禁止在本脚本再抄一份）。
 const ICON_OWNERSHIP = require(path.join(__dirname, "lib", "icon-ownership.js"));
 // 登记判据的唯一实现（见 scripts/adapters/mtslg-iocontrol/lib/icon-registration-policy.js；禁止在本脚本再抄一份）。
@@ -150,7 +152,7 @@ function main() {
   const svgData = readJson(input.svg, "extractSvg JSON");
   const mapping = readJson(input.mapping, "page mapping JSON");
   const confirmed = input.confirmed ? readJson(input.confirmed, "confirmed page icon map") : { icons: [] };
-  const templateMap = readJson(input["template-map"], "mtslg-iocontrol map");
+const templateMap = loadTemplateMap(input["template-map"]);
   const snapshot = input.dsl ? readJson(input.dsl, "DSL snapshot") : null;
   const dslIndex = snapshot ? ICON_REGISTRATION.buildDslIndex(snapshot) : null;
   // 登记结论依赖真实节点树：只有 Bundle 在 manifest 未提供 dslPath（续用旧台账）时会不传 --dsl，

@@ -6,6 +6,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { spawnSync } = require("child_process");
+const { loadTemplateMap } = require(path.join(__dirname, "..", "lib", "load-template-map.js"));
 
 const script = path.join(__dirname, "..", "adapters/mtslg-iocontrol", "gen-mtslg-layout.js");
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "mtslg-layout-"));
@@ -457,13 +458,14 @@ assert.match(text, /IsShowStatus="true" IsNeedRedMark="true"/,
 // 真值源回归锁：模板表（mtslg-iocontrol-map.json）与脚本内置默认必须一致，
 // 且右栏“父节点语义（parentVariants）”建模必须保持作废状态。
 const realMapPath = path.resolve(__dirname, "..", "..", "references", "adapters", "mtslg-iocontrol", "mtslg-iocontrol-map.json");
-const realMap = JSON.parse(fs.readFileSync(realMapPath, "utf8"));
+const realMap = loadTemplateMap(realMapPath);
 assert.deepStrictEqual(
   realMap.layoutRules.bottomBar.menuItemAlwaysWrittenAttrs,
   ["LangName", "PageName", "IOCommand", "IOVisible", "IOEnable"],
   "MenuItem 常驻属性表必须与页面 XML 按钮族同策略（含 IOEnable）"
 );
-const mapText = fs.readFileSync(realMapPath, "utf8");
+// 覆盖共享类型表与路由映射表两个文件（拆分后单看路由文件会漏判）
+const mapText = JSON.stringify(realMap);
 assert.strictEqual(mapText.indexOf("parentVariants"), -1, "右栏 parentVariants 建模必须保持作废");
 assert.strictEqual(mapText.indexOf("父节点语义"), -1, "映射表不得再出现“父节点语义”匹配层");
 

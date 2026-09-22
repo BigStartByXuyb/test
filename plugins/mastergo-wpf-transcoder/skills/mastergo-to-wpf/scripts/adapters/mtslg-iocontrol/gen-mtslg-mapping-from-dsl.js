@@ -10,6 +10,8 @@ const fs = require("fs");
 const path = require("path");
 // 页面节点 ID 口径的唯一真值源在 lib/page-node-id.js；本文件的 allocateId 只是它的调用点（先查重再转调）。
 const PAGE_NODE_ID = require(path.join(__dirname, "..", "..", "lib", "page-node-id.js"));
+// 映射表读取的唯一实现（含共享类型域的 extends 合并）
+const { loadTemplateMap } = require(path.join(__dirname, "..", "..", "lib", "load-template-map.js"));
 // 跨脚本共用工具的唯一实现（见 scripts/lib/script-helpers.js；禁止在本脚本再抄一份）。
 const { readJson, normalizeToken: normalize, normalizeNewlines,
   parentOuterRightEdge, textBlockLeftValue
@@ -57,7 +59,7 @@ function textOf(node) {
 
 const dslSnapshot = readJson(required("--dsl"), "DSL snapshot");
 const visibility = readJson(required("--visibility"), "visibility");
-const templateMap = readJson(required("--template-map"), "template map");
+const templateMap = loadTemplateMap(required("--template-map"));
 // 按钮族清单的真值来源是映射表 buttonFamily.controlTypes；表中缺字段时退回内置默认（与表内容一致），
 // 与 gen-iocontrol-xml.js 的 loadButtonFamilyRules() 同口径。Bundle 也会把表里的清单传给语言键派生器。
 const buttonFamilyControlTypes = new Set(

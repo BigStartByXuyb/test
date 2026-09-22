@@ -36,6 +36,8 @@ const path = require('path');
 const { readJson, failAndExit, parentOuterRightEdge, textBlockLeftValue,
   isRightAlignedTextBlock } = require(path.join(__dirname, '..', '..', 'lib', 'script-helpers.js'));
 const { isHostShellName } = require(path.join(__dirname, '..', '..', 'lib', 'mastergo-rules.js'));
+// 映射表读取的唯一实现（含共享类型域的 extends 合并）
+const { loadTemplateMap } = require(path.join(__dirname, '..', '..', 'lib', 'load-template-map.js'));
 const fail = failAndExit(1);
 
 function parseArgs(argv) {
@@ -56,7 +58,7 @@ function parseArgs(argv) {
 
 const args = parseArgs(process.argv.slice(2));
 const mapping = readJson(args.mapping, 'mapping');
-const templateMap = readJson(args.templateMap, 'template map');
+  const templateMap = loadTemplateMap(args.templateMap);
 
 if (!Array.isArray(mapping.sourceNodes)) fail('mapping 缺少 sourceNodes');
 if (!Array.isArray(mapping.nodes)) fail('mapping 缺少 nodes');

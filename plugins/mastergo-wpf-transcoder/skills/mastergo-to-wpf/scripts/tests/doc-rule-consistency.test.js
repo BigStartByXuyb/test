@@ -10,6 +10,7 @@
 const assert = require("assert");
 const fs = require("fs");
 const path = require("path");
+const { loadTemplateMap } = require(path.join(__dirname, "..", "lib", "load-template-map.js"));
 
 const MAP = path.join(__dirname, "..", "..", "references", "adapters", "mtslg-iocontrol", "mtslg-iocontrol-map.json");
 const DOC_FORMAT_SKILL = path.join(__dirname, "..", "..", "..", "mastergo-iocontrol-document-format", "SKILL.md");
@@ -20,7 +21,7 @@ const FEISHU_MAPPING = path.join(__dirname, "..", "..", "references", "adapters"
 const MODE_DOC = path.join(__dirname, "..", "..", "references", "adapters", "mtslg-iocontrol", "mtslg-mode.md");
 const PAGE_BUILD_RULES = path.join(__dirname, "..", "..", "references", "adapters", "mtslg-iocontrol", "page-build-rules.md");
 
-const map = JSON.parse(fs.readFileSync(MAP, "utf8"));
+const map = loadTemplateMap(MAP);
 const docFormat = fs.readFileSync(DOC_FORMAT_SKILL, "utf8");
 const mainSkill = fs.readFileSync(MAIN_SKILL, "utf8");
 const generator = fs.readFileSync(GENERATOR, "utf8");
@@ -934,7 +935,7 @@ console.log("PASS 判定表不得自行枚举真值源（iconPolicy / 变体名 
 // 而是要求"枚举与映射表一一对应"——总数要对、每个变体名要逐字出现、每个小节都要是真实变体。
 // 简写（`DI 显示-0/1000/…`）会让映射表新增变体时无人发现，因此也在禁止之列。
 {
-  const mapData = JSON.parse(fs.readFileSync(MAP, "utf8"));
+const mapData = loadTemplateMap(MAP);
   const layoutDoc = fs.readFileSync(
     path.join(__dirname, "..", "..", "references", "adapters", "mtslg-iocontrol", "feishu-layout-mapping.md"), "utf8");
   const variants = Object.keys(mapData.layoutRules.bottomBar.variants);
@@ -1031,7 +1032,7 @@ console.log("PASS 匹配键口径单读法 + 同一条规则单处陈述（maste
 // 设计稿 textAlign 并按 rightMatch / rightValue / defaultValue 取值）、人读（mtslg-mode /
 // 组件库映射文档 + 硬门禁索引）。
 {
-  const mapData = JSON.parse(fs.readFileSync(MAP, "utf8"));
+const mapData = loadTemplateMap(MAP);
   const align = mapData.textBlockAlign;
   assert.ok(align, "映射表必须登记 textBlockAlign（TextBlock 的 Align 口径）");
   assert.strictEqual(align.attr, "Align", "textBlockAlign.attr 必须是 Align");

@@ -7,11 +7,13 @@
 // 这两处曾各写一份 loadControlTypeRequiredAttrs / loadButtonFamilyRules，是历史漂移点，
 // 由 scripts/tests/script-duplication.test.js 守护「不许再复制一份」。
 
-const fs = require("fs");
+const path = require("path");
+// 映射表读取的唯一实现（含共享类型域的 extends 合并）：scripts/lib/load-template-map.js
+const { loadTemplateMap } = require(path.join(__dirname, "..", "..", "..", "lib", "load-template-map.js"));
 
-// 读取 JSON；map 路径缺失/不可读由调用方决定如何处理（这里直接抛错）。
+// 读模板表：路径缺失/不可读直接抛错（fail-closed），错误信息由 readTemplateMapOrFail 包装。
 function readTemplateMap(mapPath) {
-  return JSON.parse(fs.readFileSync(mapPath, "utf8"));
+  return loadTemplateMap(mapPath);
 }
 
 // 读模板表：错误信息带路径，便于定位；解析失败直接失败（fail-closed）。生成器与校验器共用。

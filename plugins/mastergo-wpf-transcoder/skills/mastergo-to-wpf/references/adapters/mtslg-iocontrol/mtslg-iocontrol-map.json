@@ -37,7 +37,7 @@
       "IconWidth",
       "IconHeight"
     ],
-      "iconSizeRule": "IconWidth/IconHeight 取台账命中条目节点 bbox（该条目 sourceRef 指向的节点，缺失回退 sourceId；映射字段 iconSize，四舍五入取整）；台账条目必须登记在只包住该图标图形的节点上，登记在按钮级容器上会取到按钮尺寸；**例外：变体登记 iconPolicy=runtime 时图标由目标项目提供、本页台账没有也不该有该条目，尺寸改取该实例子树里唯一 PATH 的 bbox（多个 PATH 直接失败，要求设计侧消歧；登记台账对该变体无效，禁止猜尺寸）**；模板含图标字段的 IconButton 的 Icon/IconWidth/IconHeight 属于 controlTypeRequiredAttrs 的恒写字段，无图标槽位时写空字符串；Button/StatusButton 的模板不含图标字段，不发射这三项；iconSize 只在模板含图标字段且节点带 Icon 时被消费，带 Icon 却没有 iconSize 视为映射不完整，生成器直接失败"
+    "iconSizeRule": "IconWidth/IconHeight 取台账命中条目节点 bbox（该条目 sourceRef 指向的节点，缺失回退 sourceId；映射字段 iconSize，四舍五入取整）；台账条目必须登记在只包住该图标图形的节点上，登记在按钮级容器上会取到按钮尺寸；**例外：变体登记 iconPolicy=runtime 时图标由目标项目提供、本页台账没有也不该有该条目，尺寸改取该实例子树里唯一 PATH 的 bbox（多个 PATH 直接失败，要求设计侧消歧；登记台账对该变体无效，禁止猜尺寸）**；模板含图标字段的 IconButton 的 Icon/IconWidth/IconHeight 属于 controlTypeRequiredAttrs 的恒写字段，无图标槽位时写空字符串；Button/StatusButton 的模板不含图标字段，不发射这三项；iconSize 只在模板含图标字段且节点带 Icon 时被消费，带 Icon 却没有 iconSize 视为映射不完整，生成器直接失败"
   },
   "textNewlinePolicy": {
     "attrScope": "所有 XML 属性里的文案（页面 XML 的 Value / Header，Layout 的 MenuItem Name / TopLeftContent 等）与页面语言字典的字符串值",
@@ -58,10 +58,24 @@
   },
   "textBlockFontWeight": {
     "attr": "FontWeight",
-    "controlTypes": ["TextBlock"],
+    "controlTypes": [
+      "TextBlock"
+    ],
     "policy": "emit-when-not-normal",
-    "normalValues": ["", "normal", "400", "regular"],
-    "normalStyleNames": ["regular", "normal", "book", "标准体", "常规体", "常规"],
+    "normalValues": [
+      "",
+      "normal",
+      "400",
+      "regular"
+    ],
+    "normalStyleNames": [
+      "regular",
+      "normal",
+      "book",
+      "标准体",
+      "常规体",
+      "常规"
+    ],
     "valueSource": "dsl.styles[<text[0].font>].value.style → fontStyle（设计稿自己的字体样式名，如 Bold / SemiBold / 常规体）",
     "valueFormat": "design-style-name",
     "fallbackValueSource": "dsl.styles[<text[0].font>].value.weight（样式名缺失时才回退到数值）",
@@ -69,10 +83,14 @@
   },
   "textBlockAlign": {
     "attr": "Align",
-    "controlTypes": ["TextBlock"],
+    "controlTypes": [
+      "TextBlock"
+    ],
     "policy": "always",
     "valueSource": "dsl.nodes[...].textAlign（TEXT 节点级字段；设计稿实测取值 left / right / center）",
-    "rightMatch": ["right"],
+    "rightMatch": [
+      "right"
+    ],
     "rightValue": "Right",
     "defaultValue": "Left",
     "distanceAttr": "Left",
@@ -86,25 +104,156 @@
   },
   "controlTypeRequiredAttrs": {
     "_note": "每个 ControlType 的固定必写字段集（属性恒写，取不到来源时写空字符串）。ID/ControlType 恒由节点身份发射，Left/Top/Width/Height 恒由 DSL bbox 发射（TextBlock 为 Width=NaN、Height=40），因此不重复登记在这里。LangName 是另一个例外：只在多语言绑定层给出真实 key 时发射——全量多语言下每个设计文本 Value 都产键挂 LangName，只有槽位登记 langRefPolicy=none 的值（当前只有选择框 Value，运行时由数据决定）与空文本节点（Value=\"\"，没有可翻译的文案）不产键、不写空占位。TextBlock 的 Align 是第二个例外：目标框架只认 Left / Right，映射缺失/空串/第三种值一律 fail-closed（见 textBlockAlign.note），不写空占位。真值来源：设计方给定的 IOContorl 字段模板。",
-    "GroupBox": ["Style", "Header", "LangName", "IOName", "IOEnable", "IOVisible", "MinValue", "MaxValue"],
-    "Border": ["Style", "Value", "IOEnable", "IOVisible"],
-    "TextBlock": ["Style", "Value", "LangName", "IOName", "IOEnable", "IOVisible", "IsAutoRead", "Foreground", "FontSize", "Align"],
-    "Button": ["Style", "Value", "LangName", "PageName", "IOCommand", "IOEnable", "IOVisible"],
-    "StatusButton": ["Style", "Value", "LangName", "PageName", "IOCommand", "IOEnable", "IOVisible"],
-    "IconButton": ["Style", "Value", "LangName", "PageName", "Icon", "TopLeftContent", "IsShowStatus", "IsNeedRedMark", "IOCommand", "IOEnable", "IOVisible", "IconHeight", "IconWidth"],
-    "Togglebutton": ["Style", "Value", "IOName", "IOState", "IsAutoRefresh", "IOEnable", "IOVisible"],
-    "RadioButton": ["Style", "Value", "IOName", "IOState", "IsAutoRefresh", "IOEnable", "IOVisible"],
-    "ComboBox": ["Style", "Value", "IOName", "ItemsSourceFile", "DisplayMemberPath", "SelectedValuePath", "IsAutoRead", "IsAutoWrite", "IsWriteIO", "IOCommand", "IOEnable", "IOVisible"],
-    "CheckBox": ["Value", "IOName", "DefaultValue", "IsWriteIO", "IOEnable", "IOVisible"],
-    "TextBox": ["Value", "DefaultValue", "IsWriteIO", "Keypad", "IOEnable", "IOVisible"],
-    "NumberBox": ["Value", "MinValue", "MaxValue", "DefaultValue", "DecimalPlaces", "IsWriteIO", "Keypad", "IsAutoRead", "IOEnable", "IOVisible"],
-    "IntNumberBox": ["Value", "MinValue", "MaxValue", "DefaultValue", "DecimalPlaces", "IsWriteIO", "Keypad", "IsAutoRead", "IOEnable", "IOVisible"],
-    "DataGrid": ["Value", "IOName", "IOEnable", "IOVisible"],
-    "Camera": ["DesignPanelID", "Value", "IOName"]
+    "GroupBox": [
+      "Style",
+      "Header",
+      "LangName",
+      "IOName",
+      "IOEnable",
+      "IOVisible",
+      "MinValue",
+      "MaxValue"
+    ],
+    "Border": [
+      "Style",
+      "Value",
+      "IOEnable",
+      "IOVisible"
+    ],
+    "TextBlock": [
+      "Style",
+      "Value",
+      "LangName",
+      "IOName",
+      "IOEnable",
+      "IOVisible",
+      "IsAutoRead",
+      "Foreground",
+      "FontSize",
+      "Align"
+    ],
+    "Button": [
+      "Style",
+      "Value",
+      "LangName",
+      "PageName",
+      "IOCommand",
+      "IOEnable",
+      "IOVisible"
+    ],
+    "StatusButton": [
+      "Style",
+      "Value",
+      "LangName",
+      "PageName",
+      "IOCommand",
+      "IOEnable",
+      "IOVisible"
+    ],
+    "IconButton": [
+      "Style",
+      "Value",
+      "LangName",
+      "PageName",
+      "Icon",
+      "TopLeftContent",
+      "IsShowStatus",
+      "IsNeedRedMark",
+      "IOCommand",
+      "IOEnable",
+      "IOVisible",
+      "IconHeight",
+      "IconWidth"
+    ],
+    "Togglebutton": [
+      "Style",
+      "Value",
+      "IOName",
+      "IOState",
+      "IsAutoRefresh",
+      "IOEnable",
+      "IOVisible"
+    ],
+    "RadioButton": [
+      "Style",
+      "Value",
+      "IOName",
+      "IOState",
+      "IsAutoRefresh",
+      "IOEnable",
+      "IOVisible"
+    ],
+    "ComboBox": [
+      "Style",
+      "Value",
+      "IOName",
+      "ItemsSourceFile",
+      "DisplayMemberPath",
+      "SelectedValuePath",
+      "IsAutoRead",
+      "IsAutoWrite",
+      "IsWriteIO",
+      "IOCommand",
+      "IOEnable",
+      "IOVisible"
+    ],
+    "CheckBox": [
+      "Value",
+      "IOName",
+      "DefaultValue",
+      "IsWriteIO",
+      "IOEnable",
+      "IOVisible"
+    ],
+    "TextBox": [
+      "Value",
+      "DefaultValue",
+      "IsWriteIO",
+      "Keypad",
+      "IOEnable",
+      "IOVisible"
+    ],
+    "NumberBox": [
+      "Value",
+      "MinValue",
+      "MaxValue",
+      "DefaultValue",
+      "DecimalPlaces",
+      "IsWriteIO",
+      "Keypad",
+      "IsAutoRead",
+      "IOEnable",
+      "IOVisible"
+    ],
+    "IntNumberBox": [
+      "Value",
+      "MinValue",
+      "MaxValue",
+      "DefaultValue",
+      "DecimalPlaces",
+      "IsWriteIO",
+      "Keypad",
+      "IsAutoRead",
+      "IOEnable",
+      "IOVisible"
+    ],
+    "DataGrid": [
+      "Value",
+      "IOName",
+      "IOEnable",
+      "IOVisible"
+    ],
+    "Camera": [
+      "DesignPanelID",
+      "Value",
+      "IOName"
+    ]
   },
   "controlTypeAttrDefaults": {
     "_note": "必写字段在映射没有来源时使用的默认值；未在此登记的字段一律写空字符串（例外：TextBlock 的 Align 不适用空字符串口径，取值只能是 Left / Right，缺失即失败，见 textBlockAlign.note）。Border 的 Value 是线宽，设计侧模板约定默认 1。",
-    "Border": { "Value": "1" }
+    "Border": {
+      "Value": "1"
+    }
   },
   "geometryAttrs": [
     "Left",
@@ -197,1280 +346,6 @@
     "RotatePointY",
     "Index"
   ],
-  "componentTemplates": {
-    "match": {
-      "property": "属性 1"
-    },
-    "unconfirmedVariants": [],
-    "variants": {
-      "加减快捷键-无标题": {
-        "controlType": "IconButton",
-        "style": "SmallButton",
-        "iconPolicy": "none",
-        "slots": [
-          {
-            "slot": "button_plus_5",
-            "controlType": "IconButton",
-            "style": "SmallButton",
-            "valueSource": "dsl.text"
-          },
-          {
-            "slot": "button_minus_5",
-            "controlType": "IconButton",
-            "style": "SmallButton",
-            "valueSource": "dsl.text"
-          },
-          {
-            "slot": "button_plus_1",
-            "controlType": "IconButton",
-            "style": "SmallButton",
-            "valueSource": "dsl.text"
-          },
-          {
-            "slot": "button_minus_1",
-            "controlType": "IconButton",
-            "style": "SmallButton",
-            "valueSource": "dsl.text"
-          },
-          {
-            "slot": "value",
-            "controlType": "TextBlock",
-            "valueSource": "dsl.text"
-          },
-          {
-            "slot": "direction",
-            "controlType": "TextBlock",
-            "valueSource": "dsl.text"
-          }
-        ]
-      },
-      "加减快捷键操作-2有标题": {
-        "controlType": "IconButton",
-        "style": "SmallButton",
-        "iconPolicy": "none",
-        "slots": [
-          {
-            "slot": "button_plus_5",
-            "controlType": "IconButton",
-            "style": "SmallButton",
-            "valueSource": "dsl.text"
-          },
-          {
-            "slot": "button_minus_5",
-            "controlType": "IconButton",
-            "style": "SmallButton",
-            "valueSource": "dsl.text"
-          },
-          {
-            "slot": "button_plus_1",
-            "controlType": "IconButton",
-            "style": "SmallButton",
-            "valueSource": "dsl.text"
-          },
-          {
-            "slot": "button_minus_1",
-            "controlType": "IconButton",
-            "style": "SmallButton",
-            "valueSource": "dsl.text"
-          },
-          {
-            "slot": "title",
-            "controlType": "TextBlock",
-            "valueSource": "dsl.text"
-          },
-          {
-            "slot": "value",
-            "controlType": "TextBlock",
-            "valueSource": "dsl.text"
-          }
-        ]
-      },
-      "加减快捷操作-有标题": {
-        "controlType": "IconButton",
-        "style": "SmallButton",
-        "iconPolicy": "none",
-        "slots": [
-          {
-            "slot": "button_plus_5",
-            "controlType": "IconButton",
-            "style": "SmallButton",
-            "valueSource": "dsl.text"
-          },
-          {
-            "slot": "button_minus_5",
-            "controlType": "IconButton",
-            "style": "SmallButton",
-            "valueSource": "dsl.text"
-          },
-          {
-            "slot": "button_plus_1",
-            "controlType": "IconButton",
-            "style": "SmallButton",
-            "valueSource": "dsl.text"
-          },
-          {
-            "slot": "button_minus_1",
-            "controlType": "IconButton",
-            "style": "SmallButton",
-            "valueSource": "dsl.text"
-          },
-          {
-            "slot": "title",
-            "controlType": "TextBlock",
-            "valueSource": "dsl.text"
-          },
-          {
-            "slot": "value",
-            "controlType": "TextBlock",
-            "valueSource": "dsl.text"
-          },
-          {
-            "slot": "direction",
-            "controlType": "TextBlock",
-            "valueSource": "dsl.text"
-          }
-        ]
-      },
-      "轴操作": {
-        "controlType": "IconButton",
-        "style": null,
-        "iconPolicy": "single-path",
-        "slots": [
-          {
-            "slot": "up",
-            "controlType": "IconButton",
-            "iconPolicy": "single-path",
-            "valueSource": "dsl.text"
-          },
-          {
-            "slot": "left",
-            "controlType": "IconButton",
-            "iconPolicy": "single-path",
-            "valueSource": "dsl.text"
-          },
-          {
-            "slot": "right",
-            "controlType": "IconButton",
-            "iconPolicy": "single-path",
-            "valueSource": "dsl.text"
-          },
-          {
-            "slot": "down",
-            "controlType": "IconButton",
-            "iconPolicy": "single-path",
-            "valueSource": "dsl.text"
-          },
-          {
-            "slot": "scan",
-            "controlType": "TextBlock",
-            "optional": true,
-            "valueSource": "dsl.text"
-          }
-        ]
-      },
-      "轴操作-快慢": {
-        "controlType": "IconButton",
-        "style": null,
-        "iconPolicy": "single-path",
-        "groupMinWidth": 55,
-        "slots": [
-          {
-            "slot": "up_inner",
-            "controlType": "IconButton",
-            "iconPolicy": "single-path",
-            "position": "up_inner",
-            "valueSource": "dsl.text"
-          },
-          {
-            "slot": "up_outer",
-            "controlType": "IconButton",
-            "iconPolicy": "single-path",
-            "position": "up_outer",
-            "valueSource": "dsl.text"
-          },
-          {
-            "slot": "down_inner",
-            "controlType": "IconButton",
-            "iconPolicy": "single-path",
-            "position": "down_inner",
-            "valueSource": "dsl.text"
-          },
-          {
-            "slot": "down_outer",
-            "controlType": "IconButton",
-            "iconPolicy": "single-path",
-            "position": "down_outer",
-            "valueSource": "dsl.text"
-          },
-          {
-            "slot": "left_inner",
-            "controlType": "IconButton",
-            "iconPolicy": "single-path",
-            "position": "left_inner",
-            "valueSource": "dsl.text"
-          },
-          {
-            "slot": "left_outer",
-            "controlType": "IconButton",
-            "iconPolicy": "single-path",
-            "position": "left_outer",
-            "valueSource": "dsl.text"
-          },
-          {
-            "slot": "right_inner",
-            "controlType": "IconButton",
-            "iconPolicy": "single-path",
-            "position": "right_inner",
-            "valueSource": "dsl.text"
-          },
-          {
-            "slot": "right_outer",
-            "controlType": "IconButton",
-            "iconPolicy": "single-path",
-            "position": "right_outer",
-            "valueSource": "dsl.text"
-          },
-          {
-            "slot": "scan",
-            "controlType": "TextBlock",
-            "optional": true,
-            "valueSource": "dsl.text"
-          }
-        ]
-      },
-      "方向": {
-        "controlType": "IconButton",
-        "style": null,
-        "iconPolicy": "pair-per-button",
-        "slots": [
-          {
-            "slot": "up_pair",
-            "controlType": "IconButton",
-            "iconPolicy": "pair-per-button",
-            "valueSource": "dsl.text"
-          },
-          {
-            "slot": "down_pair",
-            "controlType": "IconButton",
-            "iconPolicy": "pair-per-button",
-            "valueSource": "dsl.text"
-          },
-          {
-            "slot": "vertical_pair",
-            "controlType": "IconButton",
-            "iconPolicy": "pair-per-button",
-            "valueSource": "dsl.text"
-          },
-          {
-            "slot": "horizontal_pair",
-            "controlType": "IconButton",
-            "iconPolicy": "pair-per-button",
-            "valueSource": "dsl.text"
-          }
-        ]
-      },
-      "图像移动-单侧": {
-        "controlType": "IconButton",
-        "style": null,
-        "iconPolicy": "single-path",
-        "slots": [
-          {
-            "slot": "up",
-            "controlType": "IconButton",
-            "iconPolicy": "single-path",
-            "valueSource": "dsl.text"
-          },
-          {
-            "slot": "left",
-            "controlType": "IconButton",
-            "iconPolicy": "single-path",
-            "valueSource": "dsl.text"
-          },
-          {
-            "slot": "right",
-            "controlType": "IconButton",
-            "iconPolicy": "single-path",
-            "valueSource": "dsl.text"
-          },
-          {
-            "slot": "down",
-            "controlType": "IconButton",
-            "iconPolicy": "single-path",
-            "valueSource": "dsl.text"
-          }
-        ]
-      },
-      "图像移动-双侧": {
-        "controlType": "IconButton",
-        "style": null,
-        "iconPolicy": "pair-per-button",
-        "slots": [
-          {
-            "slot": "first",
-            "controlType": "IconButton",
-            "iconPolicy": "pair-per-button",
-            "valueSource": "dsl.text"
-          },
-          {
-            "slot": "second",
-            "controlType": "IconButton",
-            "iconPolicy": "pair-per-button",
-            "valueSource": "dsl.text"
-          },
-          {
-            "slot": "third",
-            "controlType": "IconButton",
-            "iconPolicy": "pair-per-button",
-            "valueSource": "dsl.text"
-          },
-          {
-            "slot": "fourth",
-            "controlType": "IconButton",
-            "iconPolicy": "pair-per-button",
-            "valueSource": "dsl.text"
-          }
-        ]
-      },
-      "缺口位置": {
-        "controlType": "IconButton",
-        "style": null,
-        "iconPolicy": "single-path",
-        "slots": [
-          {
-            "slot": "left",
-            "controlType": "IconButton",
-            "iconPolicy": "single-path",
-            "valueSource": "dsl.text"
-          },
-          {
-            "slot": "right",
-            "controlType": "IconButton",
-            "iconPolicy": "single-path",
-            "valueSource": "dsl.text"
-          }
-        ]
-      },
-      "拟合数据-双侧上下": {
-        "controlType": "IconButton",
-        "style": null,
-        "iconPolicy": "pair-per-button",
-        "slots": [
-          {
-            "slot": "first",
-            "controlType": "IconButton",
-            "iconPolicy": "pair-per-button",
-            "valueSource": "dsl.text"
-          },
-          {
-            "slot": "second",
-            "controlType": "IconButton",
-            "iconPolicy": "pair-per-button",
-            "valueSource": "dsl.text"
-          }
-        ]
-      },
-      "拟合数据-前后": {
-        "controlType": "IconButton",
-        "style": null,
-        "iconPolicy": "single-path",
-        "slots": [
-          {
-            "slot": "front",
-            "controlType": "IconButton",
-            "iconPolicy": "single-path",
-            "valueSource": "dsl.text"
-          },
-          {
-            "slot": "back",
-            "controlType": "IconButton",
-            "iconPolicy": "single-path",
-            "valueSource": "dsl.text"
-          }
-        ]
-      },
-      "拟合数据-单侧上下": {
-        "controlType": "IconButton",
-        "style": null,
-        "iconPolicy": "single-path",
-        "slots": [
-          {
-            "slot": "up",
-            "controlType": "IconButton",
-            "iconPolicy": "single-path",
-            "valueSource": "dsl.text"
-          },
-          {
-            "slot": "down",
-            "controlType": "IconButton",
-            "iconPolicy": "single-path",
-            "valueSource": "dsl.text"
-          }
-        ]
-      },
-      "扫描": {
-        "controlType": "IconButton",
-        "style": null,
-        "iconPolicy": "single-path",
-        "slots": [
-          {
-            "slot": "scan_title",
-            "controlType": "TextBlock",
-            "valueSource": "dsl.text"
-          },
-          {
-            "slot": "left",
-            "controlType": "IconButton",
-            "iconPolicy": "single-path",
-            "valueSource": "dsl.text"
-          },
-          {
-            "slot": "right",
-            "controlType": "IconButton",
-            "iconPolicy": "single-path",
-            "valueSource": "dsl.text"
-          }
-        ]
-      }
-    }
-  },
-  "rightSidebarTemplates": {
-    "match": {
-      "property": "按钮类型"
-    },
-    "componentSetPolicy": "按公开属性「按钮类型」的值命中变体；变体登记 componentSet 时用变体内部实例的组件名交叉核对，两者不一致直接失败并要求重新核对（不静默选边）；componentSet=null 表示尚未从组件库登记，仅按属性值匹配。图层名不参与匹配。",
-    "variants": {
-      "F+文案": {
-        "componentSet": null,
-        "controlType": "IconButton",
-        "style": null,
-        "iconPolicy": "single-path",
-        "slots": [
-          {
-            "slot": "button",
-            "controlType": "IconButton",
-            "iconPolicy": "single-path"
-          }
-        ]
-      },
-      "文案 大button": {
-        "componentSet": null,
-        "controlType": "IconButton",
-        "style": null,
-        "iconPolicy": "single-path",
-        "slots": [
-          {
-            "slot": "button",
-            "controlType": "IconButton",
-            "iconPolicy": "single-path"
-          }
-        ]
-      },
-      "上下结构-icon+文案": {
-        "componentSet": "右侧栏-上下结构-icon+文案",
-        "controlType": "IconButton",
-        "style": "UpDownRightButtonStyle",
-        "iconPolicy": "single-path",
-        "slots": [
-          {
-            "slot": "button",
-            "controlType": "IconButton",
-            "style": "UpDownRightButtonStyle",
-            "iconPolicy": "single-path"
-          }
-        ]
-      },
-      "左右结构-icon+文案": {
-        "componentSet": "右侧栏-左右结构-icon+文案",
-        "controlType": "IconButton",
-        "style": "RightButtonStyle",
-        "iconPolicy": "single-path",
-        "slots": [
-          {
-            "slot": "button",
-            "controlType": "IconButton",
-            "style": "RightButtonStyle",
-            "iconPolicy": "single-path"
-          }
-        ]
-      },
-      "stop": {
-        "componentSet": null,
-        "controlType": "IconButton",
-        "style": "RightButtonStyle",
-        "iconPolicy": "single-path",
-        "slots": [
-          {
-            "slot": "button",
-            "controlType": "IconButton",
-            "style": "RightButtonStyle",
-            "iconPolicy": "single-path"
-          }
-        ]
-      },
-      "start": {
-        "componentSet": "start",
-        "controlType": "IconButton",
-        "style": "RightButtonStyle",
-        "iconPolicy": "single-path",
-        "slots": [
-          {
-            "slot": "button",
-            "controlType": "IconButton",
-            "style": "RightButtonStyle",
-            "iconPolicy": "single-path"
-          }
-        ]
-      },
-      "恢复切割": {
-        "componentSet": null,
-        "controlType": "IconButton",
-        "style": "RightButtonStyle",
-        "iconPolicy": "single-path",
-        "slots": [
-          {
-            "slot": "button",
-            "controlType": "IconButton",
-            "style": "RightButtonStyle",
-            "iconPolicy": "single-path"
-          }
-        ]
-      },
-      "删除料盒-1": {
-        "componentSet": null,
-        "controlType": "IconButton",
-        "style": null,
-        "iconPolicy": "single-path",
-        "slots": [
-          {
-            "slot": "button",
-            "controlType": "IconButton",
-            "iconPolicy": "single-path"
-          }
-        ]
-      },
-      "删除料盒-2": {
-        "componentSet": null,
-        "controlType": "IconButton",
-        "style": null,
-        "iconPolicy": "single-path",
-        "slots": [
-          {
-            "slot": "button",
-            "controlType": "IconButton",
-            "iconPolicy": "single-path"
-          }
-        ]
-      },
-      "文案-小button": {
-        "componentSet": null,
-        "controlType": "IconButton",
-        "style": null,
-        "iconPolicy": "single-path",
-        "slots": [
-          {
-            "slot": "button",
-            "controlType": "IconButton",
-            "iconPolicy": "single-path"
-          }
-        ]
-      },
-      "enter": {
-        "componentSet": "enter",
-        "controlType": "IconButton",
-        "style": "EnterButtonStyle",
-        "iconPolicy": "runtime",
-        "runtimeIcon": "EnterGeometry",
-        "iconRequired": true,
-        "fixedAttrs": {
-          "IsSave": "true"
-        },
-        "omitRequiredAttrs": [
-          "IOVisible",
-          "IOEnable",
-          "IsShowStatus",
-          "IsNeedRedMark"
-        ],
-        "langPolicy": "fixed",
-        "langKeyTemplate": "{page}Enter",
-        "langText": {
-          "CN": "ENTER",
-          "EN": "ENTER"
-        },
-        "slots": [
-          {
-            "slot": "button",
-            "controlType": "IconButton",
-            "style": "EnterButtonStyle",
-            "iconPolicy": "runtime",
-            "runtimeIcon": "EnterGeometry",
-            "iconRequired": true
-          }
-        ]
-      },
-      "exit": {
-        "componentSet": "exit",
-        "controlType": "IconButton",
-        "style": "ExitButtonStyle",
-        "iconPolicy": "runtime",
-        "runtimeIcon": "ExitGeometry",
-        "iconRequired": true,
-        "fixedAttrs": {
-          "PageName": "GoBack"
-        },
-        "omitRequiredAttrs": [
-          "IOVisible",
-          "IOEnable",
-          "IsShowStatus",
-          "IsNeedRedMark"
-        ],
-        "langPolicy": "fixed",
-        "langKeyTemplate": "{page}Exit",
-        "langText": {
-          "CN": "EXIT",
-          "EN": "EXIT"
-        },
-        "slots": [
-          {
-            "slot": "button",
-            "controlType": "IconButton",
-            "style": "ExitButtonStyle",
-            "iconPolicy": "runtime",
-            "runtimeIcon": "ExitGeometry",
-            "iconRequired": true
-          }
-        ]
-      },
-      "startstop": {
-        "componentSet": null,
-        "controlType": "IconButton",
-        "style": "UpDownRightButtonStyle",
-        "iconPolicy": "single-path",
-        "iconRequired": true,
-        "slots": [
-          {
-            "slot": "button",
-            "controlType": "IconButton",
-            "style": "UpDownRightButtonStyle",
-            "iconPolicy": "single-path",
-            "iconRequired": true
-          }
-        ]
-      }
-    }
-  },
-  "rightSidebarComponentTemplates": {
-    "match": {
-      "componentSet": true
-    },
-    "componentSetPolicy": "独立组件（团队组件库中可直接放置的按钮组件）按组件名命中；组件名取自实例自身的组件名，图层重命名不改变组件名。",
-    "variants": {
-    "右侧栏-左右结构-icon+文案": {
-      "componentSet": "右侧栏-左右结构-icon+文案",
-      "controlType": "IconButton",
-      "style": "RightButtonStyle",
-      "iconPolicy": "single-path",
-      "slots": [
-        {
-          "slot": "button",
-          "controlType": "IconButton",
-          "style": "RightButtonStyle",
-          "iconPolicy": "single-path"
-        }
-      ]
-    },
-    "右侧栏-上下结构-icon+文案": {
-      "componentSet": "右侧栏-上下结构-icon+文案",
-      "controlType": "IconButton",
-      "style": "UpDownRightButtonStyle",
-      "iconPolicy": "single-path",
-      "slots": [
-        {
-          "slot": "button",
-          "controlType": "IconButton",
-          "style": "UpDownRightButtonStyle",
-          "iconPolicy": "single-path"
-        }
-      ]
-    },
-    "start": {
-        "componentSet": "start",
-        "controlType": "IconButton",
-        "style": "RightButtonStyle",
-        "iconPolicy": "single-path",
-        "slots": [
-          {
-            "slot": "button",
-            "controlType": "IconButton",
-            "style": "RightButtonStyle",
-            "iconPolicy": "single-path"
-          }
-        ]
-      }
-    }
-  },
-  "inputTemplates": {
-    "match": {
-      "property": "属性 1"
-    },
-    "unconfirmedVariants": [
-      "密码输入框"
-    ],
-    "variants": {
-      "输入框-整数-40": {
-        "controlType": "IntNumberBox",
-        "style": null,
-        "iconPolicy": "none",
-        "height": 40,
-        "slots": [
-          {
-            "slot": "input",
-            "controlType": "IntNumberBox",
-            "iconPolicy": "none",
-            "valueSource": "dsl.text"
-          }
-        ]
-      },
-      "输入框-整数-36": {
-        "controlType": "IntNumberBox",
-        "style": null,
-        "iconPolicy": "none",
-        "height": 36,
-        "slots": [
-          {
-            "slot": "input",
-            "controlType": "IntNumberBox",
-            "iconPolicy": "none",
-            "valueSource": "dsl.text"
-          }
-        ]
-      },
-      "输入框-整数-32": {
-        "controlType": "IntNumberBox",
-        "style": null,
-        "iconPolicy": "none",
-        "height": 32,
-        "slots": [
-          {
-            "slot": "input",
-            "controlType": "IntNumberBox",
-            "iconPolicy": "none",
-            "valueSource": "dsl.text"
-          }
-        ]
-      },
-      "输入框-整数-28": {
-        "controlType": "IntNumberBox",
-        "style": null,
-        "iconPolicy": "none",
-        "height": 28,
-        "slots": [
-          {
-            "slot": "input",
-            "controlType": "IntNumberBox",
-            "iconPolicy": "none",
-            "valueSource": "dsl.text"
-          }
-        ]
-      },
-      "输入框-小数-40": {
-        "controlType": "NumberBox",
-        "style": null,
-        "iconPolicy": "none",
-        "height": 40,
-        "slots": [
-          {
-            "slot": "input",
-            "controlType": "NumberBox",
-            "iconPolicy": "none",
-            "valueSource": "dsl.text"
-          }
-        ]
-      },
-      "输入框-小数-36": {
-        "controlType": "NumberBox",
-        "style": null,
-        "iconPolicy": "none",
-        "height": 36,
-        "slots": [
-          {
-            "slot": "input",
-            "controlType": "NumberBox",
-            "iconPolicy": "none",
-            "valueSource": "dsl.text"
-          }
-        ]
-      },
-      "输入框-小数-32": {
-        "controlType": "NumberBox",
-        "style": null,
-        "iconPolicy": "none",
-        "height": 32,
-        "slots": [
-          {
-            "slot": "input",
-            "controlType": "NumberBox",
-            "iconPolicy": "none",
-            "valueSource": "dsl.text"
-          }
-        ]
-      },
-      "输入框-小数-28": {
-        "controlType": "NumberBox",
-        "style": null,
-        "iconPolicy": "none",
-        "height": 28,
-        "slots": [
-          {
-            "slot": "input",
-            "controlType": "NumberBox",
-            "iconPolicy": "none",
-            "valueSource": "dsl.text"
-          }
-        ]
-      },
-      "输入框-文字-40": {
-        "controlType": "TextBox",
-        "style": null,
-        "iconPolicy": "none",
-        "height": 40,
-        "slots": [
-          {
-            "slot": "input",
-            "controlType": "TextBox",
-            "iconPolicy": "none",
-            "valueSource": "dsl.text"
-          }
-        ]
-      },
-      "输入框-文字-36": {
-        "controlType": "TextBox",
-        "style": null,
-        "iconPolicy": "none",
-        "height": 36,
-        "slots": [
-          {
-            "slot": "input",
-            "controlType": "TextBox",
-            "iconPolicy": "none",
-            "valueSource": "dsl.text"
-          }
-        ]
-      },
-      "输入框-文字-32": {
-        "controlType": "TextBox",
-        "style": null,
-        "iconPolicy": "none",
-        "height": 32,
-        "slots": [
-          {
-            "slot": "input",
-            "controlType": "TextBox",
-            "iconPolicy": "none",
-            "valueSource": "dsl.text"
-          }
-        ]
-      },
-      "输入框-文字-28": {
-        "controlType": "TextBox",
-        "style": null,
-        "iconPolicy": "none",
-        "height": 28,
-        "slots": [
-          {
-            "slot": "input",
-            "controlType": "TextBox",
-            "iconPolicy": "none",
-            "valueSource": "dsl.text"
-          }
-        ]
-      }
-    }
-  },
-  "selectBoxTemplates": {
-    "match": {
-      "property": "属性 1"
-    },
-    "langRefPolicyNote": "选择框的 `Value` 是「**默认选中的名称**」（MT3.0 界面设计器文档：`Value | string | Y | 默认选中的名称`；`IOName` 才是把选中值写入/读出的数据绑定）——运行时由数据决定，不是要翻译的固定文案，因此本族槽位登记 `langRefPolicy: \"none\"`：**不产语言键、不挂 LangName**。需要多语言的是**选项文字**：设计器文档里选项是 ComboBox 的子 `TextBlock`（各自带 `Value`），或由 `ItemsSourceFile` 数据文件提供；设计稿只画关闭态、没有选项列表时，选项数据属运行时待绑定，不得编造。",
-    "variants": {
-      "选择框-40": {
-        "controlType": "ComboBox",
-        "style": null,
-        "iconPolicy": "none",
-        "height": 40,
-        "slots": [
-          {
-            "slot": "select",
-            "controlType": "ComboBox",
-            "iconPolicy": "none",
-            "valueSource": "dsl.text",
-            "langRefPolicy": "none"
-          }
-        ]
-      },
-      "选择框-36": {
-        "controlType": "ComboBox",
-        "style": null,
-        "iconPolicy": "none",
-        "height": 36,
-        "slots": [
-          {
-            "slot": "select",
-            "controlType": "ComboBox",
-            "iconPolicy": "none",
-            "valueSource": "dsl.text",
-            "langRefPolicy": "none"
-          }
-        ]
-      },
-      "选择框-32": {
-        "controlType": "ComboBox",
-        "style": null,
-        "iconPolicy": "none",
-        "height": 32,
-        "slots": [
-          {
-            "slot": "select",
-            "controlType": "ComboBox",
-            "iconPolicy": "none",
-            "valueSource": "dsl.text",
-            "langRefPolicy": "none"
-          }
-        ]
-      },
-      "选择框-28": {
-        "controlType": "ComboBox",
-        "style": null,
-        "iconPolicy": "none",
-        "height": 28,
-        "slots": [
-          {
-            "slot": "select",
-            "controlType": "ComboBox",
-            "iconPolicy": "none",
-            "valueSource": "dsl.text",
-            "langRefPolicy": "none"
-          }
-        ]
-      }
-    }
-  },
-  "selectionTemplates": {
-    "match": {
-      "property": "属性 1"
-    },
-    "variants": {
-      "单选-选中": {
-        "controlType": "RadioButton",
-        "style": null,
-        "iconPolicy": "none",
-        "slots": [
-          {
-            "slot": "choice",
-            "controlType": "RadioButton",
-            "iconPolicy": "none",
-            "valueSource": "dsl.text"
-          }
-        ]
-      },
-      "单选-未选择": {
-        "controlType": "RadioButton",
-        "style": null,
-        "iconPolicy": "none",
-        "slots": [
-          {
-            "slot": "choice",
-            "controlType": "RadioButton",
-            "iconPolicy": "none",
-            "valueSource": "dsl.text"
-          }
-        ]
-      },
-      "多选-选中": {
-        "controlType": "CheckBox",
-        "style": null,
-        "iconPolicy": "none",
-        "slots": [
-          {
-            "slot": "choice",
-            "controlType": "CheckBox",
-            "iconPolicy": "none",
-            "valueSource": "dsl.text"
-          }
-        ]
-      },
-      "多选-未选择": {
-        "controlType": "CheckBox",
-        "style": null,
-        "iconPolicy": "none",
-        "slots": [
-          {
-            "slot": "choice",
-            "controlType": "CheckBox",
-            "iconPolicy": "none",
-            "valueSource": "dsl.text"
-          }
-        ]
-      }
-    }
-  },
-  "infoGroupTemplates": {
-    "match": {
-      "componentSet": true
-    },
-    "styleInsets": {
-      "IOGroupBoxBaseStyle": { "left": 2, "top": 40 },
-      "IOGroupBoxSecondary": { "left": 1, "top": 35 },
-      "IOGroupBoxThirdly": { "left": 1, "top": 25 },
-      "IOGroupBoxFour": { "left": 1, "top": 35 }
-    },
-    "styleInsetsNote": "容器内容区原点（相对容器左上角）= 内容区边框厚度 + 标题条高度。本表这四个原点是**项目框架侧的确定口径**（历史上抄录自框架模板 SDC/Style/IOGroupBox.xaml 的内容区边框 2 0 2 2 / 1 0 1 1 与 SDC/Sizes.xaml 的 GroupBoxBaseHeader=40 / GroupBoxSecondaryHeader=35 / GroupBoxThirdlyHeader=25，作为数值由来说明）。重挂进容器的子控件坐标必须按此原点换算：expectedLeft = 子绝对X − 容器绝对X − inset.left，expectedTop = 子绝对Y − 容器绝对Y − inset.top；不换算会让容器内所有子控件整体下移一个标题条高度。容器变体上，`style` 是发射到 XML 的 Style 值、`contentInsetStyle` 是仅用于查本表 styleInsets 的内部键，两者分开登记：项目框架口径下 GroupBox 的 `style` 恒为空串（`Style=\"\"`），而其内容区原点就是 `contentInsetStyle` 指向的本表取值（本族 `IOGroupBoxSecondary` = {left:1, top:35}）——这是既定事实，直接换算，不设待确认项；`contentInsetStyle` 仍必须显式登记（禁止 null），否则子控件相对坐标无法机械换算，生成器 fail-closed。",
-    "componentSetPolicy": "容器类组件（团队组件库中可直接放置的分组框 / 弹层）按组件名命中：候选值只有实例**自身**的组件名这一条，命中时必须与该组件集名逐字相等；容器族**不使用「内部实例子节点名」作为候选**——那条候选路径是聚合集合（如右栏）专用的，页面根的第一个实例子节点恰好与外层容器同名时会把整页误判成容器。图层重命名不改变组件名。命中后发射一个 GroupBox 外壳：Header 取实例内第一条可见 TEXT，位置宽高取实例 bbox；壳内子控件由 apply-container-containment.js 按「坐标完全包含」重挂为子节点（childPolicy=nested-page-templates）。",
-    "variants": {
-      "信息分组-模块化": {
-        "componentSet": "信息分组-模块化",
-        "controlType": "GroupBox",
-        "style": "",
-        "contentInsetStyle": "IOGroupBoxSecondary",
-    "iconPolicy": "none",
-    "childPolicy": "nested-page-templates",
-        "slots": [
-          {
-            "slot": "header",
-            "controlType": "GroupBox",
-            "iconPolicy": "none",
-            "valueSource": "dsl.text"
-          }
-        ]
-      },
-      "信息模块-手动控制弹层": {
-        "componentSet": "信息模块-手动控制弹层",
-        "controlType": "GroupBox",
-        "style": "",
-        "contentInsetStyle": "IOGroupBoxSecondary",
-        "iconPolicy": "none",
-        "childPolicy": "nested-page-templates",
-        "slots": [
-          {
-            "slot": "header",
-            "controlType": "GroupBox",
-            "iconPolicy": "none",
-            "valueSource": "dsl.text"
-          }
-        ]
-      }
-    }
-  },
-  "cameraTemplates": {
-    "match": {
-      "componentSet": true
-    },
-    "innerCandidatePolicy": "never",
-    "innerCandidatePolicyNote": "相机族只按实例**自身**的组件集名命中，禁止用「内部实例子节点名」当候选：页面根的第一个实例子节点常常就是相机（集成图像），走内部名会把整页误判成 Camera。",
-    "controlType": "Camera",
-    "stylePolicy": "none",
-    "alwaysWrittenAttrs": ["DesignPanelID", "Value"],
-    "innerTextPolicy": {
-      "decision": "omit",
-      "role": "camera-viewport-internal",
-      "note": "相机视口是一个整体：组件内部的一切绘制内容（网格、坐标、通道名、JOG mode、拟合结果等）都不处理，只发射外层 Camera 控件。内部 TEXT 必须显式 consume + 以本角色 omit，避免漏进通用文本循环被发射成根级 TextBlock。该角色已登记进 validate-iocontrol-provenance.js 的 OMIT_ROLES。"
-    },
-    "componentSetPolicy": "相机视口组件（团队组件库「集成图像」画廊里的 集成图像 / 晶圆图 组件集）按组件集名（= 实例自身名）命中，命中后发射一个 ControlType=Camera 的视口控件。只发射 DesignPanelID / Value / Width / Height（外加恒写集合里的 IOName 空占位），**不发射 Style**——直接用运行时默认控件外观。DesignPanelID（相机编号）与 Value（相机名称）在设计稿里没有可靠来源（相机实例不带公开属性、也没有承载相机名的文本），按固定模板写空串占位，由工程师或运行时绑定填写；Width/Height 取实例自身 bbox；坐标按页面统一规则计算。",
-    "variants": {
-      "集成图像": { "componentSet": "集成图像", "controlType": "Camera", "style": null, "iconPolicy": "none" },
-      "集成图像-XIS 模式": { "componentSet": "集成图像-XIS 模式", "controlType": "Camera", "style": null, "iconPolicy": "none" },
-      "集成图像-晶圆图 - 线条模式": { "componentSet": "集成图像-晶圆图 - 线条模式", "controlType": "Camera", "style": null, "iconPolicy": "none" },
-      "晶圆图 - 工件模式": { "componentSet": "晶圆图 - 工件模式", "controlType": "Camera", "style": null, "iconPolicy": "none" },
-      "集成图像-低倍率": { "componentSet": "集成图像-低倍率", "controlType": "Camera", "style": null, "iconPolicy": "none" },
-      "集成图像-JOG mode": { "componentSet": "集成图像-JOG mode", "controlType": "Camera", "style": null, "iconPolicy": "none" },
-      "集成图像-结果检查（预对准）": { "componentSet": "集成图像-结果检查（预对准）", "controlType": "Camera", "style": null, "iconPolicy": "none" },
-      "集成图像=结果检查（预对准）展开": { "componentSet": "集成图像=结果检查（预对准）展开", "controlType": "Camera", "style": null, "iconPolicy": "none" },
-      "组件 1065": { "componentSet": "组件 1065", "controlType": "Camera", "style": null, "iconPolicy": "none" }
-    }
-  },
-  "layoutRules": {
-    "_note": "底部栏 → Layout MenuItem 的规则。只有布局侧脚本（gen-mtslg-layout-manifest.js / gen-mtslg-layout.js）读取，不参与 IOContorl 模板匹配。",
-    "bottomBar": {
-      "match": {
-        "_note": "底部栏变体的匹配键：componentName=true 表示「变体值 = 被引用组件的名字（实例的 name）」。实测底部栏实例的属性里没有变体信息（properties 只有 实例/显示icon/显示文案/显示F，或为空），它们引用的是独立组件本体（名字即变体值，如 非首页-长方形、首页-长方形），因此底部栏与右栏独立组件族一样按「组件名」匹配；一族一个键，与组件模板族同一套机制。",
-        "componentName": true
-      },
-      "residentGroupPattern": "常驻(button|按钮|分组)",
-      "fKeyPattern": "^F\\d+$",
-      "decorativeNamePattern": "背景|分割",
-      "menuItemFlags": {
-        "_note": "MenuItem 的设计稿标记：命中才写属性，未命中不发射该属性（不是恒写字段）。attr / 数值阈值 / exclude* 开关都由 gen-mtslg-layout-manifest.js 与 gen-mtslg-layout.js 直接读取。",
-        "redText": {
-          "attr": "IsNeedRedMark",
-          "minRed": 180,
-          "maxGreenBlue": 100,
-          "note": "颜色取菜单项文案 TEXT 的 _color（取不到时回退 fill→styles 的值）；属于红色系（R≥minRed 且 G≤maxGreenBlue 且 B≤maxGreenBlue，实测 #F8274B）时写 <attr>=\"true\"。"
-        },
-        "statusBox": {
-          "attr": "IsShowStatus",
-          "nodeTypes": ["GROUP", "LAYER"],
-          "minSize": 8,
-          "maxSize": 32,
-          "maxOffsetX": 20,
-          "maxOffsetY": 20,
-          "excludeIconSubtree": true,
-          "note": "菜单项内存在左上角小方框时写 <attr>=\"true\"：节点类型必须在 nodeTypes 内（实测状态方框是 GROUP 组 2492 + LAYER 矩形，图标是 INSTANCE + PATH，因此排除 INSTANCE/PATH/TEXT 即可区分），宽高 minSize–maxSize px，相对菜单项左上角 x≤maxOffsetX 且 y≤maxOffsetY；excludeIconSubtree=true 时再排除图标映射命中的几何子树。实测 18×18@8,8。"
-        }
-      },
-      "menuItemAlwaysWrittenAttrs": [
-        "LangName",
-        "PageName",
-        "IOCommand",
-        "IOVisible",
-        "IOEnable"
-      ],
-      "iconSizeAttrs": [
-        "IconWidth",
-        "IconHeight"
-      ],
-      "variants": {
-        "首页-长方形": {
-          "topLeftContent": "none"
-        },
-        "非首页-长方形": {
-          "topLeftContent": "text"
-        },
-        "方-icon+文案": {
-          "topLeftContent": "none"
-        },
-        "方-icon": {
-          "topLeftContent": "none"
-        },
-        "非首页-F": {
-          "topLeftContent": "text"
-        },
-        "非首页-文案": {
-          "topLeftContent": "none"
-        },
-        "非首页- F": {
-          "topLeftContent": "text"
-        },
-        "DI 显示-0": {
-          "topLeftContent": "none"
-        },
-        "DI 显示-1000": {
-          "topLeftContent": "none"
-        },
-        "DI 显示-2000": {
-          "topLeftContent": "none"
-        },
-        "DI 显示-3000": {
-          "topLeftContent": "none"
-        },
-        "DI 显示-4000": {
-          "topLeftContent": "none"
-        },
-        "DI 显示-5000": {
-          "topLeftContent": "none"
-        },
-        "DO 显示-0": {
-          "topLeftContent": "none"
-        },
-        "DO 显示-1000": {
-          "topLeftContent": "none"
-        },
-        "DO 显示-2000": {
-          "topLeftContent": "none"
-        }
-      }
-    }
-  },
-  "mainMenuTemplates": {
-    "match": {
-      "property": "属性 1"
-    },
-    "variants": {
-      "主菜单button": {
-        "controlType": "IconButton",
-        "style": "MainButtonStyle",
-        "iconPolicy": "single-path",
-        "slots": [
-          {
-            "slot": "button",
-            "controlType": "IconButton",
-            "style": "MainButtonStyle",
-            "iconPolicy": "single-path"
-          }
-        ]
-      },
-      "主菜单button-文字": {
-        "controlType": "IconButton",
-        "style": "MainButtonStyle",
-        "iconPolicy": "none",
-        "slots": [
-          {
-            "slot": "button",
-            "controlType": "IconButton",
-            "style": "MainButtonStyle",
-            "iconPolicy": "none"
-          }
-        ]
-      }
-    }
-  },
-  "tableTemplates": {
-    "match": {
-      "structural": {
-        "nodeTypes": ["GROUP"],
-        "variant": "Table",
-        "signature": {
-          "headerGroupNames": ["表头"],
-          "rowGroupNames": ["item"],
-          "minRows": 1,
-          "minHeaderTexts": 1
-        }
-      }
-    },
-    "structuralPolicy": "表格在团队组件库里没有组件集，设计稿里只是一个 GROUP，因此本族**只登记一条命中路径**（没有 match.property，也没有 componentSet）：节点类型 GROUP + 孩子里含名为「表头」的群组 + 至少 minRows 个名为「item」的行群组 + 表头至少有 minHeaderTexts 条可见文本，**四项同时成立**才算命中——这是与设计侧约定的表格结构身份。**图层名不参与匹配**（与「图层名称只用于核对」同一原则），本族因此不是图层名例外，图层如何命名、是否带序号都不改变命中结果。**部分命中**只有一种：表的「表头 + item 行」结构身份成立、但表头没有足够可见文本（列标题无处取值）——此时登记 pending 并写明原因，既不静默套模板，也不静默丢表；结构身份不成立的普通 GROUP 不属于候选，不产生候选记录。",
-    "columnTemplate": {
-      "geometry": {
-        "left": 0,
-        "top": 0,
-        "height": 45
-      },
-      "omitWidth": true,
-      "alwaysWrittenAttrs": ["IOName"],
-      "requiredAttrsPolicy": "column-template",
-      "note": "DataGrid 的列子节点是**列定义**，不是页面控件：按设计器模板发射固定几何（Left=0 / Top=0 / Height=45，不写 Width），属性只发射 Value（列标题，来自表头文本）加恒写 IOName 空占位，不套用 controlTypeRequiredAttrs（那是页面控件的字段集）。列顺序 = 表头文本从左到右；列数 = 表头可见文本数（没有「隐藏主键列」这类额外列——本族不为列发射 IOVisible，除非将来为它在 columnTemplate 登记来源判据与发射口径）。"
-    },
-    "columnControlTypePolicy": "strict-majority-else-TextBlock",
-    "columnControlTypePolicyNote": "列 ControlType 由该列各行的单元格机械判定：每个单元格按类型归类（输入框实例取它命中的 ControlType，纯文本取 TextBlock），严格多数（> 50%）胜出；没有严格多数时退化为 TextBlock。判定依据与每列分布写进 mapping.tableAudits[].columns，便于复核与后续调整。",
-    "rowPolicy": "row-data-not-emitted",
-    "rowPolicyNote": "表格的行是数据（PageData 文件里的记录），不是页面控件：item 行里的左标题 / 单位 / 各列值一律不发射成 IOContorl，按行登记进 mapping.tableAudits[].rows（含单元格的 DSL ref、原文与类型），供工程师据此建数据文件。行数据不得编造，只登记设计稿里真实存在的内容。",
-    "innerTextPolicy": {
-      "decision": "omit",
-      "role": "table-data-cell",
-      "note": "命中表格后，表头文本作为列标题被消费（decision=emit，承载在列节点的 Value 上）；表格内其余文本（行标题、单位、单元格文本，含输入框实例内部的固定文本）一律 decision=omit，避免泄漏成根级 TextBlock。该角色已登记进 validate-iocontrol-provenance.js 的 OMIT_ROLES。"
-    },
-    "valuePolicy": {
-      "attr": "Value",
-      "decision": "fixed-empty",
-      "allowEmpty": true,
-      "note": "DataGrid 根节点的 Value 当前阶段**固定写空串**（`Value=\"\"`）：本阶段不再要求 AI 去找数据文件名，数据源由工程师或运行时后续绑定。禁止编造文件名，也不得因为「空串」把该控件判成未完成——它是当前阶段的正式产物形态。",
-      "pendingRule": "空串必须同时带 `tableAudits[].valuePending=true` 与 Bundle `tables[].valuePending=true` 作为**待绑定提示**（便于工程师接手时一眼看到哪张表还没绑数据源）；该标记是提示性审计字段，不是交付门禁，也不影响 provenance/坐标门禁的通过。工程师绑定真实数据文件名后把 `valuePending` 置 false。"
-    },
-    "variants": {
-      "Table": {
-        "controlType": "DataGrid",
-        "style": null,
-        "iconPolicy": "none",
-        "childPolicy": "columns-from-page-mapping",
-        "requiredAttrsNote": "本变体不再登记 requiredAttrs：必写字段集的唯一登记点是本文件顶层的 controlTypeRequiredAttrs.DataGrid（生成器与校验器都只读那一处），此处重复登记会造成第二个真值点。",
-        "slots": [
-          {
-            "slot": "table",
-            "controlType": "DataGrid",
-            "iconPolicy": "none",
-            "note": "本槽位只固定 ControlType 与「根节点就是这张表」的结构事实；根节点属性的来源与占位口径一律以同族 valuePolicy 为唯一真值源，不在此复述。"
-          }
-        ]
-      }
-    }
-  },
   "controlTypes": {
     "View": {
       "description": "纯容器/页签（Value=标题），可含 Index/Icon/LangName 作为页签属性",
@@ -1807,5 +682,44 @@
   },
   "_nested": {
     "description": "布局分组（无控件语义）：保持层级时用无 ControlType 的子 IOContorl 标签（与根节点同形）；框架是否支持需运行时验证，不支持则展平并把子坐标重基于最近有效父容器"
+  },
+  "extends": "../../component-types.json",
+  "familyOverlays": {
+    "infoGroupTemplates": {
+      "styleInsets": {
+        "IOGroupBoxBaseStyle": {
+          "left": 2,
+          "top": 40
+        },
+        "IOGroupBoxSecondary": {
+          "left": 1,
+          "top": 35
+        },
+        "IOGroupBoxThirdly": {
+          "left": 1,
+          "top": 25
+        },
+        "IOGroupBoxFour": {
+          "left": 1,
+          "top": 35
+        }
+      },
+      "styleInsetsNote": "容器内容区原点（相对容器左上角）= 内容区边框厚度 + 标题条高度。本表这四个原点是**项目框架侧的确定口径**（历史上抄录自框架模板 SDC/Style/IOGroupBox.xaml 的内容区边框 2 0 2 2 / 1 0 1 1 与 SDC/Sizes.xaml 的 GroupBoxBaseHeader=40 / GroupBoxSecondaryHeader=35 / GroupBoxThirdlyHeader=25，作为数值由来说明）。重挂进容器的子控件坐标必须按此原点换算：expectedLeft = 子绝对X − 容器绝对X − inset.left，expectedTop = 子绝对Y − 容器绝对Y − inset.top；不换算会让容器内所有子控件整体下移一个标题条高度。容器变体上，`style` 是发射到 XML 的 Style 值、`contentInsetStyle` 是仅用于查本表 styleInsets 的内部键，两者分开登记：项目框架口径下 GroupBox 的 `style` 恒为空串（`Style=\"\"`），而其内容区原点就是 `contentInsetStyle` 指向的本表取值（本族 `IOGroupBoxSecondary` = {left:1, top:35}）——这是既定事实，直接换算，不设待确认项；`contentInsetStyle` 仍必须显式登记（禁止 null），否则子控件相对坐标无法机械换算，生成器 fail-closed。"
+    },
+    "tableTemplates": {
+      "columnTemplate": {
+        "geometry": {
+          "left": 0,
+          "top": 0,
+          "height": 45
+        },
+        "omitWidth": true,
+        "alwaysWrittenAttrs": [
+          "IOName"
+        ],
+        "requiredAttrsPolicy": "column-template",
+        "note": "DataGrid 的列子节点是**列定义**，不是页面控件：按设计器模板发射固定几何（Left=0 / Top=0 / Height=45，不写 Width），属性只发射 Value（列标题，来自表头文本）加恒写 IOName 空占位，不套用 controlTypeRequiredAttrs（那是页面控件的字段集）。列顺序 = 表头文本从左到右；列数 = 表头可见文本数（没有「隐藏主键列」这类额外列——本族不为列发射 IOVisible，除非将来为它在 columnTemplate 登记来源判据与发射口径）。"
+      }
+    }
   }
 }

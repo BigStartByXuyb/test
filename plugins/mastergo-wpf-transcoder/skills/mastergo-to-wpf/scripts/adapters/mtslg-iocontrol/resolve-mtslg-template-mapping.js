@@ -5,6 +5,8 @@ const fs = require("fs");
 const path = require("path");
 // 跨脚本共用工具的唯一实现（见 scripts/lib/script-helpers.js；禁止在本脚本再抄一份）。
 const helpers = require(path.join(__dirname, "..", "..", "lib", "script-helpers.js"));
+// 映射表读取的唯一实现（含共享类型域的 extends 合并）
+const { loadTemplateMap: readTemplateMapFile } = require(path.join(__dirname, "..", "..", "lib", "load-template-map.js"));
 const fail = helpers.failWithPrefix("MTSLG 模板映射失败");
 const normalizeToken = helpers.normalizeToken;
 
@@ -21,7 +23,7 @@ function loadJson(filePath, label) {
 }
 
 function loadTemplateMap(filePath) {
-  const map = loadJson(filePath, "模板 map");
+  const map = readTemplateMapFile(filePath);
   if (!map.componentTemplates || !map.componentTemplates.variants) {
     fail("模板 map 缺少 componentTemplates.variants");
   }

@@ -4,11 +4,12 @@
 const assert = require("assert");
 const fs = require("fs");
 const path = require("path");
+const { loadTemplateMap } = require(path.join(__dirname, "..", "lib", "load-template-map.js"));
 const { auditMappingCoverage } = require("../adapters/mtslg-iocontrol/audit-mtslg-feishu-map.js");
 
 const docPath = path.join(__dirname, "..", "..", "references", "adapters", "mtslg-iocontrol", "feishu-component-library-mapping.md");
 const mapPath = path.join(__dirname, "..", "..", "references", "adapters", "mtslg-iocontrol", "mtslg-iocontrol-map.json");
-const report = auditMappingCoverage(fs.readFileSync(docPath, "utf8"), JSON.parse(fs.readFileSync(mapPath, "utf8")));
+const report = auditMappingCoverage(fs.readFileSync(docPath, "utf8"), loadTemplateMap(mapPath));
 
 assert.deepStrictEqual(report.undocumented, [],
   "映射表登记的模板族/变体必须都在映射文档里出现（反向覆盖）: " + JSON.stringify(report.undocumented));
@@ -33,7 +34,7 @@ assert.deepStrictEqual(report.documented.labels.includes("单选+多选"), true,
   "章节名（如《单选+多选》）不是变体值，必须归入 labels 而不是报 unregisteredVariants");
 
 const doc = fs.readFileSync(docPath, "utf8");
-const templateMap = JSON.parse(fs.readFileSync(mapPath, "utf8"));
+const templateMap = loadTemplateMap(mapPath);
 
 // ① 文档正文完全不提该变体名（模拟"表里加了、文档忘了写"）→ 反向覆盖必须报出
 const docWithoutModal = doc.split("信息模块-手动控制弹层").join("已删除的组件集");

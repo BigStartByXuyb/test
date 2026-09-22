@@ -16,6 +16,8 @@ const SCRIPT_DIR = __dirname;
 const DEFAULT_MAP = path.resolve(SCRIPT_DIR, "..", "..", "..", "references", "adapters", "mtslg-iocontrol", "mtslg-iocontrol-map.json");
 // 跨脚本共用工具的唯一实现（见 scripts/lib/script-helpers.js；禁止在本脚本再抄一份）。
 const { fail, normalizeNewlines } = require(path.join(SCRIPT_DIR, "..", "..", "lib", "script-helpers.js"));
+// 映射表读取的唯一实现（含共享类型域的 extends 合并）
+const { loadTemplateMap } = require(path.join(SCRIPT_DIR, "..", "..", "lib", "load-template-map.js"));
 
 function parseArgs(argv) {
   const out = {};
@@ -36,7 +38,7 @@ for (const field of ["dsl", "icon-map", "page-target", "layout-path", "out"]) {
 
 const dslSnapshot = JSON.parse(fs.readFileSync(path.resolve(args.dsl), "utf8"));
 const iconMap = JSON.parse(fs.readFileSync(path.resolve(args["icon-map"]), "utf8"));
-const templateMap = JSON.parse(fs.readFileSync(path.resolve(args.map || DEFAULT_MAP), "utf8"));
+  const templateMap = loadTemplateMap(args.map || DEFAULT_MAP);
 const bottomBar = templateMap.layoutRules && templateMap.layoutRules.bottomBar;
 if (!bottomBar || !bottomBar.variants) fail("模板表缺少 layoutRules.bottomBar（底部栏变体表）");
 
