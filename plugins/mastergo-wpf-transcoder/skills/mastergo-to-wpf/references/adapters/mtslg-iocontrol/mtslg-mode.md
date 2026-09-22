@@ -200,7 +200,7 @@
 
 1. 读目标项目实际加载的现有页面 XML；由适配记录确认唯一生效版本，不能按目录名或历史副本猜测。
 2. 建映射：先套用公共栏边界表并归一 bbox，再写 DSL 节点 → 映射 JSON（`ref`/`id`/`controlType`/`parent`/pageAbsX/pageAbsY/w/h/attrs）；公共栏节点保留审计记录但不进入页面映射。
-3. Group 语义用 `classify-mastergo-groups.js` 的 role，再经 `mtslg-iocontrol-map.json` roleMap 定 ControlType；不得用相机/按钮实例在有效相机组件外重复搭建内部控件。
+3. 控件类型一律来自组件模板族（组件集名 / 公开属性值 → 映射表 `variants[].controlType`）；不得按图层名猜类型，也不得用相机/按钮实例在有效相机组件外重复搭建内部控件。
 4. `gen-iocontrol-xml.js --merge <现有XML> <mapping.json> --out <已确认页面输出路径>` → 读 merge 报告，逐条裁决冲突。
 5. `check-iocontrol-coords.js --xml <产出> --nodes <节点表>`：0 MISMATCH / 0 EXTRA。
 6. 执行第 6 节键查证门禁，处理全部未核验键。
@@ -252,7 +252,6 @@
 | `check-iocontrol-coords.js` | 页面坐标逐控件核对（0 MISMATCH 硬门） | 新 |
 | `scan-mtslg-keys.ps1` | 键白名单生成（styles/icons/langNames 成对/pageTargets/ioCommands/ioNames） | 新 |
 | `sync-to-mt.ps1` | 安全同步：备份+回滚+拒绝副本路径+svn 摘要 | 新 |
-| `classify-mastergo-groups.js` | Group 名称→语义 role 分类 | 双模式共用 |
 | `cap-window.ps1` | 截图验证（`-Method printwindow` 默认，`screen` 为屏幕抓取兜底；运行宿主与输出路径由适配记录提供） | 双模式共用 |
 | `discover-mtslg-page-icon-map.js` | 从当前页面 mapping 的真实 PATH/SVG 发现候选，保留已确认资源键，输出 `candidates/unmapped` 审计与**登记结论**（每条候选的 `registration.register`/`basis`/`source` + `mustName`；判据实现 `scripts/lib/icon-registration-policy.js`，取值读映射表的 `iconPolicy` 与 `layoutRules.bottomBar`） | 双模式共用 |
 | `gen-mtslg-page-icons.js` | 从发现结果和逐项确认的图标映射生成当前页面 Icon 文件；未确认候选不发射 | 双模式共用 |

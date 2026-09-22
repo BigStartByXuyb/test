@@ -127,7 +127,6 @@
 - `resolve-mastergo-visibility.js`：组件映射前强制运行；输出所有节点的有效可见性，是 `gen-mtslg-mapping-from-dsl.js` 生成 mapping/`textAudit` 的事实输入。显隐事实只读当前组件实例的 `componentInfo.properties`：仅当明确的显示槽位属性（如「显示文案」「显示icon」「显示主标题」「显示F」）为布尔 `false` 时隐藏对应槽位；节点自身的 `visible`/`visibility` 与泛化属性不参与判定。
 - `scan-mtslg-keys.ps1`：只有存在目标 MTSLG 运行时目录、需要确认 Style/Icon/LangName/IOName/IOCommand 键时运行。
 - `gen-mtslg-lang-keys-from-dsl.js`：`languages.auto=true` 时由 Bundle 在 XML 生成前自动调用；也可单独运行以预先审阅派生结果（`--report` 输出待翻译清单、临时键 `provisionalKeys`、中英文写法相同的键 `identicalTextKeys` 与槽位豁免 `valueLangExempt`）。不负责翻译。
-- `classify-mastergo-groups.js`：DSL 中存在未明确语义的 GROUP、容器或组合层级时运行；已由组件模板命中的实例不重复运行。
 - `scan-icon-coords.js`：Icon XAML 已生成且包含 Geometry 时运行。
 - `audit-mtslg-feishu-map.js`：组件映射文档或模板 JSON 修改后运行，检查文档覆盖（`missing` / `unregisteredFamilies` / `unregisteredVariants` / `undocumented` / `duplicateMatchKeys` 必须全为空）；整批同步清单见 `skills/mastergo-iocontrol-document-format/SKILL.md` 的「新增/修改映射的同步清单」。
 - `audit-script-duplication.js`：改任何脚本后由 `tests/script-duplication.test.js` 自动运行——同一功能只允许一份实现：复制体（函数体完全相同）直接失败；同名函数必须复用 `scripts/lib/` 的共享实现，或在 `scripts/lib/script-reuse-registry.json` 登记 reason。

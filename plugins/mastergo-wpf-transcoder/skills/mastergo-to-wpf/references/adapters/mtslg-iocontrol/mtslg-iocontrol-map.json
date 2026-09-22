@@ -1472,36 +1472,6 @@
       }
     }
   },
-  "roleMap": {
-    "button": "Button",
-    "iconbutton": "IconButton",
-    "statusbutton": "StatusButton",
-    "buttongroup": "ButtonGroup",
-    "togglebutton": "Togglebutton",
-    "radiobutton": "RadioButton",
-    "checkbox": "CheckBox",
-    "textbox": "TextBox",
-    "numberbox": "NumberBox",
-    "intnumberbox": "IntNumberBox",
-    "combobox": "ComboBox",
-    "textblock": "TextBlock",
-    "groupbox": "GroupBox",
-    "tabcontrol": "TabControl",
-    "tabitem": "TabItem",
-    "progressbar": "ProgressBar",
-    "rangeprogressbar": "RangeProgressBar",
-    "datagrid": "DataGrid",
-    "image": "Image",
-    "camera": "Camera",
-    "autocutcamera": "AutoCutCamera",
-    "highanglecamera": "HighAngleCamera",
-    "lowanglecamera": "LowAngleCamera",
-    "emtcamera": "EMTCamera",
-    "powercontrol": "PowerControl",
-    "view": "View",
-    "border": "Border",
-    "container": "_nested"
-  },
   "controlTypes": {
     "View": {
       "description": "纯容器/页签（Value=标题），可含 Index/Icon/LangName 作为页签属性",
