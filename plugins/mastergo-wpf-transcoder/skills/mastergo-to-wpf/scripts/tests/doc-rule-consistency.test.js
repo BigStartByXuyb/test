@@ -912,6 +912,16 @@ console.log("PASS 页面节点 ID 口径（派生 + 唯一 + 稳定）一致性�
     "page-build-rules.md 必须写明各族匹配键以 mtslg-iocontrol-map.json 的 match 为准");
   assert.ok(rulesText.includes("iconEntryOf"),
     "page-build-rules.md 必须写明 MenuItem 的 Icon 来自台账（layout 脚本的 iconEntryOf）");
+  // 分族边界必须按**位置**界定：`layoutRules.bottomBar` 也有 `match` 块，
+  // 用"带 match 的各族"当组件模板族的定义会把布局族并进来（2026-09-22 审计抓到过），所以禁止这种概括。
+  assert.ok(!/带\s*`?match`?\s*的各族/.test(rulesText),
+    "不得用「带 match 的各族」定义组件模板族——layoutRules.bottomBar 也带 match，会把布局族并进来；" +
+    "应按位置区分：登记在 map 顶层的各族 vs 登记在 layoutRules 下的族");
+  assert.ok(rulesText.includes("顶层") && rulesText.includes("`layoutRules` 下"),
+    "page-build-rules.md 必须按位置写清组件模板族（map 顶层）与布局族（layoutRules 下）的边界");
+  // 两种"不登记"的语义必须分开写，且 runtimeIcons 只能挂在"由目标项目提供"那一类上。
+  assert.ok(rulesText.includes("没有图标") && rulesText.includes("由目标项目提供") && rulesText.includes("runtimeIcons"),
+    "page-build-rules.md 必须把「该槽位没有图标」与「图标由目标项目提供（记进 runtimeIcons）」分开表述");
 }
 console.log("PASS 判定表不得自行枚举真值源（iconPolicy / 变体名 / 模式值 / 标记词）一致性回归测试");
 
