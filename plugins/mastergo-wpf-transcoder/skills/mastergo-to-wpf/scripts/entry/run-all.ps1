@@ -917,7 +917,9 @@ if ($EndStep.Id -eq 6) {
     # 这一步只能读已存在的草稿：产物化的 Generated\<Target>.mapping.json 与 layout-manifest 分别到第 10 / 8 步才有。
     # 带 --page-name 时该脚本会用生成器的同一套派生链，列出「派生不出语义键、必须补术语表」的文案——
     # 漏掉它们只会到第 11 步门禁才失败，整段返工。
-    $LangCmd = "node `"$(Join-Path $ScriptsFolder 'adapters/mtslg-iocontrol/list-lang-sources.mjs')`" `"$DraftMappingJson`" --page-name $Target"
+    # 文案枚举读第 5 步的产物：作业B 是 mapping 草稿，作业A 是类型判定（A 不产 mapping 草稿）。
+    $langSourceJson = if ($Mode -eq 'mw-wpf') { $TypeAuditJson } else { $DraftMappingJson }
+    $LangCmd = "node `"$(Join-Path $ScriptsFolder 'adapters/mtslg-iocontrol/list-lang-sources.mjs')`" `"$langSourceJson`" --page-name $Target"
     if (Test-Path -LiteralPath $TranslationsJson) { $LangCmd += " --translations `"$TranslationsJson`"" }
     if (Test-Path -LiteralPath $GlossaryJson) { $LangCmd += " --glossary `"$GlossaryJson`"" }
     Write-Output ("  3) 枚举本页文案，并同一次列出「必须补术语表」的文案：")
