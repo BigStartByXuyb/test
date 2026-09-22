@@ -58,6 +58,13 @@ const invented = auditMappingCoverage(docWithInvented, templateMap);
 assert.ok(invented.unregisteredVariants.includes("凭空变体"),
   "文档写出的、映射表没有的变体值必须报出: " + JSON.stringify(invented.unregisteredVariants));
 
+// ④ `### 固定模板：结构分支=X` 是文档规范允许的写法，X 是结构分支名而不是变体值 → 不算错
+const docWithBranch = doc + "\n## 右栏结构分支示例\n\n### 固定模板：结构分支=右栏图标+文案\n\n本节示例。\n";
+const branch = auditMappingCoverage(docWithBranch, templateMap);
+assert.ok(!branch.unregisteredVariants.includes("右栏图标+文案"),
+  "结构分支名不得被当成变体值报错: " + JSON.stringify(branch.unregisteredVariants));
+assert.ok(branch.documented.labels.includes("右栏图标+文案"), "结构分支名必须归入 labels");
+
 assert.ok(!doc.includes("RightUpDownButtonStyle"), "不得保留旧的 RightUpDownButtonStyle 兼容别名");
 assert.ok(!doc.includes("或其他实际变量值"), "按钮模板必须使用明确的 startstop 变体");
 assert.ok(doc.includes("40/36/32/28"), "高度规则必须包含 28 变体");

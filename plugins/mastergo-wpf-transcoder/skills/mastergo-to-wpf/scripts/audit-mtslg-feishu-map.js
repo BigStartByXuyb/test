@@ -27,7 +27,13 @@ function splitVariants(text) {
 // 标题值的拆法：先剥掉括注说明（如「聚合集合=右侧栏（全部按钮类型变体）」里的括号），再按列举分隔符切开，
 // 每段取**最后一个** `=` 之后的内容；没有 `=` 的段继承上一段的键 ——
 // `组件集=选择框，变体=选择框-40/选择框-36` → 组件集段(选择框) + 变体段(选择框-40、选择框-36)。
+// 标题键分三类：
+//   variant —— `属性 1` / `按钮类型` / `变体`：后面的值就是变体值，解析不到映射表就是文档凭空多写；
+//   section —— `组件集` / `聚合集合` / `独立组件`：后面的值是"这一节属于哪个组件集/聚合"，解析不到时
+//              要看同组里有没有别的变体锚定（有 → 算标签；整组都没有 → 孤儿章节，报错）；
+//   label   —— `结构分支`：纯结构分支名（如《右栏图标+文案》），按定义不等于任何变体名，一律算标签。
 const SECTION_KEYS = ["组件集", "聚合集合", "独立组件"];
+const LABEL_KEYS = ["结构分支"];
 
 function extractDocumentedRules(markdown) {
   // 按一级/二级标题分组：同一组件集/同一按钮族的所有结构化 token 落在同一组里，
@@ -55,7 +61,7 @@ function extractDocumentedRules(markdown) {
     for (const part of raw.split(/[、，,/]/)) {
       if (part.indexOf("=") >= 0) {
         const key = part.slice(0, part.indexOf("=")).trim();
-        kind = SECTION_KEYS.includes(key) ? "section" : "variant";
+        kind = LABEL_KEYS.includes(key) ? "label" : (SECTION_KEYS.includes(key) ? "section" : "variant");
         pushToken(part.slice(part.lastIndexOf("=") + 1), kind);
         continue;
       }
@@ -92,7 +98,8 @@ function buildVariantOwners(templateMap) {
 //   ① 命中 variants            → covered（文档→表这条能落地）
 //   ② 命中 unconfirmedVariants → unconfirmed（映射表自己登记为「待确认」，不算错）
 //   ③ 是某个变体名的子串        → labels（尺寸/分组这类片段：整数、小数、文字、晶圆图…）
-//   ④ kind=section（章节名）且同组里有解析得通的 token → labels
+//   ④ kind=label（`结构分支=` 这类纯结构名）→ labels
+//      kind=section（章节名）且同组里有解析得通的 token → labels
 //      （《单选+多选》《右侧栏》这类章节标题本来就不等于任何变体名，只要它所在的组件集章节
 //       确实登记了变体，就说明这个标题是标签；反过来，整组一个变体都解析不到 → 该章节是孤儿，报错）
 //   ⑤ 其余                     → unregisteredVariants（文档写了映射表没有的变体值/组件集，退 2）
@@ -125,6 +132,7 @@ function classifyDocTokens(groups, templateMap) {
       if (seen.has(token.value)) continue;
       seen.add(token.value);
       if (variantNames.some(variant => variant.includes(token.value))) { labels.push(token.value); continue; }
+      if (token.kind === "label") { labels.push(token.value); continue; }
       if (token.kind === "section" && anchored) { labels.push(token.value); continue; }
       unregisteredVariants.push(token.value);
       if (token.kind === "section") unresolvedSections.push(group.title || token.value);
@@ -158,8 +166,8 @@ function auditMappingCoverage(markdown, templateMap) {
   };
 }
 
-// 映射表里登记的模板族/变体（机器真值源）。文档侧的家族清单是人工登记的，
-// 单靠「文档 → 映射表」方向看不见「表加了、文档忘了写」，所以需要反向核对。
+// 映射表里登记的模板族/变体（机器真值源）。单靠「文档 → 映射表」方向看不见
+// 「表加了、文档忘了写」，所以还要跑这个反向核对。
 function collectMapVariants(templateMap) {
   const rows = [];
   for (const [family, spec] of Object.entries(templateMap)) {
