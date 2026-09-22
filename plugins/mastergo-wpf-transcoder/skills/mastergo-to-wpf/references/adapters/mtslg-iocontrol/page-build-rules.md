@@ -29,6 +29,21 @@
 - 没有目标项目键时，允许使用页面内唯一的临时 Geometry 键，状态标记 `provisional` 并保留 `sourceId` / `sourceRef`；临时键必须写入 mapping/manifest。
 - 只有未被任何实际 Icon 槽位引用的 PATH 候选才进入 `candidates` / `unmapped`，不进入 XAML。XAML 注释只写中文名称，溯源与 `keyStatus` 写入 mapping/manifest。
 
+**哪些图形要进本页台账（判定表）**：判据只有一个——该图形是否被本页某个 Icon 槽位引用；槽位由该实例**命中的模板变体**登记的 `iconPolicy` 决定。逐类结论：
+
+| 图形来源 | 进本页台账 / `Icons.xaml` | 说明 |
+|---|---|---|
+| `iconPolicy: "single-path"` 的 Icon 槽位（页面内容区按钮、**底部栏 MenuItem**、右侧栏 IconButton 都算） | **是** | 一槽位一图形，是绝大多数图标；底部栏菜单图标与其它按钮图标同等对待，不因"由 Layout 引用"而降级 |
+| `iconPolicy: "pair-per-button"`（一个按钮一对图标，如"方向"变体的 `up_pair` / `down_pair`） | **是**，两个分别登记 | 同一按钮的两个图形各自成条，不合并 |
+| `iconPolicy: "runtime"`（例：ENTER / EXIT） | **否** | `Icon` 是目标项目已存在的资源键：本页不生成该 Geometry，台账里也不该有该条目（有也会被 Bundle 剔除，并记进审计 `runtimeIcons`） |
+| `iconPolicy: "none"` | 否 | 该变体不取设计图形 |
+| 右下角常驻分组（`右侧底部-常驻button`）里的实例 | **布局层面**：不生成 MenuItem、不占 Index；**图标层面**：仍按该实例自身命中的变体的 `iconPolicy` 判——分组归属本身不决定登记与否 | 两组结论互不影响；实测同一页的常驻实例里既有要登记的，也有 `runtime` 不登记的 |
+| 宿主公共栏（顶部状态栏、顶部栏；`role=host-shell`）的图形 | 否 | 归宿主，不进本页台账（见第 5 节） |
+| 相机视口内部绘制（`role=camera-viewport-internal`）的图形 | 否 | 相机视口是整体：内部网格 / 坐标 / 通道名 / 拟合结果一律不处理，只发射外层 `Camera` 控件（见第 5 节） |
+| 其它 omit `role`（`page-title` / `excluded-component` / `unmapped-component` / `table-data-cell`） | 否 | 见第 5 节 omit 角色表 |
+
+判定顺序：先看该图形所属实例命中的模板变体给了什么 `iconPolicy`，再看它是否落在第 5 节的 omit 角色里；**两处都不排除才登记**。注意 `discover` 的候选清单只给**可机械判定**的归属标记（`ownerControlType` 仅覆盖 IconButton / Camera 这类），底部栏菜单图标不带归属标记——它们的结论来自本表，不要因为没有标记就跳过，也不要靠图层名（"顶部状态栏""键盘""组 2178"）猜。
+
 ### 2.2 几何来源核对（`verify-icon-source.mjs`，定名前必跑）
 
 台账条目的 `sourceId` 只有**唯一指向该图标自己的图形节点**时才能用于取几何。出现下列任一情形，必须改成 `fromDsl: true` + 该图标 PATH 节点的 ref（否则会把别的图形当成本图标，且静态校验不会报错）：
