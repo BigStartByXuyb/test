@@ -15,9 +15,9 @@ const { readJson, normalizeToken: normalize, normalizeNewlines,
   parentOuterRightEdge, textBlockLeftValue
 } = require(path.join(__dirname, "..", "..", "lib", "script-helpers.js"));
 const { isHostShellName } = require(path.join(__dirname, "..", "..", "lib", "mastergo-rules.js"));
-// 图标归属判据的唯一实现（见 scripts/lib/icon-ownership.js；禁止在本脚本再抄一份）。
+// 图标归属判据的唯一实现（见 scripts/adapters/mtslg-iocontrol/lib/icon-ownership.js；禁止在本脚本再抄一份）。
 const ICON_OWNERSHIP = require(path.join(__dirname, "lib", "icon-ownership.js"));
-// 模板表规则块的解析唯一实现（见 scripts/lib/iocontrol-map-rules.js；禁止在本脚本再抄一份）。
+// 模板表规则块的解析唯一实现（见 scripts/adapters/mtslg-iocontrol/lib/iocontrol-map-rules.js；禁止在本脚本再抄一份）。
 const MAP_RULES = require(path.join(__dirname, "lib", "iocontrol-map-rules.js"));
 
 // 槽位级多语言策略（langRefPolicy）的**唯一**登记点：值槽位（各族 slots[0]）——即该族

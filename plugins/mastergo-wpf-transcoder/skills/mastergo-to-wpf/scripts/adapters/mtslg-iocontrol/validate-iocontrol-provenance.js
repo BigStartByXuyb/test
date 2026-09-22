@@ -9,7 +9,7 @@
 'use strict';
 
 const fs = require('fs');
-// 模板表规则块的解析唯一实现（见 scripts/lib/iocontrol-map-rules.js；禁止在本脚本再抄一份）。
+// 模板表规则块的解析唯一实现（见 scripts/adapters/mtslg-iocontrol/lib/iocontrol-map-rules.js；禁止在本脚本再抄一份）。
 const MAP_RULES = require('./lib/iocontrol-map-rules');
 // 数值解析的唯一实现（见 scripts/lib/script-helpers.js；本校验器与坐标核对器共用同一口径）。
 // 文案比对归一（解码字符引用 + 换行归一成 LF）的唯一实现，见 scripts/lib/script-helpers.js。

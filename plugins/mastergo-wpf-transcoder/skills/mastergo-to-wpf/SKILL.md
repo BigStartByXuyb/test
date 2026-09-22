@@ -11,7 +11,7 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 
 ### 读取纪律（避免把"照步骤执行"变成"通读实现"）
 
-- 整页转换**一条命令跑完**（`run-all.ps1`，默认第 1→12 步）；步骤、输入、产物、失败处理看 `references/adapters/mtslg-iocontrol/pipeline-contract.md`。**不需要**读 `scripts/*.js`、`scripts/*.ps1` 源码来复述规则。
+- 整页转换**一条命令跑完**（`run-all.ps1`，默认第 1→12 步）；步骤、输入、产物、失败处理看 `references/adapters/mtslg-iocontrol/pipeline-contract.md`。**不需要**读 `scripts/` 下分桶目录里的源码来复述规则。
 - 只在下面三种情况读 reference：① 本文件明确写「读 X」；② 脚本报错，按 `pipeline-contract.md` 的「怎么修」定位到该 reference 的对应小节；③ 要写/改 Bundle 清单、图标命名表、译文清单，需要字段口径。
 - 未在「参考文件读取条件」里点名、且当前任务没触发的文件不要读；`references/adapters/mw-wpf/**` 属停用资料，不读。
 
@@ -72,10 +72,10 @@ description: 当前将明确要求的 MasterGo 设计稿转换为 MTSLG IOContor
 - 区域前缀（`ui`）：取值链的唯一实现在 `run-all.ps1`（`-Ui` → 项目登记表 `pages[].ui` / `derivation` → Target 编号前缀 → Target 首词 → **报错**）；取不到就报错，不静默默认。`fileId` / `layerId` 同样按「命令行 → 项目登记表 → 报错」解析，插件不内置任何项目的设计来源。
 
 ```powershell
-pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -ProjectRoot <项目> -Target <Target>                       # 一次跑完 12 步
-pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -ProjectRoot <项目> -Target <Target> -Progress <步骤名>     # 失败后从该步继续
-pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -ProjectRoot <项目> -Target <Target> -Overwrite            # 仅用户明确要求替换时
-pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -List -Format json -OutFile <文件>                         # 12 步契约（机器可读：写文件，UTF-8）
+pwsh -NoProfile -File <skill>\scripts\entry\run-all.ps1 -ProjectRoot <项目> -Target <Target>                       # 一次跑完 12 步
+pwsh -NoProfile -File <skill>\scripts\entry\run-all.ps1 -ProjectRoot <项目> -Target <Target> -Progress <步骤名>     # 失败后从该步继续
+pwsh -NoProfile -File <skill>\scripts\entry\run-all.ps1 -ProjectRoot <项目> -Target <Target> -Overwrite            # 仅用户明确要求替换时
+pwsh -NoProfile -File <skill>\scripts\entry\run-all.ps1 -List -Format json -OutFile <文件>                         # 12 步契约（机器可读：写文件，UTF-8）
 ```
 
 ### 模型必须提供的三类页面级输入（语义判断不进脚本）

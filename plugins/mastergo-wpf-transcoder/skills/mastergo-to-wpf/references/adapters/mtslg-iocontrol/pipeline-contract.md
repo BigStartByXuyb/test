@@ -1,15 +1,15 @@
 # 一键流水线步骤契约（生成物，勿手改）
 
-本文件由 `scripts/gen-pipeline-contract.mjs` 从 `scripts/run-all.ps1` 的步骤定义生成；
+本文件由 `scripts/core/gen-pipeline-contract.mjs` 从 `scripts/entry/run-all.ps1` 的步骤定义生成；
 **真值源是脚本，不是本文件**——要改契约就改 `run-all.ps1` 的 `$Steps`，然后重新生成本文件
-（`node scripts/gen-pipeline-contract.mjs`）。回归测试用 `--check` 重新生成并比对，手改本文件会直接挂测试。
+（`node scripts/core/gen-pipeline-contract.mjs`）。回归测试用 `--check` 重新生成并比对，手改本文件会直接挂测试。
 
 ## 怎么跑
 
 **一条命令跑完全部 12 步**，不需要逐个手工调用，也不要为每一步单独起一次 `run-all`：
 
 ```powershell
-pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -ProjectRoot <项目> -Target <Target>   # 首次生成：不加 -Overwrite
+pwsh -NoProfile -File <skill>\scripts\entry\run-all.ps1 -ProjectRoot <项目> -Target <Target>   # 首次生成：不加 -Overwrite
 ```
 
 默认区间是第 1 步 → 第 12 步。下面的 12 个阶段用于**定位失败**与**断点续跑**：失败后从该步继续 `-Progress <步骤名>`；需要人工补语义输入时先跑到 `-StopAfter discover`。
@@ -214,8 +214,8 @@ pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -ProjectRoot <项目> -Target 
 ## 运行方式
 
 ```powershell
-pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -ProjectRoot <项目> -Target <Target>              # 一次跑完 12 步
-pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -ProjectRoot <项目> -Target <Target> -Progress <步骤名> # 失败后从该步继续
-pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -ProjectRoot <项目> -Target <Target> -Overwrite # 仅用户明确要求替换时
-pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -List -Format json -OutFile <文件>              # 本文件的机器可读来源（写文件，UTF-8）
+pwsh -NoProfile -File <skill>\scripts\entry\run-all.ps1 -ProjectRoot <项目> -Target <Target>              # 一次跑完 12 步
+pwsh -NoProfile -File <skill>\scripts\entry\run-all.ps1 -ProjectRoot <项目> -Target <Target> -Progress <步骤名> # 失败后从该步继续
+pwsh -NoProfile -File <skill>\scripts\entry\run-all.ps1 -ProjectRoot <项目> -Target <Target> -Overwrite # 仅用户明确要求替换时
+pwsh -NoProfile -File <skill>\scripts\entry\run-all.ps1 -List -Format json -OutFile <文件>              # 本文件的机器可读来源（写文件，UTF-8）
 ```

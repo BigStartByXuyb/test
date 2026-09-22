@@ -36,7 +36,7 @@ const registrationAvailable = data.registrationAvailable !== false &&
 // 缺结论（未传 --dsl / 旧候选清单）时拒绝生成——没有判据就生成台账，等于把判定又交回人脑。
 if (!registrationAvailable) {
   throw new Error("候选清单没有登记结论（registration）：请在 run-all 的 discover 步骤用当前 DSL 快照重新生成候选清单"
-    + "（判据实现 scripts/lib/icon-registration-policy.js，禁止手工判断哪条要登记）");
+        + "（判据实现 scripts/adapters/mtslg-iocontrol/lib/icon-registration-policy.js，禁止手工判断哪条要登记）");
 }
 const mustName = candidates
   .map((candidate, index) => (candidate.registration.register === true ? index : -1))

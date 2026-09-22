@@ -796,5 +796,5 @@ if ($EndStep.Id -eq 6) {
     Write-Output ("       「还缺译文」= 补上合格英文译文即可，不必进术语表。")
     Write-Output ("     Layout 菜单名要等第 8 步产出，届时把 $LayoutManifestJson 作为第二个位置参数。")
     Write-Output ("     据此把中文→英文译文写进：$TranslationsJson")
-    Write-Output ("  4) 然后继续（台账由命名表生成、并自动做图标几何来源核对）：pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -ProjectRoot `"$ProjectRoot`" -Target $Target -Progress ledger")
+    Write-Output ("  4) 然后继续（台账由命名表生成、并自动做图标几何来源核对）：pwsh -NoProfile -File <skill>\scripts\entry\run-all.ps1 -ProjectRoot `"$ProjectRoot`" -Target $Target -Progress ledger")
 }

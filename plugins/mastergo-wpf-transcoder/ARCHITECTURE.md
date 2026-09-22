@@ -81,21 +81,21 @@ flowchart LR
 | 审计/运维 | `audit-mtslg-feishu-map.js`、`scan-mtslg-keys.ps1`、`sync-to-mt.ps1`、`cap-window.ps1` | 文档覆盖审计、键查证、运行目录同步、视觉截图（`cap-window.ps1 -Method printwindow\|screen`） |
 | 脚本复用门禁 | `audit-script-duplication.js`（由 `tests/script-duplication.test.js` 调用） | 禁止「同一个功能写两份」：复制体（函数体完全相同）直接失败；同名函数必须在 `lib/script-reuse-registry.json` 登记原因 |
 
-### 4.1 脚本函数复用（`scripts/lib/` 与硬门禁）
+### 4.1 脚本函数复用（`scripts/lib/`、`scripts/adapters/*/lib/` 与硬门禁）
 
 脚本各自可独立运行，历史上因此把同一套工具函数抄了多份，抄完就开始漂移（`inferHostPaths` 两处一份用 `startsWith`、一份用 `includes`；`num` 一处 `parseFloat`、一处 `Number`）。现在的口径是**同一个功能只允许一份实现**：
 
 | 共享模块 | 内容 | 使用方 |
 |---|---|---|
-| `lib/script-helpers.js` | `fail` / `failWithPrefix` / `failAndExit`、`normalizeNewlines`、`langValueText`、`decodeXmlEntities`、`normalizeForCompare`、`xmlAttr`、`xmlDocText`、`xmlElementText`、`normalizeToken`、`numberOrNull`、`readJson`、`backupFile` | 全部脚本 |
-| `lib/project-csproj.js` | `.csproj` Include 解析、宿主路径推断（`inferHostPaths`） | `gen-mastergo-page-bundle.js`、`gen-mw-wpf-page.js` |
-| `lib/iocontrol-map-rules.js` | 模板表 `controlTypeRequiredAttrs` / `buttonFamily` 的读取与解析 | `gen-iocontrol-xml.js`、`validate-iocontrol-provenance.js` |
-| `lib/mastergo-rules.js` | DSL 层共用判定（如宿主壳标记词 `isHostShellName`） | `gen-mtslg-mapping-from-dsl.js`、`apply-container-containment.js` |
-| `lib/page-node-id.js` | 页面节点 ID 口径的唯一真值源（`MX_` + sha256(页面键 + "\n" + 节点 ref) 前 32 位小写十六进制） | `gen-mtslg-mapping-from-dsl.js`（`allocateId` 转调） |
-| `lib/icon-ownership.js` | 图标归属判据（树包含优先、前缀回退、取最深命中） | `gen-mtslg-mapping-from-dsl.js`、`discover-mtslg-page-icon-map.js` |
-| `lib/icon-registration-policy.js` | 图标**登记判据**的唯一实现（「这个 PATH 要不要进本页台账」：模板族变体的 `iconPolicy`、布局族底部栏 MenuItem、常驻分组、宿主壳标记、装饰名；取值全部读映射表） | `discover-mtslg-page-icon-map.js` |
+| `scripts/lib/script-helpers.js` | `fail` / `failWithPrefix` / `failAndExit`、`normalizeNewlines`、`langValueText`、`decodeXmlEntities`、`normalizeForCompare`、`xmlAttr`、`xmlDocText`、`xmlElementText`、`normalizeToken`、`numberOrNull`、`readJson`、`backupFile` | 全部脚本 |
+| `scripts/lib/project-csproj.js` | `.csproj` Include 解析、宿主路径推断（`inferHostPaths`） | `gen-mastergo-page-bundle.js`、`gen-mw-wpf-page.js` |
+| `scripts/adapters/mtslg-iocontrol/lib/iocontrol-map-rules.js` | 模板表 `controlTypeRequiredAttrs` / `buttonFamily` 的读取与解析 | `gen-iocontrol-xml.js`、`validate-iocontrol-provenance.js` |
+| `scripts/lib/mastergo-rules.js` | DSL 层共用判定（如宿主壳标记词 `isHostShellName`） | `gen-mtslg-mapping-from-dsl.js`、`apply-container-containment.js` |
+| `scripts/lib/page-node-id.js` | 页面节点 ID 口径的唯一真值源（`MX_` + sha256(页面键 + "\n" + 节点 ref) 前 32 位小写十六进制） | `gen-mtslg-mapping-from-dsl.js`（`allocateId` 转调） |
+| `scripts/adapters/mtslg-iocontrol/lib/icon-ownership.js` | 图标归属判据（树包含优先、前缀回退、取最深命中） | `gen-mtslg-mapping-from-dsl.js`、`discover-mtslg-page-icon-map.js` |
+| `scripts/adapters/mtslg-iocontrol/lib/icon-registration-policy.js` | 图标**登记判据**的唯一实现（「这个 PATH 要不要进本页台账」：模板族变体的 `iconPolicy`、布局族底部栏 MenuItem、常驻分组、宿主壳标记、装饰名；取值全部读映射表） | `discover-mtslg-page-icon-map.js` |
 
-规则：**同一个功能要复用，不许反复造轮子**。新脚本需要已存在的工具就 `require` 共享模块；确实职责不同但同名的函数，登记到 `lib/script-reuse-registry.json` 并写清 `reason`（登记是显式决定，不是隐藏白名单）。发版前 `tests/script-duplication.test.js` 必须 PASS。
+规则：**同一个功能要复用，不许反复造轮子**。新脚本需要已存在的工具就 `require` 共享模块；确实职责不同但同名的函数，登记到 `scripts/lib/script-reuse-registry.json` 并写清 `reason`（登记是显式决定，不是隐藏白名单）。发版前 `tests/script-duplication.test.js` 必须 PASS。
 
 ## 5. 规则与文档分层（谁是事实源）
 
@@ -184,4 +184,4 @@ DSL/mapping 文案 ──► 英文等译文由 AI 产出 translations 清单并
 - 每次插件发版前，把本地规则文档按"整篇重建"同步到对应的飞书在线文档（按标题检索定位，不写死地址；冲突以本地为准），并记录 revision 便于回滚。
 - 版本号写在 `.claude-plugin/plugin.json`；发版时递增，避免同版本号内容漂移。
 - 不要在上一次 CI run 未结束时连续 push（会被 concurrency 取消，产生空审计报告）。
-- **脚本函数复用**：同一个功能只保留一份实现（放 `scripts/lib/`），各脚本 `require`；复制体与未登记的同名函数由 `scripts/tests/script-duplication.test.js` 拦下。改动脚本后必须跑全量 `scripts/tests/*.test.js`。
+- **脚本函数复用**：同一个功能只保留一份实现（与目标无关的放 `scripts/lib/`，路线专属的放 `scripts/adapters/<适配器>/lib/`），各脚本 `require`；复制体与未登记的同名函数由 `scripts/tests/script-duplication.test.js` 拦下。改动脚本后必须跑全量 `scripts/tests/*.test.js`。

@@ -26,7 +26,7 @@
  *                            camera-viewport-internal / no-icon-slot / unregistered-variant /
  *                            variant-without-icon-policy）
  *   registration.source   —— 结论的真值源（映射表里的具体登记项 / 宿主壳标记词实现）
- * 判据唯一实现在 scripts/lib/icon-registration-policy.js；本脚本只负责把候选与真值源喂进去。
+ * 判据唯一实现在 scripts/adapters/mtslg-iocontrol/lib/icon-registration-policy.js；本脚本只负责把候选与真值源喂进去。
  * 输出里的 mustName 是「命名表必须覆盖的候选下标」（= register=true 的候选），
  * build-icon-ledger.mjs 按它做双向门禁（漏定名 / 多定名都失败）。
  *
@@ -50,9 +50,9 @@ const fs = require("fs");
 const path = require("path");
 // 跨脚本共用工具的唯一实现（见 scripts/lib/script-helpers.js；禁止在本脚本再抄一份）。
 const { readJson } = require(path.join(__dirname, "..", "..", "lib", "script-helpers.js"));
-// 图标归属判据的唯一实现（见 scripts/lib/icon-ownership.js；禁止在本脚本再抄一份）。
+// 图标归属判据的唯一实现（见 scripts/adapters/mtslg-iocontrol/lib/icon-ownership.js；禁止在本脚本再抄一份）。
 const ICON_OWNERSHIP = require(path.join(__dirname, "lib", "icon-ownership.js"));
-// 登记判据的唯一实现（见 scripts/lib/icon-registration-policy.js；禁止在本脚本再抄一份）。
+// 登记判据的唯一实现（见 scripts/adapters/mtslg-iocontrol/lib/icon-registration-policy.js；禁止在本脚本再抄一份）。
 const ICON_REGISTRATION = require(path.join(__dirname, "lib", "icon-registration-policy.js"));
 
 function usage() {
@@ -272,7 +272,7 @@ function main() {
       review: review.length,
       byBasis,
       notes: registration
-        ? "结论来自 scripts/lib/icon-registration-policy.js（iconPolicy 与 layoutRules.bottomBar 取映射表登记值）"
+      ? "结论来自 scripts/adapters/mtslg-iocontrol/lib/icon-registration-policy.js（iconPolicy 与 layoutRules.bottomBar 取映射表登记值）"
         : "本次未传 --dsl，没有登记结论"
     }
   };

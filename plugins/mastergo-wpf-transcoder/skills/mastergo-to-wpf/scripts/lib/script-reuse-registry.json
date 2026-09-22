@@ -1,7 +1,7 @@
 {
   "_comment": [
     "跨脚本同名函数的例外登记表：只登记「名字相同但不是同一功能」的情况，每条必须写 reason。",
-    "同一个功能必须复用 scripts/lib/ 下的实现；复制体（函数体完全一致）一律失败、不允许登记。",
+    "同一个功能必须复用 scripts/lib/ 或 scripts/adapters/<适配器>/lib/ 下的实现；复制体（函数体完全一致）一律失败、不允许登记。",
     "维护方式：audit-script-duplication.js（scripts/tests/script-duplication.test.js 会跑它）会要求",
     "任何新增的同名函数要么复用共享实现，要么在这里登记原因；已不再同名的条目会提示清理。"
   ],
@@ -28,11 +28,11 @@
     },
     {
       "name": "loadControlTypeRequiredAttrs",
-      "reason": "解析唯一实现在 lib/iocontrol-map-rules.js；生成器缺表时回退内置默认，校验器缺表时不校验必写字段，回退策略本来不同。"
+      "reason": "解析唯一实现在 adapters/mtslg-iocontrol/lib/iocontrol-map-rules.js；生成器缺表时回退内置默认，校验器缺表时不校验必写字段，回退策略本来不同。"
     },
     {
       "name": "loadButtonFamilyRules",
-      "reason": "解析唯一实现在 lib/iocontrol-map-rules.js；两处的默认值集合不同（生成器含 iconSizeAttrs，校验器只做固定字段校验）。"
+      "reason": "解析唯一实现在 adapters/mtslg-iocontrol/lib/iocontrol-map-rules.js；两处的默认值集合不同（生成器含 iconSizeAttrs，校验器只做固定字段校验）。"
     }
   ]
 }

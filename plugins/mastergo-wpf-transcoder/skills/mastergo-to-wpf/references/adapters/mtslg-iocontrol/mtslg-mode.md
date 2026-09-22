@@ -243,19 +243,19 @@
 - 布局分组（无控件语义的 Group）：可以在 mapping manifest 中保留原始层级，但最终可加载的 IOContorl XML 不得输出运行时不识别的无 `ControlType` 容器；应展平到最近有效父容器并重算子坐标，或使用映射表中已确认的容器 ControlType。完整 DSL 的对应根节点/容器节点 `overflow=hidden` 时必须保留等价外层裁剪边界。
 - 新产出不得新增缺少必需语言翻译或未通过键查证的 LangName。
 
-## 10. 脚本索引（scripts/）
+## 10. 脚本索引（`scripts/` 分桶）
 
 | 脚本 | 用途 | 模式 |
 |---|---|---|
-| `call-mastergo-mcp.js` | 通过 stdio 调用 MasterGo MCP（getDsl / extractSvg / …）并把响应**只落盘**，stdout 仅一行摘要，避免整页 DSL 进入上下文 | 双模式共用 |
-| `gen-mastergo-page-bundle.js` | 一次编排页面 XML、页面 Icon、Layout、WPF 宿主壳和审计产物 | MTSLG 页面 + MaxWell WPF 宿主 |
-| `gen-mtslg-layout.js` | 创建或增量更新 Layout.xml，只发射已确认字段 | MTSLG |
-| `gen-mw-wpf-page.js` | 生成 View、View.xaml.cs、ViewModel 和 csproj 注册 | MaxWell WPF 宿主 |
-| `gen-iocontrol-xml.js` | IOContorl XML 发射器（--fresh / --merge） | 新 |
-| `check-iocontrol-coords.js` | 页面坐标逐控件核对（0 MISMATCH 硬门） | 新 |
-| `scan-mtslg-keys.ps1` | 键白名单生成（styles/icons/langNames 成对/pageTargets/ioCommands/ioNames） | 新 |
-| `sync-to-mt.ps1` | 安全同步：备份+回滚+拒绝副本路径+svn 摘要 | 新 |
-| `cap-window.ps1` | 截图验证（`-Method printwindow` 默认，`screen` 为屏幕抓取兜底；运行宿主与输出路径由适配记录提供） | 双模式共用 |
-| `discover-mtslg-page-icon-map.js` | 从当前页面 mapping 的真实 PATH/SVG 发现候选，保留已确认资源键，输出 `candidates/unmapped` 审计与**登记结论**（每条候选的 `registration.register`/`basis`/`source` + `mustName`；判据实现 `scripts/adapters/mtslg-iocontrol/lib/icon-registration-policy.js`，取值读映射表的 `iconPolicy` 与 `layoutRules.bottomBar`） | 双模式共用 |
-| `gen-mtslg-page-icons.js` | 从发现结果和逐项确认的图标映射生成当前页面 Icon 文件；未确认候选不发射 | 双模式共用 |
-| `gen-mtslg-page-lang.js` | 从语言清单发射当前页面的 `{name}_{LOCALE}.xaml` 多语言字典，强制各语言 key 完全一致 | MTSLG |
+| `core/call-mastergo-mcp.js` | 通过 stdio 调用 MasterGo MCP（getDsl / extractSvg / …）并把响应**只落盘**，stdout 仅一行摘要，避免整页 DSL 进入上下文 | 双模式共用 |
+| `entry/gen-mastergo-page-bundle.js` | 一次编排页面 XML、页面 Icon、Layout、WPF 宿主壳和审计产物 | MTSLG 页面 + MaxWell WPF 宿主 |
+| `adapters/mtslg-iocontrol/gen-mtslg-layout.js` | 创建或增量更新 Layout.xml，只发射已确认字段 | MTSLG |
+| `host/gen-mw-wpf-page.js` | 生成 View、View.xaml.cs、ViewModel 和 csproj 注册 | MaxWell WPF 宿主 |
+| `adapters/mtslg-iocontrol/gen-iocontrol-xml.js` | IOContorl XML 发射器（--fresh / --merge） | 新 |
+| `adapters/mtslg-iocontrol/check-iocontrol-coords.js` | 页面坐标逐控件核对（0 MISMATCH 硬门） | 新 |
+| `adapters/mtslg-iocontrol/scan-mtslg-keys.ps1` | 键白名单生成（styles/icons/langNames 成对/pageTargets/ioCommands/ioNames） | 新 |
+| `adapters/mtslg-iocontrol/sync-to-mt.ps1` | 安全同步：备份+回滚+拒绝副本路径+svn 摘要 | 新 |
+| `core/cap-window.ps1` | 截图验证（`-Method printwindow` 默认，`screen` 为屏幕抓取兜底；运行宿主与输出路径由适配记录提供） | 双模式共用 |
+| `adapters/mtslg-iocontrol/discover-mtslg-page-icon-map.js` | 从当前页面 mapping 的真实 PATH/SVG 发现候选，保留已确认资源键，输出 `candidates/unmapped` 审计与**登记结论**（每条候选的 `registration.register`/`basis`/`source` + `mustName`；判据实现 `scripts/adapters/mtslg-iocontrol/lib/icon-registration-policy.js`，取值读映射表的 `iconPolicy` 与 `layoutRules.bottomBar`） | 双模式共用 |
+| `adapters/mtslg-iocontrol/gen-mtslg-page-icons.js` | 从发现结果和逐项确认的图标映射生成当前页面 Icon 文件；未确认候选不发射 | 双模式共用 |
+| `adapters/mtslg-iocontrol/gen-mtslg-page-lang.js` | 从语言清单发射当前页面的 `{name}_{LOCALE}.xaml` 多语言字典，强制各语言 key 完全一致 | MTSLG |
