@@ -95,9 +95,10 @@ function newProject() {
 
 const summarize = (root, extra = []) => runNode(summaryCli, ["--project-root", root, "--target", "Demo"].concat(extra));
 
-// 1) 正常路径：字段从登记产物投影，摘要自身也登记进 outputs。
+// 1) 正常路径：字段从登记条目投影；摘要是派生视图，绝不写回登记表。
 {
   const { root, runFile } = newProject();
+  const registryBefore = fs.readFileSync(runFile, "utf8");
   const result = summarize(root);
   assert.strictEqual(result.status, 0, result.stderr);
 
@@ -125,11 +126,13 @@ const summarize = (root, extra = []) => runNode(summaryCli, ["--project-root", r
   assert.strictEqual(summary.sources.mappingDraft.step, 1);
   assert.deepStrictEqual(summary.unavailable, []);
 
-  const registry = JSON.parse(fs.readFileSync(runFile, "utf8"));
-  const entry = registry.outputs["Generated/Demo.summary.json"];
-  assert.ok(entry, "摘要必须自己登记进 outputs");
-  assert.strictEqual(entry.exists, true);
-  assert.match(entry.sha256, /^[0-9a-f]{64}$/);
+  // 台账已生成，剩下的未确认候选是信息项、差集是状态说明，两者都不该混进 todos。
+  assert.deepStrictEqual(summary.todos, []);
+  assert.deepStrictEqual(summary.notices.map((item) => item.kind), ["icons.unconfirmed", "icons.ledgerNotInPageIcons"]);
+  // 摘要是派生视图：不得写回登记表（写进去的 sha256 下一次刷新就过期）。
+  assert.strictEqual(fs.readFileSync(runFile, "utf8"), registryBefore, "摘要不得修改登记表");
+  assert.strictEqual(JSON.parse(registryBefore).outputs["Generated/Demo.summary.json"], undefined,
+    "摘要不得把自身登记进 outputs");
 }
 
 // 2) 登记产物被改写 → 必须失败，不许"读到了就先用着"。

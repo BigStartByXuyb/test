@@ -270,13 +270,13 @@ function Invoke-Registry {
 }
 
 # 本页现状摘要（build-run-summary.mjs）：每步成功后刷新一次，替代消费方手写探针去数一遍产物。
-# 它只读登记表里已登记的产物并复校 sha256，所以生成失败就意味着"登记表与磁盘不一致"——
-# 这里必须当场失败，不能留一份看着像本次、其实掺着旧数据的摘要。
+# 它只读登记表里已登记的条目并复校 sha256；失败即说明本次摘要取不到可信数据，
+# 必须当场失败（失败原因见输出，不在这里替它断言是哪一种）。
 function Update-RunSummary {
     $output = & node (Join-Path $PSScriptRoot 'build-run-summary.mjs') `
         '--project-root' $ProjectRoot '--target' $Target '--quiet' 2>&1 | Out-String
     if ($LASTEXITCODE -ne 0) {
-        throw ("本页现状摘要生成失败（登记表与磁盘不一致）`n" + (($output.Trim() -split "`n" | Select-Object -Last 8) -join "`n"))
+        throw ("本页现状摘要生成失败`n" + (($output.Trim() -split "`n" | Select-Object -Last 8) -join "`n"))
     }
 }
 
@@ -427,6 +427,7 @@ $BundleJson = Join-Path $Inputs "$Target.bundle.json"
 $DraftMappingJson = Join-Path $Work "$Target.mapping.draft.json"
 $MappingAuditJson = Join-Path $Generated "$Target.mapping.json"
 $BundleAuditJson = Join-Path $Generated "$Target.bundle.manifest.json"
+$SummaryJson = Join-Path $Generated "$Target.summary.json"
 $PageXml = Join-Path $ProjectRoot "Resources\Pages\$Target\${Target}Page.xml"
 
 # 页面标题的人工确认值：登记表里有就带上（否则标题会退回设计页名原文，带 (x.y) 编号）。
@@ -750,11 +751,15 @@ if ($warnings.Count) {
 
 if ($EndStep.Id -eq 6) {
     Write-Output ''
+    Write-Output '本页现状摘要（每步成功后刷新；先读它，不要为了盘点现状再手写探针）：'
+    Write-Output ("  $SummaryJson（身份 / 控件构成 / 待办 todos / 状态说明 notices / 图标候选 / 布局 / 产出清单，每条都写明来源）")
+    Write-Output ''
     Write-Output '下一步（语义判断，必须人工/AI 做）：'
     Write-Output ("  1) 读候选清单：$CandidateJson（含每个候选的归属控件、同级 PATH 数、图标层名与尺寸）")
     Write-Output ("  2) 把被 Icon 槽位引用的图形定名，写进命名表：$NamingJson")
     Write-Output ("     格式：[{ `"index`": <候选下标>, `"name`": `"<英文资源名>Geometry`", `"comment`": `"<中文注释>`", `"fromDsl`": <bool，可选> }, ...]")
-    Write-Output ("  3) 枚举本页需要翻译的文案：node `"$PSScriptRoot\list-lang-sources.mjs`" `"$MappingAuditJson`" `"$LayoutManifestJson`"")
+    # 这一步只能读已存在的草稿：产物化的 Generated\<Target>.mapping.json 与 layout-manifest 分别到第 10 / 8 步才有。
+    Write-Output ("  3) 枚举本页需要翻译的文案：node `"$PSScriptRoot\list-lang-sources.mjs`" `"$DraftMappingJson`"（Layout 菜单名要等第 8 步产出后，再把 $LayoutManifestJson 作为第二个参数）")
     Write-Output ("     据此把中文→英文译文写进：$TranslationsJson")
     Write-Output ("  4) 然后继续（台账由命名表生成、并自动做图标几何来源核对）：pwsh -NoProfile -File <skill>\scripts\run-all.ps1 -ProjectRoot `"$ProjectRoot`" -Target $Target -Progress ledger")
 }
