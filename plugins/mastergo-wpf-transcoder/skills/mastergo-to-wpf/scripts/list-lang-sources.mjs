@@ -84,13 +84,13 @@ if (typeof args["page-name"] === "string" && args["page-name"]) {
   const provisional = derived.report.provisionalKeys || [];
   // 拆两组，否则"还没写译文"和"写了译文也派生不出"会混在一起：
   // 前者补译文即可自动派生；后者才是必须补术语表的（单字符等形态问题）。
-  const translations = readJsonIfExists(args.translations) || {};
-  const normalized = (value) => String(value === undefined || value === null ? "" : value).replace(/\s+/g, " ").trim();
-  const translationKeys = new Map(
-    Object.keys(translations).map((key) => [normalized(key), translations[key]])
-  );
-  const needsGlossary = provisional.filter((entry) => translationKeys.has(normalized(entry.text)));
-  const needsTranslation = provisional.filter((entry) => !translationKeys.has(normalized(entry.text)));
+  // 分组直接取派生器自己的报告，不再在脚本里另判一次"有没有译文"——
+  // 那样会与生成器口径漂移（例如值为空串的条目：派生器按 `if (cn && en)` 视为没写）。
+  //   report.pendingTranslations：英文值缺失、退回中文占位 → 「还没有译文」
+  //   其余 provisionalKeys：有译文却仍派生不出语义键 → 「必须补术语表」
+  const pendingKeys = new Set((derived.report.pendingTranslations || []).map((entry) => entry.key));
+  const needsGlossary = provisional.filter((entry) => !pendingKeys.has(entry.key));
+  const needsTranslation = provisional.filter((entry) => pendingKeys.has(entry.key));
   const describe = (entry) => {
     const where = entry.menuIndex === undefined ? "页面节点" : "Layout 菜单项 #" + entry.menuIndex;
     return JSON.stringify(entry.text) + "   " + where + "   临时键=" + entry.key;

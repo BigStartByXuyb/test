@@ -38,11 +38,13 @@
 | `iconPolicy: "runtime"`（例：ENTER / EXIT） | **否** | `Icon` 是目标项目已存在的资源键：本页不生成该 Geometry，台账里也不该有该条目（有也会被 Bundle 剔除，并记进审计 `runtimeIcons`） |
 | `iconPolicy: "none"` | 否 | 该变体不取设计图形 |
 | 右下角常驻分组（`右侧底部-常驻button`）里的实例 | **布局层面**：不生成 MenuItem、不占 Index；**图标层面**：仍按该实例自身命中的变体的 `iconPolicy` 判——分组归属本身不决定登记与否 | 两组结论互不影响；实测同一页的常驻实例里既有要登记的，也有 `runtime` 不登记的 |
-| 宿主公共栏（顶部状态栏、顶部栏；`role=host-shell`）的图形 | 否 | 归宿主，不进本页台账（见第 5 节） |
+| 宿主公共栏（顶部状态栏、顶部栏）的图形 | 否 | 归宿主，不进本页台账（见第 5 节 `host-shell`） |
 | 相机视口内部绘制（`role=camera-viewport-internal`）的图形 | 否 | 相机视口是整体：内部网格 / 坐标 / 通道名 / 拟合结果一律不处理，只发射外层 `Camera` 控件（见第 5 节） |
 | 其它 omit `role`（`page-title` / `excluded-component` / `unmapped-component` / `table-data-cell`） | 否 | 见第 5 节 omit 角色表 |
 
 判定顺序：先看该图形所属实例命中的模板变体给了什么 `iconPolicy`，再看它是否落在第 5 节的 omit 角色里；**两处都不排除才登记**。注意 `discover` 的候选清单只给**可机械判定**的归属标记（`ownerControlType` 仅覆盖 IconButton / Camera 这类），底部栏菜单图标不带归属标记——它们的结论来自本表，不要因为没有标记就跳过，也不要靠图层名（"顶部状态栏""键盘""组 2178"）猜。
+
+**与第 5 节 `host-shell` 的分工（易混，明确写清）**：`host-shell` 是**文本** omit 角色，管的是顶部宿主公共栏的文本，以及**底部栏菜单的文案**（后者由 Layout `MenuItem` 的 Name 承载，不产页面内容节点）。本表管的是**图形**：底部栏 MenuItem 的图标属于页面级资源，照常登记进台账与 `Icons.xaml`。两处说的是同一条底部栏的不同侧面，不是互相排斥——不要因为文案被 omit 就认为其图标也不用登记。
 
 ### 2.2 几何来源核对（`verify-icon-source.mjs`，定名前必跑）
 
@@ -106,7 +108,7 @@
 ### 3.2 译文输入与交付
 
 - 英文文案由 AI/工程师产出，并以 `languages.translations` 显式落盘（`{ "中文文案": "English Text" }`，可内联或给 JSON 文件路径）。脚本不做翻译、不调用机翻服务，只机械套用这份清单。
-- 同一份译文清单同时用于两处：**键名语义名**（第 3.1 节第 3 条第 4 级来源）与**字典 EN 值**（`translatedFromInput` 计数）。译文清单与术语表是页面级生成产物，随 Bundle 落盘到 `Generated/{页面名}.lang-translations.json` / `.lang-glossary.json`，不做跨页面共享。
+- 同一份译文清单同时用于两处：**键名语义名**（第 3.1 节第 3 条第 4 级来源）与**字典 EN 值**（`translatedFromInput` 计数）。译文清单与术语表是页面级输入，写在 `Generated/_inputs/<Target>.lang-translations.json` / `.lang-glossary.json`（人工/AI 产出，`run-all` 的 init 会把它们的指纹记进运行登记表 `inputs`）；Bundle 再把**同一份内容逐字节复制**到 `Generated/<Target>.lang-translations.json` / `.lang-glossary.json`，作为随产物归档的副本。两处内容相同、用途不同（前者是输入，后者是归档），都不做跨页面共享。
 - 英文取值优先级：目标项目已登记字典同 key 的英文 > `translations` 译文 > 中文占位；前两者分别记入 `translatedFromCatalog` 与 `translatedFromInput`。
 - 页面标题来源必须逐页核对：`languages.titleSource=mapping.textAudit` 表示取自设计稿原文；`=manifest.pageTitleText` 表示工程师显式覆盖（交付前与 `sourceText` 逐字比对）；`=dslRoot` 表示退回设计画板框名（交付说明单列并要求人工确认）。
 - 未翻译条目保留中文占位并记入 `languages.derivation.pendingTranslations`，交付说明必须单列，不得当已完成翻译交付。
@@ -149,7 +151,7 @@ Bundle 的固定调用顺序：模板解析 → **容器嵌套重挂（`apply-co
 | 角色 | 含义 |
 |---|---|
 | `page-title` | 页面根级 / 工件级大标题 |
-| `host-shell` | 宿主公共栏（顶部栏、底部栏） |
+| `host-shell` | 宿主公共栏的**文本**：顶部状态栏 / 顶部栏，以及**底部栏的菜单文案**（底部栏文案由 Layout `MenuItem` 的 Name 承载，不产页面内容节点）。**只管文本**——底部栏 MenuItem 的**图标**是页面级资源，要登记进本页台账与 `Icons.xaml`，见第 2 节判定表。实现边界：该角色由 `scripts/lib/mastergo-rules.js` 的 `HOST_SHELL_NAME_MARKERS = ["顶部栏", "底部", "常驻信息"]`（按祖先节点名命中）赋予，调用点只有 `gen-mtslg-mapping-from-dsl.js`（文本 role）与 `apply-container-containment.js`（容器归属）——**图标发现与生成那条路不读这个标记**，所以"祖先名含底部 → 文本 omit"不会连带把底部栏图标排除 |
 | `excluded-component` | 被 `manifest.excludeInstances` 隔离的组件内部文本 |
 | `unmapped-component` | 未命中正式模板的组件内部文本 |
 | `camera-viewport-internal` | 相机视口内部整体渲染内容（映射表 `cameraTemplates.innerTextPolicy`） |
