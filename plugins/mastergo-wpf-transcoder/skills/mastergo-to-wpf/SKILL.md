@@ -117,7 +117,7 @@ pwsh -NoProfile -File <skill>\scripts\entry\run-all.ps1 -List -Format json -OutF
 - **框架固定区不进页面**：顶部栏 / 底部栏由框架渲染（尺寸用框架 Token），设计稿里的对应区域只用于生成 Layout 注册与菜单项；设计稿的右下角常驻分组与 IOContorl 同口径（不发射 / 不计格 / 不登记图标）→ `references/adapters/mw-wpf/mw-wpf-mode.md`
 - **页面必须合并本页 Icon 字典**：A 页面用 `{StaticResource …Geometry}` 引用图形，缺合并点会在加载期抛 `XamlParseException` → `references/adapters/mw-wpf/page-build-rules.md`
 - **无对应条目的类型 fail-closed**：写法表把 `Border` / `Camera` 登记为待确认，遇到即挂待确认、不发射 → `references/adapters/mw-wpf/mw-wpf-map.json`
-- **布局门禁**：`scripts/adapters/mw-wpf/check-wpf-layout.js`（越界 / 同格冲突 / 禁止写法 / 协议 / 资源键 / 硬编码文本 / 尺寸来源；空行空列只作提示，不失败——框架允许空行列）
+- **布局门禁**：`scripts/adapters/mw-wpf/check-wpf-layout.js`（越界 / 锚点格冲突 / 禁止写法 / 协议 / 资源键 / 硬编码文本 / 尺寸来源；空行空列只作提示，不失败——框架允许空行列）
 
 ## 交付与验收
 
