@@ -135,8 +135,8 @@ $Steps = @(
         Id = 7; Name = 'ledger'; Title = '由命名表生成图标台账 + 图标几何来源核对'
         Inputs   = @('候选清单', '命名表 Generated/_inputs/<Target>.icon-naming.json（人工/AI 语义输入）')
         Outputs  = @('图标台账 Generated/_inputs/<Target>.icon-map.json', 'verify-icon-source 的几何来源核对结果')
-        Failures = @('缺命名表（未加 -AllowEmptyLedger）', 'icons[] 为空', '命名表漏定名（mustName 里的候选没定名）', '命名表多定名（登记了 registration.register=false 的候选）', 'sourceId 指向页面根或被多条共用', '缺 extractSvg 条目且未声明 fromDsl')
-        Recovery = @('按候选清单的 mustName 补齐或删掉多余条目，重跑：-Progress ledger；本页确实无图标槽位时加 -AllowEmptyLedger（登记与命名表一一对应，门禁会点名具体下标与判据）')
+        Failures = @('缺命名表（未加 -AllowEmptyLedger）', 'icons[] 为空', '命名表漏定名（mustName 里的候选没定名）', '命名表多定名（登记了 registration.register=false 的候选）', 'sourceId 指向页面根', '缺 extractSvg 条目且未声明 fromDsl')
+        Recovery = @('按候选清单的 mustName 补齐或删掉多余条目，重跑：-Progress ledger；本页确实无图标槽位时加 -AllowEmptyLedger（登记与命名表一一对应，门禁会点名具体下标与判据）', 'sourceId 指向页面根 / 缺 extractSvg 条目：在命名表把该条目标成 "fromDsl": true（几何改由该图标自己的 PATH 节点合成）；多条台账条目共用同一几何是允许的，不需要改')
     },
     [pscustomobject]@{
         Id = 8; Name = 'layout'; Title = 'Layout 清单机械推导（底部栏 MenuItem）'
@@ -693,7 +693,8 @@ foreach ($step in $Steps) {
                 if (Test-Path -LiteralPath $NamingJson) {
                     Invoke-StepCommand -Label 'build icon ledger' -LogFile $log -File 'node' -Arguments @(
                     (Join-Path $ScriptsFolder 'adapters/mtslg-iocontrol/build-icon-ledger.mjs'), $CandidateJson, $LedgerJson, $NamingJson) | Out-Null
-                    # 生成后立刻核对几何来源：sourceId 指向页面根 / 被多条共用 / 缺 extractSvg 条目且未声明 fromDsl
+                    # 生成后立刻核对几何来源：sourceId 指向页面根 / 缺 extractSvg 条目且未声明 fromDsl
+                    # （多条台账条目共用同一几何按放行口径只登记事实，不判失败）
                     Invoke-StepCommand -Label 'verify icon source' -LogFile (Join-Path $StepLogs '07-ledger-verify-icon-source.log') -File 'node' -Arguments @(
                     (Join-Path $ScriptsFolder 'adapters/mtslg-iocontrol/verify-icon-source.mjs'), $CandidateJson, $SnapshotJson, $SvgJson, '--naming', $NamingJson) | Out-Null
                 }

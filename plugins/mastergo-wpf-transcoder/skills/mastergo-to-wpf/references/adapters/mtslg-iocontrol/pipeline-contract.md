@@ -133,10 +133,11 @@ pwsh -NoProfile -File <skill>\scripts\entry\run-all.ps1 -ProjectRoot <项目> -T
   - icons[] 为空
   - 命名表漏定名（mustName 里的候选没定名）
   - 命名表多定名（登记了 registration.register=false 的候选）
-  - sourceId 指向页面根或被多条共用
+  - sourceId 指向页面根
   - 缺 extractSvg 条目且未声明 fromDsl
 - **怎么修**：
   - 按候选清单的 mustName 补齐或删掉多余条目，重跑：-Progress ledger；本页确实无图标槽位时加 -AllowEmptyLedger（登记与命名表一一对应，门禁会点名具体下标与判据）
+  - sourceId 指向页面根 / 缺 extractSvg 条目：在命名表把该条目标成 "fromDsl": true（几何改由该图标自己的 PATH 节点合成）；多条台账条目共用同一几何是允许的，不需要改
 
 ### 8. `layout` —— Layout 清单机械推导（底部栏 MenuItem）
 

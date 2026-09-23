@@ -22,7 +22,7 @@ for (const entry of entries) {
   const index = Number(entry.index);
   if (!Number.isInteger(index)) throw new Error(`命名表条目缺少整数 index: ${JSON.stringify(entry)}`);
   if (!entry.name || !entry.comment) throw new Error(`命名表 #${index} 需要 name 与 comment`);
-  // fromDsl 必须一并带上：漏掉它会让「sourceId 不唯一的图标」退回错误几何（静默出错）。
+  // fromDsl 必须一并带上：漏掉它会让依赖 fromDsl 的条目退回 extractSvg 的整页/分组几何（静默出错）。
   approved.set(index, { name: entry.name, comment: entry.comment, fromDsl: entry.fromDsl === true });
 }
 if (approved.size === 0) throw new Error("命名表为空：本页若确实没有 Icon 槽位，请直接手写空台账 icons[] 而不是跑这个脚本");
