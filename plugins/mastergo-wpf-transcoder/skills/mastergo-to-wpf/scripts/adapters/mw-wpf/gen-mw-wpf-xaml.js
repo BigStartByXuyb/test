@@ -118,8 +118,9 @@ function resolveStyle(map, controlType, variant, report, ref) {
   if (pageDefault) {
     report.styleHits.push({ ref: ref, controlType: controlType, style: pageDefault, from: "pageDefault" });
     report.styleFallback.push({ ref: ref, controlType: controlType, variant: variant, style: pageDefault });
-    // "implicit" = 框架隐式默认样式：既不写 Style，也不进页级 Resources。
-    return { style: pageDefault === "implicit" ? null : pageDefault, pageLevel: true };
+    // "implicit" = 框架隐式默认样式：既不写 Style，也不进页级 Resources（不能写成 BasedOn="{StaticResource null}"）。
+    if (pageDefault === "implicit") return { style: null, pageLevel: false };
+    return { style: pageDefault, pageLevel: true };
   }
   fail("写法表没有 " + controlType + " 的样式族：变体 " + (variant || "(缺)") + " 既不命中 byVariant，也没有 pageDefault");
   return null;
@@ -177,7 +178,7 @@ function renderControl(node, cell, ctx, depth) {
   const element = spec.element;
   const gridLevel = ctx.gridIsMulti;
   const styleInfo = resolveStyle(ctx.map, node.controlType, variantOf(node), ctx.report, node.ref);
-  if (styleInfo.pageLevel) ctx.pageLevelStyles.add(node.controlType + "|" + styleInfo.style);
+  if (styleInfo.style && styleInfo.pageLevel) ctx.pageLevelStyles.add(node.controlType + "|" + styleInfo.style);
 
   const attrLines = [];
   const attr = function (name, value) { attrLines.push([name, value]); };
@@ -215,7 +216,7 @@ function renderControl(node, cell, ctx, depth) {
     ctx.report.textPending.push({ ref: node.ref, controlType: node.controlType, text: node.sourceText });
   }
 
-  if (!styleInfo.pageLevel) attr("Style", "{StaticResource " + styleInfo.style + "}");
+  if (styleInfo.style && !styleInfo.pageLevel) attr("Style", "{StaticResource " + styleInfo.style + "}");
   // 页级样式命中时不写 Style：外观由 <UserControl.Resources> 的 BasedOn 统一。
 
   // 协议挂载：只在类型判定给出取值时发射，不写空串占位（A 侧没有「必须恒写的宿主字段」）。

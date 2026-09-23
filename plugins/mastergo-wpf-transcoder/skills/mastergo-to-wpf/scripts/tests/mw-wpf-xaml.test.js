@@ -142,20 +142,20 @@ function emitArgs(layoutPath, typesPath, outPath, extra = []) {
   assert.strictEqual(report.textPending.length, 0);
 }
 
-// 2) 未登记/待确认类型（写法表 status=pending）→ 挂待确认、不发射（与作业B 的 pending 处置一致）。
+// 2) 未登记/待确认类型（写法表 status=pending，当前是 Border）→ 挂待确认、不发射（与作业B 的 pending 处置一致）。
 {
   const layout = baseLayout();
-  layout.regions[1].grid.cells = [{ ref: "work/camera", controlType: "Camera", row: 0, column: 0, rowSpan: 1, columnSpan: 1 }];
-  const layoutPath = writeJson("layout.camera.json", layout);
-  const typesPath = writeJson("types.camera.json", baseTypes([
-    { ref: "work/camera", sourceRef: "work/camera", controlType: "Camera", absX: 0, absY: 0, w: 10, h: 10 }
+  layout.regions[1].grid.cells = [{ ref: "work/border", controlType: "Border", row: 0, column: 0, rowSpan: 1, columnSpan: 1 }];
+  const layoutPath = writeJson("layout.pendingtype.json", layout);
+  const typesPath = writeJson("types.pendingtype.json", baseTypes([
+    { ref: "work/border", sourceRef: "work/border", controlType: "Border", absX: 0, absY: 0, w: 10, h: 10 }
   ]));
-  const outPath = path.join(tmpRoot, "camera", "View.xaml");
-  const reportPath = path.join(tmpRoot, "camera", "report.json");
+  const outPath = path.join(tmpRoot, "pendingtype", "View.xaml");
+  const reportPath = path.join(tmpRoot, "pendingtype", "report.json");
   run(emitArgs(layoutPath, typesPath, outPath, ["--report", reportPath, "--overwrite"]));
   const xaml = fs.readFileSync(outPath, "utf8");
   const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
-  assert.ok(!xaml.includes("s:Camera") && !xaml.includes("<Camera"), "待确认类型不得发射成任何控件");
+  assert.ok(!xaml.includes("s:Border") && !xaml.includes("<Border"), "待确认类型不得发射成任何控件");
   assert.strictEqual(report.pending.length, 1);
   assert.match(report.pending[0].reason, /待确认/);
 }
@@ -201,6 +201,24 @@ function emitArgs(layoutPath, typesPath, outPath, extra = []) {
   const out = run(emitArgs(layoutPath, typesPath, outPath), true);
   assert.match(out, /已存在/);
   assert.strictEqual(fs.readFileSync(outPath, "utf8"), "<!-- 既有产物 -->\n", "拒绝覆盖时原文件必须逐字节不变");
+}
+
+// 6) 隐式默认样式（pageDefault="implicit"，如 Camera）：不写 Style、也不许进页级 Resources
+//    ——曾经错写成 BasedOn="{StaticResource null}"，被资源键门禁 R6 拦下。
+{
+  const layout = baseLayout();
+  layout.regions[1].grid.cells = [{ ref: "work/camera", controlType: "Camera", row: 0, column: 0, rowSpan: 1, columnSpan: 1 }];
+  const layoutPath = writeJson("layout.implicit.json", layout);
+  const typesPath = writeJson("types.implicit.json", baseTypes([
+    { ref: "work/camera", sourceRef: "work/camera", controlType: "Camera", absX: 0, absY: 0, w: 200, h: 150 }
+  ]));
+  const outPath = path.join(tmpRoot, "implicit", "View.xaml");
+  run(emitArgs(layoutPath, typesPath, outPath, ["--overwrite"]));
+  const xaml = fs.readFileSync(outPath, "utf8");
+  assert.match(xaml, /<s:Camera/, "Camera 按写法表发射成 s:Camera");
+  assert.ok(!xaml.includes("StaticResource null"), "隐式默认样式不得写成 BasedOn=\"{StaticResource null}\"");
+  assert.ok(!/BasedOn="\{StaticResource [^}]*\}" \/>\s*$/m.test(xaml.split("<s:Camera")[0].split("<UserControl.Resources>")[1] || ""),
+    "隐式默认样式不得进页级 Resources");
 }
 
 console.log("PASS 作业A 页面 XAML 发射（形态 / 固定区 / fail-closed / 语言键 / 覆盖保护）回归测试");
