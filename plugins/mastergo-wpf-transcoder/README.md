@@ -42,7 +42,7 @@ MasterGo 转换只从 MasterGo MCP 取数：`getDsl` 不可调用或报错时**�
 
 可见性脚本的输出是 mapping 生成器的事实输入，不是最终页面文件。新建页面的 mapping 由 `gen-mtslg-mapping-from-dsl.js` 从原始 DSL、visibility audit 和正式组件映射机械生成（Bundle 自动调用），不由人工/AI 逐条改写；mapping 再由 Bundle 生成 XML、Icon、Layout 和宿主文件。人工/AI 的产出是**输入与边界决策**：`manifest.excludeInstances` 的组件隔离、`manifest.pageTitleText` / `langGlossary` / `languages.translations` 的文案语义，以及 `pending` / `unmappedComponents` 的处理结论。
 
-两条路线在没有目标项目时都出完整脚手架，公共部分是 `.csproj`、`framework.config.json`、宿主壳（View / code-behind / ViewModel）、Icon 资源容器、Layout 壳层与待配置清单；差异部分是各自的页面产物——作业 B 出 IOContorl 页面 XML + mapping/provenance，作业 A 出真控件 `View.xaml` + Icon 字典合并点 + `Generated/<页面名>.wpf-layout.json`。只跳过编译、WPF 加载和真实运行时验证。
+两条路线在没有目标项目时都出完整脚手架，公共部分是 `.csproj`、`framework.config.json`、code-behind / ViewModel、Icon 资源容器、Layout 壳层与待配置清单；差异部分是 `View.xaml` 与页面产物——作业 B 的 View 只是宿主壳（内容来自 IOContorl 页面 XML），页面产物是页面 XML + mapping/provenance；作业 A 的 View 是真控件页面（含本页 Icon 字典合并点），页面产物是 `Generated/<页面名>.wpf-layout.json`。只跳过编译、WPF 加载和真实运行时验证。
 
 ## Claude Code 安装
 
