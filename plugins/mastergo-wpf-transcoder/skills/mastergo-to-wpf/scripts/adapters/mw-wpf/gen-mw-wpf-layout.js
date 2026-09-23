@@ -18,8 +18,9 @@
 //     regions:[{id,name,ref,role,emit,x,y,w,h,grid:{rows[],columns[],cells[]}}], pending[] }
 //
 // 规则
-//   - 分区按设计稿带状切分：顶栏按框架 Token 高度、底栏按框架 Token 高度，其余进内容区；
-//     内容区顶部/底部的扁平条（高度不超过 strip 阈值）单独成日志条。
+//   - 分区只有两类：框架固定区（顶部栏 / 底部栏，按框架 Token 高度，emit=false）
+//     与**一个**内容区（emit=true）。框架只提供顶部栏与底部栏，因此页面根 Grid 恒为一行；
+//     设计稿的业务内容（含容器链条）全部落在同一个内容区里，内部再按行列分格。
 //   - 行列由节点 bbox 聚类得到（列 = x 向互不重叠的带，行 = y 向互不重叠的带），尺寸照设计稿像素。
 //   - 容器（写法表登记为可容纳子节点的类型）内部的节点递归成嵌套 Grid，不与被容纳节点抢同一格。
 //   - 归不进任何格的节点进 pending，不猜坐标。
@@ -29,8 +30,6 @@ const path = require("path");
 const { fail, readJson } = require(path.join(__dirname, "..", "..", "lib", "script-helpers.js"));
 
 const ROUTE_MAP = path.join(__dirname, "..", "..", "..", "references", "adapters", "mw-wpf", "mw-wpf-map.json");
-// 内容区里高度不超过该值的扁平带单独成日志条（设计稿把日志/提示条与工作区并排放时用）。
-const STRIP_MAX_HEIGHT = 60;
 const EPSILON = 2;
 
 function parseArgs(argv) {
@@ -283,31 +282,17 @@ function deriveLayout(options) {
   const headerBand = entries.filter(function (n) { return n.y + n.h <= tokens.headerHeight + EPSILON; });
   const bottomBand = entries.filter(function (n) { return n.y >= design.height - tokens.bottomHeight - EPSILON; });
   const content = entries.filter(function (n) { return headerBand.indexOf(n) < 0 && bottomBand.indexOf(n) < 0; });
-  const strips = content.filter(function (n) { return n.h <= STRIP_MAX_HEIGHT && n.y >= design.height - tokens.bottomHeight - 4 * STRIP_MAX_HEIGHT; });
-  const work = content.filter(function (n) { return strips.indexOf(n) < 0; });
 
   const regions = [
     frameworkRegion("top-strip", "顶部栏", "framework-top", "MaxwellFramework_HeaderHeight", tokens.headerHeight, design, "y"),
     frameworkRegion("bottom-bar", "底部栏", "framework-bottom", "MaxwellFramework_BottomHeight", tokens.bottomHeight, design, "y")
   ];
-  if (work.length) {
-    // 工作区与日志条必须是不重叠的纵向区间：发射端按分区顺序给根 Grid 分行，
-    // 若工作区整段盖住日志条，两行的高度就没法同时对上设计稿（门禁 R3 也会判重叠）。
-    const stripTop = strips.length ? Math.min.apply(null, strips.map(function (n) { return n.y; })) : null;
+  if (content.length) {
     regions.push({
       id: "work-area", name: "工作区", ref: null, role: "work-area", emit: true,
       x: 0, y: tokens.headerHeight, w: design.width,
-      h: (stripTop === null ? design.height - tokens.bottomHeight : stripTop) - tokens.headerHeight,
-      grid: buildRegionGrid(work, containers, pending)
-    });
-  }
-  if (strips.length) {
-    const stripTop = Math.min.apply(null, strips.map(function (n) { return n.y; }));
-    const stripBottom = Math.max.apply(null, strips.map(function (n) { return n.y + n.h; }));
-    regions.push({
-      id: "log-strip", name: "日志条", ref: null, role: "log-strip", emit: true,
-      x: 0, y: stripTop, w: design.width, h: stripBottom - stripTop,
-      grid: buildRegionGrid(strips, containers, pending)
+      h: design.height - tokens.bottomHeight - tokens.headerHeight,
+      grid: buildRegionGrid(content, containers, pending)
     });
   }
   // 归位核对：发射分区里的每个节点（含嵌套 Grid 内的）都必须被某个格子引用，否则挂待确认——
@@ -321,7 +306,7 @@ function deriveLayout(options) {
   };
   regions.filter(function (region) { return region.emit !== false; })
     .forEach(function (region) { collectRefs(region.grid); });
-  work.concat(strips).forEach(function (node) {
+  content.forEach(function (node) {
     if (!placedRefs.has(node.ref)) pending.push({ ref: node.ref, reason: "未归入任何分区/格子" });
   });
 

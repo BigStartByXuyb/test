@@ -322,17 +322,13 @@ function renderXaml(args, layout, typeInfo, map) {
     if (!region.grid) fail("发射分区缺少 grid: " + region.id);
     emitRegions.push(region);
   });
-  // 多个发射分区（工作区 + 日志条）必须各占根 Grid 的一行：直接并进同一个根 Grid 会让它们叠在一格里。
-  // 行高按分区在设计稿里的纵向顺序与间距取：区间高度 = 下一个分区起点 − 本分区起点，最后一行吃剩余空间。
-  const ordered = emitRegions.slice().sort(function (a, b) { return Number(a.y || 0) - Number(b.y || 0); });
-  const rootRows = ordered.map(function (region, index) {
-    const next = ordered[index + 1];
-    if (!next) return { size: "Star", source: "design" };
-    return { size: "Pixel", value: Math.max(1, Math.round(Number(next.y || 0) - Number(region.y || 0))), source: "design" };
-  });
-  ordered.forEach(function (region, index) {
-    bodyLines.push(renderGrid(region.grid, ctx, 1, { "Grid.Row": String(index) }));
-  });
+  // 分区模型固定为「框架固定区（不发射）+ 一个内容区」：页面根 Grid 就是内容区本身，
+  // 外层只有这一个 Grid（不再套「根 Grid + Grid.Row」的包裹层）。
+  if (emitRegions.length !== 1) {
+    fail("布局产物必须恰好有一个发射分区（内容区），当前 " + emitRegions.length + " 个: " +
+      emitRegions.map(function (region) { return region.id; }).join(", "));
+  }
+  bodyLines.push(renderGrid(emitRegions[0].grid, ctx, 1, null));
 
   const head = [
     "<UserControl x:Class=\"" + args.xClass + "\"",
@@ -348,16 +344,7 @@ function renderXaml(args, layout, typeInfo, map) {
   ];
   // 页级样式表要在 Resources 生成之前定稿，所以先渲染一遍 body 收集命中，再拼最终文本。
   const body = bodyLines.join("\n");
-  const rootGrid = ["  <Grid>"];
-  // 行定义按分区数给出：只有一个发射分区时不必写（与真实页面一致）。
-  if (ordered.length > 1) {
-    rootGrid.push("    <Grid.RowDefinitions>");
-    rootRows.forEach(function (size) { rootGrid.push("      " + rowDefinition(size).trim()); });
-    rootGrid.push("    </Grid.RowDefinitions>");
-  }
-  if (body) rootGrid.push(body);
-  rootGrid.push("  </Grid>");
-  const xaml = head.join("\n") + "\n" + renderResources(ctx) + "\n" + rootGrid.join("\n") + "\n</UserControl>\n";
+  const xaml = head.join("\n") + "\n" + renderResources(ctx) + "\n" + body + "\n</UserControl>\n";
   return { xaml: xaml, report: report };
 }
 

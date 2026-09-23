@@ -26,7 +26,7 @@
 
 坐标载体是 Grid，不是绝对定位：
 
-1. **分区**：设计稿的具名容器/带状区域切成 region，每个 region 有自己的行列定义与格子。
+1. **分区**：只有「框架固定区（顶部栏 / 底部栏，`emit=false`，按框架 Token 高度）」与**一个内容区**（`emit=true`）——框架只提供顶部栏与底部栏，所以**页面根 Grid 恒为一行**；设计稿的业务内容（含容器链条）全部落在同一个内容区里，内部再按行列分格。
 2. **框架固定区以框架为准**：顶部栏、底部栏、右侧栏常驻由框架渲染，**不发射进页面**；它们的尺寸用框架 Token（`MaxwellFramework_HeaderWidth/Height`、`MaxwellFramework_BottomHeight` 等）登记在布局产物的 `source` 里，并只用于生成 Layout 注册与菜单项。
 3. **尺寸照设计稿**：普通 region 的行列尺寸取设计稿像素（`source: "design"`），控件自身尺寸取设计稿 bbox；格子放不下时是设计问题，不改写成"凑得下"的值。
 4. **落格**：控件写 `Grid.Row` / `Grid.Column`（跨格再写 `Grid.RowSpan` / `Grid.ColumnSpan`）；同一格只放一个控件，放多个必须各自带互斥条件（`IOVisible` 或 `IOEnable` 表达式且互不相同），否则门禁失败。
