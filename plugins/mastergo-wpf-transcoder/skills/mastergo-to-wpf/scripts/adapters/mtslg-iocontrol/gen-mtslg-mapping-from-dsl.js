@@ -1195,7 +1195,6 @@ for (const child of root.children || []) {
   const s = source(child.id);
   if (!["INSTANCE", "FRAME", "COMPONENT", "GROUP", "LAYER"].includes(s.type)) continue;
   if (matchedRefs.has(s.ref) || isInHostShell(s.ref)) continue;
-  if (pending.some(item => item.sourceRef === s.ref)) continue;
   if (/背景|常驻信息|分割线/.test(s.name)) continue;
   if (!Object.keys(s.properties || {}).length && s.width === source(root.id).width && s.height === source(root.id).height) continue;
   // 纯布局包裹层不隔离：内部控件/文本照常映射，容器自身不进 pending。
