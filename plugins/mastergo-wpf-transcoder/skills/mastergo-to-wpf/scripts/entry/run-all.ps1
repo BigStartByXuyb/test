@@ -777,7 +777,7 @@ foreach ($step in $Steps) {
             }
             'gates' {
                 if ($Mode -eq 'mw-wpf') {
-                    # 作业A 的门禁：布局（越界/空行空列/同格互斥/禁止类型/尺寸来源）+ 协议/资源键/硬编码文本。
+                    # 作业A 的门禁：布局（越界/空行空列/锚点格冲突/禁止类型/尺寸来源）+ 协议/资源键/硬编码文本。
                     # 输入用 Bundle 定稿的 mapping（语言绑定已落在节点上），不是第 5 步的判定草稿——
                     # 否则"有文本没语言键"会把已绑定的节点全判成缺键。
                     Invoke-StepCommand -Label 'wpf layout gates' -LogFile $log -File 'node' -Arguments @(

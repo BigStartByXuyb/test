@@ -74,7 +74,7 @@ description: 将明确要求的 MasterGo 设计稿转换为 MTSLG IOContorl XML�
 | 11 | `gates` | 严格门禁（审计逐条断言） |
 | 12 | `verify` | 四项独立验证（provenance / 坐标 / Icon / 结构） |
 
-- **作业 A 的差异**（步骤号与名称不变，步内命令与产物不同）：第 5 步 = 共享类型判定（只读共享类型表，产出 `Generated/<Target>.component-types.json`）；第 8 步 = 共用 Layout 清单推导 **+** 布局产物推导 `Generated/<Target>.wpf-layout.json`（分区 → 行列 → 格子）；第 10 步 = 真控件 `View.xaml`（含本页 Icon 字典合并点）+ 宿主壳 + 本页 Icon/语言字典 + Layout 注册，**不发射 IOContorl 页面 XML**；第 11/12 步 = 布局门禁（越界 / 同格互斥 / 禁止类型 / 尺寸来源 / 协议 / 资源键 / 硬编码文本；空行空列只作提示）。第 1–4、6、7、9 步两条路线沿用同一套。
+- **作业 A 的差异**（步骤号与名称不变，步内命令与产物不同）：第 5 步 = 共享类型判定（只读共享类型表，产出 `Generated/<Target>.component-types.json`）；第 8 步 = 共用 Layout 清单推导 **+** 布局产物推导 `Generated/<Target>.wpf-layout.json`（分区 → 行列 → 格子）；第 10 步 = 真控件 `View.xaml`（含本页 Icon 字典合并点）+ 宿主壳 + 本页 Icon/语言字典 + Layout 注册，**不发射 IOContorl 页面 XML**；第 11/12 步 = 布局门禁（越界 / 锚点格冲突 / 禁止类型 / 尺寸来源 / 协议 / 资源键 / 硬编码文本；空行空列只作提示）。第 1–4、6、7、9 步两条路线沿用同一套。
 
 - **每一步的输入 / 产物 / 失败语义 / 怎么修：`references/adapters/mtslg-iocontrol/pipeline-contract.md`**。该文件由 `run-all.ps1` 的步骤定义生成（`node scripts/core/gen-pipeline-contract.mjs`），**真值源是脚本**；要改契约就改脚本再重新生成，手改文档会挂测试。
 - 运行登记表：`<项目>/Generated/runs/<Target>/run.json`，规则是「**产出即登记、消费只按登记取、未登记的旧同名文件一律拒绝**」；清单里的采集输入（`dslPath` / `visibilityPath` / `svgPath`）都从登记表解析并校验 `sha256`。断点续跑用 `-Progress <步骤名>`（续跑的身份与登记表口径、可改语义输入见 `references/adapters/mtslg-iocontrol/bundle-manifest.md` 第 7 节）。

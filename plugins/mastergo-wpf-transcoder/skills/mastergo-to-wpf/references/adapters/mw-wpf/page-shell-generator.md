@@ -10,7 +10,7 @@ scripts/host/gen-mw-wpf-page.js 用一个页面清单生成独立页面的固定
 
 **code-behind 挂在同页 View.xaml 下**：注册 `.csproj` 时，`<Page>View.xaml` 与它的 `<Compile>View.xaml.cs` 写成一组嵌套条目——Compile 条目带 `<DependentUpon>View.xaml</DependentUpon>`，形态与在 Visual Studio 里把 `.xaml.cs` 拖到 `.xaml` 上之后 VS 写出的**完全一致**（Solution Explorer 里表现为 `View.xaml` 一个节点、展开出 `.xaml.cs`），不需要人工拖拽。ViewModel 没有 `.xaml` 主文件，仍发射平级 `<Compile Include="…" />`。只有 code-behind 恰好等于「View 路径 + `.cs`」时才写 `DependentUpon`；清单显式给出的 `viewPath`/`codeBehindPath` 不成对时不猜主文件。重新生成时，已存在的平级 `<Compile Include="…xaml.cs" />` 会被**就地升级**成该嵌套块（幂等：不新增、不重复）。
 
-**View 的两条路线形态不同**：`renderView` 按 `config.route` 分流——作业 B 的 `<Page>View.xaml` 只由 `UserControl` 头 + `<Grid>` 里的 `uidesign:PageDesign` 组成，**不生成** `<UserControl.Resources><ResourceDictionary Source="/<程序集>;component/Resources/Pages/<页面名>/<页面名>Icons.xaml" /></UserControl.Resources>`；作业 A 的 View 交给 `scripts/adapters/mw-wpf/gen-mw-wpf-xaml.js` 发射真控件页面，`iconPage` / `assembly` 齐备时**发射**该合并声明（`StaticResource` 加载期解析，缺了会在加载期抛 `XamlParseException`）。页面 Icon 文件本身两条路线都照常生成，并按 Icon Page 注册进 `.csproj`。
+**View 的两条路线形态不同**：`renderView` 按 `config.route` 分流——作业 B 的 `<Page>View.xaml` 只由 `UserControl` 头 + `<Grid>` 里的 `uidesign:PageDesign` 组成，**不生成** `<UserControl.Resources><ResourceDictionary Source="/<程序集>;component/Resources/Pages/<页面名>/<页面名>Icons.xaml" /></UserControl.Resources>`；作业 A 的 View 交给 `scripts/adapters/mw-wpf/gen-mw-wpf-xaml.js` 发射真控件页面，图标字典路径与程序集齐备时**发射**该合并声明（`StaticResource` 加载期解析，缺了会在加载期抛 `XamlParseException`）。页面 Icon 文件本身两条路线都照常生成，并按 Icon Page 注册进 `.csproj`。
 
 ## 清单
 
