@@ -28,9 +28,18 @@ const { readJson } = require(path.join(__dirname, "..", "..", "lib", "script-hel
 const findings = [];
 const counts = {};
 
+// 提示（notice）：不失败、不进 findings，只在报告里登记事实。
+// 目标框架允许 Grid 出现空行空列（框架自身控件模板里就有空列），保留空列还能让后续控件保持设计稿坐标，
+// 因此"空行空列"只作为提示登记。
+const notices = [];
+
 function report(rule, ref, message) {
   findings.push({ rule: rule, ref: ref || null, message: message });
   counts[rule] = (counts[rule] || 0) + 1;
+}
+
+function notice(rule, ref, message) {
+  notices.push({ rule: rule, ref: ref || null, message: message });
 }
 
 function parseArgs(argv) {
@@ -98,7 +107,7 @@ function checkCells(region, map, layout) {
   });
   if (region.emit === false) return;
 
-  // R4：空行空列（收尾的星号行/列除外——它就是用来吃掉剩余空间的）。
+  // R4：空行空列 → 提示，不失败（框架允许；收尾的星号行/列本来就是用来吃掉剩余空间的）。
   const coveredRows = new Set();
   const coveredColumns = new Set();
   region.grid.cells.forEach(function (cell) {
@@ -107,12 +116,12 @@ function checkCells(region, map, layout) {
   });
   region.grid.rows.forEach(function (size, index) {
     if (!coveredRows.has(index) && !(index === rows - 1 && size.size === "Star")) {
-      report("R4", region.id, "第 " + (index + 1) + " 行没有控件覆盖（也不是收尾星号行）");
+      notice("R4", region.id, "第 " + (index + 1) + " 行没有控件覆盖（也不是收尾星号行）");
     }
   });
   region.grid.columns.forEach(function (size, index) {
     if (!coveredColumns.has(index) && !(index === columns - 1 && size.size === "Star")) {
-      report("R4", region.id, "第 " + (index + 1) + " 列没有控件覆盖（也不是收尾星号列）");
+      notice("R4", region.id, "第 " + (index + 1) + " 列没有控件覆盖（也不是收尾星号列）");
     }
   });
 
@@ -243,7 +252,7 @@ function main() {
     report("R9", item.ref || null, "推导阶段待确认：" + (item.reason || ""));
   });
 
-  const result = { status: findings.length ? "fail" : "pass", findings: findings, counts: counts, pending: pending };
+  const result = { status: findings.length ? "fail" : "pass", findings: findings, counts: counts, notices: notices, pending: pending };
   if (args.reportPath) {
     fs.mkdirSync(path.dirname(args.reportPath), { recursive: true });
     fs.writeFileSync(args.reportPath, JSON.stringify(result, null, 2) + "\n", "utf8");
