@@ -241,7 +241,7 @@
 - 版本控制：改动前备份；提交、合并和推送由用户确认后执行。
 - 如果存在重复部署副本，必须由适配配置和运行宿主确认唯一生效目录。
 - 布局分组（无控件语义的 Group）：可以在 mapping manifest 中保留原始层级，但最终可加载的 IOContorl XML 不得输出运行时不识别的无 `ControlType` 容器；应展平到最近有效父容器并重算子坐标，或使用映射表中已确认的容器 ControlType。完整 DSL 的对应根节点/容器节点 `overflow=hidden` 时必须保留等价外层裁剪边界。
-  实现口径：`gen-mtslg-mapping-from-dsl.js` 只把未命中的**组件实例**（`INSTANCE`/`COMPONENT`）登记为 `pending`/`unmappedComponents` 并隔离其内部文本；无组件身份的 `FRAME`/`GROUP`/`LAYER` 包裹层一律走本条展平路径（容器自身不发射控件，内部控件与文本按页级坐标照常发射）。
+  实现口径：`gen-mtslg-mapping-from-dsl.js` 把未命中的**组件实例**（`INSTANCE`/`COMPONENT`），以及命中模板族但结构部分命中（如表格表头可见文本不足）的节点登记为 `pending`/`unmappedComponents` 并隔离其内部文本；未命中模板族、也未登记 `pending` 的 `FRAME`/`GROUP`/`LAYER` 包裹层一律走本条展平路径（容器自身不发射控件，内部控件与文本按页级坐标照常发射）。
 - 新产出不得新增缺少必需语言翻译或未通过键查证的 LangName。
 
 ## 10. 脚本索引（`scripts/` 分桶）
