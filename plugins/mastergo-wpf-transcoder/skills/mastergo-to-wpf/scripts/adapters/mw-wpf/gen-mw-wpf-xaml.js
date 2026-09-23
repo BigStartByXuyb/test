@@ -322,8 +322,8 @@ function renderXaml(args, layout, typeInfo, map) {
     if (!region.grid) fail("发射分区缺少 grid: " + region.id);
     emitRegions.push(region);
   });
-  // 分区模型固定为「框架固定区（不发射）+ 一个内容区」：外层唯一的 Grid 就是内容网格本身，
-  // 不再套「根 Grid + Grid.Row」的包裹层（框架常驻区见 mw-wpf-mode.md 第 2 条）。
+  // 分区模型固定为「框架固定区（不发射：顶部栏 / 底部栏）+ 一个内容区」：外层唯一的 Grid 就是内容网格本身，
+  // 不再套「根 Grid + Grid.Row」的包裹层。
   if (emitRegions.length !== 1) {
     fail("布局产物必须恰好有一个发射分区（内容区），当前 " + emitRegions.length + " 个: " +
       emitRegions.map(function (region) { return region.id; }).join(", "));
