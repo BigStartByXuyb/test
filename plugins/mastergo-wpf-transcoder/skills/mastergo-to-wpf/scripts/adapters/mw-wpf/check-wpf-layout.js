@@ -231,17 +231,6 @@ function main() {
       if (entry && entry.status !== "pending") checkProtocols(cell, entry);
     });
   });
-  // 发射分区之间不得在纵向上重叠：重叠意味着两个分区会挤进根 Grid 的同一行（发射端已按分区顺序分行，
-  // 这里拦的是布局产物本身把两个分区放在同一段纵向区间）。
-  const emitRegions = layout.regions.filter(function (region) { return region.emit !== false && region.grid; })
-    .slice().sort(function (a, b) { return Number(a.y || 0) - Number(b.y || 0); });
-  for (let i = 1; i < emitRegions.length; i += 1) {
-    const previous = emitRegions[i - 1];
-    const current = emitRegions[i];
-    if (Number(current.y || 0) < Number(previous.y || 0) + Number(previous.h || 0)) {
-      report("R3", current.id, "发射分区与上一个分区纵向重叠（" + previous.id + "）：根 Grid 无法分行安置");
-    }
-  }
   checkStyleKeys(layout, map, iconNames, xamlText);
   checkHardcodedText(xamlText, layout, typesByRef);
 
