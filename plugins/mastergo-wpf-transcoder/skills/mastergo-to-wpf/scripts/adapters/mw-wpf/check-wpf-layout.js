@@ -17,7 +17,7 @@
 //   R3 格子越界：row/column/rowSpan/columnSpan 必须落在本 region 的行列范围内
 //   R4 空行空列：没有格子覆盖、也不是被星号撑开的收尾行/列
 //   R5 锚点格冲突：同一锚点格（Grid.Row/Column 起点）只允许一个控件（推导用占用表 + 行下移保证唯一）
-//   R10 待人工确认（提示）：页面用到 manual-only 类型（如 Camera：仅用户确认、无手册/真实页面证据）
+//   R10 待人工确认（提示）：页面用到写法表 manual-only 类型（证据不全，如 Camera 只有用户确认）
 //   R6 资源键闭环：{StaticResource <键>} 必须来自写法表样式族、本页 Icon 台账或 Icon 字典合并点
 //   R7 文本零硬编码中文：发射区不得出现字面中文
 //   R8 尺寸来源：框架固定区必须是 framework:<Token>，其余必须是 design
@@ -263,10 +263,10 @@ function main() {
     };
     walkProtocols(region.grid);
   });
-  // R10：manual-only 类型（仅用户确认、无手册与真实页面的A 侧证据）不阻断，但必须登记成提示，
-  // 让"首次生成需人工确认、事后回填手册"有可观测落点。
+  // R10：manual-only 类型（证据不全：有手册条目但真实页面未出现，或只有用户确认）不阻断，
+  // 但必须登记成提示，让"首次生成需人工确认、事后补齐缺的证据"有可观测落点。
   manualOnlyTypes.forEach(function (type) {
-    notice("R10", null, "写法表把 " + type + " 记为 manual-only（证据不全）：发射前需人工确认，事后按需回填手册条目");
+    notice("R10", null, "写法表把 " + type + " 记为 manual-only（证据不全）：发射前需人工确认，事后补齐缺的证据（真实页面或手册条目）");
   });
   checkStyleKeys(layout, map, iconNames, xamlText);
   checkHardcodedText(xamlText, layout, typesByRef);
