@@ -122,7 +122,8 @@ function bandOfStart(bands, value) {
 }
 
 // 控件区间覆盖到的带：起点所在带为第 0 条，之后只要带起点还在控件区间内就继续算跨度。
-// 坐标系是 Grid 相对坐标（设计稿绝对坐标减去首带起点），否则末带/相邻带会算错重叠。
+// 带起点与控件区间同为设计稿绝对坐标（clusterBands / clusterByOverlap 的输入），两边可直接比较；
+// 网格里的相对坐标只在 bandSizes 里按"相邻带起点差"体现。
 function bandSpan(bands, start, end) {
   const index = bandOfStart(bands, start);
   let last = index;
@@ -134,8 +135,9 @@ function bandSpan(bands, start, end) {
 }
 
 // ---------- flex 主轴 ----------
-// 设计稿里 FRAME/INSTANCE 可以声明 flexContainerInfo（flexDirection / gap / alignItems ...）：
-// 那是设计稿自己的布局语义。沿父链收集每个节点能看到的 flex 声明，返回 [{containerRef, direction, itemRef}]，
+// 设计稿里任何节点都可以声明 flexContainerInfo（flexDirection / gap / alignItems ...）：
+// 那是设计稿自己的布局语义。沿父链收集每个节点能看到的 flex 声明（不限声明节点的类型），
+// 返回 [{containerRef, direction, itemRef}]，
 // itemRef 是"该容器下承载本节点的那一条 flex 条目"（容器 → … → 节点 这条路径上容器的直接子节点）。
 function flexAncestors(tree, ref) {
   const chain = [];
