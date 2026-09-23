@@ -136,10 +136,18 @@ function checkCells(region, map, layout) {
 }
 
 // 协议属性：写法表里登记过、且在真实页面里出现的形状（Click / PageName / IOEnable / IOVisible / IOName）。
-function checkProtocols(cell, entry) {
-  const protocols = new Set((entry.protocols || []).map(function (text) { return String(text).split(/[={]/)[0].trim(); }));
-  Object.keys(cell.protocols || {}).forEach(function (name) {
-    if (!protocols.has(name)) report("R2", cell.ref, "未登记协议属性: " + name + "（写法表 " + cell.controlType + " 未登记）");
+// 协议属性名：写法表 protocols 里的形如 "Click={s:Action 动作名}" / "i:Interaction.Triggers + …"。
+function protocolNameOf(text) {
+  const name = String(text).split(/[={+\s]/)[0].trim();
+  return /^[A-Za-z][A-Za-z0-9.:]*$/.test(name) ? name : null;
+}
+
+// R2 读类型判定产物里的 attrs（协议的来源），不是布局产物——布局格子只登记落格信息。
+function checkProtocols(cell, entry, node, protocolAttrs) {
+  const allowed = new Set((entry.protocols || []).map(protocolNameOf).filter(Boolean));
+  Object.keys((node && node.attrs) || {}).forEach(function (name) {
+    if (!protocolAttrs.has(name)) return;
+    if (!allowed.has(name)) report("R2", cell.ref, "未登记协议属性: " + name + "（写法表 " + cell.controlType + " 未登记）");
   });
 }
 
@@ -224,11 +232,21 @@ function main() {
       });
     };
     walkNested(region.grid);
-    // 协议检查同样要递归到每一层 Grid——新容器层让"容器里的控件"不在顶层 cells 里了。
+    // 协议检查同样要递归到每一层 Grid——新容器层让"容器里的控件"不在顶层 cells 里了；
+    // 协议属性来源是类型判定产物的 attrs。
+    const protocolAttrs = new Set();
+    Object.values(map.controlTypes || {}).forEach(function (entry) {
+      (entry.protocols || []).forEach(function (text) {
+        const name = protocolNameOf(text);
+        if (name) protocolAttrs.add(name);
+      });
+    });
     const walkProtocols = function (grid) {
       (grid.cells || []).forEach(function (cell) {
-        const entry = (map.controlTypes || {})[cell.controlType];
-        if (entry && entry.status !== "pending") checkProtocols(cell, entry);
+        if (!cell.container) {
+          const entry = (map.controlTypes || {})[cell.controlType];
+          if (entry && entry.status !== "pending") checkProtocols(cell, entry, typesByRef.get(cell.ref), protocolAttrs);
+        }
         if (cell.children) walkProtocols(cell.children);
       });
     };
