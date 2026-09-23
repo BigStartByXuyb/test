@@ -12,10 +12,12 @@
 //
 // 条目（编号固定）
 //   R1 禁止写法：发射区出现写法表未登记/待确认的类型（Border）；框架固定区里出现控件
-//   R2 协议语法：XAML 里的协议属性必须是写法表登记过的形状
+//   R2 协议属性名：--types 产物节点的 attrs 里，凡属协议属性名集合（由写法表 protocols 派生）的键，
+//                  必须在该类型的 protocols 里登记过（不校验取值形状；布局格子不承载协议属性）
 //   R3 格子越界：row/column/rowSpan/columnSpan 必须落在本 region 的行列范围内
 //   R4 空行空列：没有格子覆盖、也不是被星号撑开的收尾行/列
 //   R5 锚点格冲突：同一锚点格（Grid.Row/Column 起点）只允许一个控件（推导用占用表 + 行下移保证唯一）
+//   R10 待人工确认（提示）：页面用到 manual-only 类型（如 Camera：仅用户确认、无手册/真实页面证据）
 //   R6 资源键闭环：{StaticResource <键>} 必须来自写法表样式族、本页 Icon 台账或 Icon 字典合并点
 //   R7 文本零硬编码中文：发射区不得出现字面中文
 //   R8 尺寸来源：框架固定区必须是 framework:<Token>，其余必须是 design
@@ -27,6 +29,7 @@ const { readJson } = require(path.join(__dirname, "..", "..", "lib", "script-hel
 
 const findings = [];
 const counts = {};
+const manualOnlyTypes = new Set();
 
 // 提示（notice）：不失败、不进 findings，只在报告里登记事实。
 // 目标框架允许 Grid 出现空行空列（框架自身控件模板里就有空列），保留空列还能让后续控件保持设计稿坐标，
@@ -136,15 +139,22 @@ function checkCells(region, map, layout) {
 }
 
 // 协议属性：写法表里登记过、且在真实页面里出现的形状（Click / PageName / IOEnable / IOVisible / IOName）。
-// 协议属性名：写法表 protocols 里的形如 "Click={s:Action 动作名}" / "i:Interaction.Triggers + …"。
-function protocolNameOf(text) {
-  const name = String(text).split(/[={+\s]/)[0].trim();
-  return /^[A-Za-z][A-Za-z0-9.:]*$/.test(name) ? name : null;
+// 协议属性名：写法表 protocols 的一条登记里可能用 + / 、 / ； 连接多个属性，也可能带中文前缀
+// （如「只读点位：IOName="…" + IOEnable="false" + IsAutoRead="True"」），逐个拆出来取属性名。
+function protocolNamesOf(text) {
+  return String(text).split(/[+、；;]/).map(function (part) {
+    const name = part.split(/[={]/)[0].split("：").pop().trim();
+    return /^[A-Za-z][A-Za-z0-9.:]*$/.test(name) ? name : null;
+  }).filter(Boolean);
 }
 
-// R2 读类型判定产物里的 attrs（协议的来源），不是布局产物——布局格子只登记落格信息。
+// R2 读 --types 产物节点的 attrs 键名（步骤 8 传类型判定产物，步骤 11/12 传 mapping 定稿），
+// 只校验属性名是否在该类型的写法表 protocols 里登记，不校验取值形状——布局格子只登记落格信息。
 function checkProtocols(cell, entry, node, protocolAttrs) {
-  const allowed = new Set((entry.protocols || []).map(protocolNameOf).filter(Boolean));
+  const allowed = new Set();
+  (entry.protocols || []).forEach(function (text) {
+    protocolNamesOf(text).forEach(function (name) { allowed.add(name); });
+  });
   Object.keys((node && node.attrs) || {}).forEach(function (name) {
     if (!protocolAttrs.has(name)) return;
     if (!allowed.has(name)) report("R2", cell.ref, "未登记协议属性: " + name + "（写法表 " + cell.controlType + " 未登记）");
@@ -237,8 +247,7 @@ function main() {
     const protocolAttrs = new Set();
     Object.values(map.controlTypes || {}).forEach(function (entry) {
       (entry.protocols || []).forEach(function (text) {
-        const name = protocolNameOf(text);
-        if (name) protocolAttrs.add(name);
+        protocolNamesOf(text).forEach(function (name) { protocolAttrs.add(name); });
       });
     });
     const walkProtocols = function (grid) {
@@ -246,11 +255,17 @@ function main() {
         if (!cell.container) {
           const entry = (map.controlTypes || {})[cell.controlType];
           if (entry && entry.status !== "pending") checkProtocols(cell, entry, typesByRef.get(cell.ref), protocolAttrs);
+          if (entry && entry.status === "manual-only") manualOnlyTypes.add(cell.controlType);
         }
         if (cell.children) walkProtocols(cell.children);
       });
     };
     walkProtocols(region.grid);
+  });
+  // R10：manual-only 类型（仅用户确认、无手册与真实页面的A 侧证据）不阻断，但必须登记成提示，
+  // 让"首次生成需人工确认、事后回填手册"有可观测落点。
+  manualOnlyTypes.forEach(function (type) {
+    notice("R10", null, "写法表把 " + type + " 记为 manual-only（仅用户确认）：发射前需人工确认，首次用新框架生成后回填手册条目");
   });
   checkStyleKeys(layout, map, iconNames, xamlText);
   checkHardcodedText(xamlText, layout, typesByRef);
