@@ -7,6 +7,8 @@
 //   2) 容器声明 flexDirection=column 时同理拆行；
 //   3) 没有 flex 声明的层级仍按 x 区间重叠聚类（同一条列带里的控件靠撞格下移）；
 //   4) 落格按「起始边」判定，横跨多行的控件不会把整页算进第一行。
+// 另：控件 bbox 覆盖到的带必须写进 columnSpan / rowSpan——拆带后列会变窄，
+// 跨带控件若只占一个格、又按设计稿 bbox 写宽度，就会溢出压住邻格（审计 REVIEW-003）。
 // 背景：落格按 [start, end) 包含关系判定时，一条横跨多行的控件（如相机）会让其余控件全部落到第一行，
 // 再靠撞格逐行下移——设计稿的行列语义丢失（实测某页 25 个控件被顶 151 次）。
 
@@ -107,6 +109,9 @@ function sizes(bands) {
   assert.strictEqual(rowB.row, rowC.row, "同一行容器里的条目必须在同一行");
   assert.deepStrictEqual([rowA.column, rowB.column, rowC.column], [0, 1, 2], "三个条目必须落在三条列带上");
   assert.strictEqual(cellOf(region, "wideLabel").row, 0, "上方的标签落在第一行");
+  assert.strictEqual(cellOf(region, "wideLabel").columnSpan, 3, "宽 500 的标签覆盖三条列带，必须写 columnSpan");
+  assert.strictEqual(rowB.columnSpan, 1, "单个条目的占格不跨列");
+  assert.strictEqual(region.grid.columns[2].size, "Star", "末列用星号吃掉剩余空间，容得下跨带控件");
 }
 
 // ---------- 2. 没有 flex 声明：回退 x 区间重叠聚类 ----------
@@ -168,5 +173,7 @@ function sizes(bands) {
   assert.strictEqual(region.grid.rows.length, 2, "两个 y 起点 → 两条行带");
   assert.strictEqual(cellOf(region, "tall").row, 0, "高控件落在自己的行带");
   assert.strictEqual(cellOf(region, "target").row, 1, "后面的控件落在自己的行带，不被高控件的带吞掉");
+  assert.strictEqual(cellOf(region, "tall").rowSpan, 2, "高 300 的控件覆盖两条行带，必须写 rowSpan");
+  assert.strictEqual(cellOf(region, "target").rowSpan, 1, "单行控件不跨行");
 }
 

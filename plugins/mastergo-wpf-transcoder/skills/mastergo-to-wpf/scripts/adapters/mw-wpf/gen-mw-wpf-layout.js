@@ -22,7 +22,8 @@
 //     与**一个**内容区（emit=true）。框架固定区只有顶部栏与底部栏（框架加载壳只有这两条常驻带），
 //     不进页面，因此页面外层只有**一个** Grid（内容网格本身）；设计稿的业务内容（含容器链条）
 //     全部落在同一个内容区里，内部再按行列分格。
-//   - 行列由节点 bbox 聚类得到（列 = x 向互不重叠的带，行 = y 向互不重叠的带），尺寸照设计稿像素。
+//   - 行列由节点 bbox 聚类得到（列 = x 区间重叠的带，行 = y 起始边邻近的带），尺寸照设计稿像素。
+//   - 落格按起始边判定归属；控件 bbox 覆盖到的带全部占住（跨带即写 RowSpan / ColumnSpan）。
 //   - flex 主轴优先：容器声明了 flexContainerInfo.flexDirection（row/column）时，该容器主轴上的每个
 //     flex 条目独占一条带（同一条带里出现 ≥2 个条目才拆，拆点取设计稿起点，gap 体现在"下一带起点 − 本带起点"）；
 //     没有声明的层级仍按 bbox 聚类。
@@ -118,6 +119,18 @@ function bandOfStart(bands, value) {
     else break;
   }
   return found;
+}
+
+// 控件区间覆盖到的带：起点所在带为第 0 条，之后只要带起点还在控件区间内就继续算跨度。
+// 坐标系是 Grid 相对坐标（设计稿绝对坐标减去首带起点），否则末带/相邻带会算错重叠。
+function bandSpan(bands, start, end) {
+  const index = bandOfStart(bands, start);
+  let last = index;
+  for (let i = index + 1; i < bands.length; i += 1) {
+    if (bands[i].start < end - EPSILON) last = i;
+    else break;
+  }
+  return { index: index, span: last - index + 1 };
 }
 
 // ---------- flex 主轴 ----------
@@ -258,12 +271,8 @@ function buildGridFrom(nodes, ctx) {
   const baseRows = clusterBands(nodes, yOf, function (n) { return Math.max(n.h, 1); });
   // 设计稿声明了 flex 主轴的地方，主轴上的每个条目独占一条带——否则"同一行横向排列的条目
   // 被并进同一条列带"后会被撞格规则竖排（设计稿语义丢失）。没有声明的层级仍按上面的聚类。
-  const columns = ctx.dslTree
-    ? splitBands(baseColumns, flexSplitStarts(baseColumns, nodes, ctx.dslTree, "column"))
-    : baseColumns;
-  const rows = ctx.dslTree
-    ? splitBands(baseRows, flexSplitStarts(baseRows, nodes, ctx.dslTree, "row"))
-    : baseRows;
+  const columns = splitBands(baseColumns, flexSplitStarts(baseColumns, nodes, ctx.dslTree, "column"));
+  const rows = splitBands(baseRows, flexSplitStarts(baseRows, nodes, ctx.dslTree, "row"));
   const cells = [];
   const occupied = new Set();
   let rowSizes = bandSizes(rows, "y");
@@ -276,19 +285,24 @@ function buildGridFrom(nodes, ctx) {
     return rowSizes.length - (starRow ? 2 : 1);
   };
   nodes.forEach(function (node) {
-    const column = bandOfStart(columns, node.x);
-    const row = bandOfStart(rows, node.y);
+    const column = bandSpan(columns, node.x, node.x + node.w);
+    const row = bandSpan(rows, node.y, node.y + node.h);
     // 同格只放一个控件（同格多控件必须带互斥条件，那是设计稿的语义，不由推导生成）：
     // 撞格时按 y 向后找第一个空格子；后面放不下就插入新行，保证每个控件都有确定落点。
-    let target = row;
-    while (occupied.has(target + ":" + column)) {
+    // 占格只按锚点（起始格）判定：跨格控件与设计稿一样允许压住邻格，否则重叠区会被推开。
+    let target = row.index;
+    while (occupied.has(target + ":" + column.index)) {
       if (target + 1 < rowSizes.length) target += 1;
       else target = appendRow(node);
     }
-    occupied.add(target + ":" + column);
+    occupied.add(target + ":" + column.index);
+    // 跨格数不得越界：末尾可用行/列不足时收到格子里，越界由门禁兜底。
+    const rowSpan = Math.max(1, Math.min(row.span, rowSizes.length - target));
+    const columnSpan = Math.max(1, Math.min(column.span, columns.length - column.index));
     const childNodes = ctx.childrenOf.get(node.ref) || [];
     cells.push({
-      ref: node.ref, controlType: node.controlType, row: target, column: column, rowSpan: 1, columnSpan: 1,
+      ref: node.ref, controlType: node.controlType, row: target, column: column.index,
+      rowSpan: rowSpan, columnSpan: columnSpan,
       ...(childNodes.length ? { children: buildGridFrom(childNodes, ctx) } : {})
     });
   });
