@@ -11,7 +11,7 @@
 // 退出码：0 通过；2 有 findings（门禁失败）；1 输入/契约错误。
 //
 // 条目（编号固定）
-//   R1 禁止写法：发射区出现写法表未登记/待确认的类型（Border / Camera）；框架固定区里出现控件
+//   R1 禁止写法：发射区出现写法表未登记/待确认的类型（Border）；框架固定区里出现控件
 //   R2 协议语法：XAML 里的协议属性必须是写法表登记过的形状
 //   R3 格子越界：row/column/rowSpan/columnSpan 必须落在本 region 的行列范围内
 //   R4 空行空列：没有格子覆盖、也不是被星号撑开的收尾行/列
@@ -224,10 +224,15 @@ function main() {
       });
     };
     walkNested(region.grid);
-    (region.grid.cells || []).forEach(function (cell) {
-      const entry = (map.controlTypes || {})[cell.controlType];
-      if (entry && entry.status !== "pending") checkProtocols(cell, entry);
-    });
+    // 协议检查同样要递归到每一层 Grid——新容器层让"容器里的控件"不在顶层 cells 里了。
+    const walkProtocols = function (grid) {
+      (grid.cells || []).forEach(function (cell) {
+        const entry = (map.controlTypes || {})[cell.controlType];
+        if (entry && entry.status !== "pending") checkProtocols(cell, entry);
+        if (cell.children) walkProtocols(cell.children);
+      });
+    };
+    walkProtocols(region.grid);
   });
   checkStyleKeys(layout, map, iconNames, xamlText);
   checkHardcodedText(xamlText, layout, typesByRef);

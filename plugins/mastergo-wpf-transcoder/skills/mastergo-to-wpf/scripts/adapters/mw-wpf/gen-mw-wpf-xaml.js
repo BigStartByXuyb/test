@@ -100,7 +100,7 @@ function variantOf(node) {
 function specOf(map, controlType) {
   const spec = (map.controlTypes || {})[controlType];
   if (!spec) fail("写法表未登记该 ControlType: " + controlType);
-  // 待确认类型（如 Border / Camera）挂待确认、不发射：与本路线其它未命中项的处置一致
+  // 待确认类型（如 Border）挂待确认、不发射：与本路线其它未命中项的处置一致
   // （页面照常发射，待确认项进报告与门禁的警告清单，不静默猜测替代控件）。
   if (spec.status === "pending") return null;
   if (!spec.element) fail("写法表 " + controlType + " 缺少 element");
@@ -277,12 +277,13 @@ function renderGrid(grid, ctx, depth, gridAttrs) {
   const childCtx = Object.assign({}, ctx, { gridIsMulti: multi });
   grid.cells.forEach(function (cell) {
     const node = ctx.byRef.get(cell.ref);
-    // 容器格子：设计稿声明的 flex 容器没有控件类型，它自己就是一层 <Grid>（层级照设计稿）。
-    if (!node) {
-      if (!cell.children) fail("格子引用的节点不在类型判定产物里: " + cell.ref);
+    // 容器格子（产物里 container: true）：设计稿声明的 flex 容器没有控件类型，它自己就是一层 <Grid>。
+    if (cell.container) {
+      if (!cell.children) fail("容器格子缺少内层 Grid: " + cell.ref);
       lines.push(renderGrid(cell.children, ctx, depth + 1, gridCellAttrs(cell, childCtx)));
       return;
     }
+    if (!node) fail("格子引用的节点不在类型判定产物里: " + cell.ref);
     if (!node.controlType) fail("节点缺少 controlType: " + cell.ref);
     const sized = Object.assign({}, cell, {
       width: cell.width || (grid.columns[cell.column] && grid.columns[cell.column].value),
