@@ -164,6 +164,19 @@ function columnDefinition(size) {
 
 function indentOf(depth) { return "    ".repeat(depth); }
 
+// 格子定位属性：只有多行/多列的 Grid 才写 Grid.Row/Column（单行单列不写，与真实页面一致），
+// 跨格再写 RowSpan/ColumnSpan。控件与容器 Grid 共用同一套口径。
+function gridCellAttrs(cell, ctx) {
+  if (!ctx.gridIsMulti) return null;
+  if (typeof cell.row !== "number" || typeof cell.column !== "number") {
+    fail("格子里缺少 row/column: " + cell.ref);
+  }
+  const attrs = { "Grid.Row": String(cell.row), "Grid.Column": String(cell.column) };
+  if (cell.rowSpan > 1) attrs["Grid.RowSpan"] = String(cell.rowSpan);
+  if (cell.columnSpan > 1) attrs["Grid.ColumnSpan"] = String(cell.columnSpan);
+  return attrs;
+}
+
 // 控件属性：顺序固定为 定位 → 文本 → 图形 → 样式 → 协议，便于逐行比对真实页面。
 function renderControl(node, cell, ctx, depth) {
   const spec = specOf(ctx.map, node.controlType);
@@ -176,22 +189,14 @@ function renderControl(node, cell, ctx, depth) {
   const pad = indentOf(depth) + "  ";
 
   const element = spec.element;
-  const gridLevel = ctx.gridIsMulti;
   const styleInfo = resolveStyle(ctx.map, node.controlType, variantOf(node), ctx.report, node.ref);
   if (styleInfo.style && styleInfo.pageLevel) ctx.pageLevelStyles.add(node.controlType + "|" + styleInfo.style);
 
   const attrLines = [];
   const attr = function (name, value) { attrLines.push([name, value]); };
 
-  if (gridLevel) {
-    if (typeof cell.row !== "number" || typeof cell.column !== "number") {
-      fail("格子里缺少 row/column: " + node.ref);
-    }
-    attr("Grid.Row", String(cell.row));
-    attr("Grid.Column", String(cell.column));
-    if (cell.rowSpan > 1) attr("Grid.RowSpan", String(cell.rowSpan));
-    if (cell.columnSpan > 1) attr("Grid.ColumnSpan", String(cell.columnSpan));
-  }
+  const cellAttrs = gridCellAttrs(cell, ctx);
+  if (cellAttrs) Object.keys(cellAttrs).forEach(function (name) { attr(name, cellAttrs[name]); });
 
   // 尺寸照设计稿：格子尺寸取自布局产物，控件自身尺寸取自设计稿 bbox，偏移转 Margin。
   if (typeof node.w === "number" && typeof node.h === "number" && cell.width && cell.height) {
@@ -272,7 +277,12 @@ function renderGrid(grid, ctx, depth, gridAttrs) {
   const childCtx = Object.assign({}, ctx, { gridIsMulti: multi });
   grid.cells.forEach(function (cell) {
     const node = ctx.byRef.get(cell.ref);
-    if (!node) fail("格子引用的节点不在类型判定产物里: " + cell.ref);
+    // 容器格子：设计稿声明的 flex 容器没有控件类型，它自己就是一层 <Grid>（层级照设计稿）。
+    if (!node) {
+      if (!cell.children) fail("格子引用的节点不在类型判定产物里: " + cell.ref);
+      lines.push(renderGrid(cell.children, ctx, depth + 1, gridCellAttrs(cell, childCtx)));
+      return;
+    }
     if (!node.controlType) fail("节点缺少 controlType: " + cell.ref);
     const sized = Object.assign({}, cell, {
       width: cell.width || (grid.columns[cell.column] && grid.columns[cell.column].value),

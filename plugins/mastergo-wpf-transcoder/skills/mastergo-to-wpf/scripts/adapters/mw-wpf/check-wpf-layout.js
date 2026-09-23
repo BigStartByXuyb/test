@@ -92,7 +92,8 @@ function checkCells(region, map, layout) {
       report("R1", cell.ref, "框架固定区（" + region.id + "）里不得有控件");
       return;
     }
-    if (!entry || entry.status === "pending") {
+    // 容器格子（设计稿声明的 flex 容器）没有控件类型：类型检查交给内层 Grid 里的控件。
+    if (!cell.container && (!entry || entry.status === "pending")) {
       report("R1", cell.ref, "写法表未登记或登记为待确认的类型: " + cell.controlType);
       return;
     }

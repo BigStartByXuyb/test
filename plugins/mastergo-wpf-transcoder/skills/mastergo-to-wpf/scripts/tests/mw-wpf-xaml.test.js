@@ -221,4 +221,39 @@ function emitArgs(layoutPath, typesPath, outPath, extra = []) {
     "隐式默认样式不得进页级 Resources");
 }
 
-console.log("PASS 作业A 页面 XAML 发射（形态 / 固定区 / fail-closed / 语言键 / 覆盖保护）回归测试");
+// 7) 容器格子（设计稿声明的 flex 容器）：没有控件类型，自己就是一层 <Grid>，
+//    定位属性写在它身上，内部控件落它自己的内层格子。
+{
+  const layout = baseLayout();
+  layout.regions[1].grid.cells = [
+    { ref: "work/camera", controlType: "Camera", row: 0, column: 0, rowSpan: 1, columnSpan: 1 },
+    {
+      ref: "work/flex", container: true, row: 0, column: 1, rowSpan: 1, columnSpan: 1,
+      children: {
+        rows: [{ size: "Pixel", value: 40, source: "design" }, { size: "Star", source: "design" }],
+        columns: [{ size: "Pixel", value: 120, source: "design" }, { size: "Star", source: "design" }],
+        cells: [
+          { ref: "work/label", controlType: "TextBlock", row: 0, column: 0, rowSpan: 1, columnSpan: 1 }
+        ]
+      }
+    }
+  ];
+  const layoutPath = writeJson("layout.container.json", layout);
+  const typesPath = writeJson("types.container.json", baseTypes([
+    { ref: "work/camera", sourceRef: "work/camera", controlType: "Camera", absX: 0, absY: 0, w: 200, h: 150 },
+    {
+      ref: "work/label", sourceRef: "work/label", controlType: "TextBlock",
+      sourceText: "工件厚度", absX: 16, absY: 106, w: 120, h: 30, langName: "SamplePageWorkpieceThickness"
+    }
+  ]));
+  const outPath = path.join(tmpRoot, "container", "View.xaml");
+  run(emitArgs(layoutPath, typesPath, outPath, ["--overwrite"]));
+  const xaml = fs.readFileSync(outPath, "utf8");
+  assert.match(xaml, /<Grid Grid\.Row="0" Grid\.Column="1">/, "容器格子必须发射成一层带定位属性的 <Grid>");
+  const container = xaml.slice(xaml.indexOf('<Grid Grid.Row="0" Grid.Column="1">'));
+  const inner = container.slice(0, container.indexOf("</Grid>"));
+  assert.match(inner, /<Grid\.RowDefinitions>/, "容器 Grid 必须有内层行列定义");
+  assert.match(inner, /<TextBlock[\s\S]*Grid\.Row="0"[\s\S]*Grid\.Column="0"/, "子控件必须落在容器 Grid 的内层格子里");
+}
+
+console.log("PASS 作业A 页面 XAML 发射（形态 / 固定区 / fail-closed / 语言键 / 覆盖保护 / 容器层）回归测试");

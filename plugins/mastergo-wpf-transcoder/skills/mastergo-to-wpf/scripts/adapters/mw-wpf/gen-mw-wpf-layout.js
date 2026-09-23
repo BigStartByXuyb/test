@@ -27,6 +27,8 @@
 //   - flex 主轴优先：容器声明了 flexContainerInfo.flexDirection（row/column）时，该容器主轴上的每个
 //     flex 条目独占一条带（同一条带里出现 ≥2 个条目才拆，拆点取设计稿起点，gap 体现在"下一带起点 − 本带起点"）；
 //     没有声明的层级仍按 bbox 聚类。
+//   - 层级照设计稿：声明了 flex 主轴（flexDirection）的容器各自发射一个内层 Grid（格子带 container:true），
+//     它的条目（直接子控件 / 更内层的容器）进该层格子；没有 flex 声明的包裹层展平到最近一层。
 //   - 容器（写法表登记为可容纳子节点的类型）内部的节点递归成嵌套 Grid，不与被容纳节点抢同一格。
 //   - 归不进任何格的节点进 pending，不猜坐标。
 
@@ -176,6 +178,54 @@ function flexMainAxisItems(nodes, tree, axis) {
   return byContainer;
 }
 
+// ---------- flex 容器层级 ----------
+// 设计稿声明的 flex 容器在页面里要保留层级：容器 → 一层 Grid，它的条目进该层格子。
+// 两条收口规则（避免纯噪声层）：
+//   ① 只有 ≥2 个条目的容器才成层——单条目容器没有主轴关系可表达，内容提到上一层；
+//   ② 区域根网格不做 1×1 空壳——顶层如果是"单容器链"，把最内层条目的层提上来。
+function flexContainerParent(tree, containerRef) {
+  const chain = flexAncestors(tree, containerRef);
+  return chain.length ? chain[0].containerRef : null;
+}
+
+function buildFlexItems(entries, tree) {
+  const membersOf = new Map();
+  const containers = new Set();
+  entries.forEach(function (entry) {
+    const chain = flexAncestors(tree, entry.ref);
+    chain.forEach(function (info) { containers.add(info.containerRef); });
+    const key = chain.length ? chain[0].containerRef : null;
+    if (!membersOf.has(key)) membersOf.set(key, []);
+    membersOf.get(key).push(entry);
+  });
+  const childContainers = new Map();
+  containers.forEach(function (containerRef) {
+    const parent = flexContainerParent(tree, containerRef);
+    if (!childContainers.has(parent)) childContainers.set(parent, []);
+    childContainers.get(parent).push(containerRef);
+  });
+  const build = function (key) {
+    const items = (membersOf.get(key) || []).slice();
+    (childContainers.get(key) || []).forEach(function (containerRef) {
+      const record = tree.byRef.get(containerRef);
+      if (!record) return;
+      const inner = build(containerRef);
+      if (inner.length < 2) {
+        items.push.apply(items, inner);
+        return;
+      }
+      items.push({
+        ref: containerRef, container: true,
+        x: record.x, y: record.y, w: record.w, h: record.h, items: inner
+      });
+    });
+    return items;
+  };
+  let items = build(null);
+  while (items.length === 1 && items[0].container) items = build(items[0].ref);
+  return items;
+}
+
 // 只有"同一条带里出现 ≥2 个 flex 条目"才需要拆带：一个条目独占一条带时拆了也没有信息量。
 function flexSplitStarts(bands, nodes, tree, axis) {
   const perBand = bands.map(function () { return []; });
@@ -301,12 +351,17 @@ function buildGridFrom(nodes, ctx) {
     // 跨格数不得越界：末尾可用行/列不足时收到格子里，越界由门禁兜底。
     const rowSpan = Math.max(1, Math.min(row.span, rowSizes.length - target));
     const columnSpan = Math.max(1, Math.min(column.span, columns.length - column.index));
-    const childNodes = ctx.childrenOf.get(node.ref) || [];
-    cells.push({
-      ref: node.ref, controlType: node.controlType, row: target, column: column.index,
-      rowSpan: rowSpan, columnSpan: columnSpan,
-      ...(childNodes.length ? { children: buildGridFrom(childNodes, ctx) } : {})
-    });
+    // 容器格子（设计稿声明的 flex 容器）不带控件类型，只带内层 Grid；
+    // 控件格子照旧：写法表登记 holdsChildren 的类型（GroupBox）可再挂一层内层 Grid。
+    const childNodes = node.container ? node.items : (ctx.childrenOf.get(node.ref) || []);
+    const cell = {
+      ref: node.ref, row: target, column: column.index,
+      rowSpan: rowSpan, columnSpan: columnSpan
+    };
+    if (node.container) cell.container = true;
+    else cell.controlType = node.controlType;
+    if (childNodes.length) cell.children = buildGridFrom(childNodes, ctx);
+    cells.push(cell);
   });
   return {
     rows: rowSizes,
@@ -317,7 +372,7 @@ function buildGridFrom(nodes, ctx) {
 
 function buildRegionGrid(entries, containers, pending, dslTree) {
   const tree = buildContainmentTree(entries, containers, pending);
-  return buildGridFrom(tree.roots, { childrenOf: tree.childrenOf, dslTree: dslTree });
+  return buildGridFrom(buildFlexItems(tree.roots, dslTree), { childrenOf: tree.childrenOf, dslTree: dslTree });
 }
 
 // 区间重叠聚类：x/y 区间相交的算同一条带。用于"互不包含"的同层节点——
