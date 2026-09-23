@@ -27,7 +27,7 @@
 坐标载体是 Grid，不是绝对定位：
 
 1. **分区**：只有「框架固定区（`emit=false`）」与**一个内容区**（`emit=true`）。框架固定区只有**顶部栏**与**底部栏**两类（框架的实际加载壳只有这两条常驻带）；它们不进页面，所以**页面外层只有唯一一个 Grid —— 内容网格本身**（不再另套一层带 `Grid.Row` 的根 Grid）；设计稿的业务内容（含容器链条）全部落在同一个内容区里，内部再按行列分格。
-2. **框架固定区以框架为准**：顶部栏、底部栏由框架渲染，**不发射进页面**；它们的高度用框架 Token（`MaxwellFramework_HeaderHeight` / `MaxwellFramework_BottomHeight`）登记在布局产物的 `source` 里，只用于布局产物登记与 Layout 注册。设计稿右侧那一列按钮（例：右侧栏实例）是**页面控件**，照常映射发射，不要与框架侧边菜单混淆（框架的 `MaxwellFramework_SideMenuWidth/Height` 在 SDC 内零引用、疑似遗留，本链路不消费）。
+2. **框架固定区以框架为准**：顶部栏、底部栏由框架渲染，**不发射进页面**；它们的高度用框架 Token（`MaxwellFramework_HeaderHeight` / `MaxwellFramework_BottomHeight`）登记在布局产物的 `source` 里，只用于布局产物登记与 Layout 注册。设计稿的**右下角常驻分组**（`右侧底部-常驻button`）与 `mtslg-iocontrol` 同口径：整组不发射进页面、不参与布局计格、其中的图形不登记图标（框架单独处理），A 路线不另立口径。
 3. **尺寸照设计稿**：普通 region 的行列尺寸取设计稿像素（`source: "design"`），控件自身尺寸取设计稿 bbox；格子放不下时是设计问题，不改写成"凑得下"的值。
 4. **落格**：控件写 `Grid.Row` / `Grid.Column`（跨格再写 `Grid.RowSpan` / `Grid.ColumnSpan`）；同一格只放一个控件，放多个必须各自带互斥条件（`IOVisible` 或 `IOEnable` 表达式且互不相同），否则门禁失败。
 5. **单行/单列**：只有一行或一列时不写 `Grid.RowDefinitions` / `Grid.ColumnDefinitions`，也不写 `Grid.Row` / `Grid.Column`。
