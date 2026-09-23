@@ -23,6 +23,9 @@
 //     不进页面，因此页面外层只有**一个** Grid（内容网格本身）；设计稿的业务内容（含容器链条）
 //     全部落在同一个内容区里，内部再按行列分格。
 //   - 行列由节点 bbox 聚类得到（列 = x 向互不重叠的带，行 = y 向互不重叠的带），尺寸照设计稿像素。
+//   - flex 主轴优先：容器声明了 flexContainerInfo.flexDirection（row/column）时，该容器主轴上的每个
+//     flex 条目独占一条带（同一条带里出现 ≥2 个条目才拆，拆点取设计稿起点，gap 体现在"下一带起点 − 本带起点"）；
+//     没有声明的层级仍按 bbox 聚类。
 //   - 容器（写法表登记为可容纳子节点的类型）内部的节点递归成嵌套 Grid，不与被容纳节点抢同一格。
 //   - 归不进任何格的节点进 pending，不猜坐标。
 
@@ -63,6 +66,7 @@ function layoutTree(dslSnapshot) {
     const record = {
       ref: node.id, name: node.name, type: node.type, parentRef: parentRef,
       x: x, y: y, w: Number(style.width || 0), h: Number(style.height || 0),
+      flex: node.flexContainerInfo || null,
       children: []
     };
     nodes.set(node.id, record);
@@ -104,12 +108,94 @@ function clusterBands(items, startOf, sizeOf) {
   return bands;
 }
 
-function bandIndex(bands, item, startOf) {
-  const value = startOf(item);
+// 带是按"起始边邻近"聚出来的（行带上一条横跨多行的控件会让带区间互相覆盖），
+// 所以判断"某个起点属于哪条带"只能按起始边找：取起始边 ≤ 该起点的最后一条带。
+// 按 [start, end) 包含关系找会把整页都算进第一条带，后面的行全靠撞格下移凑出来。
+function bandOfStart(bands, value) {
+  let found = 0;
   for (let i = 0; i < bands.length; i += 1) {
-    if (value >= bands[i].start - EPSILON && value < bands[i].end) return i;
+    if (bands[i].start <= value + EPSILON) found = i;
+    else break;
   }
-  return bands.length - 1;
+  return found;
+}
+
+// ---------- flex 主轴 ----------
+// 设计稿里 FRAME/INSTANCE 可以声明 flexContainerInfo（flexDirection / gap / alignItems ...）：
+// 那是设计稿自己的布局语义。沿父链收集每个节点能看到的 flex 声明，返回 [{containerRef, direction, itemRef}]，
+// itemRef 是"该容器下承载本节点的那一条 flex 条目"（容器 → … → 节点 这条路径上容器的直接子节点）。
+function flexAncestors(tree, ref) {
+  const chain = [];
+  let record = tree.byRef.get(ref);
+  if (!record) return chain;
+  let child = record;
+  let parent = tree.byRef.get(record.parentRef);
+  while (parent) {
+    const direction = parent.flex && parent.flex.flexDirection;
+    if (direction === "row" || direction === "column") {
+      chain.push({ containerRef: parent.ref, direction: direction, itemRef: child.ref });
+    }
+    child = parent;
+    parent = tree.byRef.get(parent.parentRef);
+  }
+  return chain;
+}
+
+// 某个轴上要拆的起点：axis="column" 取 flexDirection=row 容器的条目 x（主轴是横向），
+// axis="row" 取 flexDirection=column 容器的条目 y。按容器分组，便于后面判断"是否落在同一条带"。
+function flexMainAxisItems(nodes, tree, axis) {
+  const wantDirection = axis === "row" ? "column" : "row";
+  const byContainer = new Map();
+  nodes.forEach(function (node) {
+    flexAncestors(tree, node.ref).forEach(function (info) {
+      if (info.direction !== wantDirection) return;
+      const item = tree.byRef.get(info.itemRef);
+      if (!item) return;
+      if (!byContainer.has(info.containerRef)) byContainer.set(info.containerRef, []);
+      const entries = byContainer.get(info.containerRef);
+      if (!entries.some(function (entry) { return entry.itemRef === info.itemRef; })) {
+        entries.push({ itemRef: info.itemRef, start: axis === "row" ? item.y : item.x });
+      }
+    });
+  });
+  return byContainer;
+}
+
+// 只有"同一条带里出现 ≥2 个 flex 条目"才需要拆带：一个条目独占一条带时拆了也没有信息量。
+function flexSplitStarts(bands, nodes, tree, axis) {
+  const perBand = bands.map(function () { return []; });
+  flexMainAxisItems(nodes, tree, axis).forEach(function (entries) {
+    const grouped = new Map();
+    entries.forEach(function (entry) {
+      const index = bandOfStart(bands, entry.start);
+      if (!grouped.has(index)) grouped.set(index, []);
+      grouped.get(index).push(entry.start);
+    });
+    grouped.forEach(function (starts, index) {
+      if (starts.length < 2) return;
+      perBand[index] = perBand[index].concat(starts);
+    });
+  });
+  return perBand;
+}
+
+// 按拆点把带切开：[本带起点, 拆点1) / [拆点1, 拆点2) / … / [最后拆点, 本带终点)。
+function splitBands(bands, splitStarts) {
+  const out = [];
+  bands.forEach(function (band, index) {
+    const starts = (splitStarts[index] || [])
+      .filter(function (start) { return start > band.start + EPSILON && start < band.end - EPSILON; })
+      .sort(function (a, b) { return a - b; });
+    if (!starts.length) { out.push(band); return; }
+    let cursor = band.start;
+    starts.forEach(function (start) {
+      if (start <= cursor + EPSILON) return;
+      out.push({ start: cursor, end: start, items: band.items });
+      cursor = start;
+    });
+    out.push({ start: cursor, end: band.end, items: band.items });
+  });
+  return out;
 }
 
 // 尺寸照设计稿：一条带的尺寸 = 到下一带起始边的距离（最后一条用星号吃掉剩余空间）。
@@ -164,10 +250,20 @@ function buildContainmentTree(entries, containers, pending) {
 // 同层节点 → Grid（列按 x 区间重叠聚、行按起始边聚），容器节点带上自己的嵌套 Grid。
 function buildGridFrom(nodes, ctx) {
   if (!nodes.length) return { rows: [], columns: [], cells: [] };
+  const xOf = function (n) { return n.x; };
+  const yOf = function (n) { return n.y; };
   // 列按 x 区间重叠聚（同一列的控件横向重叠）；行按**起始边**聚（容器跨多行是常态，
   // 按 y 区间重叠会把整页并成一行，位置就丢了）。
-  const columns = clusterByOverlap(nodes, function (n) { return n.x; }, function (n) { return Math.max(n.w, 1); });
-  const rows = clusterBands(nodes, function (n) { return n.y; }, function (n) { return Math.max(n.h, 1); });
+  const baseColumns = clusterByOverlap(nodes, xOf, function (n) { return Math.max(n.w, 1); });
+  const baseRows = clusterBands(nodes, yOf, function (n) { return Math.max(n.h, 1); });
+  // 设计稿声明了 flex 主轴的地方，主轴上的每个条目独占一条带——否则"同一行横向排列的条目
+  // 被并进同一条列带"后会被撞格规则竖排（设计稿语义丢失）。没有声明的层级仍按上面的聚类。
+  const columns = ctx.dslTree
+    ? splitBands(baseColumns, flexSplitStarts(baseColumns, nodes, ctx.dslTree, "column"))
+    : baseColumns;
+  const rows = ctx.dslTree
+    ? splitBands(baseRows, flexSplitStarts(baseRows, nodes, ctx.dslTree, "row"))
+    : baseRows;
   const cells = [];
   const occupied = new Set();
   let rowSizes = bandSizes(rows, "y");
@@ -180,8 +276,8 @@ function buildGridFrom(nodes, ctx) {
     return rowSizes.length - (starRow ? 2 : 1);
   };
   nodes.forEach(function (node) {
-    const column = bandIndex(columns, node, function (n) { return n.x; });
-    const row = bandIndex(rows, node, function (n) { return n.y; });
+    const column = bandOfStart(columns, node.x);
+    const row = bandOfStart(rows, node.y);
     // 同格只放一个控件（同格多控件必须带互斥条件，那是设计稿的语义，不由推导生成）：
     // 撞格时按 y 向后找第一个空格子；后面放不下就插入新行，保证每个控件都有确定落点。
     let target = row;
@@ -203,9 +299,9 @@ function buildGridFrom(nodes, ctx) {
   };
 }
 
-function buildRegionGrid(entries, containers, pending) {
+function buildRegionGrid(entries, containers, pending, dslTree) {
   const tree = buildContainmentTree(entries, containers, pending);
-  return buildGridFrom(tree.roots, { childrenOf: tree.childrenOf });
+  return buildGridFrom(tree.roots, { childrenOf: tree.childrenOf, dslTree: dslTree });
 }
 
 // 区间重叠聚类：x/y 区间相交的算同一条带。用于"互不包含"的同层节点——
@@ -293,7 +389,7 @@ function deriveLayout(options) {
       id: "work-area", name: "工作区", ref: null, role: "work-area", emit: true,
       x: 0, y: tokens.headerHeight, w: design.width,
       h: design.height - tokens.bottomHeight - tokens.headerHeight,
-      grid: buildRegionGrid(content, containers, pending)
+      grid: buildRegionGrid(content, containers, pending, tree)
     });
   }
   // 归位核对：发射分区里的每个节点（含嵌套 Grid 内的）都必须被某个格子引用，否则挂待确认——
