@@ -1186,13 +1186,18 @@ for (const { item: inst, match } of matched) {
   addInstance(match, inst.ref, required);
 }
 
-// 未命中的顶层组件先登记，供下面的文本扫描判断“文本是否位于被隔离的组件内”。
+// 未命中的顶层节点先分类，供下面的文本扫描判断“文本是否位于被隔离的组件内”：
+//   · 组件实例（INSTANCE / COMPONENT）未命中正式模板 → 登记 pending（隔离，内部文本 omit，fail-closed）；
+//   · 纯布局包裹层（FRAME / GROUP / LAYER，无组件身份）→ **展平**：容器本身不发射控件，
+//     内部控件与文本按页级坐标照常映射（口径见 mtslg-mode.md 第 9 节、page-build-rules.md 第 5 节）。
 for (const child of root.children || []) {
   const s = source(child.id);
-  if (!["INSTANCE", "FRAME", "COMPONENT"].includes(s.type)) continue;
+  if (!["INSTANCE", "FRAME", "COMPONENT", "GROUP", "LAYER"].includes(s.type)) continue;
   if (matchedRefs.has(s.ref) || isInHostShell(s.ref)) continue;
   if (/背景|常驻信息|分割线/.test(s.name)) continue;
   if (!Object.keys(s.properties || {}).length && s.width === source(root.id).width && s.height === source(root.id).height) continue;
+  // 无组件身份的纯布局包裹层不隔离：内部控件/文本照常映射，容器自身不进 pending。
+  if (s.type === "FRAME" || s.type === "GROUP" || s.type === "LAYER") continue;
   pending.push({ sourceRef: s.ref, reason: "正式组件模板未命中，保留 DSL 来源，未猜测 ControlType" });
 }
 

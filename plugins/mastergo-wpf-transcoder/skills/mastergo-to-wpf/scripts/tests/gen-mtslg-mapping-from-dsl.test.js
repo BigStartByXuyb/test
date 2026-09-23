@@ -310,6 +310,64 @@ assert.strictEqual(isolatedText.omitReason, 'excluded-component');
 assert.ok(!isolated.nodes.some(node => node.sourceRef === 'side:root/inner/text'),
   '被隔离组件内的文本不得泄漏成独立 TextBlock');
 
+// 纯布局包裹层展平回归：根级 FRAME/GROUP/LAYER（无组件身份）不得当「未映射组件」隔离，
+// 内部文本照常发射为 TextBlock；同一页里未命中模板的组件实例仍按 fail-closed 隔离。
+function layoutWrapperDsl() {
+  const root = 'layout:root';
+  const wrapper = root + '/容器 95';
+  const unmappedInstance = root + '/未登记组件';
+  return {
+    styles: {},
+    nodes: [{
+      type: 'FRAME',
+      id: root,
+      name: '激光精准对焦',
+      layoutStyle: { width: 1280, height: 1024, relativeX: 0, relativeY: 0 },
+      children: [
+        {
+          type: 'FRAME',
+          id: wrapper,
+          name: '容器 95',
+          layoutStyle: { width: 161, height: 16, relativeX: 674, relativeY: 202 },
+          children: [textNode(wrapper + '/text', wrapper, '工件厚度', 0, 0)]
+        },
+        {
+          type: 'INSTANCE',
+          id: unmappedInstance,
+          name: '未登记组件',
+          layoutStyle: { width: 200, height: 80, relativeX: 658, relativeY: 300 },
+          componentInfo: { properties: { '属性 1': '未登记变体' } },
+          children: [textNode(unmappedInstance + '/text', unmappedInstance, '未映射文案', 10, 10)]
+        }
+      ]
+    }]
+  };
+}
+
+const layoutWrapper = runMappingCase('layout-wrapper-flatten', layoutWrapperDsl(), []);
+const wrapperText = layoutWrapper.nodes.find(node => node.sourceText === '工件厚度');
+assert.ok(wrapperText, '纯布局包裹层内的文本必须照常发射为 TextBlock（展平，不隔离）');
+assert.strictEqual(wrapperText.controlType, 'TextBlock');
+assert.strictEqual(wrapperText.parent, null, '展平后文本挂在页面根级（无控件父容器）');
+assert.strictEqual(
+  layoutWrapper.textAudit.find(item => item.sourceRef === 'layout:root/容器 95/text').decision,
+  'emit'
+);
+assert.ok(!layoutWrapper.unmappedComponents.includes('layout:root/容器 95'),
+  '纯布局包裹层不得进 unmappedComponents');
+assert.ok(!layoutWrapper.pending.some(item => item.sourceRef === 'layout:root/容器 95'),
+  '纯布局包裹层不得进 pending');
+assert.ok(layoutWrapper.pending.some(item => item.sourceRef === 'layout:root/未登记组件'),
+  '未命中模板的组件实例仍须进 pending');
+assert.ok(layoutWrapper.unmappedComponents.includes('layout:root/未登记组件'),
+  '未命中模板的组件实例仍须隔离（fail-closed）');
+assert.strictEqual(
+  layoutWrapper.textAudit.find(item => item.sourceRef === 'layout:root/未登记组件/text').omitReason,
+  'unmapped-component'
+);
+assert.ok(!layoutWrapper.nodes.some(node => node.sourceRef === 'layout:root/未登记组件/text'),
+  '被隔离组件实例内的文本不得泄漏成独立 TextBlock');
+
 // 轴操作-快慢：8 个方向键按「方向 × 内外圈」自动绑定到模板槽位（与设计稿真实坐标一致）。
 function axisDsl(rootX, rootY) {
   const buttons = [

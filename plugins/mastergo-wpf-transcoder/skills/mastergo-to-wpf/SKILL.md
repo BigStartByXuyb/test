@@ -34,6 +34,7 @@ description: 将明确要求的 MasterGo 设计稿转换为 MTSLG IOContorl XML�
 1. **只认一次 `getDsl`**：用 `scripts/core/call-mastergo-mcp.js` 调 `getDsl(fileId, layerId, format=json)` 读当前图层完整 DSL，**响应只落盘**（`<runDir>/getDsl.json`）不进上下文；不得分段读取，不得用浏览器、截图或视觉猜测替代。MCP 不可调用或 `getDsl` 报错时**停止本次转换并报告原因**，不得换成其他设计数据来源继续。`extractSvg` 是 `getDsl` 成功后的独立图标步骤（`<runDir>/extractSvg.json`），不参与页面结构。
 2. **不读图**：不得打开、渲染或裁剪设计稿截图/图标位图做判断题；图形形状与朝向一律由 DSL 的 `rotate` / `flipH` / `flipV` 机械烘焙得出。宿主运行截图只属「项目运行时交付」门禁，与设计稿判断无关。
 3. **不降级、不伪造**：没有正式映射的组件只进来源清单与待确认，不得改成 `Button`、`Border`、无类型容器或近似控件；存在未映射组件时不得宣称「完整可运行页面」。
+   **纯布局包裹层不属于未映射组件**：无组件身份的 `FRAME`/`GROUP`/`LAYER` 按 `mtslg-mode.md` 第 9 节展平到最近有效父容器（容器本身不发射控件），内部控件与文本照常映射；只有未命中模板的**组件实例**才进待确认并隔离其内部文本。
 
 ## 入口分流（先判断）
 
