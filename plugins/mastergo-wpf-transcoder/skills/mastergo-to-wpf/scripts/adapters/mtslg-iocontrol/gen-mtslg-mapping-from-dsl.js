@@ -273,11 +273,14 @@ function isInHostShell(ref) {
 }
 function isPageTitle(ref) {
   const s = source(ref);
-  if (s.parentRef !== root.id) return false;
   const clean = value => String(value || "").replace(/[.。\s]/g, "");
-  return clean(s.name) === clean(root.name) ||
-    clean(s.text) === clean(root.name) ||
-    (s.type === "TEXT" && typeof s.pageAbsY === "number" && s.pageAbsY < 192);
+  const named = clean(s.name) === clean(root.name) || clean(s.text) === clean(root.name);
+  const inTitleStrip = typeof s.pageAbsY === "number" && s.pageAbsY < 192;
+  // 根级：沿用原口径（页名同名文本，或顶部标题区里的任意文本）。
+  if (s.parentRef === root.id) return named || (s.type === "TEXT" && inTitleStrip);
+  // 非根级：设计稿把页面大标题包进容器时（例：整页被「容器 N」包住），标题不再是根的直接子节点；
+  // 此时要求「文本或图层名等于设计页名」且「落在顶部标题区（contentOriginY=192 以上）」才判页面标题。
+  return s.type === "TEXT" && named && inTitleStrip;
 }
 function descendants(ref) {
   const result = [];

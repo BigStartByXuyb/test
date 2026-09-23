@@ -147,7 +147,7 @@ Bundle 的固定调用顺序：模板解析 → **容器嵌套重挂（`apply-co
 
 | 角色 | 含义 |
 |---|---|
-| `page-title` | 页面根级 / 工件级大标题 |
+| `page-title` | 设计稿里的页面大标题：文本或图层名等于设计页名，且落在顶部标题区（`pageAbsY < 192`）。**不限于页面根的直接子节点**——整页被「容器 N」包住时标题同样按本角色 omit（宿主负责渲染标题栏）|
 | `host-shell` | 宿主公共栏的**文本**：顶部宿主栏的区域文本，以及**底部栏的菜单文案**（底部栏文案由 Layout `MenuItem` 的 Name 承载，不产页面内容节点）。**只管文本**——底部栏 MenuItem 的**图标**是页面级资源，要登记进本页台账与 `Icons.xaml`，见第 2 节。判定方式：标记词清单登记在 `scripts/lib/mastergo-rules.js` 的 `HOST_SHELL_NAME_MARKERS`（清单以该常量为准，本表不复制），由 `isInHostShell` **沿祖先链逐级取名字**，**任一祖先的名字包含标记词即命中**——不是比对某个固定图层名，所以"名字里带某个词"本身就是命中条件。调用点有 `gen-mtslg-mapping-from-dsl.js`（写文本 role）、`apply-container-containment.js`（容器归属）与登记判据 `scripts/adapters/mtslg-iocontrol/lib/icon-registration-policy.js`（宿主公共栏的**图形**不登记）。**顺序是关键**：登记判据先判模板族与布局族的变体命中，宿主壳标记只在**不属于模板族也不属于布局族**时才生效——所以"祖先名命中标记 → 文本 omit"不会连带把底部栏菜单图标排除（右下角常驻分组另由 `layoutRules.bottomBar.residentGroupPattern` 判成不登记） |
 | `excluded-component` | 被 `manifest.excludeInstances` 隔离的组件内部文本 |
 | `unmapped-component` | 未命中正式模板的**组件实例**（`INSTANCE`/`COMPONENT`）内部文本，以及命中模板族但结构部分命中（如表格表头可见文本不足）而登记 `pending` 的节点内部文本；纯布局包裹层（`FRAME`/`GROUP`/`LAYER`，未命中模板族且未登记 `pending`）不隔离——按 `mtslg-mode.md` 第 9 节展平，内部控件与文本照常发射 |

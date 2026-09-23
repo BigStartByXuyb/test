@@ -368,6 +368,47 @@ assert.strictEqual(
 assert.ok(!layoutWrapper.nodes.some(node => node.sourceRef === 'layout:root/未登记组件/text'),
   '被隔离组件实例内的文本不得泄漏成独立 TextBlock');
 
+// 页面标题识别不限于根的直接子节点：整页被容器包住时，标题仍是「文本 == 设计页名 且位于顶部标题区」。
+function wrappedTitleDsl(titleY) {
+  const root = 'title:root';
+  const wrapper = root + '/容器 210';
+  return {
+    styles: {},
+    nodes: [{
+      type: 'FRAME',
+      id: root,
+      name: '激光精准对焦',
+      layoutStyle: { width: 1280, height: 1024, relativeX: 0, relativeY: 0 },
+      children: [{
+        type: 'FRAME',
+        id: wrapper,
+        name: '容器 210',
+        layoutStyle: { width: 1280, height: 1024, relativeX: 0, relativeY: 0 },
+        children: [
+          textNode(wrapper + '/title', wrapper, '激光精准对焦', 0, titleY),
+          textNode(wrapper + '/body', wrapper, '工件厚度', 0, 300)
+        ]
+      }]
+    }]
+  };
+}
+
+const wrappedTitle = runMappingCase('title-inside-wrapper', wrappedTitleDsl(182), []);
+const wrappedTitleAudit = wrappedTitle.textAudit.find(item => item.sourceRef === 'title:root/容器 210/title');
+assert.strictEqual(wrappedTitleAudit.role, 'page-title', '容器内的页面大标题必须识别为 page-title');
+assert.strictEqual(wrappedTitleAudit.decision, 'omit');
+assert.ok(!wrappedTitle.nodes.some(node => node.sourceRef === 'title:root/容器 210/title'),
+  '页面标题不得发射成 TextBlock（宿主渲染标题栏）');
+assert.ok(wrappedTitle.nodes.some(node => node.sourceRef === 'title:root/容器 210/body'),
+  '同一容器内的业务文本照常发射');
+
+const titleOutsideStrip = runMappingCase('title-outside-strip', wrappedTitleDsl(300), []);
+assert.strictEqual(
+  titleOutsideStrip.textAudit.find(item => item.sourceRef === 'title:root/容器 210/title').decision,
+  'emit',
+  '与页名同名但不在顶部标题区的文本不得被 omit'
+);
+
 // 轴操作-快慢：8 个方向键按「方向 × 内外圈」自动绑定到模板槽位（与设计稿真实坐标一致）。
 function axisDsl(rootX, rootY) {
   const buttons = [
