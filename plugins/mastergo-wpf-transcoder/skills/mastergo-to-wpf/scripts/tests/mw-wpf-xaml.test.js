@@ -3,7 +3,7 @@
 
 // 作业A（mw-wpf）页面 XAML 发射器回归：
 //   1) 发射形态对齐真实页面（UserControl 头 / Resources 合并本页 Icon 字典 / Grid 行列 / Grid.Row / 语言键 / 形状资源）；
-//   2) 框架固定区（顶栏/底栏/侧栏）不发射；
+//   2) 框架固定区（顶部栏 / 底部栏）不发射；
 //   3) 未登记类型（写法表 status=pending）与取不到样式族的变体一律 fail-closed；
 //   4) 没有语言键的文本不写字面量，进 textPending；
 //   5) 目标已存在且未加 --overwrite 时拒绝覆盖。

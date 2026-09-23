@@ -76,7 +76,7 @@ function checkCells(region, map, layout) {
       report("R8", region.id, "行列尺寸缺少 source");
       return;
     }
-    // 框架固定区只在**被框架钉住的那一维**上用 Token（顶/底栏是高度、侧栏是宽度）；
+    // 框架固定区只在**被框架钉住的那一维**上用 Token（顶部栏 / 底部栏都钉在高度上）；
     // 另一维是自由伸展的星号，来源仍是设计稿。
     if (isFramework && size.size === "Pixel" && size.source.indexOf("framework:") !== 0) {
       report("R8", region.id, "框架固定区的固定尺寸必须用 framework:<Token>，当前: " + size.source);
