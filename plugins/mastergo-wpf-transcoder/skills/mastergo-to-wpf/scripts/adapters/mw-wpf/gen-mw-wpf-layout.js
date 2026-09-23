@@ -258,7 +258,7 @@ function deriveLayout(options) {
   const entries = [];
   byRef.forEach(function (node) {
     if (!node.controlType) return;
-    // 写法表登记为待确认的类型（Border / Camera）：挂待确认、不进任何格子，也不发射。
+    // 写法表登记为待确认的类型（当前是 Border）：挂待确认、不进任何格子，也不发射。
     const typeEntry = (routeMap.controlTypes || {})[node.controlType];
     if (!typeEntry || typeEntry.status === "pending") {
       pending.push({ ref: node.ref, reason: "写法表未登记或登记为待确认的类型: " + node.controlType });

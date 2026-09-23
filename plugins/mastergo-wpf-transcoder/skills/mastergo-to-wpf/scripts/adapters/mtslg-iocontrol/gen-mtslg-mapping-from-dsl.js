@@ -372,39 +372,6 @@ function innerComponentName(n) {
   return child ? String(child.name || "") : "";
 }
 
-// 取名字：**沿组件引用链从近到远**。
-//   1) 直接子层有引用实例 → 就用它的图层名（与拆分前同一行为，52 页产物不变）；
-//   2) 直接子层没有（实例内部先包了 GROUP/LAYER，库里那层在更深处）→ 沿引用链往下找
-//      内部实例，取它们的图层名作为候选。
-// 名字一律取自 DSL 的引用关系，不猜测层级、不额外查询服务端。
-function instanceCandidateNames(n) {
-  const candidates = [];
-  const push = function (value, fromInner) {
-    const name = typeof value === "string" ? value.trim() : "";
-    if (!name) return;
-    if (candidates.some(c => c.name === name && c.fromInner === fromInner)) return;
-    candidates.push({ name: name, fromInner: fromInner });
-  };
-  const direct = (n && Array.isArray(n.children) ? n.children : []).find(c => c && c.type === "INSTANCE");
-  if (direct) {
-    push(direct.name, true);
-    return candidates;
-  }
-  const queue = (n && Array.isArray(n.children) ? n.children.slice() : []);
-  let visited = 0;
-  while (queue.length && visited < 8) {
-    const node = queue.shift();
-    if (!node) continue;
-    if (node.type === "INSTANCE") {
-      visited += 1;
-      push(node.name, true);
-      continue;
-    }
-    (node.children || []).forEach(child => queue.push(child));
-  }
-  return candidates;
-}
-
 // componentSet 索引：变体登记了 componentSet 时，允许按内部组件名直接命中。
 const componentSetIndex = new Map();
 for (const [family, spec] of Object.entries(templateMap)) {
@@ -439,9 +406,10 @@ function formalMatches(n) {
   // 容器族（childPolicy=nested-page-templates）额外要求命中实例**自身名**等于组件集名：
   // 「先看内部实例名」是给聚合集合（如右栏）用的，页面根的第一个实例子节点恰好与外层容器同名时
   // 会把整页误判成容器，因此容器族不允许走内部实例名这条候选路径。
-  const candidateNames = instanceCandidateNames(n).concat([
+  const candidateNames = [
+    { name: innerComponentName(n), fromInner: true },
     { name: typeof n.name === "string" ? n.name : "", fromInner: false }
-  ]).filter(candidate => candidate.name);
+  ].filter(candidate => candidate.name);
   for (const candidate of candidateNames) {
     const hits = componentSetIndex.get(candidate.name);
     if (!hits || !hits.length) continue;

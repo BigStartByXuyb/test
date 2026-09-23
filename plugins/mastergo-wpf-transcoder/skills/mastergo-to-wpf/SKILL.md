@@ -115,7 +115,7 @@ pwsh -NoProfile -File <skill>\scripts\entry\run-all.ps1 -List -Format json -OutF
 - **尺寸照设计稿，外观只走样式族**：Grid 行列 / `Margin` / 对齐取设计稿值；配色、边框、状态、模板一律用样式族键，设计稿与样式族冲突时停下报告，不得散写属性凑 → `references/adapters/mw-wpf/mw-wpf-mode.md`
 - **框架固定区不进页面**：顶部栏 / 底部栏 / 右侧栏常驻由框架渲染（尺寸用框架 Token），设计稿里的对应区域只用于生成 Layout 注册与菜单项 → `references/adapters/mw-wpf/mw-wpf-mode.md`
 - **页面必须合并本页 Icon 字典**：A 页面用 `{StaticResource …Geometry}` 引用图形，缺合并点会在加载期抛 `XamlParseException` → `references/adapters/mw-wpf/page-build-rules.md`
-- **无对应条目的类型 fail-closed**：写法表把 `Border` / `Camera` 登记为待确认，遇到即挂待确认、不发射 → `references/adapters/mw-wpf/mw-wpf-map.json`
+- **无对应条目的类型 fail-closed**：写法表把 `Border` 登记为**待确认**（遇到即挂待确认、不发射）；`Camera` 已登记为 `manual-only`（按用户确认发射 `<s:Camera>`，外观走运行时默认）→ `references/adapters/mw-wpf/mw-wpf-map.json`
 - **布局门禁**：`scripts/adapters/mw-wpf/check-wpf-layout.js`（越界 / 空行空列 / 同格冲突 / 禁止写法 / 协议 / 资源键 / 硬编码文本 / 尺寸来源）
 
 ## 交付与验收

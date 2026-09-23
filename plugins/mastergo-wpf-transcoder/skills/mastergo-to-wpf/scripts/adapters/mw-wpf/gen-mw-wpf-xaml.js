@@ -100,7 +100,7 @@ function variantOf(node) {
 function specOf(map, controlType) {
   const spec = (map.controlTypes || {})[controlType];
   if (!spec) fail("写法表未登记该 ControlType: " + controlType);
-  // 待确认类型（如 Border / Camera）挂待确认、不发射：与本路线其它未命中项的处置一致
+  // 待确认类型（当前是 Border）挂待确认、不发射：与本路线其它未命中项的处置一致
   // （页面照常发射，待确认项进报告与门禁的警告清单，不静默猜测替代控件）。
   if (spec.status === "pending") return null;
   if (!spec.element) fail("写法表 " + controlType + " 缺少 element");

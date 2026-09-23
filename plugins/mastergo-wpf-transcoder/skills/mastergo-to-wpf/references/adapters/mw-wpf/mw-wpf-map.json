@@ -5,7 +5,7 @@
       "作业A（mw-wpf）写法表：组件类型 → WPF/XAML 怎么写。",
       "组件类型本身（设计稿组件集/变体 → ControlType）由共享类型表 references/component-types.json 唯一决定；本文件只登记「同一类型在 WPF 这一侧怎么写」，不重复类型判定。",
       "element / styleKeys 取自框架手册 02-controls/<类别>/<条目>.md 的「声明」与「样式族表」（每条标注 manualEntry）；attrs 取自真实页面 ManualView.xaml（框架唯一 P2 业务页）与 AutoCutView.xaml（MaxWell.SLGPages 真实页面）。",
-      "status: ready = 手册与真实页面都有证据；manual-only = 有手册条目但真实页面未出现，首次生成需人工确认；pending = 手册无对应控件，遇到即挂待确认、不发射。"
+      "status: ready = 手册与真实页面都有证据；manual-only = 手册有条目但真实页面未出现、或手册无条目但有用户明确确认（后者的条目在 evidence 里写明「用户确认」，首次生成需人工确认，回填手册后改为 ready）；pending = 手册无对应控件，遇到即挂待确认、不发射。"
     ]
   },
   "variantRule": {
@@ -617,8 +617,7 @@
         "用户确认（2026-09-23）：作业A 侧控件就是 Camera，与作业B 的 ControlType=Camera 同名同义"
       ],
       "status": "manual-only",
-      "note": "本机框架程序集版本较旧，MaxwellControl/MaxWell.UIDesign 里查不到该控件（手册也无条目），唯一证据是用户确认；首次用新框架生成后需回填手册条目。外观沿用运行时默认（不写 Style，与作业B cameraTemplates 同口径），DesignPanelID/Value 在设计稿里没有来源，按空串占位由工程师或运行时绑定填写。",
-      "stylePolicy": "none"
+      "note": "本机框架程序集版本较旧，MaxwellControl/MaxWell.UIDesign 里查不到该控件（手册也无条目），唯一证据是用户确认（status=manual-only，含义见 _meta.note 的状态定义）；首次用新框架生成后需回填手册条目。外观沿用运行时默认：唯一口径是 styleRules.pageDefault.Camera = implicit，本条目不再另登记 stylePolicy。DesignPanelID/Value 在设计稿里没有来源——生成器不发射这两个属性（本路线不写空串占位），由工程师或运行时绑定补齐。"
     }
   }
 }
