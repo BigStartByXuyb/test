@@ -143,7 +143,8 @@ function checkCells(region, map, layout) {
 // （如「只读点位：IOName="…" + IOEnable="false" + IsAutoRead="True"」），逐个拆出来取属性名。
 function protocolNamesOf(text) {
   return String(text).split(/[+、；;]/).map(function (part) {
-    const name = part.split(/[={]/)[0].split("：").pop().trim();
+    // 形如 "i:InvokeCommandAction Command={Binding …}" 的登记，属性名取空格前的那个标识符。
+    const name = part.split(/[={]/)[0].split("：").pop().trim().split(/\s+/)[0];
     return /^[A-Za-z][A-Za-z0-9.:]*$/.test(name) ? name : null;
   }).filter(Boolean);
 }
@@ -265,7 +266,7 @@ function main() {
   // R10：manual-only 类型（仅用户确认、无手册与真实页面的A 侧证据）不阻断，但必须登记成提示，
   // 让"首次生成需人工确认、事后回填手册"有可观测落点。
   manualOnlyTypes.forEach(function (type) {
-    notice("R10", null, "写法表把 " + type + " 记为 manual-only（仅用户确认）：发射前需人工确认，首次用新框架生成后回填手册条目");
+    notice("R10", null, "写法表把 " + type + " 记为 manual-only（证据不全）：发射前需人工确认，事后按需回填手册条目");
   });
   checkStyleKeys(layout, map, iconNames, xamlText);
   checkHardcodedText(xamlText, layout, typesByRef);
