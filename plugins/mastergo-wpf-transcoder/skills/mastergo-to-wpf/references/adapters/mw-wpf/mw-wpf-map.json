@@ -73,7 +73,6 @@
     "note": "框架固定区尺寸 Token（Sizes.xaml 框架级布局键，取值见 framework-manual/01-resources/colors-fonts-sizes.md）。框架固定区不发射进页面，尺寸只用于布局产物登记与 Layout 注册。",
     "headerHeight": 85,
     "bottomHeight": 180,
-    "sideMenuWidth": 85,
     "statusBarHeight": 80,
     "statusLightHeight": 70
   },
