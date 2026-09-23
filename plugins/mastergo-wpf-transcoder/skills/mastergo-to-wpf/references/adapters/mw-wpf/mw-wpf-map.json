@@ -1,13 +1,13 @@
 {
   "_meta": {
     "source": "references/adapters/mw-wpf/mw-wpf-map.json",
-  "note": [
-    "作业A（mw-wpf）写法表：组件类型 → WPF/XAML 怎么写。",
-    "组件类型本身（设计稿组件集/变体 → ControlType）由共享类型表 references/component-types.json 唯一决定；本文件只登记「同一类型在 WPF 这一侧怎么写」，不重复类型判定。",
-    "element / styleKeys 取自框架手册 02-controls/<类别>/<条目>.md 的「声明」与「样式族表」（每条标注 manualEntry）；attrs 取自真实页面 ManualView.xaml（框架唯一 P2 业务页）与 AutoCutView.xaml（MaxWell.SLGPages 真实页面）。",
-    "layoutAttrs 是真实页面的抽样证据（记录该类型实际出现过哪些布局属性），不是属性白名单：跨度由布局推导按控件覆盖带数写出，任何可落格类型都可能带 Grid.RowSpan / Grid.ColumnSpan，口径以 mw-wpf-mode.md 为准。",
-    "status: ready = 手册与真实页面都有证据；manual-only = 有手册条目但真实页面未出现，首次生成需人工确认；pending = 手册无对应控件，遇到即挂待确认、不发射。"
-  ]
+    "note": [
+      "作业A（mw-wpf）写法表：组件类型 → WPF/XAML 怎么写。",
+      "组件类型本身（设计稿组件集/变体 → ControlType）由共享类型表 references/component-types.json 唯一决定；本文件只登记「同一类型在 WPF 这一侧怎么写」，不重复类型判定。",
+      "element / styleKeys 取自框架手册 02-controls/<类别>/<条目>.md 的「声明」与「样式族表」（每条标注 manualEntry）；attrs 取自真实页面 ManualView.xaml（框架唯一 P2 业务页）与 AutoCutView.xaml（MaxWell.SLGPages 真实页面）。",
+      "layoutAttrs 是真实页面的抽样证据（记录该类型实际出现过哪些布局属性），不是属性白名单：跨度由布局推导按控件覆盖带数写出，任何可落格类型都可能带 Grid.RowSpan / Grid.ColumnSpan，口径以 mw-wpf-mode.md 为准。",
+      "status: ready = 手册与真实页面都有证据；manual-only = 有手册条目但真实页面未出现，首次生成需人工确认；pending = 手册无对应控件，遇到即挂待确认、不发射。"
+    ]
   },
   "variantRule": {
     "note": "同一类型存在 IO 变体（绑 IO 点）与非 IO 变体时，MW 页面默认用 IO 变体：真实页面里输入/显示控件一律是 s:IOTextBox / s:IOComboBox / s:IOCheckBox / s:IOGroupBox。仅当设计稿该控件不绑 IO 点时用 native 变体。",

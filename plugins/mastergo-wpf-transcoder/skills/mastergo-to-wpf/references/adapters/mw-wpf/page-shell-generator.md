@@ -10,12 +10,7 @@ scripts/host/gen-mw-wpf-page.js 用一个页面清单生成独立页面的固定
 
 **code-behind 挂在同页 View.xaml 下**：注册 `.csproj` 时，`<Page>View.xaml` 与它的 `<Compile>View.xaml.cs` 写成一组嵌套条目——Compile 条目带 `<DependentUpon>View.xaml</DependentUpon>`，形态与在 Visual Studio 里把 `.xaml.cs` 拖到 `.xaml` 上之后 VS 写出的**完全一致**（Solution Explorer 里表现为 `View.xaml` 一个节点、展开出 `.xaml.cs`），不需要人工拖拽。ViewModel 没有 `.xaml` 主文件，仍发射平级 `<Compile Include="…" />`。只有 code-behind 恰好等于「View 路径 + `.cs`」时才写 `DependentUpon`；清单显式给出的 `viewPath`/`codeBehindPath` 不成对时不猜主文件。重新生成时，已存在的平级 `<Compile Include="…xaml.cs" />` 会被**就地升级**成该嵌套块（幂等：不新增、不重复）。
 
-**生成的 View 不合并页面 Icon 资源字典**：`<Page>View.xaml` 只由 `UserControl` 头 + `<Grid>` 里的 `uidesign:PageDesign` 组成，**不生成** `<UserControl.Resources><ResourceDictionary Source="/<程序集>;component/Resources/Pages/<页面名>/<页面名>Icons.xaml" /></UserControl.Resources>` 这一段。页面 Icon 文件本身仍照常生成，并按 Icon Page 注册进 `.csproj`；宿主脚本不写页面级资源合并声明。
-
-**脚本层面的精确事实与两路线的差异**：`scripts/host/gen-mw-wpf-page.js` 的 `renderView` **没有路线分支**——它对两条路线都恒不发射这段合并声明。因此：
-
-- 对**作业 B（`mtslg-iocontrol`，当前唯一启用）**：这就是最终形态，View 只输出 `UserControl` 头 + `PageDesign`；
-- 对**作业 A（`mw-wpf`，停用中）**：这是**缺口**。作业 A 页面用 `{StaticResource …Geometry}` 引用图标，`StaticResource` 加载期解析，页面自身没有合并点就会抛 `XamlParseException`（框架规则 R5）。**作业 A 重新启用前，必须给该脚本增加路线分支（或由另一生成器）为作业 A 补上本页 Icon 字典的合并点，并做加载验证**——只在文档里写"复核"不足以修复。
+**View 的两条路线形态不同**：`renderView` 按 `config.route` 分流——作业 B 的 `<Page>View.xaml` 只由 `UserControl` 头 + `<Grid>` 里的 `uidesign:PageDesign` 组成，**不生成** `<UserControl.Resources><ResourceDictionary Source="/<程序集>;component/Resources/Pages/<页面名>/<页面名>Icons.xaml" /></UserControl.Resources>`；作业 A 的 View 交给 `scripts/adapters/mw-wpf/gen-mw-wpf-xaml.js` 发射真控件页面，`iconPage` / `assembly` 齐备时**发射**该合并声明（`StaticResource` 加载期解析，缺了会在加载期抛 `XamlParseException`）。页面 Icon 文件本身两条路线都照常生成，并按 Icon Page 注册进 `.csproj`。
 
 ## 清单
 

@@ -10,8 +10,8 @@
 
 | 路线 | Adapter | 状态 | 说明 |
 |---|---|---|---|
-| **作业 B** | `mtslg-iocontrol` | **当前唯一启用** | 完整页面交付链路；本架构文档的主体 |
-| 作业 A | `mw-wpf` | 资料保留、暂不开放 | 重新启用前必须完成全篇复核（含本页 Icon 字典的合并点） |
+| **作业 B** | `mtslg-iocontrol` | 启用 | IOContorl 页面 XML 交付链路 |
+| 作业 A | `mw-wpf` | 启用 | 真控件 `View.xaml`（由 `gen-mw-wpf-xaml.js` 发射，含本页 Icon 字典合并点）+ Grid 布局推导 |
 
 ## 2. 顶层结构
 

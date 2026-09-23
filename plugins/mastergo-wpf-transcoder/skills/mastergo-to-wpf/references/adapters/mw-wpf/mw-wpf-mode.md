@@ -31,7 +31,7 @@
 3. **尺寸照设计稿**：普通 region 的行列尺寸取设计稿像素（`source: "design"`），控件自身尺寸取设计稿 bbox；格子放不下时是设计问题，不改写成"凑得下"的值。
 4. **行列来源**：设计稿声明的 `flexContainerInfo.flexDirection`（`row`/`column`）优先——`flexDirection` 沿父链读取（不限节点类型），条目＝声明容器到该控件这条路径上容器的直接子节点；**同一个声明容器**在同一条带里出现两个及以上条目才拆，拆点取条目设计稿起点，`gap` 体现在"下一带起点 − 本带起点"。没有声明（或该带内只有一个条目）的层级按 bbox 聚类（列＝x 区间重叠、行＝y 起始边邻近）。
    落格按**起始边**判定归属（横跨多行的控件不吞掉后面的行），控件 bbox 覆盖到的带全部算跨度：格子的 `rowSpan` / `columnSpan` 由覆盖带数得出，发射器照写 `Grid.RowSpan` / `Grid.ColumnSpan`；占格只按起始格判定，跨格控件与设计稿一样允许压住邻格。
-5. **落格**：控件写 `Grid.Row` / `Grid.Column`，跨格再写 `Grid.RowSpan` / `Grid.ColumnSpan`。**"同一格"指锚点（起始）格**：同一锚点格只放一个控件，放多个必须各自带互斥条件（`IOVisible` 或 `IOEnable` 表达式且互不相同），否则门禁失败（门禁按锚点判重）。跨格控件覆盖到的邻格不算占用——设计稿里控件互相压住是常态，由设计稿的层级关系负责，推导不替它排冲突；撞格时只沿 y 往后找空锚点格。
+5. **落格**：控件写 `Grid.Row` / `Grid.Column`，跨格再写 `Grid.RowSpan` / `Grid.ColumnSpan`。**同一锚点（起始）格只放一个控件**：推导用占用表 + 撞格下移保证锚点格唯一，门禁 R5 也按锚点判重，出现重复即产物被改坏。覆盖邻格见第 4 条。
 6. **单行/单列**：只有一行或一列时不写 `Grid.RowDefinitions` / `Grid.ColumnDefinitions`，也不写 `Grid.Row` / `Grid.Column`。
 7. **一维星号**：星号尺寸写成裸 `<RowDefinition />` / `<ColumnDefinition />`，像素尺寸写 `Height="<值>"`。
 

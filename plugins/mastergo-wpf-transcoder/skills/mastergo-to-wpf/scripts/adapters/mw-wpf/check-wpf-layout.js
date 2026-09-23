@@ -15,7 +15,7 @@
 //   R2 协议语法：XAML 里的协议属性必须是写法表登记过的形状
 //   R3 格子越界：row/column/rowSpan/columnSpan 必须落在本 region 的行列范围内
 //   R4 空行空列：没有格子覆盖、也不是被星号撑开的收尾行/列
-//   R5 同格冲突：同一锚点格（Grid.Row/Column 起点）多控件必须各自带互斥条件（IOVisible / IOEnable 且互不相同）
+//   R5 同格冲突：同一锚点格（Grid.Row/Column 起点）只允许一个控件（推导用占用表 + 行下移保证唯一）
 //   R6 资源键闭环：{StaticResource <键>} 必须来自写法表样式族、本页 Icon 台账或 Icon 字典合并点
 //   R7 文本零硬编码中文：发射区不得出现字面中文
 //   R8 尺寸来源：框架固定区必须是 framework:<Token>，其余必须是 design
@@ -125,15 +125,11 @@ function checkCells(region, map, layout) {
     }
   });
 
-  // R5：同一**锚点格**（Grid.Row + Grid.Column 起点）多控件必须各自带互斥条件；
-  // 跨格控件覆盖到的邻格不算冲突——设计稿里控件互相压住是常态，由设计稿的层级关系负责。
+  // R5：同一**锚点格**（Grid.Row + Grid.Column 起点）只允许一个控件。布局产物由推导机械生成，
+  // 推导用占用表 + 撞格下移保证锚点格唯一，所以重复只可能来自产物被改坏——直接失败。
   seen.forEach(function (list, key) {
     if (list.length < 2) return;
-    const conditions = list.map(function (cell) { return cell.exclusive || null; });
-    const missing = list.filter(function (cell) { return !cell.exclusive; });
-    if (missing.length || new Set(conditions).size !== conditions.length) {
-      report("R5", null, "同一个锚点格 " + key + " 上有 " + list.length + " 个控件但缺少互斥条件（IOVisible/IOEnable 且互不相同）");
-    }
+    report("R5", null, "同一个锚点格 " + key + " 上有 " + list.length + " 个控件（推导保证锚点格唯一，重复即布局产物损坏）");
   });
 
 }
