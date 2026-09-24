@@ -321,4 +321,29 @@ assert.strictEqual(cells.find(function (cell) { return cell.ref === "t2"; }).con
   assert.strictEqual(report.findings.length, 0, "豁免情形不得产生失败项");
 }
 
+// ── ⑨ 内容区里带约束、却没有任何可发射内容的容器 → R12 失败（交人工处置，不静默丢）────────
+{
+  const dsl = { dsl: { nodes: [node("root", "FRAME", { width: 1280, height: 1024, relativeX: 0, relativeY: 0 }, [
+    node("box", "FRAME", { width: 200, height: 60, relativeX: 0, relativeY: 200 }, [
+      node("deco", "ELLIPSE", { width: 40, height: 16, relativeX: 0, relativeY: 0 })
+    ], { constraints: { minWidth: 80, maxWidth: 194 } }),
+    node("shown", "TEXT", { width: 80, height: 16, relativeX: 0, relativeY: 300 })
+  ])] } };
+  const derived = deriveLayout({
+    dsl: dsl,
+    types: { byRef: new Map([["shown", { ref: "shown", controlType: "TextBlock", absX: 0, absY: 300, w: 80, h: 16, langName: "PXShown" }]]) },
+    map: MAP, containers: new Set(["IOGroupBox"]),
+    tokens: { headerHeight: 85, bottomHeight: 180 }, pageTarget: "P", visibility: null
+  });
+  assert.deepStrictEqual(derived.constraintExempt, [], "内容区里的容器不算豁免");
+  const layoutPath = writeJson("no-content-layout.json", derived);
+  const typesPath = writeJson("no-content-types.json", { schemaVersion: 1, nodes: [{ ref: "shown", controlType: "TextBlock", absX: 0, absY: 300, w: 80, h: 16, langName: "PXShown" }], pending: [], unmappedComponents: [] });
+  const dslPath = writeJson("no-content-dsl.json", dsl);
+  const reportPath = path.join(tmp, "no-content-report.json");
+  const run = spawnSync(process.execPath, [CHECK, "--layout", layoutPath, "--types", typesPath, "--map", ROUTE_MAP, "--dsl", dslPath, "--json", reportPath], { encoding: "utf8" });
+  assert.strictEqual(run.status, 2, "内容区里放不下的约束必须失败，不得静默丢");
+  const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
+  assert.ok(report.findings.some(function (item) { return item.rule === "R12" && item.ref === "box"; }), "R12 必须报出这个容器");
+}
+
 console.log("constraints.test.js: 全部通过");
