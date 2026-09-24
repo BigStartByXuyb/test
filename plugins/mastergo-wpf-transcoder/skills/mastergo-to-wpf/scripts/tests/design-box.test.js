@@ -211,6 +211,7 @@ function node(id, type, style, children, extra) {
   assert.ok(tamperedReport.findings.some(function (item) { return item.rule === "R14" && /重算不一致/.test(item.message); }),
     "R14 必须报出格子尺寸不一致");
 
+
   const missing = writeJson("gate-report-missing.json", { designBox: [] });
   assert.strictEqual(run(layoutPath, missing).status, 2, "发射报告缺条目必须失败");
   const missingReport = JSON.parse(fs.readFileSync(outPath, "utf8"));
@@ -273,10 +274,27 @@ function node(id, type, style, children, extra) {
   const tamperedPath = writeJson("unsized-layout-tampered.json", tampered);
   const tamperedRun = spawnSync(process.execPath, [CHECK, "--layout", tamperedPath, "--types", typesPath, "--map", ROUTE_MAP,
     "--xaml-report", reportPath, "--json", outPath], { encoding: "utf8" });
+
   assert.strictEqual(tamperedRun.status, 2, "unsized 只免算不出的那一维，另一维不一致必须失败");
   const tamperedReport = JSON.parse(fs.readFileSync(outPath, "utf8"));
   assert.ok(tamperedReport.findings.some(function (item) { return item.rule === "R14" && /重算不一致/.test(item.message); }),
     "R14 必须报出另一维的重算不一致");
+
+  // 自报 unsized 不能豁免重算：删掉宽度并标 unsized，但按行列定义重算 > 0 → 必须失败。
+  const faked = JSON.parse(JSON.stringify(derived));
+  (function find(grid) {
+    grid.cells.forEach(function (cell) {
+      if (cell.ref === "a") { delete cell.width; cell.unsized = { width: true }; }
+      if (cell.children) find(cell.children);
+    });
+  })(faked.regions.find(function (region) { return region.emit !== false; }).grid);
+  const fakedPath = writeJson("unsized-layout-faked.json", faked);
+  const fakedRun = spawnSync(process.execPath, [CHECK, "--layout", fakedPath, "--types", typesPath, "--map", ROUTE_MAP,
+    "--xaml-report", reportPath, "--json", outPath], { encoding: "utf8" });
+  assert.strictEqual(fakedRun.status, 2, "自报 unsized 但重算 > 0 必须失败（产物被改坏）");
+  const fakedReport = JSON.parse(fs.readFileSync(outPath, "utf8"));
+  assert.ok(fakedReport.findings.some(function (item) { return item.rule === "R14" && /重算为/.test(item.message); }),
+    "R14 必须报出自报算不出但重算 > 0");
 }
 
 console.log("design-box.test.js: 全部通过");

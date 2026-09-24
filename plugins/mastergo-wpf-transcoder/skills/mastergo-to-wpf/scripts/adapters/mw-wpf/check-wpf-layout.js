@@ -150,7 +150,8 @@ function checkDesignBoxes(layout, emission) {
       const height = extentOf(rowExtents, cell.row, cell.rowSpan);
       // 撞格下移的格子没有设计稿偏移真值：期望值仍是 designBoxAttrs(cell)（有格子尺寸就写控件自身尺寸、
       // 不写对齐），只把"不是设计稿那条带"这件事登记成提示，不失败。
-      // 维度判定一律按维：cell.unsized 只免掉真正算不出的那一维，另一维照常重算与比对。
+      // 维度判定一律按维，且**格子尺寸的重算核对对这两类格子照常执行**（它俩的格子尺寸都有机械真值）：
+      // cell.unsized 的那一维只有在重算确实非正数（收尾星号带被吃光）时才允许缺尺寸，否则按产物被改坏失败。
       if (cell.shifted) {
         notice("R14", cell.ref, "该格子由推导挪位（撞格下移），不是设计稿那条带：只写控件自身尺寸，不表达间距（没有偏移真值）");
       }
@@ -161,16 +162,19 @@ function checkDesignBoxes(layout, emission) {
         const recomputed = axis[2];
         const label = name === "width" ? "格子宽" : "格子高";
         if (!(size > 0)) {
-          if (cell.shifted) return;   // 撞格下移的格子本来就没有设计稿尺寸，上面已登记提示
           if (unsized[name]) {
-            notice("R14", cell.ref, "该格子的" + (name === "width" ? "宽" : "高") +
-              "算不出正数（所在带超出承载物）：该维不表达尺寸与间距");
+            if (recomputed > 0) {
+              report("R14", cell.ref, label + "被标为算不出，但按行列定义重算为 " + recomputed + "（应 > 0）");
+            } else {
+              notice("R14", cell.ref, "该格子的" + (name === "width" ? "宽" : "高") +
+                "算不出正数（重算 " + recomputed + "）：该维不表达尺寸与间距");
+            }
             return;
           }
           report("R14", cell.ref, "布局产物没有登记" + label + "（推导必须登记：跨格累加 + 收尾星号带残差）");
           return;
         }
-        if (!cell.shifted && size !== recomputed) {
+        if (size !== recomputed) {
           report("R14", cell.ref, label + "与行列定义重算不一致：产物 " + size + "，重算 " + recomputed);
         }
       });
