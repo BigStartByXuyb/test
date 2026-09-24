@@ -59,7 +59,7 @@
 
 设计稿可以在「宽度 / 高度」栏用「添加」设置**最小 / 最大宽高**。这四个值只存在于插件 API（`LayoutMixin`），DevMode DSL 与 MCP 都不导出，所以由插件侧单独取、由流水线合并：
 
-1. **取约束**：常驻桥（`mg-dsl-export` 插件 + `bridge-server.mjs`）返回当前页所有设置了约束的节点。**未设置返回 `0`（不是 `null`）**，只有 `> 0` 才算设置。
+1. **取约束**：这四个值只存在于插件 API（`LayoutMixin` 的 `minWidth` / `maxWidth` / `minHeight` / `maxHeight`），DevMode DSL 与 MCP 都不导出，因此需要一个**外部导出的约束 JSON**（本仓库不产出该文件）。形状固定为 `{ pageId, nodes: [{ id, minWidth, maxWidth, minHeight, maxHeight, … }] }`；**未设置返回 `0`（不是 `null`）**，只有 `> 0` 才算设置。
 2. **合并**：`scripts/core/apply-constraints.js --dsl <dsl.snapshot.json> --constraints <约束.json>` 把 `node.constraints = { minWidth, maxWidth, minHeight, maxHeight }`（只保留 `> 0` 的项）合并进 DSL 快照，**不改动 DSL 任何原生字段**。配对先按完整 id，再按复合 id 末段兜底（实例内子层两边链长不同）；末段歧义不猜，记进报告。
 3. **透传**：布局推导只把 `constraints` 透传进对应格子（`cell.constraints`），不推算、不补默认值。
 4. **发射**：`View.xaml` 上落 `MinWidth / MaxWidth / MinHeight / MaxHeight`；`TextBlock` 在设了最大宽时补 `TextWrapping="Wrap"`。
@@ -67,4 +67,4 @@
 
 入口在 `run-all.ps1`：`-Constraints <约束.json>`；不传时自动找 `Generated/_inputs/<页面名>.constraints.json`；两者都没有 = 无约束（与旧行为完全一致）。
 
-**官方 DSL 支持这四个字段之后**：只改 `apply-constraints.js` 的 `readConstraintSource()`（改成从 DSL 节点自身读同名字段），并停止传 `-Constraints`；布局推导、XAML 发射、门禁三处一行都不用改。
+**官方 DSL 支持这四个字段之后**：删掉 `apply-constraints.js` 这一步与 `run-all.ps1` 的 `-Constraints` / `-RequireConstraints` 入口，改由下游直接读 DSL 节点自带的同名字段。键名一致时，布局推导、XAML 发射、门禁三处一行都不用改——要动的只有"约束来源"这一处适配。

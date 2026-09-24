@@ -29,6 +29,9 @@
 const fs = require("fs");
 const path = require("path");
 const { readJson } = require(path.join(__dirname, "..", "..", "lib", "script-helpers.js"));
+const {
+  CONSTRAINT_KEYS, CONSTRAINT_ATTRS, normalizeConstraints, collectConstraints
+} = require(path.join(__dirname, "..", "..", "lib", "constraints.js"));
 
 const findings = [];
 const counts = {};
@@ -77,31 +80,21 @@ function parseArgs(argv) {
 // 布局推导只透传，因此这里逐格比对：格子的约束必须与 DSL 完全一致，且必须真的发射进 XAML。
 function checkConstraints(layout, dslConstraints, xamlText) {
   if (!dslConstraints) return;
-  const KEYS = [["minWidth", "MinWidth"], ["maxWidth", "MaxWidth"], ["minHeight", "MinHeight"], ["maxHeight", "MaxHeight"]];
-  const normalize = function (value) {
-    const out = {};
-    if (!value) return out;
-    KEYS.forEach(function (pair) {
-      const number = Number(value[pair[0]]);
-      if (Number.isFinite(number) && number > 0) out[pair[0]] = number;
-    });
-    return out;
-  };
   const placedRefs = new Set();
   const visit = function (grid) {
     if (!grid || !Array.isArray(grid.cells)) return;
     grid.cells.forEach(function (cell) {
       placedRefs.add(cell.ref);
-      const expected = normalize(dslConstraints[cell.ref]);
-      const actual = normalize(cell.constraints);
-      KEYS.forEach(function (pair) {
-        if (expected[pair[0]] !== actual[pair[0]]) {
-          report("R11", cell.ref, "尺寸约束与 DSL 不一致：" + pair[0] + " 期望 " +
-            (expected[pair[0]] === undefined ? "未设置" : expected[pair[0]]) + "，布局产物为 " +
-            (actual[pair[0]] === undefined ? "未设置" : actual[pair[0]]));
+      const expected = normalizeConstraints(dslConstraints[cell.ref]);
+      const actual = normalizeConstraints(cell.constraints);
+      CONSTRAINT_KEYS.forEach(function (key) {
+        if (expected[key] !== actual[key]) {
+          report("R11", cell.ref, "尺寸约束与 DSL 不一致：" + key + " 期望 " +
+            (expected[key] === undefined ? "未设置" : expected[key]) + "，布局产物为 " +
+            (actual[key] === undefined ? "未设置" : actual[key]));
         }
-        if (xamlText && actual[pair[0]] && xamlText.indexOf(pair[1] + '="' + Math.round(actual[pair[0]]) + '"') < 0) {
-          report("R13", cell.ref, "尺寸约束未发射到 XAML：缺少 " + pair[1] + '="' + Math.round(actual[pair[0]]) + '"');
+        if (xamlText && actual[key] && xamlText.indexOf(CONSTRAINT_ATTRS[key] + '="' + Math.round(actual[key]) + '"') < 0) {
+          report("R13", cell.ref, "尺寸约束未发射到 XAML：缺少 " + CONSTRAINT_ATTRS[key] + '="' + Math.round(actual[key]) + '"');
         }
       });
       if (cell.children) visit(cell.children);
@@ -323,14 +316,7 @@ function main() {
   if (args.dslPath) {
     const snapshot = readJson(args.dslPath);
     const roots = (snapshot.dsl && snapshot.dsl.nodes) || snapshot.nodes || [];
-    dslConstraints = {};
-    const walkDsl = function (node) {
-      if (!node || typeof node !== "object") return;
-      if (Array.isArray(node)) { node.forEach(walkDsl); return; }
-      if (typeof node.id === "string" && node.constraints) dslConstraints[node.id] = node.constraints;
-      (node.children || []).forEach(walkDsl);
-    };
-    roots.forEach(walkDsl);
+    dslConstraints = collectConstraints(roots);
   }
   checkConstraints(layout, Object.keys(dslConstraints || {}).length ? dslConstraints : null, xamlText);
 

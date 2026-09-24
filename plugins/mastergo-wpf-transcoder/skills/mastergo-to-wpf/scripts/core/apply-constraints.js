@@ -1,31 +1,33 @@
 #!/usr/bin/env node
 "use strict";
 
-// 约束适配层：把「插件 API 的尺寸约束（min/max 宽高）」合并进 DSL 快照。
+// 约束适配层：把外部导出的尺寸约束（min/max 宽高）合并进 DSL 快照。
 //
 // 这是**唯一**读取约束来源的地方：下游（布局推导 / XAML 发射 / 布局门禁）只认统一字段
-// `node.constraints = { minWidth, maxWidth, minHeight, maxHeight }`（只保留 > 0 的项）。
-// 官方 DSL 支持这四个字段后，只需改本文件的 readConstraintSource()，其余脚本不动。
+// `node.constraints = { minWidth, maxWidth, minHeight, maxHeight }`（只保留 > 0 的项）；
+// 键集与归一化口径的唯一实现在 scripts/lib/constraints.js。
 //
 // CLI
 //   node apply-constraints.js --dsl <dsl.snapshot.json> --constraints <constraints.json>
 //        [--out <dsl.constrained.json>] [--report <report.json>] [--require]
 //
-// --constraints 接受两种形态（都来自常驻桥）：
-//   A. { pageId, count, nodes:[{ id, minWidth, maxWidth, minHeight, maxHeight, ... }] }   ← bridge:constraints
-//   B. { pageId, rootIds, nodes:[ ... 同上 ... ] }                                        ← bridge:exportPage
+// --constraints 的输入契约（本仓库不产出该文件，由外部导出；形状固定为其中一种）：
+//   A. { pageId, count, nodes:[{ id, minWidth, maxWidth, minHeight, maxHeight, ... }] }
+//   B. { pageId, rootIds, nodes:[ ... 同上 ... ] }
+//   约束值取 MasterGo 插件 API 的 LayoutMixin（未设置 = 0，不是 null）。
 //
 // 约定
-//   - 未设置 = 0（MasterGo 插件 API 对"没设约束"返回 0，不是 null）；只有 > 0 才算设置。
 //   - 配对：先按完整 id，再按复合 id 末段（实例内子层两边链长不同）；一个 DSL 节点只取一次。
 //   - 只增加 node.constraints，不改动 DSL 任何原生字段。
-//   - --require：没有约束来源、或来源里一条约束都没有时 fail-closed（顺序严格时用）。
+//   - --require：来源里一条约束都没有、或与 DSL 一个都没配上时 fail-closed；
+//     由 run-all.ps1 的 -RequireConstraints 传入。
 
 const fs = require("fs");
 const path = require("path");
 const { fail, readJson } = require(path.join(__dirname, "..", "lib", "script-helpers.js"));
-
-const CONSTRAINT_KEYS = ["minWidth", "maxWidth", "minHeight", "maxHeight"];
+const {
+  normalizeConstraints, eachDslNode
+} = require(path.join(__dirname, "..", "lib", "constraints.js"));
 
 function parseArgs(argv) {
   const args = { require: false };
@@ -47,9 +49,10 @@ function parseArgs(argv) {
   return args;
 }
 
-// ── 唯一的约束来源读取点（官方 DSL 支持后只改这里） ─────────────────────────────
-// 现在：插件 API（常驻桥）的节点数组。
-// 以后：改成从 DSL 节点自身读 minWidth / maxWidth / minHeight / maxHeight（同名字段）。
+// ── 唯一的约束来源读取点 ────────────────────────────────────────────────────
+// 现在：外部导出的节点数组（形状见文件头）。
+// 官方 DSL 直接导出这四个字段后：本步骤整体删除（含 run-all.ps1 的 -Constraints 入口），
+// 下游改读 DSL 节点自带的同名字段；布局推导 / XAML 发射 / 门禁三处都不用动。
 function readConstraintSource(sourcePath) {
   const file = readJson(sourcePath);
   const rows = Array.isArray(file) ? file : (file.nodes || []);
@@ -64,27 +67,8 @@ function readConstraintSource(sourcePath) {
   };
 }
 
-function normalizeConstraints(row) {
-  const result = {};
-  CONSTRAINT_KEYS.forEach(function (key) {
-    const value = Number(row[key]);
-    if (Number.isFinite(value) && value > 0) result[key] = value;
-  });
-  return Object.keys(result).length ? result : null;
-}
-
 function lastSegment(id) {
   return String(id).split("/").pop();
-}
-
-function walkDsl(node, visit) {
-  if (!node || typeof node !== "object") return;
-  if (Array.isArray(node)) {
-    node.forEach(function (item) { walkDsl(item, visit); });
-    return;
-  }
-  visit(node);
-  (node.children || []).forEach(function (child) { walkDsl(child, visit); });
 }
 
 function applyConstraints(options) {
@@ -96,7 +80,7 @@ function applyConstraints(options) {
   let constraintRowCount = 0;
   source.rows.forEach(function (row) {
     const constraints = normalizeConstraints(row);
-    if (!constraints) return;
+    if (Object.keys(constraints).length === 0) return;
     constraintRowCount += 1;
     byFullId.set(row.id, constraints);
     const key = lastSegment(row.id);
@@ -126,7 +110,7 @@ function applyConstraints(options) {
   };
 
   roots.forEach(function (root) {
-    walkDsl(root, function (node) {
+    eachDslNode(root, function (node) {
       if (typeof node.id !== "string" || !node.id) return;
       report.dslNodes += 1;
       let constraints = byFullId.get(node.id) || null;
@@ -183,4 +167,4 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { applyConstraints, normalizeConstraints, lastSegment, readConstraintSource, CONSTRAINT_KEYS };
+module.exports = { applyConstraints, lastSegment, readConstraintSource };

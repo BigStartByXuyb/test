@@ -27,6 +27,7 @@ const path = require("path");
 const {
   fail, xmlAttr, readJson
 } = require(path.join(__dirname, "..", "..", "lib", "script-helpers.js"));
+const { constraintAttributes } = require(path.join(__dirname, "..", "..", "lib", "constraints.js"));
 
 function parseArgs(argv) {
   const args = { overwrite: false };
@@ -178,16 +179,10 @@ function gridCellAttrs(cell, ctx) {
 }
 
 // 尺寸约束属性：来自布局格子（core/apply-constraints.js 合并进 DSL 节点、布局推导透传）。
-// 只发射设计稿真实设置的约束（未设置 = 0，视为没有），不推算、不填默认值。
+// 键集与"未设置 = 0"的口径唯一实现在 lib/constraints.js；本函数只决定"有没有"。
 function constraintAttrs(cell) {
-  const constraints = cell && cell.constraints;
-  if (!constraints) return null;
-  const attrs = {};
-  [["minWidth", "MinWidth"], ["maxWidth", "MaxWidth"], ["minHeight", "MinHeight"], ["maxHeight", "MaxHeight"]]
-    .forEach(function (pair) {
-      const value = Number(constraints[pair[0]]);
-      if (Number.isFinite(value) && value > 0) attrs[pair[1]] = String(Math.round(value));
-    });
+  if (!cell || !cell.constraints) return null;
+  const attrs = constraintAttributes(cell.constraints);
   return Object.keys(attrs).length ? attrs : null;
 }
 

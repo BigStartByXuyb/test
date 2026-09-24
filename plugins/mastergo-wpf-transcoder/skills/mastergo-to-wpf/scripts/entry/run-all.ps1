@@ -31,10 +31,12 @@ param(
     [string] $Ui,
     [string] $Target,
     [string] $DesignPageName = '',
-    # 尺寸约束来源（可选）：常驻桥导出的约束 JSON（bridge 的 constraints 或 exportPage 结果）。
+    # 尺寸约束来源（可选）：外部导出的约束 JSON（形状见 references/adapters/mw-wpf/page-build-rules.md 第 5 节）。
     # 不给就自动找 <Inputs>/<Target>.constraints.json；两者都没有 = 无约束（与旧行为一致）。
     # 合并由 core/apply-constraints.js 完成，下游只认 DSL 节点上的 constraints 字段。
     [string] $Constraints = '',
+    # 顺序严格时用：要求约束来源必须存在且至少配上一条，缺失/全空直接失败（不静默退化成"无约束"）。
+    [switch] $RequireConstraints,
     # 路线（适配器）：mtslg-iocontrol = 作业B（绝对坐标 IOContorl 页面 XML）；mw-wpf = 作业A（真 WPF XAML + Grid）。
     # 各路线用哪些脚本、真值源与产物路径由 references/adapters/<路线>/adapter.json 描述符给出，本文件不写死步内路径。
     [ValidateSet('mtslg-iocontrol', 'mw-wpf')]
@@ -737,7 +739,7 @@ foreach ($step in $Steps) {
                 $note = "菜单项 $(@($layout.menuItems).Count) 个"
                 if ($Mode -eq 'mw-wpf') {
                     # 作业A 另做一步布局推导：分区 → 行列 → 格子（Grid 布局是 A 的坐标载体，不再是绝对坐标）。
-                    # 尺寸约束（可选）：把常驻桥取到的 min/max 合并进 DSL 快照，布局与门禁共用合并后的快照。
+                    # 尺寸约束（可选）：把外部导出的 min/max 合并进 DSL 快照，布局与门禁共用合并后的快照。
                     $constraintsInput = $Constraints
                     if (-not $constraintsInput) {
                         $autoConstraints = Join-Path $Inputs "$Target.constraints.json"
@@ -745,11 +747,15 @@ foreach ($step in $Steps) {
                     }
                     if ($constraintsInput) {
                         Assert-File $constraintsInput "约束来源不存在: $constraintsInput"
-                        Invoke-StepCommand -Label 'apply constraints' -LogFile $log -File 'node' -Arguments @(
+                        $applyConstraintArgs = @(
                             (Join-Path $ScriptsFolder 'core\apply-constraints.js'),
                             '--dsl', $SnapshotJson, '--constraints', $constraintsInput,
-                            '--out', $ConstrainedDslJson, '--report', $ConstraintsReportJson) | Out-Null
+                            '--out', $ConstrainedDslJson, '--report', $ConstraintsReportJson)
+                        if ($RequireConstraints) { $applyConstraintArgs += '--require' }
+                        Invoke-StepCommand -Label 'apply constraints' -LogFile $log -File 'node' -Arguments $applyConstraintArgs | Out-Null
                         $LayoutDslJson = $ConstrainedDslJson
+                    } elseif ($RequireConstraints) {
+                        throw "-RequireConstraints 要求约束来源，但 -Constraints 未传且 $(Join-Path $Inputs "$Target.constraints.json") 不存在"
                     } else {
                         $LayoutDslJson = $SnapshotJson
                     }
@@ -801,6 +807,8 @@ foreach ($step in $Steps) {
             }
             'gates' {
                 if ($Mode -eq 'mw-wpf') {
+                    # 续跑到这一步时布局步不会重跑：约束快照存在就直接用它，门禁不得静默丢掉尺寸约束。
+                    if (Test-Path -LiteralPath $ConstrainedDslJson) { $LayoutDslJson = $ConstrainedDslJson }
                     # 作业A 的门禁：布局（越界/空行空列/锚点格冲突/禁止类型/尺寸来源）+ 协议/资源键/硬编码文本。
                     # 输入用 Bundle 定稿的 mapping（语言绑定已落在节点上），不是第 5 步的判定草稿——
                     # 否则"有文本没语言键"会把已绑定的节点全判成缺键。
@@ -852,6 +860,8 @@ foreach ($step in $Steps) {
             }
             'verify' {
                 if ($Mode -eq 'mw-wpf') {
+                    # 与 gates 同口径：续跑复核也必须带上尺寸约束，不能因为没跑布局步而跳过。
+                    if (Test-Path -LiteralPath $ConstrainedDslJson) { $LayoutDslJson = $ConstrainedDslJson }
                     # 作业A 的独立复核：门禁重跑一遍并落独立日志（结构闭环按本页 View.xaml 与布局产物校验）。
                     Invoke-StepCommand -Label 'wpf verifications' -LogFile $log -File 'node' -Arguments @(
                         (Get-AdapterScript 'wpfGate'), '--layout', $WpfLayoutJson,
