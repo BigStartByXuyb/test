@@ -1,6 +1,6 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
-  "name": "laya-decisions-mcp",
+  "name": "laya-decisions",
   "version": "1.0.0",
   "description": "Local jev_* decision tools (check / route / score / evaluate) backed by the laya System One model on this host. Zero cost, zero egress, calibrated probabilities.",
   "author": {

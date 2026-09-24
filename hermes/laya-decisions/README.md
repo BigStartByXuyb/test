@@ -1,4 +1,4 @@
-# laya-decisions-mcp
+# laya-decisions
 
 Local `jev_*` decision tools for Hermes, backed by the laya System One model on
 `10.101.0.62:8095`. Zero cost, zero egress.
@@ -7,10 +7,29 @@ An Agent Plugins v1 portable package: one skill plus one stdio MCP server. Insta
 disabled (the v1 contract); enable it after install.
 
 ```bash
-hermes plugins install "BigStartByXuyb/test#hermes/laya-decisions-mcp"
-hermes plugins enable laya-decisions-mcp
-hermes mcp list            # laya-decisions should appear, sourced from the plugin
+hermes plugins install "BigStartByXuyb/test#hermes/laya-decisions"
+hermes plugins enable laya-decisions
 ```
+
+## Why the names here are short
+
+Hermes folds a portable plugin's name into the MCP server key
+(`agent-plugin-<plugin>-<sha8>__<mcp.json key>`), and OpenAI-compatible providers reject
+function names longer than 64 characters. Past that limit hermes clamps the name to
+`mcp__…_<hash8>`, and the tool stops being called `jev_check` on the wire — which defeats
+the point of mirroring the community `jev_*` names.
+
+The budget is `5 + len(namespace) + 2 + len(mcp key) + 2 + len(tool name) ≤ 64`, and the
+namespace alone is `agent_plugin_<plugin>_<sha8>` (22 + len(plugin)). Hence the terse
+plugin name `laya-decisions` and server key `laya`, which keeps the longest tool
+(`jev_evaluate`) at 61 characters:
+
+```
+mcp__agent_plugin_laya_decisions_<sha8>__laya__jev_evaluate   61 chars, not clamped
+```
+
+Renaming the plugin or the server key longer will silently reintroduce the hashed names.
+Check with `hermes mcp test laya` after any change.
 
 ## Why the tool names are `jev_*`
 
@@ -29,7 +48,7 @@ them, not alongside — the tool names collide.
 | Path | What |
 | --- | --- |
 | `plugin.json` | Agent Plugins v1 manifest |
-| `mcp.json` | declares the `laya-decisions` stdio server |
+| `mcp.json` | declares the `laya` stdio server |
 | `bin/laya-mcp` | launcher; picks an interpreter that can `import mcp.server.mcpserver` |
 | `server/laya_decisions_server.py` | the MCP server |
 | `prompts/frozen-questions.v1.json` | versioned, verbatim question wording |
