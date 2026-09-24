@@ -2,8 +2,8 @@
 "use strict";
 
 // 尺寸约束（min/max 宽高）的唯一实现：键集、归一化口径、键名→WPF 属性名、DSL 遍历与收集。
-// 消费者：core/apply-constraints.js（合并进 DSL）、adapters/mw-wpf/gen-mw-wpf-xaml.js（发射属性）、
-//         adapters/mw-wpf/check-wpf-layout.js（门禁一致性）。
+// 消费者：core/apply-constraints.js（合并进 DSL）、adapters/mw-wpf/gen-mw-wpf-layout.js（成层判据与透传）、
+//         adapters/mw-wpf/gen-mw-wpf-xaml.js（发射属性）、adapters/mw-wpf/check-wpf-layout.js（门禁一致性）。
 
 // 设计稿的四个尺寸约束；顺序即产物里的属性顺序。
 const CONSTRAINT_KEYS = ["minWidth", "maxWidth", "minHeight", "maxHeight"];

@@ -277,4 +277,48 @@ assert.strictEqual(cells.find(function (cell) { return cell.ref === "t2"; }).con
   assert.deepStrictEqual(derived.pending, [], "没有节点因为成层而漏落格");
 }
 
+// ── ⑧ 本页不发射的带约束节点（页面根 / 不可见 / 框架固定区）登记豁免，不失败 ─────────
+{
+  const dsl = {
+    dsl: {
+      nodes: [node("root", "FRAME", { width: 1280, height: 1024, relativeX: 0, relativeY: 0 }, [
+        node("top", "TEXT", { width: 80, height: 16, relativeX: 10, relativeY: 10 }, [], { constraints: { minHeight: 20 } }),
+        node("body", "FRAME", { width: 1280, height: 902, relativeX: 0, relativeY: 85 }, [
+          node("hidden", "TEXT", { width: 80, height: 16, relativeX: 0, relativeY: 0 }, [], { constraints: { minWidth: 80 } }),
+          node("shown", "TEXT", { width: 80, height: 16, relativeX: 0, relativeY: 20 })
+        ])
+      ], { constraints: { minHeight: 600 } })]
+    }
+  };
+  const types = {
+    byRef: new Map([
+      ["top", { ref: "top", controlType: "TextBlock", absX: 10, absY: 10, w: 80, h: 16, langName: "PXTop" }],
+      ["hidden", { ref: "hidden", controlType: "TextBlock", absX: 0, absY: 85, w: 80, h: 16, langName: "PXHidden" }],
+      ["shown", { ref: "shown", controlType: "TextBlock", absX: 0, absY: 105, w: 80, h: 16, langName: "PXShown" }]
+    ])
+  };
+  const derived = deriveLayout({
+    dsl: dsl, types: types, map: MAP, containers: new Set(["IOGroupBox"]),
+    tokens: { headerHeight: 85, bottomHeight: 180 }, pageTarget: "P",
+    visibility: { nodes: { hidden: { effectiveVisible: false } } }
+  });
+  const exempt = new Map((derived.constraintExempt || []).map(function (item) { return [item.ref, item.reason]; }));
+  assert.ok(exempt.has("root"), "页面根带约束 → 登记豁免");
+  assert.ok(exempt.has("top"), "框架固定区里的节点带约束 → 登记豁免");
+  assert.ok(exempt.has("hidden"), "不可见节点带约束 → 登记豁免");
+  assert.strictEqual(exempt.has("shown"), false, "没有约束的节点不得进豁免清单");
+
+  const layoutPath = writeJson("exempt-layout.json", derived);
+  const typesPath = writeJson("exempt-types.json", { schemaVersion: 1, nodes: Array.from(types.byRef.values()), pending: [], unmappedComponents: [] });
+  const dslPath = writeJson("exempt-dsl.json", dsl);
+  const reportPath = path.join(tmp, "exempt-report.json");
+  const run = spawnSync(process.execPath, [CHECK, "--layout", layoutPath, "--types", typesPath, "--map", ROUTE_MAP, "--dsl", dslPath, "--json", reportPath], { encoding: "utf8" });
+  assert.strictEqual(run.status, 0, "本页不发射的带约束节点不得阻断门禁: " + run.stdout + run.stderr);
+  const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
+  ["root", "top", "hidden"].forEach(function (ref) {
+    assert.ok(report.notices.some(function (item) { return item.rule === "R12" && item.ref === ref; }), ref + " 的约束豁免必须登记提示");
+  });
+  assert.strictEqual(report.findings.length, 0, "豁免情形不得产生失败项");
+}
+
 console.log("constraints.test.js: 全部通过");

@@ -27,9 +27,10 @@
 //   - flex 主轴优先：容器声明了 flexContainerInfo.flexDirection（row/column）时，该容器主轴上的每个
 //     flex 条目独占一条带（同一条带里出现 ≥2 个条目才拆，拆点取设计稿起点，gap 体现在"下一带起点 − 本带起点"）；
 //     没有声明的层级仍按 bbox 聚类。
-//   - 层级照设计稿：声明了 flex 主轴（flexDirection）的容器各自发射一个内层 Grid（格子带 container:true），
-//     它的条目（直接子控件 / 更内层的容器）进该层格子；没有 flex 声明的包裹层展平到最近一层。
-//     单条目容器同样展平，**但带尺寸约束的容器不展平**：约束是设计意图，展平会让它没有落到产物的位置。
+//   - 层级照设计稿：成层容器各自发射一个内层 Grid（格子带 container:true），它的条目（直接子控件 /
+//     更内层的容器）进该层格子。成层容器 = 声明了 flex 主轴（flexDirection）的容器，或**带尺寸约束的容器**
+//     （约束是设计意图，展平会让它没有落到产物的位置）；没有 flex 声明、也没有尺寸约束的包裹层展平到最近一层；
+//     单条目容器同样展平（带约束的除外）。
 //   - 容器（写法表登记为可容纳子节点的类型）内部的节点递归成嵌套 Grid，不与被容纳节点抢同一格。
 //   - 归不进任何格的节点进 pending，不猜坐标。
 //   - 尺寸约束（min/max 宽高）由 core/apply-constraints.js 合并进 DSL 节点的 `constraints` 字段，
@@ -204,10 +205,14 @@ function levelAncestors(tree, ref) {
   if (!record) return chain;
   let parent = tree.byRef.get(record.parentRef);
   while (parent) {
-    const direction = parent.flex && parent.flex.flexDirection;
-    const isFlex = direction === "row" || direction === "column";
-    if (isFlex || carriesConstraints(tree, parent.ref)) {
-      chain.push({ containerRef: parent.ref, direction: isFlex ? direction : null });
+    // 页面根是画布本身、不是页面里的控件：它不成层（区域根网格就是它的那一层），
+    // 它自己的尺寸约束由 constraintExempt 登记。
+    if (parent.ref !== tree.root.ref) {
+      const direction = parent.flex && parent.flex.flexDirection;
+      const isFlex = direction === "row" || direction === "column";
+      if (isFlex || carriesConstraints(tree, parent.ref)) {
+        chain.push({ containerRef: parent.ref, direction: isFlex ? direction : null });
+      }
     }
     parent = tree.byRef.get(parent.parentRef);
   }
@@ -480,9 +485,13 @@ function deriveLayout(options) {
     });
   });
 
-  const headerBand = entries.filter(function (n) { return n.y + n.h <= tokens.headerHeight + EPSILON; });
-  const bottomBand = entries.filter(function (n) { return n.y >= design.height - tokens.bottomHeight - EPSILON; });
-  const content = entries.filter(function (n) { return headerBand.indexOf(n) < 0 && bottomBand.indexOf(n) < 0; });
+  // 节点落在哪条带（唯一判据）：顶部栏 / 底部栏由框架渲染、不进页面，其余进内容区。
+  const bandOfBox = function (y, h) {
+    if (y + h <= tokens.headerHeight + EPSILON) return "framework-top";
+    if (y >= design.height - tokens.bottomHeight - EPSILON) return "framework-bottom";
+    return "content";
+  };
+  const content = entries.filter(function (n) { return bandOfBox(n.y, n.h) === "content"; });
 
   const regions = [
     frameworkRegion("top-strip", "顶部栏", "framework-top", "MaxwellFramework_HeaderHeight", tokens.headerHeight, design, "y"),
@@ -511,13 +520,33 @@ function deriveLayout(options) {
     if (!placedRefs.has(node.ref)) pending.push({ ref: node.ref, reason: "未归入任何分区/格子" });
   });
 
+  // 尺寸约束的承载范围：本页要发射的节点（可见、且落在内容区）必须落格；本页不发射的节点
+  // （页面根、不可见节点、框架固定区里的节点）登记豁免原因，交门禁区分"产物漏约束"与"本页不发射"。
+  const constraintExempt = [];
+  tree.byRef.forEach(function (record) {
+    if (!carriesConstraints(tree, record.ref) || placedRefs.has(record.ref)) return;
+    if (record.ref === tree.root.ref) {
+      constraintExempt.push({ ref: record.ref, reason: "页面根（画布本身不是页面里的控件）" });
+      return;
+    }
+    if (visuallyHidden(options.visibility, record.ref)) {
+      constraintExempt.push({ ref: record.ref, reason: "节点不可见" });
+      return;
+    }
+    const band = bandOfBox(record.y, record.h);
+    if (band !== "content") {
+      constraintExempt.push({ ref: record.ref, reason: "落在框架固定区（" + band + "），本页不发射" });
+    }
+  });
+
   return {
     schemaVersion: 1,
     adapter: "mw-wpf",
     pageTarget: options.pageTarget,
     design: { width: Math.round(design.width), height: Math.round(design.height) },
     regions: regions,
-    pending: pending
+    pending: pending,
+    constraintExempt: constraintExempt
   };
 }
 
@@ -562,7 +591,8 @@ function main() {
           cells: region.grid.cells.length
         };
       }),
-      pending: layout.pending
+      pending: layout.pending,
+      constraintExempt: layout.constraintExempt
     };
     fs.mkdirSync(path.dirname(args.reportPath), { recursive: true });
     fs.writeFileSync(args.reportPath, JSON.stringify(summary, null, 2) + "\n", "utf8");

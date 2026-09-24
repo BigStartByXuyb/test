@@ -292,7 +292,8 @@ function renderGrid(grid, ctx, depth, gridAttrs) {
   const childCtx = Object.assign({}, ctx, { gridIsMulti: multi });
   grid.cells.forEach(function (cell) {
     const node = ctx.byRef.get(cell.ref);
-    // 容器格子（产物里 container: true）：设计稿声明的 flex 容器没有控件类型，它自己就是一层 <Grid>。
+    // 容器格子（产物里 container: true）：成层容器（flex 容器或带尺寸约束的容器）没有控件类型，
+    // 它自己就是一层 <Grid>。
     if (cell.container) {
       if (!cell.children) fail("容器格子缺少内层 Grid: " + cell.ref);
       lines.push(renderGrid(cell.children, ctx, depth + 1, Object.assign({}, gridCellAttrs(cell, childCtx) || {}, constraintAttrs(cell) || {})));

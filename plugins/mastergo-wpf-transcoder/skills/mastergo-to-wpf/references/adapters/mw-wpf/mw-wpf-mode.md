@@ -51,6 +51,6 @@ ViewModel 与作业B 共用同一套生成器（`scripts/host/gen-mw-wpf-page.js
 
 ## 5. 验证
 
-静态门禁 = `scripts/adapters/mw-wpf/check-wpf-layout.js`（越界 / 锚点格冲突 / 禁止写法 / 协议属性名 / 资源键闭环 / 硬编码文本 / 尺寸来源 / 推导待确认 / 尺寸约束一致性、落格与发射，后三者需传 `--dsl`；**空行空列与 `manual-only` 类型只作提示，不失败**），`run-all.ps1 -Mode mw-wpf` 的第 11、12 步就是它。尺寸约束来源经 `run-all.ps1 -Constraints <约束.json>` 传入（见 `page-build-rules.md` 第 5 节）。
+静态门禁 = `scripts/adapters/mw-wpf/check-wpf-layout.js`（越界 / 锚点格冲突 / 禁止写法 / 协议属性名 / 资源键闭环 / 硬编码文本 / 尺寸来源 / 推导待确认 / 尺寸约束一致性、落格与发射；尺寸约束三条需传 `--dsl`，其中发射一条还要 `--xaml`；**空行空列、`manual-only` 类型与本页不发射的带约束节点只作提示，不失败**），`run-all.ps1 -Mode mw-wpf` 的第 11、12 步就是它。尺寸约束来源经 `run-all.ps1 -Constraints <约束.json>` 传入（见 `page-build-rules.md` 第 5 节）。
 
 编译与加载验证属「项目运行时交付」门禁，只在目标项目接入且用户明确要求时执行；没有目标项目时只出静态脚手架。

@@ -50,7 +50,7 @@
 9. **推导待确认**：布局推导阶段挂起的节点（未归格 / 无尺寸 / 结构对不上 / 类型无处发射）逐条失败——它与第 1 条不同：第 1 条是"写法表没这个类型"，第 9 条是"布局推导没把它放下"。
 10. **待人工确认（提示）**：页面用到写法表 `status: manual-only` 的类型（证据不全：有手册条目但真实页面未出现，或只有用户确认，如 `Camera`）时，登记提示 `R10`，不失败——"首次生成需人工确认、事后补齐缺的证据"以提示为落点。
 11. **尺寸约束一致性**：格子带的尺寸约束必须与 DSL 节点上的 `constraints` 逐个一致（多一项 / 少一项 / 改数值都失败）——约束是设计意图，不允许推导侧改动。
-12. **尺寸约束未落格**：DSL 里带约束、布局产物里没有对应格子即失败（`R12`）——约束是设计意图，产物漏了就是漏了。带约束的容器不展平，正常不该出现。
+12. **尺寸约束未落格**：**本页要发射**的节点带约束、布局产物里却没有对应格子即失败（`R12`）——约束是设计意图，产物漏了就是漏了。带约束的容器不展平，正常不该出现。本页不发射的节点（页面根 / 不可见 / 框架固定区，即布局产物的 `constraintExempt`）只登记提示，不失败。
 13. **尺寸约束未发射**：带约束的格子必须在 `View.xaml` 里出现对应的 `MinWidth / MaxWidth / MinHeight / MaxHeight`（仅在给了 `--xaml` 时校验）。
 
 门禁报告落在 `Generated/_inputs/<页面名>.wpf-gate.json`；发射器自己的报告（命中的样式键、未命中变体、待办文本、跳过的固定区）落在 `Generated/_inputs/<页面名>.wpf-xaml.report.json`。
@@ -63,6 +63,7 @@
 2. **合并**：`scripts/core/apply-constraints.js --dsl <dsl.snapshot.json> --constraints <约束.json>` 把 `node.constraints = { minWidth, maxWidth, minHeight, maxHeight }`（只保留 `> 0` 的项）合并进 DSL 快照，**不改动 DSL 任何原生字段**。配对先按完整 id，再按复合 id 末段兜底（实例内子层两边链长不同）；末段歧义不猜，记进报告。
 3. **入口**：`run-all.ps1 -Constraints <约束.json>`；不给就自动找 `Generated/_inputs/<页面名>.constraints.json`；两者都没有 = 无约束。`-RequireConstraints` 要求约束来源必须存在且至少配上一条（缺失或全空直接失败，不静默退化成"无约束"）。解析与合并只有 `Resolve-LayoutDslSnapshot` 一处实现：第 8 步（布局推导）与第 11 / 12 步（门禁、复核）都调它重算，不读磁盘上遗留的合并快照。
 4. **透传**：布局推导只把 `constraints` 透传进对应格子（`cell.constraints`），不推算、不补默认值。**带约束的容器不展平**：约束必须有承载物，展平后它就没有落到产物的位置。
+   承载范围＝本页要发射的节点（可见、且落在内容区）。本页不发射的带约束节点（页面根 / 不可见 / 框架固定区）由布局推导登记在产物的 `constraintExempt`（含原因），门禁按它登记提示，不失败。
 5. **发射**：`View.xaml` 上落 `MinWidth / MaxWidth / MinHeight / MaxHeight`（控件与容器 Grid 都写）；`TextBlock` 在设了最大宽时补 `TextWrapping="Wrap"`。
 6. **门禁**：第 4 节第 11 / 12 / 13 条。
 

@@ -19,7 +19,9 @@
 //   R5 锚点格冲突：同一锚点格（Grid.Row/Column 起点）只允许一个控件（推导用占用表 + 行下移保证唯一）
 //   R10 待人工确认（提示）：页面用到写法表 manual-only 类型（证据不全，如 Camera 只有用户确认）
 //   R11 尺寸约束一致性：格子带的 min/max 宽高必须与 DSL 节点上的 constraints 逐个一致（多/少/改值都失败）
-//   R12 尺寸约束未落格：DSL 里带约束、布局里没有对应格子（带约束的容器不展平，正常不该出现；出现即产物漏约束）
+//   R12 尺寸约束未落格：本页要发射的节点带约束、布局里却没有对应格子即失败（带约束的容器不展平，
+//       正常不该出现）；本页不发射的节点（页面根 / 不可见 / 框架固定区，布局产物的 constraintExempt）
+//       只登记提示，不失败
 //   R13 尺寸约束未发射：带约束的格子必须在 View.xaml 里出现对应的 MinWidth/MaxWidth/MinHeight/MaxHeight
 //   R6 资源键闭环：{StaticResource <键>} 必须来自写法表样式族、本页 Icon 台账或 Icon 字典合并点
 //   R7 文本零硬编码中文：发射区不得出现字面中文
@@ -101,10 +103,16 @@ function checkConstraints(layout, dslConstraints, xamlText) {
     });
   };
   (layout.regions || []).forEach(function (region) { visit(region.grid); });
+  // 本页不发射的节点（页面根 / 不可见 / 框架固定区）由布局推导登记豁免原因：约束不落格是它的应有状态。
+  const exemptReasons = new Map();
+  (layout.constraintExempt || []).forEach(function (item) { exemptReasons.set(item.ref, item.reason); });
   Object.keys(dslConstraints).forEach(function (ref) {
-    if (!placedRefs.has(ref)) {
-      report("R12", ref, "该节点在 DSL 里带尺寸约束，但布局产物里没有对应格子，约束未落到产物（带约束的容器不展平）");
+    if (placedRefs.has(ref)) return;
+    if (exemptReasons.has(ref)) {
+      notice("R12", ref, "本页不发射该节点（" + exemptReasons.get(ref) + "），尺寸约束不落格");
+      return;
     }
+    report("R12", ref, "该节点在 DSL 里带尺寸约束，但布局产物里没有对应格子，约束未落到产物（带约束的容器不展平）");
   });
 }
 
@@ -134,7 +142,7 @@ function checkCells(region, map, layout) {
       report("R1", cell.ref, "框架固定区（" + region.id + "）里不得有控件");
       return;
     }
-    // 容器格子（设计稿声明的 flex 容器）没有控件类型：类型检查交给内层 Grid 里的控件。
+    // 容器格子（成层容器：flex 容器或带尺寸约束的容器）没有控件类型：类型检查交给内层 Grid 里的控件。
     if (!cell.container && (!entry || entry.status === "pending")) {
       report("R1", cell.ref, "写法表未登记或登记为待确认的类型: " + cell.controlType);
       return;
