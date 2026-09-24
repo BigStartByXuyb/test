@@ -8,7 +8,8 @@
 //        --types <类型判定 json 或 mapping.json> --map <mw-wpf-map.json>
 //        [--xaml <发射出的 View.xaml>] [--xaml-report <发射器报告>] [--dsl <带约束的 DSL 快照>]
 //        [--icon-map <本页图标台账>] [--json <报告路径>]
-//   --dsl 供 R11 / R12 用，--xaml 供 R13 / R6 / R7 用，--xaml-report 供 R14 用；不传就跳过对应条目。
+//   --dsl 供 R11 / R12 / R13 用（R13 还要 --xaml 才能比对发射结果），--xaml 另供 R6 / R7 用，
+//   --xaml-report 供 R14 用；不传就跳过对应条目。
 //
 // 退出码：0 通过；2 有 findings（门禁失败）；1 输入/契约错误。
 //
@@ -146,7 +147,8 @@ function checkDesignBoxes(layout, emission) {
       seen.add(cell.ref);
       const width = extentOf(columnExtents, cell.column, cell.columnSpan);
       const height = extentOf(rowExtents, cell.row, cell.rowSpan);
-      // 撞格下移的格子没有设计稿真值：只要求发射报告里也没有尺寸/对齐，并登记提示（不失败）。
+      // 撞格下移的格子没有设计稿偏移真值：期望值仍是 designBoxAttrs(cell)（有格子尺寸就写控件自身尺寸、
+      // 不写对齐），只把"不是设计稿那条带"这件事登记成提示，不失败。
       if (cell.shifted) {
         notice("R14", cell.ref, "该格子由推导挪位（撞格下移），不是设计稿那条带：只写控件自身尺寸，不表达间距（没有偏移真值）");
       } else if (!(cell.width > 0) || !(cell.height > 0)) {
