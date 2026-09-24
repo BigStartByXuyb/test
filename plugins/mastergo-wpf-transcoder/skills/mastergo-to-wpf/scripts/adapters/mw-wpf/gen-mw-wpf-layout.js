@@ -38,9 +38,9 @@
 //     全部落在同一个内容区里，内部再按行列分格。
 //   - 行列由节点 bbox 聚类得到（列 = x 区间重叠的带，行 = y 起始边邻近的带），尺寸照设计稿像素。
 //   - 落格按起始边判定归属；控件 bbox 覆盖到的带全部占住（跨带即写 RowSpan / ColumnSpan）。
-//   - flex 主轴优先：容器声明了 flexContainerInfo.flexDirection（row/column）时，该容器主轴上的每个
-//     flex 条目独占一条带（同一条带里出现 ≥2 个条目才拆，拆点取设计稿起点，gap 体现在"下一带起点 − 本带起点"）；
-//     没有声明的层级仍按 bbox 聚类。
+//   - flex 主轴优先：容器声明了 flexContainerInfo.flexDirection（row/column）时，主轴按「条目带 + 间隙带」显式成带
+//     （间隙 = 相邻条目的实测间距，落成 Auto 带 + 空 Grid 固定尺寸；同一起点的条目合并成一条带）；
+//     没有声明的层级、以及声明层级的交叉轴，仍按 bbox 聚类（带尺寸 = 到下一带起点）。
 //   - 层级照设计稿：成层容器各自发射一个内层 Grid（格子带 container:true），它的条目（直接子控件 /
 //     更内层的容器）进该层格子。成层容器 = 声明了 flex 主轴（flexDirection）的容器，或**带尺寸约束的容器**
 //     （约束是设计意图，展平会让它没有落到产物的位置）；没有 flex 声明、也没有尺寸约束的包裹层展平到最近一层；
@@ -600,7 +600,7 @@ function buildGridFrom(nodes, ctx, size, owner) {
     if (cell.spacer) return;   // 间隙格没有承载物：尺寸由它自己的固定宽/高表达
     const cellWidth = extentOf(columnExtents, cell.column, cell.columnSpan);
     const cellHeight = extentOf(rowExtents, cell.row, cell.rowSpan);
-    // 算不出正数的格子尺寸（收尾星号带被前面的像素带吃光：设计稿内容溢出了承载物）→ 登记 unsized，
+    // 算不出正数的格子尺寸（自适应带被前面的固定带 / 间隙带吃光：设计稿内容溢出了承载物）→ 登记 unsized，
     // 发射器不写尺寸与对齐，门禁按提示登记（这类格子没有设计稿尺寸可表达，不是产物损坏）。
     const unsized = {};
     if (cellWidth > 0) cell.width = cellWidth;

@@ -35,7 +35,7 @@
 //       （shifted / unsized 两类例外按类、按维，见 page-build-rules.md 第 4 节第 14 条）
 //   R6 资源键闭环：{StaticResource <键>} 必须来自写法表样式族、本页 Icon 台账或 Icon 字典合并点
 //   R7 文本零硬编码中文：发射区不得出现字面中文
-//   R8 尺寸来源：框架固定区必须是 framework:<Token>，其余必须是 design
+//   R8 尺寸来源：框架固定区必须是 framework:<Token>；发射区取 design，主轴间隙带取 gap（Auto + 空 Grid 固定尺寸）
 //   R9 推导待确认：布局推导阶段挂起的节点（未归格 / 无尺寸 / 结构对不上 / 类型无处发射）逐条失败
 
 const fs = require("fs");
@@ -176,7 +176,7 @@ function checkDesignBoxes(layout, emission) {
       // 撞格下移的格子没有设计稿偏移真值：期望值仍是 designBoxAttrs(cell)（有格子尺寸就写控件自身尺寸、
       // 不写对齐），只把"不是设计稿那条带"这件事登记成提示，不失败。
       // 维度判定一律按维，且**格子尺寸的重算核对对这两类格子照常执行**（它俩的格子尺寸都有机械真值）：
-      // cell.unsized 的那一维只有在重算确实非正数（收尾星号带被吃光）时才允许缺尺寸，否则按产物被改坏失败。
+      // cell.unsized 的那一维只有在重算确实非正数（自适应带被吃光）时才允许缺尺寸，否则按产物被改坏失败。
       if (cell.shifted) {
         notice("R14", cell.ref, "该格子由推导挪位（撞格下移），不是设计稿那条带：只写控件自身尺寸，不表达间距（没有偏移真值）");
       }
