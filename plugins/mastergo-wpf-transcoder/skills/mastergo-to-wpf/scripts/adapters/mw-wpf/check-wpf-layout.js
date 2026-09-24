@@ -3,7 +3,7 @@
 
 // 作业A（mw-wpf）布局门禁：布局产物 + 类型判定 + A 写法表（可选再查发射出的 View.xaml）逐条断言。
 //
-// CLI
+// CLI（本门禁各条目的入参前提以本块为唯一真值源，文档不复述）
 //   node check-wpf-layout.js --layout <Generated/<页面名>.wpf-layout.json>
 //        --types <类型判定 json 或 mapping.json> --map <mw-wpf-map.json>
 //        [--xaml <发射出的 View.xaml>] [--xaml-report <发射器报告>] [--dsl <带约束的 DSL 快照>]
