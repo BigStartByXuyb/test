@@ -25,6 +25,8 @@
 //       容器子树里没有可发射的控件（补内容或交设计确认）、待确认类型 / 无尺寸等不进格子的节点
 //       （先按 R1 / R9 修类型判定与映射）、产物与本次输入不同步（先重跑第 8 步）
 //   R13 尺寸约束未发射：带约束的格子必须在 View.xaml 里出现对应的 MinWidth/MaxWidth/MinHeight/MaxHeight
+//   R14 格子尺寸与尺寸/对齐发射：每个格子必须登记格子尺寸与承载物设计尺寸（含跨格累加、收尾星号带残差），
+//       且发射报告里该格子的 Width/Height/对齐/Margin 必须与 lib/design-box.js 的同一实现一致
 //   R6 资源键闭环：{StaticResource <键>} 必须来自写法表样式族、本页 Icon 台账或 Icon 字典合并点
 //   R7 文本零硬编码中文：发射区不得出现字面中文
 //   R8 尺寸来源：框架固定区必须是 framework:<Token>，其余必须是 design
@@ -36,6 +38,10 @@ const { readJson } = require(path.join(__dirname, "..", "..", "lib", "script-hel
 const {
   CONSTRAINT_KEYS, CONSTRAINT_ATTRS, normalizeConstraints, collectConstraints
 } = require(path.join(__dirname, "..", "..", "lib", "constraints.js"));
+const { designBoxAttrs } = require(path.join(__dirname, "..", "..", "lib", "design-box.js"));
+const {
+  bandExtents, extentOf, contentSizeOf
+} = require(path.join(__dirname, "gen-mw-wpf-layout.js"));
 
 const findings = [];
 const counts = {};
@@ -66,6 +72,7 @@ function parseArgs(argv) {
     else if (token === "--json") args.reportPath = argv[++i];
     else if (token === "--icon-map") args.iconMapPath = argv[++i];
     else if (token === "--dsl") args.dslPath = argv[++i];
+    else if (token === "--xaml-report") args.xamlReportPath = argv[++i];
     else {
       console.error("未知参数: " + token);
       process.exit(1);
@@ -115,6 +122,63 @@ function checkConstraints(layout, dslConstraints, xamlText) {
       return;
     }
     report("R12", ref, "DSL 里带尺寸约束的节点在布局产物里没有对应格子，也不在产物登记的 constraintExempt 里（豁免与处置见 page-build-rules.md 第 5 节第 4 条）");
+  });
+}
+
+// R14：格子尺寸与"尺寸/对齐"发射。逐格复核两件事：
+//   ① 布局产物自己算出来的格子尺寸必须与按行列定义（含跨格累加、收尾星号带残差）重算的一致；
+//   ② 发射报告里该格子的 Width/Height/对齐/Margin 必须等于 lib/design-box.js 的同一实现给出的结果。
+// 判据只比对集合与取值，不判断成因；产物与输入不同步同样命中。
+function checkDesignBoxes(layout, emission) {
+  const emitted = new Map();
+  (emission.designBox || []).forEach(function (item) {
+    if (!item || !item.ref) return;
+    if (emitted.has(item.ref)) report("R14", item.ref, "发射报告里同一个格子出现两次");
+    emitted.set(item.ref, item.attrs || {});
+  });
+  const seen = new Set();
+  const visitGrid = function (grid, size) {
+    const columnExtents = bandExtents(grid.columns || [], size.w);
+    const rowExtents = bandExtents(grid.rows || [], size.h);
+    (grid.cells || []).forEach(function (cell) {
+      seen.add(cell.ref);
+      const width = extentOf(columnExtents, cell.column, cell.columnSpan);
+      const height = extentOf(rowExtents, cell.row, cell.rowSpan);
+      // 撞格下移的格子没有设计稿真值：只要求发射报告里也没有尺寸/对齐，并登记提示（不失败）。
+      if (cell.shifted) {
+        notice("R14", cell.ref, "该格子由推导挪位（撞格下移），不是设计稿那条带：只写控件自身尺寸，不表达间距（没有偏移真值）");
+      } else if (!(cell.width > 0) || !(cell.height > 0)) {
+        report("R14", cell.ref, "布局产物没有登记格子尺寸（推导必须登记格子宽高：跨格累加 + 收尾星号带残差）");
+      } else {
+        if (cell.width !== width) report("R14", cell.ref, "格子宽与行列定义重算不一致：产物 " + cell.width + "，重算 " + width);
+        if (cell.height !== height) report("R14", cell.ref, "格子高与行列定义重算不一致：产物 " + cell.height + "，重算 " + height);
+      }
+      if (!cell.shifted && (!(cell.nodeWidth > 0) || !(cell.nodeHeight > 0))) {
+        report("R14", cell.ref, "布局产物没有登记承载物设计尺寸（nodeWidth / nodeHeight）");
+      }
+      const expected = designBoxAttrs(cell);
+      const actual = emitted.get(cell.ref);
+      if (!actual) {
+        report("R14", cell.ref, "发射报告里没有这个格子的尺寸/对齐记录");
+      } else {
+        const names = new Set(Object.keys(expected).concat(Object.keys(actual)));
+        names.forEach(function (name) {
+          if (String(expected[name]) !== String(actual[name])) {
+            report("R14", cell.ref, "尺寸/对齐与设计稿不一致：" + name + " 期望 " +
+              (expected[name] === undefined ? "不写" : expected[name]) + "，发射为 " +
+              (actual[name] === undefined ? "不写" : actual[name]));
+          }
+        });
+      }
+      if (cell.children) visitGrid(cell.children, contentSizeOf(cell));
+    });
+  };
+  (layout.regions || []).forEach(function (region) {
+    if (region.emit === false || !region.grid) return;
+    visitGrid(region.grid, { w: region.w, h: region.h });
+  });
+  emitted.forEach(function (attrs, ref) {
+    if (!seen.has(ref)) report("R14", ref, "发射报告里有布局产物中不存在的格子");
   });
 }
 
@@ -329,6 +393,12 @@ function main() {
     dslConstraints = collectConstraints(roots);
   }
   checkConstraints(layout, Object.keys(dslConstraints || {}).length ? dslConstraints : null, xamlText);
+
+  // R14：格子尺寸与尺寸/对齐发射。--xaml-report 传的是发射器的报告（gen-mw-wpf-xaml.js --report）；
+  // 没传就整体跳过（旧流水线行为不变）。
+  if (args.xamlReportPath) {
+    checkDesignBoxes(layout, readJson(args.xamlReportPath, "发射报告"));
+  }
 
   // 推导阶段的待确认项（R9）：类型无处发射、节点没归格、节点没有尺寸、结构对不上——逐条报出来，
   // 不能与 R1 的"写法表未登记"混在一条消息里（两类的排障方向不同）。

@@ -13,7 +13,7 @@
 //   --assembly   目标程序集名（页面 Icon 字典合并点用它拼 pack 路径）
 //   --icon-page  页面 Icon 字典的项目相对路径（Resources/Pages/<页面名>/<页面名>Icons.xaml）
 //   --out        发射目标 .xaml 路径
-//   [--report]   发射报告落盘路径（命中的样式键 / 未命中变体 / 跳过项）
+//   [--report]   发射报告落盘路径（命中的样式键 / 未命中变体 / 跳过项 / 逐格尺寸与对齐）
 //   [--overwrite]
 //
 // 边界
@@ -21,6 +21,8 @@
 //   - 外观只取写法表的样式族键，不散写颜色/边框/模板；写法表没有对应条目时 fail-closed。
 //   - 协议属性（IOEnable / IOVisible / Click / PageName）只在类型判定给出取值时发射，不写空串占位。
 //   - 文本一律走 `{DynamicResource <LangName>}`；没有语言键的文本走待确认，不写字面量。
+//   - 尺寸与对齐照设计稿：控件写自身 bbox，格子尺寸与控件在格内的偏移取自布局产物；
+//     格子尺寸 − 控件尺寸 = 间距，差值落在哪一侧由偏移决定（唯一实现在 lib/design-box.js）。
 
 const fs = require("fs");
 const path = require("path");
@@ -28,6 +30,7 @@ const {
   fail, xmlAttr, readJson
 } = require(path.join(__dirname, "..", "..", "lib", "script-helpers.js"));
 const { constraintAttributes } = require(path.join(__dirname, "..", "..", "lib", "constraints.js"));
+const { designBoxAttrs } = require(path.join(__dirname, "..", "..", "lib", "design-box.js"));
 
 function parseArgs(argv) {
   const args = { overwrite: false };
@@ -165,6 +168,18 @@ function columnDefinition(size) {
 
 function indentOf(depth) { return "    ".repeat(depth); }
 
+// 格子契约：设计稿格子尺寸必须由布局推导登记（跨格累加 + 收尾星号带残差）。缺了就没法表达
+// "格子尺寸 − 控件尺寸 = 间距"，宁可停在这里，也不要发射一个尺寸静默丢失的页面。
+// 例外只有一个：cell.shifted（推导为避让撞格把它挪出设计带）——那个格子没有设计稿偏移真值，
+// 只写控件自身尺寸、不写对齐（间距落哪一侧无从判断）。
+function assertDesignBox(cell) {
+  if (cell.shifted) return;
+  if (!(cell.width > 0) || !(cell.height > 0)) {
+    fail("格子缺少设计稿格子尺寸（width / height）: " + cell.ref +
+      "——布局产物必须由 gen-mw-wpf-layout.js 产出（旧产物没有这两个字段）");
+  }
+}
+
 // 格子定位属性：只有多行/多列的 Grid 才写 Grid.Row/Column（单行单列不写，与真实页面一致），
 // 跨格再写 RowSpan/ColumnSpan。控件与容器 Grid 共用同一套口径。
 function gridCellAttrs(cell, ctx) {
@@ -205,6 +220,7 @@ function renderControl(node, cell, ctx, depth) {
   const attr = function (name, value) { attrLines.push([name, value]); };
 
   const cellAttrs = gridCellAttrs(cell, ctx);
+  assertDesignBox(cell);
   if (cellAttrs) Object.keys(cellAttrs).forEach(function (name) { attr(name, cellAttrs[name]); });
   const constraintAttrLines = constraintAttrs(cell);
   if (constraintAttrLines) {
@@ -213,11 +229,11 @@ function renderControl(node, cell, ctx, depth) {
     if (constraintAttrLines.MaxWidth && spec.element === "TextBlock") attr("TextWrapping", "Wrap");
   }
 
-  // 尺寸照设计稿：格子尺寸取自布局产物，控件自身尺寸取自设计稿 bbox，偏移转 Margin。
-  if (typeof node.w === "number" && typeof node.h === "number" && cell.width && cell.height) {
-    if (Math.round(node.w) !== Math.round(cell.width)) attr("Width", String(Math.round(node.w)));
-    if (Math.round(node.h) !== Math.round(cell.height)) attr("Height", String(Math.round(node.h)));
-  }
+  // 尺寸与对齐照设计稿：格子尺寸取自布局产物（含跨格与星号带残差），控件写自身设计稿尺寸，
+  // 两者的差就是间距；差值落在哪一侧由格子上的 offsetX/offsetY 决定（唯一实现在 lib/design-box.js）。
+  const boxAttrLines = designBoxAttrs(cell);
+  Object.keys(boxAttrLines).forEach(function (name) { attr(name, boxAttrLines[name]); });
+  ctx.report.designBox.push({ ref: node.ref, container: false, attrs: boxAttrLines });
 
   const iconName = iconNameOf(node);
   const iconAttr = iconAttrFor(ctx.map, node.controlType);
@@ -296,16 +312,17 @@ function renderGrid(grid, ctx, depth, gridAttrs) {
     // 它自己就是一层 <Grid>。
     if (cell.container) {
       if (!cell.children) fail("容器格子缺少内层 Grid: " + cell.ref);
-      lines.push(renderGrid(cell.children, ctx, depth + 1, Object.assign({}, gridCellAttrs(cell, childCtx) || {}, constraintAttrs(cell) || {})));
+      assertDesignBox(cell);
+      // 容器 Grid 自己也照设计稿写尺寸与对齐：格子比容器大时，多出来的部分就是间距。
+      const containerBox = designBoxAttrs(cell);
+      ctx.report.designBox.push({ ref: cell.ref, container: true, attrs: containerBox });
+      lines.push(renderGrid(cell.children, ctx, depth + 1, Object.assign({},
+        gridCellAttrs(cell, childCtx) || {}, containerBox, constraintAttrs(cell) || {})));
       return;
     }
     if (!node) fail("格子引用的节点不在类型判定产物里: " + cell.ref);
     if (!node.controlType) fail("节点缺少 controlType: " + cell.ref);
-    const sized = Object.assign({}, cell, {
-      width: cell.width || (grid.columns[cell.column] && grid.columns[cell.column].value),
-      height: cell.height || (grid.rows[cell.row] && grid.rows[cell.row].value)
-    });
-    const rendered = renderControl(node, sized, childCtx, depth);
+    const rendered = renderControl(node, cell, childCtx, depth);
     if (rendered) lines.push(rendered);
   });
   lines.push(pad + "</Grid>");
@@ -331,7 +348,11 @@ function renderResources(ctx) {
 
 // 纯渲染：给定布局产物 + 类型判定 + 写法表，返回 { xaml, report }（不落盘）。
 function renderXaml(args, layout, typeInfo, map) {
-  const report = { styleHits: [], styleFallback: [], textPending: [], skippedRegions: [], pending: layout.pending || [] };
+  const report = {
+    styleHits: [], styleFallback: [], textPending: [], skippedRegions: [], pending: layout.pending || [],
+    // 每个格子发射的尺寸/对齐（门禁按 lib/design-box.js 的同一实现复核）。
+    designBox: []
+  };
   const ctx = {
     map: map, byRef: typeInfo.byRef, report: report,
     pageLevelStyles: new Set(), iconPage: args.iconPage || null,
@@ -403,6 +424,7 @@ function main() {
     styleHits: result.report.styleHits.length,
     styleFallback: result.report.styleFallback.length,
     textPending: result.report.textPending.length,
+    designBox: result.report.designBox.length,
     pending: result.report.pending.length
   }, null, 2));
 }

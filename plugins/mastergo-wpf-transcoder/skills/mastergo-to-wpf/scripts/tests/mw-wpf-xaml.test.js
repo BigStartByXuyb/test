@@ -40,7 +40,7 @@ function baseLayout(overrides = {}) {
         grid: {
           rows: [{ size: "Pixel", value: 90, source: "framework:MaxwellFramework_HeaderHeight" }],
           columns: [{ size: "Star", source: "design" }],
-          cells: [{ ref: "root/top/btn", controlType: "IconButton", row: 0, column: 0, rowSpan: 1, columnSpan: 1 }]
+          cells: [cell("root/top/btn", "IconButton", 0, 0, designBox(1280, 90, 100, 60))]
         }
       },
       {
@@ -50,9 +50,9 @@ function baseLayout(overrides = {}) {
           rows: [{ size: "Pixel", value: 160, source: "design" }, { size: "Star", source: "design" }],
           columns: [{ size: "Pixel", value: 600, source: "design" }, { size: "Star", source: "design" }],
           cells: [
-            { ref: "work/group", controlType: "GroupBox", row: 0, column: 0, rowSpan: 1, columnSpan: 1 },
-            { ref: "work/enter", controlType: "IconButton", row: 0, column: 1, rowSpan: 1, columnSpan: 1 },
-            { ref: "work/label", controlType: "TextBlock", row: 1, column: 0, rowSpan: 1, columnSpan: 1 }
+            cell("work/group", "GroupBox", 0, 0, designBox(600, 160, 200, 160)),
+            cell("work/enter", "IconButton", 0, 1, designBox(680, 160, 170, 80)),
+            cell("work/label", "TextBlock", 1, 0, designBox(600, 522, 120, 30))
           ]
         }
       }
@@ -63,6 +63,20 @@ function baseLayout(overrides = {}) {
 
 function baseTypes(nodes) {
   return { schemaVersion: 1, nodes: nodes, pending: [], unmappedComponents: [] };
+}
+
+// 格子契约（布局产物）：格子尺寸 = 设计稿那条带；承载物设计尺寸 = 控件/容器自身 bbox；
+// 偏移 = 承载物在格内的起点偏移。来源与算法见 gen-mw-wpf-layout.js（bandExtents / contentSizeOf）。
+function designBox(width, height, nodeWidth, nodeHeight, offsetX = 0, offsetY = 0) {
+  return {
+    width: width, height: height,
+    nodeWidth: nodeWidth, nodeHeight: nodeHeight,
+    offsetX: offsetX, offsetY: offsetY
+  };
+}
+
+function cell(ref, controlType, row, column, box) {
+  return Object.assign({ ref: ref, controlType: controlType, row: row, column: column, rowSpan: 1, columnSpan: 1 }, box);
 }
 
 const NODES = [
@@ -145,7 +159,7 @@ function emitArgs(layoutPath, typesPath, outPath, extra = []) {
 // 2) 未登记/待确认类型（写法表 status=pending，当前是 Border）→ 挂待确认、不发射（与作业B 的 pending 处置一致）。
 {
   const layout = baseLayout();
-  layout.regions[1].grid.cells = [{ ref: "work/border", controlType: "Border", row: 0, column: 0, rowSpan: 1, columnSpan: 1 }];
+  layout.regions[1].grid.cells = [cell("work/border", "Border", 0, 0, designBox(600, 160, 10, 10))];
   const layoutPath = writeJson("layout.pendingtype.json", layout);
   const typesPath = writeJson("types.pendingtype.json", baseTypes([
     { ref: "work/border", sourceRef: "work/border", controlType: "Border", absX: 0, absY: 0, w: 10, h: 10 }
@@ -163,7 +177,7 @@ function emitArgs(layoutPath, typesPath, outPath, extra = []) {
 // 3) 变体取不到样式族（GroupBox 未登记变体）→ fail-closed，并指出是哪个变体。
 {
   const layout = baseLayout();
-  layout.regions[1].grid.cells = [{ ref: "work/group", controlType: "GroupBox", row: 0, column: 0, rowSpan: 1, columnSpan: 1 }];
+  layout.regions[1].grid.cells = [cell("work/group", "GroupBox", 0, 0, designBox(600, 160, 200, 160))];
   const layoutPath = writeJson("layout.novariant.json", layout);
   const typesPath = writeJson("types.novariant.json", baseTypes([
     { ref: "work/group", sourceRef: "work/group", controlType: "GroupBox", sourceText: "分组", absX: 0, absY: 0, w: 200, h: 160, langName: "SamplePageGroup" }
@@ -176,7 +190,7 @@ function emitArgs(layoutPath, typesPath, outPath, extra = []) {
 // 4) 有文本但无语言键 → 不写字面量，进 textPending。
 {
   const layout = baseLayout();
-  layout.regions[1].grid.cells = [{ ref: "work/label", controlType: "TextBlock", row: 1, column: 0, rowSpan: 1, columnSpan: 1 }];
+  layout.regions[1].grid.cells = [cell("work/label", "TextBlock", 1, 0, designBox(600, 522, 120, 30))];
   const layoutPath = writeJson("layout.nolang.json", layout);
   const typesPath = writeJson("types.nolang.json", baseTypes([
     { ref: "work/label", sourceRef: "work/label", controlType: "TextBlock", sourceText: "工件厚度", absX: 16, absY: 106, w: 120, h: 30 }
@@ -207,7 +221,7 @@ function emitArgs(layoutPath, typesPath, outPath, extra = []) {
 //    ——曾经错写成 BasedOn="{StaticResource null}"，被资源键门禁 R6 拦下。
 {
   const layout = baseLayout();
-  layout.regions[1].grid.cells = [{ ref: "work/camera", controlType: "Camera", row: 0, column: 0, rowSpan: 1, columnSpan: 1 }];
+  layout.regions[1].grid.cells = [cell("work/camera", "Camera", 0, 0, designBox(600, 160, 200, 150))];
   const layoutPath = writeJson("layout.implicit.json", layout);
   const typesPath = writeJson("types.implicit.json", baseTypes([
     { ref: "work/camera", sourceRef: "work/camera", controlType: "Camera", absX: 0, absY: 0, w: 200, h: 150 }
@@ -226,14 +240,17 @@ function emitArgs(layoutPath, typesPath, outPath, extra = []) {
 {
   const layout = baseLayout();
   layout.regions[1].grid.cells = [
-    { ref: "work/camera", controlType: "Camera", row: 0, column: 0, rowSpan: 1, columnSpan: 1 },
+    cell("work/camera", "Camera", 0, 0, designBox(600, 160, 200, 150)),
     {
       ref: "work/flex", container: true, row: 0, column: 1, rowSpan: 1, columnSpan: 1,
+      // 容器格子：格子 680×160（比容器本身大 → 多出来的部分是间距），容器自身 200×150，贴格起点。
+      width: 680, height: 160, nodeWidth: 200, nodeHeight: 150, offsetX: 0, offsetY: 0,
       children: {
         rows: [{ size: "Pixel", value: 40, source: "design" }, { size: "Star", source: "design" }],
         columns: [{ size: "Pixel", value: 120, source: "design" }, { size: "Star", source: "design" }],
         cells: [
-          { ref: "work/label", controlType: "TextBlock", row: 0, column: 0, rowSpan: 1, columnSpan: 1 }
+          // 内层网格可用尺寸＝容器设计尺寸 200×150（不是整个格子）：列 120 + 星号 80，行 40 + 星号 110。
+          cell("work/label", "TextBlock", 0, 0, designBox(120, 40, 120, 30))
         ]
       }
     }
@@ -249,8 +266,9 @@ function emitArgs(layoutPath, typesPath, outPath, extra = []) {
   const outPath = path.join(tmpRoot, "container", "View.xaml");
   run(emitArgs(layoutPath, typesPath, outPath, ["--overwrite"]));
   const xaml = fs.readFileSync(outPath, "utf8");
-  assert.match(xaml, /<Grid Grid\.Row="0" Grid\.Column="1">/, "容器格子必须发射成一层带定位属性的 <Grid>");
-  const container = xaml.slice(xaml.indexOf('<Grid Grid.Row="0" Grid.Column="1">'));
+  assert.match(xaml, /<Grid Grid\.Row="0" Grid\.Column="1" Width="200" Height="150" HorizontalAlignment="Left" VerticalAlignment="Top">/,
+    "容器格子必须发射成一层带定位属性、并按设计稿写尺寸与对齐的 <Grid>");
+  const container = xaml.slice(xaml.indexOf('<Grid Grid.Row="0" Grid.Column="1"'));
   const inner = container.slice(0, container.indexOf("</Grid>"));
   assert.match(inner, /<Grid\.RowDefinitions>/, "容器 Grid 必须有内层行列定义");
   assert.match(inner, /<TextBlock[\s\S]*Grid\.Row="0"[\s\S]*Grid\.Column="0"/, "子控件必须落在容器 Grid 的内层格子里");

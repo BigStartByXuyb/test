@@ -314,6 +314,23 @@ function bandSizes(bands, axis) {
   });
 }
 
+// 格子尺寸照设计稿：像素带照值；唯一的收尾星号带 = 本网格可用尺寸 − 其余像素带之和。
+// 这样"格子尺寸 − 控件尺寸 = 间距"才有真值可对（星号带的残差是设计稿的剩余空间，不是猜的）。
+function bandExtents(sizes, available) {
+  const fixed = sizes.map(function (item) {
+    return item && item.size === "Pixel" ? Number(item.value || 0) : null;
+  });
+  const used = fixed.reduce(function (total, value) { return total + (value || 0); }, 0);
+  const rest = Math.max(0, Math.round(Number(available) || 0) - used);
+  return fixed.map(function (value) { return value === null ? rest : value; });
+}
+
+function extentOf(extents, index, span) {
+  let total = 0;
+  for (let i = index; i < index + (span || 1); i += 1) total += Number(extents[i] || 0);
+  return total;
+}
+
 function containsNode(parent, child) {
   return parent !== child &&
     child.x >= parent.x - EPSILON && child.x + child.w <= parent.x + parent.w + EPSILON &&
@@ -354,7 +371,8 @@ function buildContainmentTree(entries, containers, pending) {
 }
 
 // 同层节点 → Grid（列按 x 区间重叠聚、行按起始边聚），容器节点带上自己的嵌套 Grid。
-function buildGridFrom(nodes, ctx) {
+// size 是本网格的可用尺寸（内容区 = 分区尺寸；嵌套网格 = 父格子尺寸）：收尾星号带的残差靠它算。
+function buildGridFrom(nodes, ctx, size) {
   if (!nodes.length) return { rows: [], columns: [], cells: [] };
   const xOf = function (n) { return n.x; };
   const yOf = function (n) { return n.y; };
@@ -367,6 +385,9 @@ function buildGridFrom(nodes, ctx) {
   const columns = splitBands(baseColumns, flexSplitStarts(baseColumns, nodes, ctx.dslTree, "column"));
   const rows = splitBands(baseRows, flexSplitStarts(baseRows, nodes, ctx.dslTree, "row"));
   const cells = [];
+  // 落格阶段只决定"谁落在哪个格"；格子尺寸要等所有撞格插行做完再算（插行会把收尾星号行变成像素行，
+  // 先算出来的尺寸会与最终行列定义不一致）。
+  const childSets = [];
   const occupied = new Set();
   let rowSizes = bandSizes(rows, "y");
   // 撞格时在收尾星号行之前插入一个像素行（保留"最后一行吃剩余空间"的形态）。
@@ -399,12 +420,31 @@ function buildGridFrom(nodes, ctx) {
       ref: node.ref, row: target, column: column.index,
       rowSpan: rowSpan, columnSpan: columnSpan
     };
+    // 承载物设计尺寸与"是否被撞格挪位"：撞格下移过的格子设计稿位置不在这个格子里，
+    // 尺寸/间距没有真值 —— 登记 shifted，发射器不写尺寸与对齐。
+    cell.nodeWidth = Math.round(Number(node.w) || 0);
+    cell.nodeHeight = Math.round(Number(node.h) || 0);
+    if (target !== row.index) cell.shifted = true;
+    if (target === row.index) {
+      cell.offsetX = Math.round(node.x - columns[column.index].start);
+      cell.offsetY = Math.round(node.y - rows[target].start);
+    }
     const sourceRecord = ctx.dslTree && ctx.dslTree.byRef.get(node.ref);
     if (sourceRecord && sourceRecord.constraints) cell.constraints = sourceRecord.constraints;
     if (node.container) cell.container = true;
     else cell.controlType = node.controlType;
-    if (childNodes.length) cell.children = buildGridFrom(childNodes, ctx);
     cells.push(cell);
+    childSets.push(childNodes);
+  });
+  // 第二遍：按最终行列定义算每格的格子尺寸（跨格累加 + 收尾星号带残差），再递归内层网格。
+  const columnExtents = bandExtents(bandSizes(columns, "x"), size && size.w);
+  const rowExtents = bandExtents(rowSizes, size && size.h);
+  cells.forEach(function (cell, index) {
+    const cellWidth = extentOf(columnExtents, cell.column, cell.columnSpan);
+    const cellHeight = extentOf(rowExtents, cell.row, cell.rowSpan);
+    if (cellWidth > 0) cell.width = cellWidth;
+    if (cellHeight > 0) cell.height = cellHeight;
+    if (childSets[index].length) cell.children = buildGridFrom(childSets[index], ctx, contentSizeOf(cell));
   });
   return {
     rows: rowSizes,
@@ -413,9 +453,18 @@ function buildGridFrom(nodes, ctx) {
   };
 }
 
-function buildRegionGrid(entries, containers, pending, dslTree) {
+// 内层网格的可用尺寸＝本格承载物（容器 / 被容纳控件）的设计稿尺寸：它会被写成 Width/Height，
+// 内层 Grid 填充的是那个尺寸，不是整个格子（格子比它大时多出来的部分是间距 / 剩余空间）。
+function contentSizeOf(cell) {
+  return {
+    w: cell.nodeWidth > 0 ? cell.nodeWidth : cell.width,
+    h: cell.nodeHeight > 0 ? cell.nodeHeight : cell.height
+  };
+}
+
+function buildRegionGrid(entries, containers, pending, dslTree, size) {
   const tree = buildContainmentTree(entries, containers, pending);
-  return buildGridFrom(buildFlexItems(tree.roots, dslTree), { childrenOf: tree.childrenOf, dslTree: dslTree });
+  return buildGridFrom(buildFlexItems(tree.roots, dslTree), { childrenOf: tree.childrenOf, dslTree: dslTree }, size);
 }
 
 // 区间重叠聚类：x/y 区间相交的算同一条带。用于"互不包含"的同层节点——
@@ -507,7 +556,9 @@ function deriveLayout(options) {
       id: "work-area", name: "工作区", ref: null, role: "work-area", emit: true,
       x: 0, y: tokens.headerHeight, w: design.width,
       h: design.height - tokens.bottomHeight - tokens.headerHeight,
-      grid: buildRegionGrid(content, containers, pending, tree)
+      grid: buildRegionGrid(content, containers, pending, tree, {
+        w: design.width, h: design.height - tokens.bottomHeight - tokens.headerHeight
+      })
     });
   }
   // 归位核对：发射分区里的每个节点（含嵌套 Grid 内的）都必须被某个格子引用，否则挂待确认——
@@ -616,4 +667,6 @@ if (require.main === module) {
   catch (error) { console.error(error.message); process.exitCode = 1; }
 }
 
-module.exports = { deriveLayout, clusterBands };
+// bandExtents / extentOf / contentSizeOf 同时被布局门禁（check-wpf-layout.js）复用来复核格子尺寸，
+// 避免"格子尺寸怎么算"出现第二份实现。
+module.exports = { deriveLayout, clusterBands, bandExtents, extentOf, contentSizeOf };

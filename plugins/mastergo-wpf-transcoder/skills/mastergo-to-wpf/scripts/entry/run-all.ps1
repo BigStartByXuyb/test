@@ -824,6 +824,7 @@ foreach ($step in $Steps) {
                         (Get-AdapterScript 'wpfGate'), '--layout', $WpfLayoutJson,
                         '--types', $MappingAuditJson, '--icon-map', $LedgerJson, '--map', $TemplateMap,
                         '--xaml', $WpfViewXaml,
+                        '--xaml-report', $WpfXamlReportJson,
                         '--dsl', $LayoutDslJson,
                         '--json', (Join-Path $Inputs "$Target.wpf-gate.json")) | Out-Null
                     $note = '作业A 布局门禁全部通过'
@@ -875,6 +876,7 @@ foreach ($step in $Steps) {
                         (Get-AdapterScript 'wpfGate'), '--layout', $WpfLayoutJson,
                         '--types', $MappingAuditJson, '--icon-map', $LedgerJson, '--map', $TemplateMap,
                         '--xaml', $WpfViewXaml,
+                        '--xaml-report', $WpfXamlReportJson,
                         '--dsl', $LayoutDslJson,
                         '--json', (Join-Path $Work "verification\$Target\wpf-gate.log")) | Out-Null
                     $note = '作业A 布局 / 协议 / 资源键 / 文本 全部通过'
