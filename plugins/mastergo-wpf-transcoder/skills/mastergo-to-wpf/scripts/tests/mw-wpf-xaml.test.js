@@ -221,7 +221,7 @@ function emitArgs(layoutPath, typesPath, outPath, extra = []) {
     "隐式默认样式不得进页级 Resources");
 }
 
-// 7) 容器格子（设计稿声明的 flex 容器）：没有控件类型，自己就是一层 <Grid>，
+// 7) 容器格子（成层容器：flex 容器或带尺寸约束的容器）：没有控件类型，自己就是一层 <Grid>，
 //    定位属性写在它身上，内部控件落它自己的内层格子。
 {
   const layout = baseLayout();

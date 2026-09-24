@@ -15,7 +15,12 @@
 //
 // 输出（冻结；发射器与门禁按它读）
 //   { schemaVersion, adapter:"mw-wpf", pageTarget, design:{width,height},
-//     regions:[{id,name,ref,role,emit,x,y,w,h,grid:{rows[],columns[],cells[]}}], pending[] }
+//     regions:[{id,name,ref,role,emit,x,y,w,h,grid:{rows[],columns[],cells[]}}], pending[],
+//     constraintExempt:[{ref,reason}] }
+//   cells[] 里的格子带 ref / row / column / rowSpan / columnSpan，容器格子再带 container:true 与 children；
+//   带尺寸约束的格子带 constraints。
+//   constraintExempt 由本脚本登记「本页不发射的带约束节点」（页面根 / 不可见 / 框架固定区）及原因，
+//   门禁据此把 R12 从失败降为提示（见 page-build-rules.md 第 5 节）。
 //
 // 规则
 //   - 分区只有两类：框架固定区（顶部栏 / 底部栏，按框架 Token 高度，emit=false）
@@ -387,7 +392,7 @@ function buildGridFrom(nodes, ctx) {
     // 跨格数不得越界：末尾可用行/列不足时收到格子里，越界由门禁兜底。
     const rowSpan = Math.max(1, Math.min(row.span, rowSizes.length - target));
     const columnSpan = Math.max(1, Math.min(column.span, columns.length - column.index));
-    // 容器格子（设计稿声明的 flex 容器）不带控件类型，只带内层 Grid；
+    // 容器格子（成层容器：flex 容器或带尺寸约束的容器）不带控件类型，只带内层 Grid；
     // 控件格子照旧：写法表登记 holdsChildren 的类型（GroupBox）可再挂一层内层 Grid。
     const childNodes = node.container ? node.items : (ctx.childrenOf.get(node.ref) || []);
     const cell = {
