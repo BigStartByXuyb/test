@@ -20,9 +20,10 @@
 //   R10 待人工确认（提示）：页面用到写法表 manual-only 类型（证据不全，如 Camera 只有用户确认）
 //   R11 尺寸约束一致性：格子带的 min/max 宽高必须与 DSL 节点上的 constraints 逐个一致（多/少/改值都失败）
 //   R12 尺寸约束未落格：DSL 里带尺寸约束的节点在布局产物里没有对应格子、也不在该产物登记的
-//       constraintExempt 里即失败。判据只看这两个集合，不区分成因：本页要发射的可见节点推导给不出
-//       格子（常见成因：容器子树里没有可发射的控件）会命中，产物与本次输入不同步或产物被改动也会命中；
-//       本页不发射的节点（页面根 / 不可见 / 框架固定区）登记在 constraintExempt 里，只提示不失败
+//       constraintExempt 里即失败。豁免只有 constraintExempt 里登记的三类（页面根 / 不可见 /
+//       框架固定区，提示不失败）；其余未落格的带约束节点一律失败，成因可能是容器子树里没有可发射的
+//       控件（补内容或交设计确认）、也可能是待确认类型 / 无尺寸等（先按 R1 / R9 修类型判定与映射），
+//       产物与本次输入不同步同样命中（先重跑第 8 步）
 //   R13 尺寸约束未发射：带约束的格子必须在 View.xaml 里出现对应的 MinWidth/MaxWidth/MinHeight/MaxHeight
 //   R6 资源键闭环：{StaticResource <键>} 必须来自写法表样式族、本页 Icon 台账或 Icon 字典合并点
 //   R7 文本零硬编码中文：发射区不得出现字面中文
@@ -113,7 +114,7 @@ function checkConstraints(layout, dslConstraints, xamlText) {
       notice("R12", ref, "本页不发射该节点（" + exemptReasons.get(ref) + "），尺寸约束不落格");
       return;
     }
-    report("R12", ref, "DSL 里带尺寸约束的节点在布局产物里没有对应格子，也不在该产物登记的 constraintExempt 里（本页要发射的可见节点必须落格；常见成因是容器子树里没有可发射的控件，推导给不出格子）");
+    report("R12", ref, "DSL 里带尺寸约束的节点在布局产物里没有对应格子，也不在该产物登记的 constraintExempt 里（豁免只有页面根 / 不可见 / 框架固定区；其余未落格的带约束节点一律失败）");
   });
 }
 
