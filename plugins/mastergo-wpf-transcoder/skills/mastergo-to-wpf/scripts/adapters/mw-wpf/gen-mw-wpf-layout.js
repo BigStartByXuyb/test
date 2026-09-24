@@ -25,9 +25,9 @@
 //     shifted:true          该格子由推导挪位（撞格下移），不是设计稿那条带（只免间距/对齐，未免尺寸）
 //     unsized:{width?,height?} 哪一维算不出正数格子尺寸（自适应带（星号带）被前面的固定带 / 间隙带吃光＝内容溢出承载物）
 //     spacer:{axis,size}    间隙格（主轴上的空隙）：空 Grid 的固定宽/高，轴上的带是 Auto + gap
-//     发射器与门禁（R14）按 width/height/nodeWidth/nodeHeight/offsetX/offsetY 出尺寸与对齐。
 //   网格带：rows[] / columns[] 的每项是 {size:"Pixel"|"Star"|"Auto", value?/weight?/gap?, source:"design"|"gap"}；
-//     grid.owner = {ref,direction,gap,root} 记录该层对应的 flex 容器（推导内部用它成带；门禁按它核对间隙带）。
+//     grid.owner = {ref,direction,gap,root} 记录该层对应的 flex 容器（推导内部用它成带；间隙带由门禁按行列定义与间隙格自证）。
+//     发射器与门禁（R14）按 width/height/nodeWidth/nodeHeight/offsetX/offsetY 出尺寸与对齐。
 //   constraintExempt 由本脚本登记「本页不发射的带约束节点」（页面根 / 不可见 / 框架固定区）及原因，
 //   门禁据此把 R12 从失败降为提示（见 page-build-rules.md 第 5 节）。
 //
@@ -156,12 +156,9 @@ function bandSpan(bands, start, end) {
   return { index: index, span: last - index + 1 };
 }
 
-// ---------- flex 主轴 ----------
-// ---------- flex 声明与层级 ----------
+// ---------- flex 声明与容器层级 ----------
 // 成层容器与它的主轴方向由 levelAncestors / flexOwnerOf 读取：主轴显式成带（条目带 + 间隙带），
-// 交叉轴与没有声明 flex 的层级一律按 bbox 聚类（见 buildGridFrom 与 mainAxisBands）。
-
-// ---------- flex 容器层级 ----------
+// 交叉轴与没有声明 flex 的层级按 bbox 聚类。
 // 成层容器在页面里要保留层级：容器 → 一层 Grid，它的条目进该层格子。成层容器的判据有两条：
 // 设计稿声明的 flex 容器（节点带 flexContainerInfo.flexDirection），或**带尺寸约束的容器**
 // （约束是设计意图，必须有承载物；展平后它就没有落到产物的位置，门禁 R12 按这条拦）。
@@ -525,7 +522,7 @@ function buildGridFrom(nodes, ctx, size, owner) {
     if (cell.spacer) return;   // 间隙格没有承载物：尺寸由它自己的固定宽/高表达
     const cellWidth = extentOf(columnExtents, cell.column, cell.columnSpan);
     const cellHeight = extentOf(rowExtents, cell.row, cell.rowSpan);
-    // 算不出正数的格子尺寸（自适应带被前面的固定带 / 间隙带吃光：设计稿内容溢出了承载物）→ 登记 unsized，
+    // 算不出正数的格子尺寸（自适应带（星号带）被前面的固定带 / 间隙带吃光：设计稿内容溢出了承载物）→ 登记 unsized，
     // 发射器不写尺寸与对齐，门禁按提示登记（这类格子没有设计稿尺寸可表达，不是产物损坏）。
     const unsized = {};
     if (cellWidth > 0) cell.width = cellWidth;
