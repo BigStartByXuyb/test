@@ -23,7 +23,7 @@
 //     nodeWidth / nodeHeight 承载物（控件 / 容器）自身设计稿尺寸
 //     offsetX / offsetY     承载物起点相对格子起点的偏移（撞格下移的格子不写）
 //     shifted:true          该格子由推导挪位（撞格下移），不是设计稿那条带
-//     unsized:true          该格子算不出正数格子尺寸（收尾星号带被前面的像素带吃光＝内容溢出承载物）
+//     unsized:{width?,height?} 哪一维算不出正数格子尺寸（收尾星号带被前面的像素带吃光＝内容溢出承载物）
 //     发射器与门禁（R14）按 width/height/nodeWidth/nodeHeight/offsetX/offsetY 出尺寸与对齐。
 //   constraintExempt 由本脚本登记「本页不发射的带约束节点」（页面根 / 不可见 / 框架固定区）及原因，
 //   门禁据此把 R12 从失败降为提示（见 page-build-rules.md 第 5 节）。
@@ -450,10 +450,12 @@ function buildGridFrom(nodes, ctx, size) {
     const cellHeight = extentOf(rowExtents, cell.row, cell.rowSpan);
     // 算不出正数的格子尺寸（收尾星号带被前面的像素带吃光：设计稿内容溢出了承载物）→ 登记 unsized，
     // 发射器不写尺寸与对齐，门禁按提示登记（这类格子没有设计稿尺寸可表达，不是产物损坏）。
+    const unsized = {};
     if (cellWidth > 0) cell.width = cellWidth;
-    else cell.unsized = true;
+    else unsized.width = true;
     if (cellHeight > 0) cell.height = cellHeight;
-    else cell.unsized = true;
+    else unsized.height = true;
+    if (Object.keys(unsized).length) cell.unsized = unsized;
     if (childSets[index].length) cell.children = buildGridFrom(childSets[index], ctx, contentSizeOf(cell));
   });
   return {

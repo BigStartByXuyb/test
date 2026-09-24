@@ -167,7 +167,7 @@ function node(id, type, style, children, extra) {
   const legacy = JSON.parse(JSON.stringify(layout));
   delete legacy.regions[0].grid.cells[0].width;
   assert.throws(function () { renderXaml({ iconPage: null, assembly: null }, legacy, types, MAP); },
-    /缺少设计稿格子尺寸/, "旧布局产物必须失败");
+    /缺少设计稿格子宽/, "旧布局产物必须失败");
 }
 
 // ── ④ 门禁 R14：正常通过；格子尺寸被改 / 发射报告缺条目 → 失败 ────────────────────
@@ -244,7 +244,7 @@ function node(id, type, style, children, extra) {
     grid.cells.forEach(function (item) { cells.set(item.ref, item); if (item.children) walk(item.children); });
   })(derived.regions.find(function (region) { return region.emit !== false; }).grid);
   const overflow = cells.get("b");
-  assert.strictEqual(overflow.unsized, true, "溢出带的格子必须登记 unsized");
+  assert.deepStrictEqual(overflow.unsized, { width: true }, "溢出带的格子必须按维登记 unsized");
   assert.strictEqual(overflow.width, undefined, "算不出正数尺寸时不写格子宽");
   assert.deepStrictEqual(designBoxAttrs(overflow), { Height: "16", VerticalAlignment: "Top" },
     "算不出的那一维不写，另一维照写");
@@ -264,6 +264,19 @@ function node(id, type, style, children, extra) {
   assert.ok(report.notices.some(function (item) { return item.rule === "R14" && item.ref === "b"; }),
     "R14 必须把溢出带的格子登记成提示");
   assert.strictEqual(report.findings.length, 0, "溢出带的格子不得产生失败项");
+
+  // 分维强度：unsized 只免宽度，高度被改坏仍必须失败。
+  const tampered = JSON.parse(JSON.stringify(derived));
+  (function find(grid) {
+    grid.cells.forEach(function (cell) { if (cell.ref === "b") cell.height = 999; if (cell.children) find(cell.children); });
+  })(tampered.regions.find(function (region) { return region.emit !== false; }).grid);
+  const tamperedPath = writeJson("unsized-layout-tampered.json", tampered);
+  const tamperedRun = spawnSync(process.execPath, [CHECK, "--layout", tamperedPath, "--types", typesPath, "--map", ROUTE_MAP,
+    "--xaml-report", reportPath, "--json", outPath], { encoding: "utf8" });
+  assert.strictEqual(tamperedRun.status, 2, "unsized 只免算不出的那一维，另一维不一致必须失败");
+  const tamperedReport = JSON.parse(fs.readFileSync(outPath, "utf8"));
+  assert.ok(tamperedReport.findings.some(function (item) { return item.rule === "R14" && /重算不一致/.test(item.message); }),
+    "R14 必须报出另一维的重算不一致");
 }
 
 console.log("design-box.test.js: 全部通过");

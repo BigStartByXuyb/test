@@ -150,17 +150,31 @@ function checkDesignBoxes(layout, emission) {
       const height = extentOf(rowExtents, cell.row, cell.rowSpan);
       // 撞格下移的格子没有设计稿偏移真值：期望值仍是 designBoxAttrs(cell)（有格子尺寸就写控件自身尺寸、
       // 不写对齐），只把"不是设计稿那条带"这件事登记成提示，不失败。
+      // 维度判定一律按维：cell.unsized 只免掉真正算不出的那一维，另一维照常重算与比对。
       if (cell.shifted) {
         notice("R14", cell.ref, "该格子由推导挪位（撞格下移），不是设计稿那条带：只写控件自身尺寸，不表达间距（没有偏移真值）");
-      } else if (cell.unsized) {
-        notice("R14", cell.ref, "该格子所在带超出承载物尺寸（内容比容器宽/高）：算不出的那一维不表达尺寸与间距");
-      } else if (!(cell.width > 0) || !(cell.height > 0)) {
-        report("R14", cell.ref, "布局产物没有登记格子尺寸（推导必须登记格子宽高：跨格累加 + 收尾星号带残差）");
-      } else {
-        if (cell.width !== width) report("R14", cell.ref, "格子宽与行列定义重算不一致：产物 " + cell.width + "，重算 " + width);
-        if (cell.height !== height) report("R14", cell.ref, "格子高与行列定义重算不一致：产物 " + cell.height + "，重算 " + height);
       }
-      if (!cell.shifted && !cell.unsized && (!(cell.nodeWidth > 0) || !(cell.nodeHeight > 0))) {
+      const unsized = cell.unsized || {};
+      [["width", cell.width, width], ["height", cell.height, height]].forEach(function (axis) {
+        const name = axis[0];
+        const size = axis[1];
+        const recomputed = axis[2];
+        const label = name === "width" ? "格子宽" : "格子高";
+        if (!(size > 0)) {
+          if (cell.shifted) return;   // 撞格下移的格子本来就没有设计稿尺寸，上面已登记提示
+          if (unsized[name]) {
+            notice("R14", cell.ref, "该格子的" + (name === "width" ? "宽" : "高") +
+              "算不出正数（所在带超出承载物）：该维不表达尺寸与间距");
+            return;
+          }
+          report("R14", cell.ref, "布局产物没有登记" + label + "（推导必须登记：跨格累加 + 收尾星号带残差）");
+          return;
+        }
+        if (!cell.shifted && size !== recomputed) {
+          report("R14", cell.ref, label + "与行列定义重算不一致：产物 " + size + "，重算 " + recomputed);
+        }
+      });
+      if (!cell.shifted && (!(cell.nodeWidth > 0) || !(cell.nodeHeight > 0))) {
         report("R14", cell.ref, "布局产物没有登记承载物设计尺寸（nodeWidth / nodeHeight）");
       }
       const expected = designBoxAttrs(cell);
