@@ -114,7 +114,7 @@ function checkConstraints(layout, dslConstraints, xamlText) {
       notice("R12", ref, "本页不发射该节点（" + exemptReasons.get(ref) + "），尺寸约束不落格");
       return;
     }
-    report("R12", ref, "DSL 里带尺寸约束的节点在布局产物里没有对应格子，也不在该产物登记的 constraintExempt 里（只有登记进 constraintExempt 的节点才豁免；其余未落格的带约束节点一律失败）");
+    report("R12", ref, "DSL 里带尺寸约束的节点在布局产物里没有对应格子，也不在产物登记的 constraintExempt 里（豁免与处置见 page-build-rules.md 第 5 节第 4 条）");
   });
 }
 
