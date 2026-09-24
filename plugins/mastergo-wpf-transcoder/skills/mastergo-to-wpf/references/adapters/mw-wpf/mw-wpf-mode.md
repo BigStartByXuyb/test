@@ -38,7 +38,9 @@
    落格按**起始边**判定归属（横跨多行的控件不吞掉后面的行），控件 bbox 覆盖到的带全部算跨度：格子的 `rowSpan` / `columnSpan` 由覆盖带数得出，发射器照写 `Grid.RowSpan` / `Grid.ColumnSpan`；占格只按起始格判定，跨格控件与设计稿一样允许压住邻格。
 5. **落格**：控件写 `Grid.Row` / `Grid.Column`，跨格再写 `Grid.RowSpan` / `Grid.ColumnSpan`。**同一锚点（起始）格只放一个控件**：推导用占用表 + 撞格下移保证锚点格唯一，门禁 R5 也按锚点判重，出现重复即产物被改坏。覆盖邻格见第 4 条。
 6. **单行/单列**：只有一行或一列时不写 `Grid.RowDefinitions` / `Grid.ColumnDefinitions`，也不写 `Grid.Row` / `Grid.Column`。
-7. **星号写法**：单个自适应条目写成裸 `<RowDefinition />` / `<ColumnDefinition />`；主轴 `row` 上出现多个自适应条目时按设计稿比例写加权星号（`Width="1016*"`，见第 3 条；主轴 `row` 时行方向即交叉轴，只会出现收尾的那条裸星号，没有自适应条目；主轴 `column` 时行是主轴，按第 3 条只有像素行与间隙行）；像素尺寸写 `Height="<值>"`，间隙带写 `Auto`。
+7. **星号写法**：像素尺寸写 `Height="<值>"` / `Width="<值>"`，间隙带写 `Auto`。自适应部分分两种：
+    - **走 bbox 聚类的轴**（没有 flex 声明的层级两轴、主轴 `row` 的行方向、主轴 `column` 的列方向）：最后一条带落成**裸星号**（`<RowDefinition />` / `<ColumnDefinition />`，吃掉剩余空间，门禁 R4 按这条放行）；
+    - **主轴 `row` 的列方向**：单个自适应条目写成裸 `<ColumnDefinition />`；出现多个自适应条目时按设计稿比例写**加权星号**（`Width="1016*"`，见第 3 条）。
 8. **尺寸约束**：设计稿用「宽度 / 高度」栏设置的最小/最大宽高走 DSL 节点的 `constraints` 字段（来源、合并与官方支持后的切换点见 `page-build-rules.md` 第 5 节）。布局推导只把它透传进格子，发射器在控件与容器 Grid 上写 `MinWidth / MaxWidth / MinHeight / MaxHeight`；`TextBlock` 在设了最大宽时补 `TextWrapping="Wrap"`。
 
 ## 3. 外观与协议
