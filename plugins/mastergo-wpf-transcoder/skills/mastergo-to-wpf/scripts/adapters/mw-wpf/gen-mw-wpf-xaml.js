@@ -175,7 +175,7 @@ function columnDefinition(size) {
 
 function indentOf(depth) { return "    ".repeat(depth); }
 
-// 格子契约：设计稿格子尺寸必须由布局推导登记（跨格累加 + 收尾星号带残差）。缺了就没法表达
+// 格子契约：设计稿格子尺寸必须由布局推导登记（跨格累加；像素/间隙带照值、自适应带（星号带）吃剩余）。缺了就没法表达
 // "格子尺寸 − 控件尺寸 = 间距"，宁可停在这里，也不要发射一个尺寸静默丢失的页面。
 // 例外按类说明（只免掉真正没有真值的那部分）：
 //   cell.shifted（为避让撞格被挪出设计带）——设计稿偏移没有真值：只写承载物自身尺寸、不表达间距/对齐，
@@ -242,7 +242,7 @@ function renderControl(node, cell, ctx, depth) {
     if (constraintAttrLines.MaxWidth && spec.element === "TextBlock") attr("TextWrapping", "Wrap");
   }
 
-  // 尺寸与对齐照设计稿：格子尺寸取自布局产物（含跨格与星号带残差），控件写自身设计稿尺寸，
+  // 尺寸与对齐照设计稿：格子尺寸取自布局产物（含跨格与自适应带（星号带）分到的剩余），控件写自身设计稿尺寸，
   // 两者的差就是间距；差值落在哪一侧由格子上的 offsetX/offsetY 决定（唯一实现在 lib/design-box.js）。
   const boxAttrLines = designBoxAttrs(cell);
   Object.keys(boxAttrLines).forEach(function (name) { attr(name, boxAttrLines[name]); });

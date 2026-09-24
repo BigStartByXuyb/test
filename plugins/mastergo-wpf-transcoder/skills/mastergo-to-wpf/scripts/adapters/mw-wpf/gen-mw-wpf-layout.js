@@ -19,15 +19,15 @@
 //     constraintExempt:[{ref,reason}] }
 //   cells[] 里的格子带 ref / row / column / rowSpan / columnSpan，容器格子再带 container:true 与 children；
 //   带尺寸约束的格子带 constraints。格子尺寸与发射依据也在格子上：
-//     width / height        格子尺寸（跨格累加 + 收尾星号带残差；推导给不出正数时不写）
+//     width / height        格子尺寸（跨格累加；像素/间隙带照值、自适应带（星号带）吃剩余；推导给不出正数时不写）
 //     nodeWidth / nodeHeight 承载物（控件 / 容器）自身设计稿尺寸
 //     offsetX / offsetY     承载物起点相对格子起点的偏移（撞格下移的格子不写）
 //     shifted:true          该格子由推导挪位（撞格下移），不是设计稿那条带（只免间距/对齐，未免尺寸）
-//     unsized:{width?,height?} 哪一维算不出正数格子尺寸（自适应带被前面的固定带吃光＝内容溢出承载物）
+//     unsized:{width?,height?} 哪一维算不出正数格子尺寸（自适应带（星号带）被前面的固定带 / 间隙带吃光＝内容溢出承载物）
 //     spacer:{axis,size}    间隙格（主轴上的空隙）：空 Grid 的固定宽/高，轴上的带是 Auto + gap
 //     发射器与门禁（R14）按 width/height/nodeWidth/nodeHeight/offsetX/offsetY 出尺寸与对齐。
 //   网格带：rows[] / columns[] 的每项是 {size:"Pixel"|"Star"|"Auto", value?/weight?/gap?, source:"design"|"gap"}；
-//     grid.owner = {ref,direction,gap,root} 记录该层对应的 flex 容器（主轴显式成带用它）。
+//     grid.owner = {ref,direction,gap,root} 记录该层对应的 flex 容器（推导内部用它成带；门禁按它核对间隙带）。
 //   constraintExempt 由本脚本登记「本页不发射的带约束节点」（页面根 / 不可见 / 框架固定区）及原因，
 //   门禁据此把 R12 从失败降为提示（见 page-build-rules.md 第 5 节）。
 //
@@ -157,46 +157,9 @@ function bandSpan(bands, start, end) {
 }
 
 // ---------- flex 主轴 ----------
-// 设计稿里任何节点都可以声明 flexContainerInfo（flexDirection / gap / alignItems ...）：
-// 那是设计稿自己的布局语义。沿父链收集每个节点能看到的 flex 声明（不限声明节点的类型），
-// 返回 [{containerRef, direction, itemRef}]，
-// itemRef 是"该容器下承载本节点的那一条 flex 条目"（容器 → … → 节点 这条路径上容器的直接子节点）。
-function flexAncestors(tree, ref) {
-  const chain = [];
-  let record = tree.byRef.get(ref);
-  if (!record) return chain;
-  let child = record;
-  let parent = tree.byRef.get(record.parentRef);
-  while (parent) {
-    const direction = parent.flex && parent.flex.flexDirection;
-    if (direction === "row" || direction === "column") {
-      chain.push({ containerRef: parent.ref, direction: direction, itemRef: child.ref });
-    }
-    child = parent;
-    parent = tree.byRef.get(parent.parentRef);
-  }
-  return chain;
-}
-
-// 某个轴上要拆的起点：axis="column" 取 flexDirection=row 容器的条目 x（主轴是横向），
-// axis="row" 取 flexDirection=column 容器的条目 y。按容器分组，便于后面判断"是否落在同一条带"。
-function flexMainAxisItems(nodes, tree, axis) {
-  const wantDirection = axis === "row" ? "column" : "row";
-  const byContainer = new Map();
-  nodes.forEach(function (node) {
-    flexAncestors(tree, node.ref).forEach(function (info) {
-      if (info.direction !== wantDirection) return;
-      const item = tree.byRef.get(info.itemRef);
-      if (!item) return;
-      if (!byContainer.has(info.containerRef)) byContainer.set(info.containerRef, []);
-      const entries = byContainer.get(info.containerRef);
-      if (!entries.some(function (entry) { return entry.itemRef === info.itemRef; })) {
-        entries.push({ itemRef: info.itemRef, start: axis === "row" ? item.y : item.x });
-      }
-    });
-  });
-  return byContainer;
-}
+// ---------- flex 声明与层级 ----------
+// 成层容器与它的主轴方向由 levelAncestors / flexOwnerOf 读取：主轴显式成带（条目带 + 间隙带），
+// 交叉轴与没有声明 flex 的层级一律按 bbox 聚类（见 buildGridFrom 与 mainAxisBands）。
 
 // ---------- flex 容器层级 ----------
 // 成层容器在页面里要保留层级：容器 → 一层 Grid，它的条目进该层格子。成层容器的判据有两条：
@@ -211,8 +174,8 @@ function carriesConstraints(tree, ref) {
   return Boolean(record) && Object.keys(normalizeConstraints(record.constraints)).length > 0;
 }
 
-// 成层祖先（含带约束的无 flex 声明的容器），由近及远。拆带用的主轴语义只归 flexAncestors，这里不掺和：
-// 没有 flex 声明的成层容器在 chain 里 direction 为 null，`flexSplitStarts` 不认它，内层走 bbox 聚类。
+// 成层祖先（含带约束的无 flex 声明的容器），由近及远：有 flex 方向的层主轴显式成带，
+// 没有 flex 方向的层（带约束的容器）主干与交叉轴都走 bbox 聚类。
 function levelAncestors(tree, ref) {
   const chain = [];
   let record = tree.byRef.get(ref);
@@ -281,43 +244,6 @@ function buildFlexItems(entries, tree) {
     items = build(ownerRef);
   }
   return { items: items, owner: ownerRef ? tree.byRef.get(ownerRef) : null };
-}
-
-// 只有"同一条带里出现 ≥2 个 flex 条目"才需要拆带：一个条目独占一条带时拆了也没有信息量。
-function flexSplitStarts(bands, nodes, tree, axis) {
-  const perBand = bands.map(function () { return []; });
-  flexMainAxisItems(nodes, tree, axis).forEach(function (entries) {
-    const grouped = new Map();
-    entries.forEach(function (entry) {
-      const index = bandOfStart(bands, entry.start);
-      if (!grouped.has(index)) grouped.set(index, []);
-      grouped.get(index).push(entry.start);
-    });
-    grouped.forEach(function (starts, index) {
-      if (starts.length < 2) return;
-      perBand[index] = perBand[index].concat(starts);
-    });
-  });
-  return perBand;
-}
-
-// 按拆点把带切开：[本带起点, 拆点1) / [拆点1, 拆点2) / … / [最后拆点, 本带终点)。
-function splitBands(bands, splitStarts) {
-  const out = [];
-  bands.forEach(function (band, index) {
-    const starts = (splitStarts[index] || [])
-      .filter(function (start) { return start > band.start + EPSILON && start < band.end - EPSILON; })
-      .sort(function (a, b) { return a - b; });
-    if (!starts.length) { out.push(band); return; }
-    let cursor = band.start;
-    starts.forEach(function (start) {
-      if (start <= cursor + EPSILON) return;
-      out.push({ start: cursor, end: start, items: band.items });
-      cursor = start;
-    });
-    out.push({ start: cursor, end: band.end, items: band.items });
-  });
-  return out;
 }
 
 // 交叉轴（没有声明 flex 主轴的层级）：一条带的尺寸 = 到下一带起始边的距离（最后一条用星号吃掉剩余空间）。
@@ -427,7 +353,7 @@ function flexOwnerOf(record) {
 }
 
 // 格子尺寸照设计稿：像素带照值、间隙带照 gap；自适应带平分剩余（带权重的按权重分）。
-// 这样"格子尺寸 − 控件尺寸 = 间距"才有真值可对（星号带的残差是设计稿的剩余空间，不是猜的）。
+// 这样"格子尺寸 − 控件尺寸 = 间距"才有真值可对（自适应带（星号带）分到的是设计稿的剩余空间，不是猜的）。
 function bandExtents(sizes, available) {
   const fixed = sizes.map(function (item) {
     if (!item) return 0;
@@ -493,7 +419,7 @@ function buildContainmentTree(entries, containers, pending) {
 }
 
 // 同层节点 → Grid（列按 x 区间重叠聚、行按起始边聚），容器节点带上自己的嵌套 Grid。
-// size 是本网格的可用尺寸（内容区 = 分区尺寸；嵌套网格 = 父格子尺寸）：收尾星号带的残差靠它算。
+// size 是本网格的可用尺寸（内容区 = 分区尺寸；嵌套网格 = 父格子尺寸）：自适应带（星号带）分多少靠它算。
 // owner = 本网格对应的成层容器（{ref, direction, record}）：声明了 flex 主轴时，主轴按 owner 显式成带
 // （条目带 + 间隙带），交叉轴仍按聚类；没有 owner（或约束成层但无 flex 声明）时两轴都按聚类。
 function buildGridFrom(nodes, ctx, size, owner) {
@@ -508,10 +434,9 @@ function buildGridFrom(nodes, ctx, size, owner) {
   // 设计稿声明了 flex 主轴的地方，主轴上的每个条目独占一条带——否则"同一行横向排列的条目
   // 被并进同一条列带"后会被撞格规则竖排（设计稿语义丢失）。没有声明的层级仍按上面的聚类。
   const mainBands = direction ? mainAxisBands(nodes, owner) : null;
-  const columns = direction === "row" ? mainBands
-    : splitBands(baseColumns, flexSplitStarts(baseColumns, nodes, ctx.dslTree, "column"));
-  const rows = direction === "column" ? mainBands
-    : splitBands(baseRows, flexSplitStarts(baseRows, nodes, ctx.dslTree, "row"));
+  // 主轴（声明了 flex 方向）用显式带；交叉轴与没有声明的层级都用 bbox 聚类。
+  const columns = direction === "row" ? mainBands : baseColumns;
+  const rows = direction === "column" ? mainBands : baseRows;
   const cells = [];
   // 落格阶段只决定"谁落在哪个格"；格子尺寸要等所有撞格插行做完再算（插行会把收尾星号行变成像素行，
   // 先算出来的尺寸会与最终行列定义不一致）。
@@ -593,7 +518,7 @@ function buildGridFrom(nodes, ctx, size, owner) {
     cells.push(cell);
     childSets.push([]);
   });
-  // 第二遍：按最终行列定义算每格的格子尺寸（跨格累加 + 收尾星号带残差），再递归内层网格。
+  // 第二遍：按最终行列定义算每格的格子尺寸（跨格累加；含自适应带分的剩余），再递归内层网格。
   const columnExtents = bandExtents(columnSizes, size && size.w);
   const rowExtents = bandExtents(rowSizes, size && size.h);
   cells.forEach(function (cell, index) {

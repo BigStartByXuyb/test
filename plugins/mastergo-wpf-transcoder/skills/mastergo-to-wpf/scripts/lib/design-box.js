@@ -8,7 +8,7 @@
 // 非对称内缩（两侧都不为 0 且不等）贴起始边并用 Margin 补偏移，精确复现设计稿位置。
 //
 // 输入只有一个「设计稿格子」（布局产物的 cell），字段都由 gen-mw-wpf-layout.js 从 DSL 推出并登记：
-//   cell.width / cell.height           格子尺寸（含跨格累加与收尾星号带的残差）
+//   cell.width / cell.height           格子尺寸（含跨格累加；像素/间隙带照值，自适应带（星号带）吃剩余）
 //   cell.nodeWidth / cell.nodeHeight   控件（或容器）自身的设计稿尺寸
 //   cell.offsetX / cell.offsetY        控件起点相对格子起点的偏移（撞格下移的格子不登记）
 // 三种落空的情况各写各的：

@@ -35,7 +35,8 @@
 //       （shifted / unsized 两类例外按类、按维，见 page-build-rules.md 第 4 节第 14 条）
 //   R6 资源键闭环：{StaticResource <键>} 必须来自写法表样式族、本页 Icon 台账或 Icon 字典合并点
 //   R7 文本零硬编码中文：发射区不得出现字面中文
-//   R8 尺寸来源：框架固定区必须是 framework:<Token>；发射区取 design，主轴间隙带取 gap（Auto + 空 Grid 固定尺寸）
+//   R8 尺寸来源：框架固定区必须是 framework:<Token>（未被框架钉住的那一维是自由伸展的星号，来源仍是 design）；
+//       发射区取 design，主轴间隙带取 gap（Auto + 空 Grid 固定尺寸）
 //   R9 推导待确认：布局推导阶段挂起的节点（未归格 / 无尺寸 / 结构对不上 / 类型无处发射）逐条失败
 
 const fs = require("fs");
@@ -132,7 +133,7 @@ function checkConstraints(layout, dslConstraints, xamlText) {
 }
 
 // R14：格子尺寸与"尺寸/对齐"发射。逐格复核两件事：
-//   ① 布局产物自己算出来的格子尺寸必须与按行列定义（含跨格累加、收尾星号带残差）重算的一致；
+//   ① 布局产物自己算出来的格子尺寸必须与按行列定义（含跨格累加、间隙带与自适应带）重算的一致；
 //   ② 发射报告里该格子的 Width/Height/对齐/Margin 必须等于 lib/design-box.js 的同一实现给出的结果。
 // 判据只比对集合与取值，不判断成因；产物与输入不同步同样命中。
 function checkDesignBoxes(layout, emission) {
@@ -196,7 +197,7 @@ function checkDesignBoxes(layout, emission) {
             }
             return;
           }
-          report("R14", cell.ref, "布局产物没有登记" + label + "（推导必须登记：跨格累加 + 收尾星号带残差）");
+          report("R14", cell.ref, "布局产物没有登记" + label + "（推导必须登记：跨格累加 + 像素/间隙带照值 + 自适应带吃剩余）");
           return;
         }
         if (size !== recomputed) {
