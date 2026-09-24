@@ -18,6 +18,9 @@
 //   R4 空行空列：没有格子覆盖、也不是被星号撑开的收尾行/列
 //   R5 锚点格冲突：同一锚点格（Grid.Row/Column 起点）只允许一个控件（推导用占用表 + 行下移保证唯一）
 //   R10 待人工确认（提示）：页面用到写法表 manual-only 类型（证据不全，如 Camera 只有用户确认）
+//   R11 尺寸约束一致性：格子带的 min/max 宽高必须与 DSL 节点上的 constraints 逐个一致（多/少/改值都失败）
+//   R12 尺寸约束未落格（提示）：DSL 里带约束、布局里没有对应格子（常见原因：单条目容器被折叠）
+//   R13 尺寸约束未发射：带约束的格子必须在 View.xaml 里出现对应的 MinWidth/MaxWidth/MinHeight/MaxHeight
 //   R6 资源键闭环：{StaticResource <键>} 必须来自写法表样式族、本页 Icon 台账或 Icon 字典合并点
 //   R7 文本零硬编码中文：发射区不得出现字面中文
 //   R8 尺寸来源：框架固定区必须是 framework:<Token>，其余必须是 design
@@ -55,6 +58,7 @@ function parseArgs(argv) {
     else if (token === "--xaml") args.xamlPath = argv[++i];
     else if (token === "--json") args.reportPath = argv[++i];
     else if (token === "--icon-map") args.iconMapPath = argv[++i];
+    else if (token === "--dsl") args.dslPath = argv[++i];
     else {
       console.error("未知参数: " + token);
       process.exit(1);
@@ -67,6 +71,48 @@ function parseArgs(argv) {
     }
   });
   return args;
+}
+
+// 尺寸约束（min/max 宽高）：来源是 core/apply-constraints.js 合并进 DSL 的 node.constraints。
+// 布局推导只透传，因此这里逐格比对：格子的约束必须与 DSL 完全一致，且必须真的发射进 XAML。
+function checkConstraints(layout, dslConstraints, xamlText) {
+  if (!dslConstraints) return;
+  const KEYS = [["minWidth", "MinWidth"], ["maxWidth", "MaxWidth"], ["minHeight", "MinHeight"], ["maxHeight", "MaxHeight"]];
+  const normalize = function (value) {
+    const out = {};
+    if (!value) return out;
+    KEYS.forEach(function (pair) {
+      const number = Number(value[pair[0]]);
+      if (Number.isFinite(number) && number > 0) out[pair[0]] = number;
+    });
+    return out;
+  };
+  const placedRefs = new Set();
+  const visit = function (grid) {
+    if (!grid || !Array.isArray(grid.cells)) return;
+    grid.cells.forEach(function (cell) {
+      placedRefs.add(cell.ref);
+      const expected = normalize(dslConstraints[cell.ref]);
+      const actual = normalize(cell.constraints);
+      KEYS.forEach(function (pair) {
+        if (expected[pair[0]] !== actual[pair[0]]) {
+          report("R11", cell.ref, "尺寸约束与 DSL 不一致：" + pair[0] + " 期望 " +
+            (expected[pair[0]] === undefined ? "未设置" : expected[pair[0]]) + "，布局产物为 " +
+            (actual[pair[0]] === undefined ? "未设置" : actual[pair[0]]));
+        }
+        if (xamlText && actual[pair[0]] && xamlText.indexOf(pair[1] + '="' + Math.round(actual[pair[0]]) + '"') < 0) {
+          report("R13", cell.ref, "尺寸约束未发射到 XAML：缺少 " + pair[1] + '="' + Math.round(actual[pair[0]]) + '"');
+        }
+      });
+      if (cell.children) visit(cell.children);
+    });
+  };
+  (layout.regions || []).forEach(function (region) { visit(region.grid); });
+  Object.keys(dslConstraints).forEach(function (ref) {
+    if (!placedRefs.has(ref)) {
+      notice("R12", ref, "该节点在 DSL 里带尺寸约束，但布局产物里没有对应格子（常见原因：单条目容器被折叠），约束未落到产物");
+    }
+  });
 }
 
 function checkCells(region, map, layout) {
@@ -270,6 +316,23 @@ function main() {
   });
   checkStyleKeys(layout, map, iconNames, xamlText);
   checkHardcodedText(xamlText, layout, typesByRef);
+
+  // R11/R12/R13：尺寸约束。--dsl 传的是 core/apply-constraints.js 产出的带 constraints 的快照；
+  // 没传就整体跳过这三条（旧流水线行为不变）。
+  let dslConstraints = null;
+  if (args.dslPath) {
+    const snapshot = readJson(args.dslPath);
+    const roots = (snapshot.dsl && snapshot.dsl.nodes) || snapshot.nodes || [];
+    dslConstraints = {};
+    const walkDsl = function (node) {
+      if (!node || typeof node !== "object") return;
+      if (Array.isArray(node)) { node.forEach(walkDsl); return; }
+      if (typeof node.id === "string" && node.constraints) dslConstraints[node.id] = node.constraints;
+      (node.children || []).forEach(walkDsl);
+    };
+    roots.forEach(walkDsl);
+  }
+  checkConstraints(layout, Object.keys(dslConstraints || {}).length ? dslConstraints : null, xamlText);
 
   // 推导阶段的待确认项（R9）：类型无处发射、节点没归格、节点没有尺寸、结构对不上——逐条报出来，
   // 不能与 R1 的"写法表未登记"混在一条消息里（两类的排障方向不同）。

@@ -31,6 +31,8 @@
 //     它的条目（直接子控件 / 更内层的容器）进该层格子；没有 flex 声明的包裹层展平到最近一层。
 //   - 容器（写法表登记为可容纳子节点的类型）内部的节点递归成嵌套 Grid，不与被容纳节点抢同一格。
 //   - 归不进任何格的节点进 pending，不猜坐标。
+//   - 尺寸约束（min/max 宽高）由 core/apply-constraints.js 合并进 DSL 节点的 `constraints` 字段，
+//     本脚本只把它透传进对应格子（cell.constraints），不做任何推算。
 
 const fs = require("fs");
 const path = require("path");
@@ -70,6 +72,7 @@ function layoutTree(dslSnapshot) {
       ref: node.id, name: node.name, type: node.type, parentRef: parentRef,
       x: x, y: y, w: Number(style.width || 0), h: Number(style.height || 0),
       flex: node.flexContainerInfo || null,
+      constraints: node.constraints || null,
       children: []
     };
     nodes.set(node.id, record);
@@ -358,6 +361,8 @@ function buildGridFrom(nodes, ctx) {
       ref: node.ref, row: target, column: column.index,
       rowSpan: rowSpan, columnSpan: columnSpan
     };
+    const sourceRecord = ctx.dslTree && ctx.dslTree.byRef.get(node.ref);
+    if (sourceRecord && sourceRecord.constraints) cell.constraints = sourceRecord.constraints;
     if (node.container) cell.container = true;
     else cell.controlType = node.controlType;
     if (childNodes.length) cell.children = buildGridFrom(childNodes, ctx);

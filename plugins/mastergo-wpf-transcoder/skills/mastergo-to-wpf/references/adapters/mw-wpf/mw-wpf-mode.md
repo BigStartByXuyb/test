@@ -35,6 +35,7 @@
 5. **落格**：控件写 `Grid.Row` / `Grid.Column`，跨格再写 `Grid.RowSpan` / `Grid.ColumnSpan`。**同一锚点（起始）格只放一个控件**：推导用占用表 + 撞格下移保证锚点格唯一，门禁 R5 也按锚点判重，出现重复即产物被改坏。覆盖邻格见第 4 条。
 6. **单行/单列**：只有一行或一列时不写 `Grid.RowDefinitions` / `Grid.ColumnDefinitions`，也不写 `Grid.Row` / `Grid.Column`。
 7. **一维星号**：星号尺寸写成裸 `<RowDefinition />` / `<ColumnDefinition />`，像素尺寸写 `Height="<值>"`。
+8. **尺寸约束**：设计稿用「宽度 / 高度」栏设置的最小/最大宽高走 DSL 节点的 `constraints` 字段（来源、合并与官方支持后的切换点见 `page-build-rules.md` 第 5 节）。布局推导只把它透传进格子，发射器在控件与容器 Grid 上写 `MinWidth / MaxWidth / MinHeight / MaxHeight`；`TextBlock` 在设了最大宽时补 `TextWrapping="Wrap"`。
 
 ## 3. 外观与协议
 
@@ -50,6 +51,6 @@ ViewModel 与作业B 共用同一套生成器（`scripts/host/gen-mw-wpf-page.js
 
 ## 5. 验证
 
-静态门禁 = `scripts/adapters/mw-wpf/check-wpf-layout.js`（越界 / 锚点格冲突 / 禁止写法 / 协议属性名 / 资源键闭环 / 硬编码文本 / 尺寸来源 / 推导待确认；**空行空列与 `manual-only` 类型只作提示，不失败**），`run-all.ps1 -Mode mw-wpf` 的第 11、12 步就是它。
+静态门禁 = `scripts/adapters/mw-wpf/check-wpf-layout.js`（越界 / 锚点格冲突 / 禁止写法 / 协议属性名 / 资源键闭环 / 硬编码文本 / 尺寸来源 / 推导待确认 / 尺寸约束一致性与发射，后者需传 `--dsl`；**空行空列、`manual-only` 类型与"约束未落格"只作提示，不失败**），`run-all.ps1 -Mode mw-wpf` 的第 11、12 步就是它。尺寸约束来源经 `run-all.ps1 -Constraints <约束.json>` 传入（见 `page-build-rules.md` 第 5 节）。
 
 编译与加载验证属「项目运行时交付」门禁，只在目标项目接入且用户明确要求时执行；没有目标项目时只出静态脚手架。

@@ -49,5 +49,22 @@
 8. **尺寸来源**：框架固定区必须是 `framework:<Token>`，其余必须是 `design`。
 9. **推导待确认**：布局推导阶段挂起的节点（未归格 / 无尺寸 / 结构对不上 / 类型无处发射）逐条失败——它与第 1 条不同：第 1 条是"写法表没这个类型"，第 9 条是"布局推导没把它放下"。
 10. **待人工确认（提示）**：页面用到写法表 `status: manual-only` 的类型（证据不全：有手册条目但真实页面未出现，或只有用户确认，如 `Camera`）时，登记提示 `R10`，不失败——"首次生成需人工确认、事后补齐缺的证据"以提示为落点。
+11. **尺寸约束一致性**：格子带的尺寸约束必须与 DSL 节点上的 `constraints` 逐个一致（多一项 / 少一项 / 改数值都失败）——约束是设计意图，不允许推导侧改动。
+12. **尺寸约束未落格（提示）**：DSL 里带约束、布局产物里没有对应格子（常见原因：单条目容器被折叠）时登记提示 `R12`，不失败——但必须可见，便于人工判断该约束是否需要表达。
+13. **尺寸约束未发射**：带约束的格子必须在 `View.xaml` 里出现对应的 `MinWidth / MaxWidth / MinHeight / MaxHeight`（仅在给了 `--xaml` 时校验）。
 
 门禁报告落在 `Generated/_inputs/<页面名>.wpf-gate.json`；发射器自己的报告（命中的样式键、未命中变体、待办文本、跳过的固定区）落在 `Generated/_inputs/<页面名>.wpf-xaml.report.json`。
+
+## 5. 尺寸约束（min/max 宽高）
+
+设计稿可以在「宽度 / 高度」栏用「添加」设置**最小 / 最大宽高**。这四个值只存在于插件 API（`LayoutMixin`），DevMode DSL 与 MCP 都不导出，所以由插件侧单独取、由流水线合并：
+
+1. **取约束**：常驻桥（`mg-dsl-export` 插件 + `bridge-server.mjs`）返回当前页所有设置了约束的节点。**未设置返回 `0`（不是 `null`）**，只有 `> 0` 才算设置。
+2. **合并**：`scripts/core/apply-constraints.js --dsl <dsl.snapshot.json> --constraints <约束.json>` 把 `node.constraints = { minWidth, maxWidth, minHeight, maxHeight }`（只保留 `> 0` 的项）合并进 DSL 快照，**不改动 DSL 任何原生字段**。配对先按完整 id，再按复合 id 末段兜底（实例内子层两边链长不同）；末段歧义不猜，记进报告。
+3. **透传**：布局推导只把 `constraints` 透传进对应格子（`cell.constraints`），不推算、不补默认值。
+4. **发射**：`View.xaml` 上落 `MinWidth / MaxWidth / MinHeight / MaxHeight`；`TextBlock` 在设了最大宽时补 `TextWrapping="Wrap"`。
+5. **门禁**：第 4 节第 11 / 12 / 13 条。
+
+入口在 `run-all.ps1`：`-Constraints <约束.json>`；不传时自动找 `Generated/_inputs/<页面名>.constraints.json`；两者都没有 = 无约束（与旧行为完全一致）。
+
+**官方 DSL 支持这四个字段之后**：只改 `apply-constraints.js` 的 `readConstraintSource()`（改成从 DSL 节点自身读同名字段），并停止传 `-Constraints`；布局推导、XAML 发射、门禁三处一行都不用改。

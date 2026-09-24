@@ -31,6 +31,10 @@ param(
     [string] $Ui,
     [string] $Target,
     [string] $DesignPageName = '',
+    # 尺寸约束来源（可选）：常驻桥导出的约束 JSON（bridge 的 constraints 或 exportPage 结果）。
+    # 不给就自动找 <Inputs>/<Target>.constraints.json；两者都没有 = 无约束（与旧行为一致）。
+    # 合并由 core/apply-constraints.js 完成，下游只认 DSL 节点上的 constraints 字段。
+    [string] $Constraints = '',
     # 路线（适配器）：mtslg-iocontrol = 作业B（绝对坐标 IOContorl 页面 XML）；mw-wpf = 作业A（真 WPF XAML + Grid）。
     # 各路线用哪些脚本、真值源与产物路径由 references/adapters/<路线>/adapter.json 描述符给出，本文件不写死步内路径。
     [ValidateSet('mtslg-iocontrol', 'mw-wpf')]
@@ -485,6 +489,10 @@ $TypeAuditJson = Join-Path $Generated "$Target.component-types.json"
 $WpfLayoutJson = Join-Path $Generated "$Target.wpf-layout.json"
 $WpfLayoutReportJson = Join-Path $Inputs "$Target.wpf-layout.report.json"
 $WpfXamlReportJson = Join-Path $Inputs "$Target.wpf-xaml.report.json"
+# 尺寸约束：合并后的 DSL 快照是布局推导与门禁的共同输入（无约束时就是原始快照）。
+$LayoutDslJson = $SnapshotJson
+$ConstrainedDslJson = Join-Path $Generated "$Target.dsl.constrained.json"
+$ConstraintsReportJson = Join-Path $Inputs "$Target.constraints.apply-report.json"
 $WpfViewXaml = Join-Path $ProjectRoot "UI\$Ui\View\${Target}View.xaml"
 $BundleAuditJson = Join-Path $Generated "$Target.bundle.manifest.json"
 $SummaryJson = Join-Path $Generated "$Target.summary.json"
@@ -729,9 +737,25 @@ foreach ($step in $Steps) {
                 $note = "菜单项 $(@($layout.menuItems).Count) 个"
                 if ($Mode -eq 'mw-wpf') {
                     # 作业A 另做一步布局推导：分区 → 行列 → 格子（Grid 布局是 A 的坐标载体，不再是绝对坐标）。
+                    # 尺寸约束（可选）：把常驻桥取到的 min/max 合并进 DSL 快照，布局与门禁共用合并后的快照。
+                    $constraintsInput = $Constraints
+                    if (-not $constraintsInput) {
+                        $autoConstraints = Join-Path $Inputs "$Target.constraints.json"
+                        if (Test-Path -LiteralPath $autoConstraints) { $constraintsInput = $autoConstraints }
+                    }
+                    if ($constraintsInput) {
+                        Assert-File $constraintsInput "约束来源不存在: $constraintsInput"
+                        Invoke-StepCommand -Label 'apply constraints' -LogFile $log -File 'node' -Arguments @(
+                            (Join-Path $ScriptsFolder 'core\apply-constraints.js'),
+                            '--dsl', $SnapshotJson, '--constraints', $constraintsInput,
+                            '--out', $ConstrainedDslJson, '--report', $ConstraintsReportJson) | Out-Null
+                        $LayoutDslJson = $ConstrainedDslJson
+                    } else {
+                        $LayoutDslJson = $SnapshotJson
+                    }
                     Invoke-StepCommand -Label 'wpf layout' -LogFile $log -File 'node' -Arguments @(
                         (Get-AdapterScript 'wpfLayout'), '--types', $TypeAuditJson,
-                        '--dsl', $SnapshotJson, '--visibility', $VisibilityJson,
+                        '--dsl', $LayoutDslJson, '--visibility', $VisibilityJson,
                         '--map', $TemplateMap, '--page-target', $Target,
                         '--out', $WpfLayoutJson, '--report', $WpfLayoutReportJson) | Out-Null
                     $wpf = Get-Content -LiteralPath $WpfLayoutJson -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -784,6 +808,7 @@ foreach ($step in $Steps) {
                         (Get-AdapterScript 'wpfGate'), '--layout', $WpfLayoutJson,
                         '--types', $MappingAuditJson, '--icon-map', $LedgerJson, '--map', $TemplateMap,
                         '--xaml', $WpfViewXaml,
+                        '--dsl', $LayoutDslJson,
                         '--json', (Join-Path $Inputs "$Target.wpf-gate.json")) | Out-Null
                     $note = '作业A 布局门禁全部通过'
                     break
@@ -832,6 +857,7 @@ foreach ($step in $Steps) {
                         (Get-AdapterScript 'wpfGate'), '--layout', $WpfLayoutJson,
                         '--types', $MappingAuditJson, '--icon-map', $LedgerJson, '--map', $TemplateMap,
                         '--xaml', $WpfViewXaml,
+                        '--dsl', $LayoutDslJson,
                         '--json', (Join-Path $Work "verification\$Target\wpf-gate.log")) | Out-Null
                     $note = '作业A 布局 / 协议 / 资源键 / 文本 全部通过'
                     break

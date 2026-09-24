@@ -1,0 +1,199 @@
+#!/usr/bin/env node
+"use strict";
+
+// 尺寸约束（min/max 宽高）回归：适配层 → 布局透传 → XAML 发射 → 门禁。
+// 锁定的约定：
+//   1) 未设置 = 0（插件 API 对"没设约束"返回 0，不是 null），只有 > 0 才算设置；
+//   2) 配对先按完整 id，再按复合 id 末段兜底；末段歧义不猜（记进报告）；
+//   3) 适配层只增加 node.constraints，不改 DSL 任何原生字段；官方 DSL 支持后只改这一处取值来源；
+//   4) 布局只透传（cell.constraints），XAML 才发射 MinWidth/MaxWidth（文本控件有最大宽才补 TextWrapping）；
+//   5) 门禁 R11 一致性 / R12 未落格（提示）/ R13 是否发射（缺 --xaml 时不做 R13）。
+
+const assert = require("assert");
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
+const { spawnSync } = require("child_process");
+
+const SCRIPT_DIR = path.join(__dirname, "..");
+const { applyConstraints } = require(path.join(SCRIPT_DIR, "core", "apply-constraints.js"));
+const { deriveLayout } = require(path.join(SCRIPT_DIR, "adapters", "mw-wpf", "gen-mw-wpf-layout.js"));
+const { renderXaml } = require(path.join(SCRIPT_DIR, "adapters", "mw-wpf", "gen-mw-wpf-xaml.js"));
+const CHECK = path.join(SCRIPT_DIR, "adapters", "mw-wpf", "check-wpf-layout.js");
+const ROUTE_MAP = path.join(SCRIPT_DIR, "..", "references", "adapters", "mw-wpf", "mw-wpf-map.json");
+const MAP = JSON.parse(fs.readFileSync(ROUTE_MAP, "utf8"));
+
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "constraints-"));
+let seq = 0;
+
+function writeJson(name, value) {
+  const file = path.join(tmp, (++seq) + "-" + name);
+  fs.writeFileSync(file, JSON.stringify(value, null, 2), "utf8");
+  return file;
+}
+
+function node(id, type, style, children, extra) {
+  return Object.assign({ id, name: id, type, layoutStyle: style, children: children || [] }, extra || {});
+}
+
+// ── ① 适配层：0 = 未设置、末段兜底、只有 constraints 这一个字段被增加 ───────────────
+{
+  const dsl = {
+    dsl: {
+      nodes: [
+        node("root", "FRAME", { width: 100, height: 100, relativeX: 0, relativeY: 0 }, [
+          node("1:1", "TEXT", { width: 80, height: 16, relativeX: 0, relativeY: 0 }, [], { name: "工件厚度" }),
+          node("1:2/9:9", "TEXT", { width: 60, height: 16, relativeX: 0, relativeY: 20 }),
+          node("1:3", "TEXT", { width: 60, height: 16, relativeX: 0, relativeY: 40 })
+        ])
+      ]
+    }
+  };
+  const constraints = {
+    pageId: "4:0",
+    count: 3,
+    nodes: [
+      { id: "1:1", name: "工件厚度", width: 80, minWidth: 80, maxWidth: 194, minHeight: 0, maxHeight: 0 },
+      { id: "7:7/9:9", minWidth: 50, maxWidth: 120, minHeight: 0, maxHeight: 0 },
+      { id: "1:3", minWidth: 0, maxWidth: 0, minHeight: 0, maxHeight: 0 }
+    ]
+  };
+  const dslPath = writeJson("dsl.json", dsl);
+  const constraintsPath = writeJson("constraints.json", constraints);
+  const before = JSON.parse(fs.readFileSync(dslPath, "utf8"));
+
+  const summary = applyConstraints({ dsl: dslPath, constraints: constraintsPath });
+  assert.strictEqual(summary.constraintRows, 2, "0 值不算约束：3 行里只有 2 行是真约束");
+  assert.strictEqual(summary.matchedFullId, 1, "1:1 按完整 id 命中");
+  assert.strictEqual(summary.matchedLastSegment, 1, "1:2/9:9 按末段 9:9 命中 7:7/9:9");
+  assert.strictEqual(summary.constrainedNodes, 2, "只有两个节点被合并");
+
+  const merged = JSON.parse(fs.readFileSync(summary.out, "utf8"));
+  const text = merged.dsl.nodes[0].children[0];
+  assert.deepStrictEqual(text.constraints, { minWidth: 80, maxWidth: 194 }, "约束只保留 > 0 的项");
+  assert.deepStrictEqual(merged.dsl.nodes[0].children[1].constraints, { minWidth: 50, maxWidth: 120 }, "末段兜底");
+  assert.strictEqual(merged.dsl.nodes[0].children[2].constraints, undefined, "全 0 不合并");
+  // 原生字段逐一不丢：与合并前的快照逐键比对（只允许多出 constraints）。
+  const strip = (value) => JSON.parse(JSON.stringify(value, (key, item) => (key === "constraints" ? undefined : item)));
+  assert.deepStrictEqual(strip(merged), before, "除 constraints 外，DSL 内容必须与合并前完全一致");
+}
+
+// ── ② 末段歧义：不猜，记进报告 ────────────────────────────────────────────────
+{
+  const dsl = { dsl: { nodes: [node("root", "FRAME", { width: 10, height: 10, relativeX: 0, relativeY: 0 }, [
+    node("1:1/9:9", "TEXT", { width: 10, height: 10, relativeX: 0, relativeY: 0 })
+  ])] } };
+  const constraints = { pageId: "4:0", nodes: [
+    { id: "7:7/9:9", minWidth: 10, maxWidth: 20 },
+    { id: "8:8/9:9", minWidth: 10, maxWidth: 20 }
+  ] };
+  const summary = applyConstraints({
+    dsl: writeJson("ambiguous-dsl.json", dsl),
+    constraints: writeJson("ambiguous-constraints.json", constraints)
+  });
+  assert.strictEqual(summary.constrainedNodes, 0, "末段有两个候选时不配对");
+  assert.strictEqual(summary.ambiguous, 1, "歧义必须记进报告");
+}
+
+// ── ③ 布局：只透传 constraints ────────────────────────────────────────────────
+function snapshotWithConstraints() {
+  return {
+    schemaVersion: "mastergo-dsl-snapshot/2",
+    dsl: {
+      nodes: [node("root", "FRAME", { width: 1280, height: 1024, relativeX: 0, relativeY: 0 }, [
+        node("body", "FRAME", { width: 1280, height: 902, relativeX: 0, relativeY: 85 }, [
+          node("t1", "TEXT", { width: 80, height: 16, relativeX: 0, relativeY: 0 }, [], {
+            name: "工件厚度", constraints: { minWidth: 80, maxWidth: 194 }
+          }),
+          node("t2", "TEXT", { width: 60, height: 16, relativeX: 0, relativeY: 20 })
+        ])
+      ])]
+    }
+  };
+}
+
+const layoutInput = snapshotWithConstraints();
+// 类型判定产物带绝对 bbox（布局按它分格），与真实产物同形状。
+const TYPES_NODES = [
+  { ref: "t1", sourceRef: "t1", controlType: "TextBlock", sourceText: "工件厚度", absX: 0, absY: 85, w: 80, h: 16, langName: "PXThickness" },
+  { ref: "t2", sourceRef: "t2", controlType: "TextBlock", sourceText: "膜带厚度", absX: 0, absY: 105, w: 60, h: 16, langName: "PXTape" }
+];
+const TYPES_FILE = { schemaVersion: 1, nodes: TYPES_NODES, pending: [], unmappedComponents: [] };
+const layout = deriveLayout({
+  dsl: layoutInput,
+  types: { byRef: new Map(TYPES_NODES.map(function (item) { return [item.ref, item]; })) },
+  map: MAP,
+  containers: new Set(["IOGroupBox"]),
+  tokens: { headerHeight: 85, bottomHeight: 180 },
+  pageTarget: "P",
+  visibility: null
+});
+const cells = [];
+(function collect(grid) {
+  if (!grid || !Array.isArray(grid.cells)) return;
+  grid.cells.forEach(function (cell) {
+    cells.push(cell);
+    if (cell.children) collect(cell.children);
+  });
+})(layout.regions.find(function (region) { return region.emit !== false; }).grid);
+const constrainedCell = cells.find(function (cell) { return cell.ref === "t1"; });
+assert.ok(constrainedCell, "t1 必须落格");
+assert.deepStrictEqual(constrainedCell.constraints, { minWidth: 80, maxWidth: 194 }, "布局只透传 DSL 上的约束");
+assert.strictEqual(cells.find(function (cell) { return cell.ref === "t2"; }).constraints, undefined, "没有约束的节点不得凭空生成");
+
+// ── ④ XAML：发射 MinWidth/MaxWidth，文本控件有最大宽才补 TextWrapping ───────────────
+{
+  const layoutPath = writeJson("layout.json", layout);
+  const typesPath = writeJson("types.json", TYPES_FILE);
+  const outPath = path.join(tmp, "view.xaml");
+  const result = spawnSync(process.execPath, [
+    path.join(SCRIPT_DIR, "adapters", "mw-wpf", "gen-mw-wpf-xaml.js"),
+    "--layout", layoutPath, "--types", typesPath, "--map", ROUTE_MAP,
+    "--page", "P", "--x-class", "X.P", "--assembly", "X",
+    "--icon-page", "Resources/Pages/P/PIcons.xaml", "--out", outPath, "--overwrite"
+  ], { encoding: "utf8" });
+  assert.strictEqual(result.status, 0, "XAML 发射应成功: " + result.stderr);
+  const xaml = fs.readFileSync(outPath, "utf8");
+  assert.ok(/MinWidth="80"/.test(xaml), "必须发射 MinWidth");
+  assert.ok(/MaxWidth="194"/.test(xaml), "必须发射 MaxWidth");
+  assert.ok(/TextWrapping="Wrap"/.test(xaml), "TextBlock 有最大宽时必须补 TextWrapping");
+  assert.strictEqual((xaml.match(/MinWidth="/g) || []).length, 1, "没有约束的控件不得被补约束");
+}
+
+// ── ⑤ 门禁：R11 一致 / R12 提示 / R13 一致性（缺 --xaml 时跳过 R13）───────────────
+{
+  const layoutPath = writeJson("gate-layout.json", layout);
+  const typesPath = writeJson("gate-types.json", TYPES_FILE);
+  const dslPath = writeJson("gate-dsl.json", layoutInput);
+  const reportPath = path.join(tmp, "gate-report.json");
+  const pass = spawnSync(process.execPath, [CHECK, "--layout", layoutPath, "--types", typesPath, "--map", ROUTE_MAP, "--dsl", dslPath, "--json", reportPath], { encoding: "utf8" });
+  assert.strictEqual(pass.status, 0, "约束一致时门禁必须通过: " + pass.stdout + pass.stderr);
+
+  // 篡改：格子上的约束与 DSL 不一致 → R11 失败。
+  const tampered = JSON.parse(JSON.stringify(layout));
+  (function findAndTamper(grid) {
+    if (!grid || !Array.isArray(grid.cells)) return;
+    grid.cells.forEach(function (cell) {
+      if (cell.ref === "t1") cell.constraints = { minWidth: 80, maxWidth: 200 };
+      if (cell.children) findAndTamper(cell.children);
+    });
+  })(tampered.regions.find(function (region) { return region.emit !== false; }).grid);
+  const tamperedLayoutPath = writeJson("gate-layout-tampered.json", tampered);
+  const fail = spawnSync(process.execPath, [CHECK, "--layout", tamperedLayoutPath, "--types", typesPath, "--map", ROUTE_MAP, "--dsl", dslPath, "--json", reportPath], { encoding: "utf8" });
+  assert.strictEqual(fail.status, 2, "约束被改动时门禁必须失败");
+  const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
+  assert.ok(report.findings.some(function (item) { return item.rule === "R11"; }), "R11 必须报出不一致");
+
+  // DSL 里有约束但没落格 → R12 提示（不失败）。
+  const orphanDsl = JSON.parse(JSON.stringify(layoutInput));
+  orphanDsl.dsl.nodes[0].children[0].children.push(
+    node("t3", "TEXT", { width: 40, height: 16, relativeX: 0, relativeY: 60 }, [], { constraints: { minWidth: 30, maxWidth: 60 } })
+  );
+  const orphanDslPath = writeJson("gate-dsl-orphan.json", orphanDsl);
+  const orphan = spawnSync(process.execPath, [CHECK, "--layout", layoutPath, "--types", typesPath, "--map", ROUTE_MAP, "--dsl", orphanDslPath, "--json", reportPath], { encoding: "utf8" });
+  assert.strictEqual(orphan.status, 0, "R12 是提示，不阻断");
+  const orphanReport = JSON.parse(fs.readFileSync(reportPath, "utf8"));
+  assert.ok(orphanReport.notices.some(function (item) { return item.rule === "R12" && item.ref === "t3"; }), "R12 必须登记未落格的约束节点");
+}
+
+console.log("constraints.test.js: 全部通过");

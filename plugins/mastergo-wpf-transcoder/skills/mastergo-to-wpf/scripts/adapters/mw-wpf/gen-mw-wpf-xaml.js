@@ -177,7 +177,21 @@ function gridCellAttrs(cell, ctx) {
   return attrs;
 }
 
-// 控件属性：顺序固定为 定位 → 文本 → 图形 → 样式 → 协议，便于逐行比对真实页面。
+// 尺寸约束属性：来自布局格子（core/apply-constraints.js 合并进 DSL 节点、布局推导透传）。
+// 只发射设计稿真实设置的约束（未设置 = 0，视为没有），不推算、不填默认值。
+function constraintAttrs(cell) {
+  const constraints = cell && cell.constraints;
+  if (!constraints) return null;
+  const attrs = {};
+  [["minWidth", "MinWidth"], ["maxWidth", "MaxWidth"], ["minHeight", "MinHeight"], ["maxHeight", "MaxHeight"]]
+    .forEach(function (pair) {
+      const value = Number(constraints[pair[0]]);
+      if (Number.isFinite(value) && value > 0) attrs[pair[1]] = String(Math.round(value));
+    });
+  return Object.keys(attrs).length ? attrs : null;
+}
+
+// 控件属性：顺序固定为 定位 → 约束 → 文本 → 图形 → 样式 → 协议，便于逐行比对真实页面。
 function renderControl(node, cell, ctx, depth) {
   const spec = specOf(ctx.map, node.controlType);
   if (!spec) {
@@ -197,6 +211,12 @@ function renderControl(node, cell, ctx, depth) {
 
   const cellAttrs = gridCellAttrs(cell, ctx);
   if (cellAttrs) Object.keys(cellAttrs).forEach(function (name) { attr(name, cellAttrs[name]); });
+  const constraintAttrLines = constraintAttrs(cell);
+  if (constraintAttrLines) {
+    Object.keys(constraintAttrLines).forEach(function (name) { attr(name, constraintAttrLines[name]); });
+    // 文本控件只在有最大宽时补换行：没有最大宽的文本不该被改成换行形态。
+    if (constraintAttrLines.MaxWidth && spec.element === "TextBlock") attr("TextWrapping", "Wrap");
+  }
 
   // 尺寸照设计稿：格子尺寸取自布局产物，控件自身尺寸取自设计稿 bbox，偏移转 Margin。
   if (typeof node.w === "number" && typeof node.h === "number" && cell.width && cell.height) {
@@ -280,7 +300,7 @@ function renderGrid(grid, ctx, depth, gridAttrs) {
     // 容器格子（产物里 container: true）：设计稿声明的 flex 容器没有控件类型，它自己就是一层 <Grid>。
     if (cell.container) {
       if (!cell.children) fail("容器格子缺少内层 Grid: " + cell.ref);
-      lines.push(renderGrid(cell.children, ctx, depth + 1, gridCellAttrs(cell, childCtx)));
+      lines.push(renderGrid(cell.children, ctx, depth + 1, Object.assign({}, gridCellAttrs(cell, childCtx) || {}, constraintAttrs(cell) || {})));
       return;
     }
     if (!node) fail("格子引用的节点不在类型判定产物里: " + cell.ref);
