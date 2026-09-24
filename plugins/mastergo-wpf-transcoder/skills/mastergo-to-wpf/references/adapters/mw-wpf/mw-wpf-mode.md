@@ -51,6 +51,6 @@ ViewModel 与作业B 共用同一套生成器（`scripts/host/gen-mw-wpf-page.js
 
 ## 5. 验证
 
-静态门禁 = `scripts/adapters/mw-wpf/check-wpf-layout.js`（越界 / 锚点格冲突 / 禁止写法 / 协议属性名 / 资源键闭环 / 硬编码文本 / 尺寸来源 / 推导待确认 / 尺寸约束一致性、落格与发射 / 格子尺寸与尺寸·对齐发射；各条目的入参前提见该脚本头部 CLI 注释；**空行空列、`manual-only` 类型、布局产物 `constraintExempt` 里登记的带约束节点（页面根 / 不可见 / 框架固定区）与撞格下移（`cell.shifted`）的格子只作提示，不失败**），`run-all.ps1 -Mode mw-wpf` 的第 11、12 步就是它。尺寸约束来源经 `run-all.ps1 -Constraints <约束.json>` 传入（见 `page-build-rules.md` 第 5 节）。
+静态门禁 = `scripts/adapters/mw-wpf/check-wpf-layout.js`（越界 / 锚点格冲突 / 禁止写法 / 协议属性名 / 资源键闭环 / 硬编码文本 / 尺寸来源 / 推导待确认 / 尺寸约束一致性、落格与发射 / 格子尺寸与尺寸·对齐发射；各条目的入参前提见该脚本头部 CLI 注释；**空行空列、`manual-only` 类型、布局产物 `constraintExempt` 里登记的带约束节点（页面根 / 不可见 / 框架固定区）只作提示、不失败；撞格下移（`cell.shifted`）的格子只有「缺偏移真值」这一半（尺寸 / 间距对齐）作提示——它的发射报告缺条目、取值不一致，以及尺寸约束一致性与发射（第 11 / 13 条）照常失败**），`run-all.ps1 -Mode mw-wpf` 的第 11、12 步就是它。尺寸约束来源经 `run-all.ps1 -Constraints <约束.json>` 传入（见 `page-build-rules.md` 第 5 节）。
 
 编译与加载验证属「项目运行时交付」门禁，只在目标项目接入且用户明确要求时执行；没有目标项目时只出静态脚手架。
