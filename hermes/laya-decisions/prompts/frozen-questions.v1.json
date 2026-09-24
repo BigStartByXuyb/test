@@ -1,0 +1,44 @@
+{
+  "registry_version": "1.0.0",
+  "frozen_on": "2026-09-24",
+  "why": [
+    "Laya is deterministic per (state, question): repeating an identical call moves the",
+    "probability by 0.000000. Rewriting the same question moves it by up to 0.32 -- more",
+    "than any threshold in use. The question text is therefore part of the interface, not",
+    "a comment: it is frozen verbatim here and versioned with the server.",
+    "Every tool response echoes the wording used plus its sha256, so a silent rewrite is",
+    "visible in the transcript instead of being absorbed into the score.",
+    "Changing any string below requires a new registry_version and a fresh stability run."
+  ],
+  "questions": {
+    "review.architect_first": {
+      "type": "noul",
+      "instructions": "Should an architect write the design before any implementation work starts?",
+      "note": "Pilot gate for AI-43: advisory only. The deciding LLM keeps the needs_clarification path."
+    },
+    "review.needs_clarification": {
+      "type": "noul",
+      "instructions": "Is the request missing information that must be supplied before work can start?"
+    },
+    "review.scope_clear": {
+      "type": "noul",
+      "instructions": "Is the scope of this task stated precisely enough to finish without further questions?"
+    },
+    "review.risk_high": {
+      "type": "noul",
+      "instructions": "Would a mistake in this task be expensive or hard to reverse?"
+    },
+    "triage.category": {
+      "type": "choice",
+      "instructions": "Which workstream should own this task?",
+      "criteria": ["implementation", "design", "research", "operations"],
+      "note": "criteria order is part of the frozen wording; reordering changes label indices."
+    },
+    "triage.urgency": {
+      "type": "score",
+      "instructions": "How urgent is this task?",
+      "criteria": ["no deadline pressure", "soon", "blocking someone now"],
+      "note": "A score question returns the expected level index, so level order is semantic."
+    }
+  }
+}

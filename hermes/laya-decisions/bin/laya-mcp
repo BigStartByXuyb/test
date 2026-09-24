@@ -1,0 +1,47 @@
+#!/bin/sh
+# Launch the laya-decisions MCP server on stdio.
+#
+# The server needs the `mcp` package. Hermes starts stdio servers with a minimal
+# environment, so `python3` on PATH may be the distro interpreter without it. We probe
+# candidates in order and use the first that can actually import what the server needs,
+# rather than picking one and failing with a traceback the caller cannot act on.
+
+set -eu
+
+PLUGIN_ROOT="${PLUGIN_ROOT:-$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)}"
+export PLUGIN_ROOT
+
+SERVER="$PLUGIN_ROOT/server/laya_decisions_server.py"
+if [ ! -f "$SERVER" ]; then
+    echo "laya-decisions-mcp: server not found at $SERVER" >&2
+    exit 1
+fi
+
+try_python() {
+    [ -n "${1:-}" ] || return 1
+    command -v "$1" >/dev/null 2>&1 || [ -x "$1" ] || return 1
+    "$1" -c 'import mcp.server.mcpserver' >/dev/null 2>&1 || return 1
+    echo "$1"
+}
+
+PYTHON=""
+for candidate in \
+    "${LAYA_MCP_PYTHON:-}" \
+    "${HERMES_HOME:-$HOME/.hermes}/hermes-agent/venv/bin/python" \
+    "$HOME/.hermes/hermes-agent/venv/bin/python" \
+    python3 python
+do
+    if PYTHON=$(try_python "$candidate"); then
+        break
+    fi
+    PYTHON=""
+done
+
+if [ -z "$PYTHON" ]; then
+    echo "laya-decisions-mcp: no Python with the 'mcp' package found." >&2
+    echo "  Tried: \$LAYA_MCP_PYTHON, \$HERMES_HOME/hermes-agent/venv/bin/python, python3, python" >&2
+    echo "  Fix: set LAYA_MCP_PYTHON to an interpreter that can 'import mcp.server.mcpserver'." >&2
+    exit 1
+fi
+
+exec "$PYTHON" "$SERVER"
