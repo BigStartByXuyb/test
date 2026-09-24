@@ -6,7 +6,9 @@
 // CLI
 //   node check-wpf-layout.js --layout <Generated/<页面名>.wpf-layout.json>
 //        --types <类型判定 json 或 mapping.json> --map <mw-wpf-map.json>
-//        [--xaml <发射出的 View.xaml>] [--icon-map <本页图标台账>] [--json <报告路径>]
+//        [--xaml <发射出的 View.xaml>] [--xaml-report <发射器报告>] [--dsl <带约束的 DSL 快照>]
+//        [--icon-map <本页图标台账>] [--json <报告路径>]
+//   --dsl 供 R11 / R12 用，--xaml 供 R13 / R6 / R7 用，--xaml-report 供 R14 用；不传就跳过对应条目。
 //
 // 退出码：0 通过；2 有 findings（门禁失败）；1 输入/契约错误。
 //

@@ -18,7 +18,12 @@
 //     regions:[{id,name,ref,role,emit,x,y,w,h,grid:{rows[],columns[],cells[]}}], pending[],
 //     constraintExempt:[{ref,reason}] }
 //   cells[] 里的格子带 ref / row / column / rowSpan / columnSpan，容器格子再带 container:true 与 children；
-//   带尺寸约束的格子带 constraints。
+//   带尺寸约束的格子带 constraints。格子尺寸与发射依据也在格子上：
+//     width / height        格子尺寸（跨格累加 + 收尾星号带残差；推导给不出正数时不写）
+//     nodeWidth / nodeHeight 承载物（控件 / 容器）自身设计稿尺寸
+//     offsetX / offsetY     承载物起点相对格子起点的偏移（撞格下移的格子不写）
+//     shifted:true          该格子由推导挪位（撞格下移），不是设计稿那条带
+//     发射器与门禁（R14）按 width/height/nodeWidth/nodeHeight/offsetX/offsetY 出尺寸与对齐。
 //   constraintExempt 由本脚本登记「本页不发射的带约束节点」（页面根 / 不可见 / 框架固定区）及原因，
 //   门禁据此把 R12 从失败降为提示（见 page-build-rules.md 第 5 节）。
 //
