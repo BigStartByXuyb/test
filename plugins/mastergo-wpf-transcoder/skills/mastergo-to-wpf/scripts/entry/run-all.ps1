@@ -32,8 +32,8 @@ param(
     [string] $Target,
     [string] $DesignPageName = '',
     # 尺寸约束来源（可选）：外部导出的约束 JSON（形状见 references/adapters/mw-wpf/page-build-rules.md 第 5 节）。
-    # 不给就自动找 <Inputs>/<Target>.constraints.json；两者都没有 = 无约束（与旧行为一致）。
-    # 合并由 core/apply-constraints.js 完成，下游只认 DSL 节点上的 constraints 字段。
+    # 不给就自动找 <Inputs>/<Target>.constraints.json；两者都没有 = 无约束。
+    # 解析优先级与合并都在 Resolve-LayoutDslSnapshot（唯一实现），下游只认 DSL 节点上的 constraints 字段。
     [string] $Constraints = '',
     # 顺序严格时用：要求约束来源必须存在且至少配上一条，缺失/全空直接失败（不静默退化成"无约束"）。
     [switch] $RequireConstraints,
@@ -492,13 +492,39 @@ $WpfLayoutJson = Join-Path $Generated "$Target.wpf-layout.json"
 $WpfLayoutReportJson = Join-Path $Inputs "$Target.wpf-layout.report.json"
 $WpfXamlReportJson = Join-Path $Inputs "$Target.wpf-xaml.report.json"
 # 尺寸约束：合并后的 DSL 快照是布局推导与门禁的共同输入（无约束时就是原始快照）。
-$LayoutDslJson = $SnapshotJson
 $ConstrainedDslJson = Join-Path $Generated "$Target.dsl.constrained.json"
 $ConstraintsReportJson = Join-Path $Inputs "$Target.constraints.apply-report.json"
 $WpfViewXaml = Join-Path $ProjectRoot "UI\$Ui\View\${Target}View.xaml"
 $BundleAuditJson = Join-Path $Generated "$Target.bundle.manifest.json"
 $SummaryJson = Join-Path $Generated "$Target.summary.json"
 $PageXml = Join-Path $ProjectRoot "Resources\Pages\$Target\${Target}Page.xml"
+
+# 布局输入的解析入口（唯一实现）：-Constraints > <Inputs>/<Target>.constraints.json > 无约束（原始快照）。
+# 第 8 步（布局推导）与第 11 / 12 步（门禁、复核）都调它重算，不读磁盘上遗留的合并快照——
+# 否则"这一次的输入是什么"会取决于上一次运行留下过什么文件，同一份参数得不到同一个结论。
+function Resolve-LayoutDslSnapshot {
+    param([string] $LogFile)
+    $source = $Constraints
+    if (-not $source) {
+        $auto = Join-Path $Inputs "$Target.constraints.json"
+        if (Test-Path -LiteralPath $auto) { $source = $auto }
+    }
+    if (-not $source) {
+        if ($RequireConstraints) {
+            throw "-RequireConstraints 要求约束来源，但 -Constraints 未传且 $(Join-Path $Inputs "$Target.constraints.json") 不存在"
+        }
+        return $SnapshotJson
+    }
+    Assert-File $source "约束来源不存在: $source"
+    # 合并由 core/apply-constraints.js 完成，下游只认 DSL 节点上的 constraints 字段。
+    $applyArgs = @(
+        (Join-Path $ScriptsFolder 'core\apply-constraints.js'),
+        '--dsl', $SnapshotJson, '--constraints', $source,
+        '--out', $ConstrainedDslJson, '--report', $ConstraintsReportJson)
+    if ($RequireConstraints) { $applyArgs += '--require' }
+    Invoke-StepCommand -Label 'apply constraints' -LogFile $LogFile -File 'node' -Arguments $applyArgs | Out-Null
+    return $ConstrainedDslJson
+}
 
 # 页面标题的人工确认值：登记表里有就带上（否则标题会退回设计页名原文，带 (x.y) 编号）。
 $PageTitleText = if ($Registry -and $Registry.PageTitleText) { $Registry.PageTitleText } else { '' }
@@ -740,25 +766,7 @@ foreach ($step in $Steps) {
                 if ($Mode -eq 'mw-wpf') {
                     # 作业A 另做一步布局推导：分区 → 行列 → 格子（Grid 布局是 A 的坐标载体，不再是绝对坐标）。
                     # 尺寸约束（可选）：把外部导出的 min/max 合并进 DSL 快照，布局与门禁共用合并后的快照。
-                    $constraintsInput = $Constraints
-                    if (-not $constraintsInput) {
-                        $autoConstraints = Join-Path $Inputs "$Target.constraints.json"
-                        if (Test-Path -LiteralPath $autoConstraints) { $constraintsInput = $autoConstraints }
-                    }
-                    if ($constraintsInput) {
-                        Assert-File $constraintsInput "约束来源不存在: $constraintsInput"
-                        $applyConstraintArgs = @(
-                            (Join-Path $ScriptsFolder 'core\apply-constraints.js'),
-                            '--dsl', $SnapshotJson, '--constraints', $constraintsInput,
-                            '--out', $ConstrainedDslJson, '--report', $ConstraintsReportJson)
-                        if ($RequireConstraints) { $applyConstraintArgs += '--require' }
-                        Invoke-StepCommand -Label 'apply constraints' -LogFile $log -File 'node' -Arguments $applyConstraintArgs | Out-Null
-                        $LayoutDslJson = $ConstrainedDslJson
-                    } elseif ($RequireConstraints) {
-                        throw "-RequireConstraints 要求约束来源，但 -Constraints 未传且 $(Join-Path $Inputs "$Target.constraints.json") 不存在"
-                    } else {
-                        $LayoutDslJson = $SnapshotJson
-                    }
+                    $LayoutDslJson = Resolve-LayoutDslSnapshot -LogFile $log
                     Invoke-StepCommand -Label 'wpf layout' -LogFile $log -File 'node' -Arguments @(
                         (Get-AdapterScript 'wpfLayout'), '--types', $TypeAuditJson,
                         '--dsl', $LayoutDslJson, '--visibility', $VisibilityJson,
@@ -807,8 +815,8 @@ foreach ($step in $Steps) {
             }
             'gates' {
                 if ($Mode -eq 'mw-wpf') {
-                    # 续跑到这一步时布局步不会重跑：约束快照存在就直接用它，门禁不得静默丢掉尺寸约束。
-                    if (Test-Path -LiteralPath $ConstrainedDslJson) { $LayoutDslJson = $ConstrainedDslJson }
+                    # 续跑到这一步时布局步不会重跑：按同一入口重算布局输入，门禁不得静默丢掉尺寸约束。
+                    $LayoutDslJson = Resolve-LayoutDslSnapshot -LogFile $log
                     # 作业A 的门禁：布局（越界/空行空列/锚点格冲突/禁止类型/尺寸来源）+ 协议/资源键/硬编码文本。
                     # 输入用 Bundle 定稿的 mapping（语言绑定已落在节点上），不是第 5 步的判定草稿——
                     # 否则"有文本没语言键"会把已绑定的节点全判成缺键。
@@ -860,8 +868,8 @@ foreach ($step in $Steps) {
             }
             'verify' {
                 if ($Mode -eq 'mw-wpf') {
-                    # 与 gates 同口径：续跑复核也必须带上尺寸约束，不能因为没跑布局步而跳过。
-                    if (Test-Path -LiteralPath $ConstrainedDslJson) { $LayoutDslJson = $ConstrainedDslJson }
+                    # 与 gates 同口径：复核同样按同一入口重算布局输入，不能因为没跑布局步而跳过约束。
+                    $LayoutDslJson = Resolve-LayoutDslSnapshot -LogFile $log
                     # 作业A 的独立复核：门禁重跑一遍并落独立日志（结构闭环按本页 View.xaml 与布局产物校验）。
                     Invoke-StepCommand -Label 'wpf verifications' -LogFile $log -File 'node' -Arguments @(
                         (Get-AdapterScript 'wpfGate'), '--layout', $WpfLayoutJson,
@@ -909,7 +917,8 @@ foreach ($step in $Steps) {
         Write-Output ("!! 步骤 {0}({1}) 失败：{2}{3}" -f $step.Id, $step.Name, $_.Exception.Message, $where)
         if ($_.ScriptStackTrace) { Write-Output ("   调用链: " + (($_.ScriptStackTrace -split "`n" | Select-Object -First 4) -join ' <- ')) }
         # 续跑命令回填本次调用的全部输入：只写 -Progress 会取不到来源；-Ui / -AllowEmptyLedger /
-        # -ConfigPath 这些命令行专属输入若不复现，续跑会在不同区域前缀或不同前置条件下静默继续。
+        # -Constraints / -ConfigPath 这些命令行专属输入若不复现，续跑会在不同区域前缀、不同前置条件
+        # 或不同约束来源下静默继续。
         $resumeArgs = @("-ProjectRoot `"$ProjectRoot`"", "-Target $Target")
         # 路线必须回放：不带 -Mode 续跑会让适配器描述符按缺省路线解析（第 8 步就会报"描述符缺少 scripts.wpfLayout"，
         # 把人引向描述符而不是命令行）。
@@ -921,7 +930,9 @@ foreach ($step in $Steps) {
         if ($Overwrite) { $resumeArgs += '-Overwrite' }
         if ($AllowEmptyLedger) { $resumeArgs += '-AllowEmptyLedger' }
         if ($ConfigPath) { $resumeArgs += "-ConfigPath `"$ConfigPath`"" }
-    Write-Output ("   修好后从这一步继续：pwsh -NoProfile -File <skill>\scripts\entry\run-all.ps1 {0} -Progress {1}" -f ($resumeArgs -join ' '), $step.Name)
+        if ($Constraints) { $resumeArgs += "-Constraints `"$Constraints`"" }
+        if ($RequireConstraints) { $resumeArgs += '-RequireConstraints' }
+        Write-Output ("   修好后从这一步继续：pwsh -NoProfile -File <skill>\scripts\entry\run-all.ps1 {0} -Progress {1}" -f ($resumeArgs -join ' '), $step.Name)
         Write-Output ''
         Write-Output '--- 本区间进度 ---'
         $results | ForEach-Object { '{0,2} {1,-10} {2,-7} {3,6}s' -f $_.Id, $_.Name, $_.Status, $_.Seconds }

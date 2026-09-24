@@ -7,7 +7,8 @@
 //   2) 配对先按完整 id，再按复合 id 末段兜底；末段歧义不猜（记进报告）；
 //   3) 适配层只增加 node.constraints，不改 DSL 任何原生字段；官方 DSL 支持后只改这一处取值来源；
 //   4) 布局只透传（cell.constraints），XAML 才发射 MinWidth/MaxWidth（文本控件有最大宽才补 TextWrapping）；
-//   5) 门禁 R11 一致性 / R12 未落格（提示）/ R13 是否发射（缺 --xaml 时不做 R13）。
+//   5) 带约束的容器不展平（约束必须有承载物），无 flex 声明的容器同样成层；
+//   6) 门禁 R11 一致性 / R12 未落格（失败）/ R13 是否发射（缺 --xaml 时不做 R13）。
 
 const assert = require("assert");
 const fs = require("fs");
@@ -160,7 +161,7 @@ assert.strictEqual(cells.find(function (cell) { return cell.ref === "t2"; }).con
   assert.strictEqual((xaml.match(/MinWidth="/g) || []).length, 1, "没有约束的控件不得被补约束");
 }
 
-// ── ⑤ 门禁：R11 一致 / R12 提示 / R13 一致性（缺 --xaml 时跳过 R13）───────────────
+// ── ⑤ 门禁：R11 一致 / R12 未落格失败 / R13 一致性（缺 --xaml 时跳过 R13）────────────
 {
   const layoutPath = writeJson("gate-layout.json", layout);
   const typesPath = writeJson("gate-types.json", TYPES_FILE);
@@ -184,16 +185,96 @@ assert.strictEqual(cells.find(function (cell) { return cell.ref === "t2"; }).con
   const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
   assert.ok(report.findings.some(function (item) { return item.rule === "R11"; }), "R11 必须报出不一致");
 
-  // DSL 里有约束但没落格 → R12 提示（不失败）。
+  // DSL 里有约束但没落格 → R12 失败（约束是设计意图，不许静默丢）。
   const orphanDsl = JSON.parse(JSON.stringify(layoutInput));
   orphanDsl.dsl.nodes[0].children[0].children.push(
     node("t3", "TEXT", { width: 40, height: 16, relativeX: 0, relativeY: 60 }, [], { constraints: { minWidth: 30, maxWidth: 60 } })
   );
   const orphanDslPath = writeJson("gate-dsl-orphan.json", orphanDsl);
   const orphan = spawnSync(process.execPath, [CHECK, "--layout", layoutPath, "--types", typesPath, "--map", ROUTE_MAP, "--dsl", orphanDslPath, "--json", reportPath], { encoding: "utf8" });
-  assert.strictEqual(orphan.status, 0, "R12 是提示，不阻断");
+  assert.strictEqual(orphan.status, 2, "有约束没落格必须失败");
   const orphanReport = JSON.parse(fs.readFileSync(reportPath, "utf8"));
-  assert.ok(orphanReport.notices.some(function (item) { return item.rule === "R12" && item.ref === "t3"; }), "R12 必须登记未落格的约束节点");
+  assert.ok(orphanReport.findings.some(function (item) { return item.rule === "R12" && item.ref === "t3"; }), "R12 必须报出未落格的约束节点");
+}
+
+// ── ⑥ 带约束的单条目容器不展平（约束必须有承载物）────────────────────────────────
+{
+  const dsl = {
+    dsl: {
+      nodes: [node("root", "FRAME", { width: 1280, height: 1024, relativeX: 0, relativeY: 0 }, [
+        node("body", "FRAME", { width: 1280, height: 902, relativeX: 0, relativeY: 85 }, [
+          node("row", "FRAME", { width: 400, height: 100, relativeX: 0, relativeY: 0 }, [
+            node("box", "FRAME", { width: 200, height: 40, relativeX: 0, relativeY: 0 }, [
+              node("t1", "TEXT", { width: 80, height: 16, relativeX: 0, relativeY: 0 })
+            ], { flexContainerInfo: { flexDirection: "column" }, constraints: { minWidth: 80, maxWidth: 194 } })
+          ], { flexContainerInfo: { flexDirection: "row" } })
+        ])
+      ])]
+    }
+  };
+  const types = {
+    byRef: new Map([["t1", { ref: "t1", controlType: "TextBlock", absX: 0, absY: 85, w: 80, h: 16 }]])
+  };
+  const derived = deriveLayout({
+    dsl: dsl, types: types, map: MAP, containers: new Set(["IOGroupBox"]),
+    tokens: { headerHeight: 85, bottomHeight: 180 }, pageTarget: "P", visibility: null
+  });
+  let boxCell = null;
+  (function walk(grid) {
+    if (!grid || !Array.isArray(grid.cells)) return;
+    grid.cells.forEach(function (cell) {
+      if (cell.ref === "box") boxCell = cell;
+      if (cell.children) walk(cell.children);
+    });
+  })(derived.regions.find(function (region) { return region.emit !== false; }).grid);
+  assert.ok(boxCell, "带约束的单条目容器必须保留成一层 Grid（否则约束无处落）");
+  assert.strictEqual(boxCell.container, true, "保留下来的是容器格子");
+  assert.deepStrictEqual(boxCell.constraints, { minWidth: 80, maxWidth: 194 }, "容器格子带上约束");
+}
+
+// ── ⑦ 带约束但没声明 flex 的容器同样成层（内层按 bbox 聚类）────────────────────────
+{
+  const dsl = {
+    dsl: {
+      nodes: [node("root", "FRAME", { width: 1280, height: 1024, relativeX: 0, relativeY: 0 }, [
+        node("body", "FRAME", { width: 1280, height: 902, relativeX: 0, relativeY: 85 }, [
+          node("row", "FRAME", { width: 400, height: 100, relativeX: 0, relativeY: 0 }, [
+            node("box2", "FRAME", { width: 200, height: 60, relativeX: 0, relativeY: 0 }, [
+              node("t1", "TEXT", { width: 80, height: 16, relativeX: 0, relativeY: 0 }),
+              node("t2", "TEXT", { width: 80, height: 16, relativeX: 0, relativeY: 32 })
+            ], { constraints: { minWidth: 80, maxWidth: 194 } })
+          ], { flexContainerInfo: { flexDirection: "row" } })
+        ])
+      ])]
+    }
+  };
+  const types = {
+    byRef: new Map([
+      ["t1", { ref: "t1", controlType: "TextBlock", absX: 0, absY: 85, w: 80, h: 16 }],
+      ["t2", { ref: "t2", controlType: "TextBlock", absX: 0, absY: 117, w: 80, h: 16 }]
+    ])
+  };
+  const derived = deriveLayout({
+    dsl: dsl, types: types, map: MAP, containers: new Set(["IOGroupBox"]),
+    tokens: { headerHeight: 85, bottomHeight: 180 }, pageTarget: "P", visibility: null
+  });
+  let boxCell = null;
+  let childRefs = [];
+  (function walk(grid) {
+    if (!grid || !Array.isArray(grid.cells)) return;
+    grid.cells.forEach(function (cell) {
+      if (cell.ref === "box2") {
+        boxCell = cell;
+        childRefs = (cell.children ? cell.children.cells : []).map(function (item) { return item.ref; });
+      }
+      if (cell.children) walk(cell.children);
+    });
+  })(derived.regions.find(function (region) { return region.emit !== false; }).grid);
+  assert.ok(boxCell, "带约束但没有 flex 声明的容器也必须成层（否则约束无处落）");
+  assert.strictEqual(boxCell.container, true, "保留下来的是容器格子");
+  assert.deepStrictEqual(boxCell.constraints, { minWidth: 80, maxWidth: 194 }, "容器格子带上约束");
+  assert.deepStrictEqual(childRefs.sort(), ["t1", "t2"], "容器的子控件进它的内层 Grid");
+  assert.deepStrictEqual(derived.pending, [], "没有节点因为成层而漏落格");
 }
 
 console.log("constraints.test.js: 全部通过");

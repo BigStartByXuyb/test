@@ -29,6 +29,7 @@
 //     没有声明的层级仍按 bbox 聚类。
 //   - 层级照设计稿：声明了 flex 主轴（flexDirection）的容器各自发射一个内层 Grid（格子带 container:true），
 //     它的条目（直接子控件 / 更内层的容器）进该层格子；没有 flex 声明的包裹层展平到最近一层。
+//     单条目容器同样展平，**但带尺寸约束的容器不展平**：约束是设计意图，展平会让它没有落到产物的位置。
 //   - 容器（写法表登记为可容纳子节点的类型）内部的节点递归成嵌套 Grid，不与被容纳节点抢同一格。
 //   - 归不进任何格的节点进 pending，不猜坐标。
 //   - 尺寸约束（min/max 宽高）由 core/apply-constraints.js 合并进 DSL 节点的 `constraints` 字段，
@@ -37,6 +38,7 @@
 const fs = require("fs");
 const path = require("path");
 const { fail, readJson } = require(path.join(__dirname, "..", "..", "lib", "script-helpers.js"));
+const { normalizeConstraints } = require(path.join(__dirname, "..", "..", "lib", "constraints.js"));
 
 const ROUTE_MAP = path.join(__dirname, "..", "..", "..", "references", "adapters", "mw-wpf", "mw-wpf-map.json");
 const EPSILON = 2;
@@ -182,12 +184,38 @@ function flexMainAxisItems(nodes, tree, axis) {
 }
 
 // ---------- flex 容器层级 ----------
-// 设计稿声明的 flex 容器在页面里要保留层级：容器 → 一层 Grid，它的条目进该层格子。
+// 成层容器在页面里要保留层级：容器 → 一层 Grid，它的条目进该层格子。成层容器的判据有两条：
+// 设计稿声明的 flex 容器（节点带 flexContainerInfo.flexDirection），或**带尺寸约束的容器**
+// （约束是设计意图，必须有承载物；展平后它就没有落到产物的位置，门禁 R12 按这条拦）。
 // 两条收口规则（避免纯噪声层）：
-//   ① 只有 ≥2 个条目的容器才成层——单条目容器没有主轴关系可表达，内容提到上一层；
-//   ② 区域根网格不做 1×1 空壳——顶层如果是"单容器链"，把最内层条目的层提上来。
-function flexContainerParent(tree, containerRef) {
-  const chain = flexAncestors(tree, containerRef);
+//   ① 只有 ≥2 个条目的容器才成层——单条目容器没有主轴关系可表达，内容提到上一层（带约束的除外）；
+//   ② 区域根网格不做 1×1 空壳——顶层如果是"单容器链"，把最内层条目的层提上来（带约束的除外）。
+// 没有 flex 声明的成层容器内层 Grid 按 bbox 聚类（与"没有声明的层级"同一套聚类口径）。
+function carriesConstraints(tree, ref) {
+  const record = tree.byRef.get(ref);
+  return Boolean(record) && Object.keys(normalizeConstraints(record.constraints)).length > 0;
+}
+
+// 成层祖先（含带约束的无 flex 声明的容器），由近及远。拆带用的主轴语义只归 flexAncestors，这里不掺和：
+// 没有 flex 声明的成层容器在 chain 里 direction 为 null，`flexSplitStarts` 不认它，内层走 bbox 聚类。
+function levelAncestors(tree, ref) {
+  const chain = [];
+  let record = tree.byRef.get(ref);
+  if (!record) return chain;
+  let parent = tree.byRef.get(record.parentRef);
+  while (parent) {
+    const direction = parent.flex && parent.flex.flexDirection;
+    const isFlex = direction === "row" || direction === "column";
+    if (isFlex || carriesConstraints(tree, parent.ref)) {
+      chain.push({ containerRef: parent.ref, direction: isFlex ? direction : null });
+    }
+    parent = tree.byRef.get(parent.parentRef);
+  }
+  return chain;
+}
+
+function levelContainerParent(tree, containerRef) {
+  const chain = levelAncestors(tree, containerRef);
   return chain.length ? chain[0].containerRef : null;
 }
 
@@ -195,7 +223,7 @@ function buildFlexItems(entries, tree) {
   const membersOf = new Map();
   const containers = new Set();
   entries.forEach(function (entry) {
-    const chain = flexAncestors(tree, entry.ref);
+    const chain = levelAncestors(tree, entry.ref);
     chain.forEach(function (info) { containers.add(info.containerRef); });
     const key = chain.length ? chain[0].containerRef : null;
     if (!membersOf.has(key)) membersOf.set(key, []);
@@ -203,7 +231,7 @@ function buildFlexItems(entries, tree) {
   });
   const childContainers = new Map();
   containers.forEach(function (containerRef) {
-    const parent = flexContainerParent(tree, containerRef);
+    const parent = levelContainerParent(tree, containerRef);
     if (!childContainers.has(parent)) childContainers.set(parent, []);
     childContainers.get(parent).push(containerRef);
   });
@@ -213,7 +241,7 @@ function buildFlexItems(entries, tree) {
       const record = tree.byRef.get(containerRef);
       if (!record) return;
       const inner = build(containerRef);
-      if (inner.length < 2) {
+      if (inner.length < 2 && !carriesConstraints(tree, containerRef)) {
         items.push.apply(items, inner);
         return;
       }
@@ -225,7 +253,7 @@ function buildFlexItems(entries, tree) {
     return items;
   };
   let items = build(null);
-  while (items.length === 1 && items[0].container) items = build(items[0].ref);
+  while (items.length === 1 && items[0].container && !carriesConstraints(tree, items[0].ref)) items = build(items[0].ref);
   return items;
 }
 

@@ -27,10 +27,6 @@ function normalizeConstraints(value) {
   return out;
 }
 
-function isEmptyConstraints(value) {
-  return Object.keys(normalizeConstraints(value)).length === 0;
-}
-
 // 值取整成字符串（WPF 尺寸属性不接受小数像素）。
 function constraintAttributes(value) {
   const normalized = normalizeConstraints(value);
@@ -67,7 +63,6 @@ module.exports = {
   CONSTRAINT_KEYS,
   CONSTRAINT_ATTRS,
   normalizeConstraints,
-  isEmptyConstraints,
   constraintAttributes,
   eachDslNode,
   collectConstraints
