@@ -170,10 +170,11 @@ function indentOf(depth) { return "    ".repeat(depth); }
 
 // 格子契约：设计稿格子尺寸必须由布局推导登记（跨格累加 + 收尾星号带残差）。缺了就没法表达
 // "格子尺寸 − 控件尺寸 = 间距"，宁可停在这里，也不要发射一个尺寸静默丢失的页面。
-// 例外只有一个：cell.shifted（推导为避让撞格把它挪出设计带）——那个格子没有设计稿偏移真值，
-// 只写控件自身尺寸、不写对齐（间距落哪一侧无从判断）。
+// 例外有两类，都由推导登记在格子上：
+//   cell.shifted（为避让撞格被挪出设计带）——没有偏移真值，只写控件自身尺寸、不写对齐；
+//   cell.unsized（某一维算不出正数格子尺寸，内容溢出承载物）——那一维不写尺寸与对齐，另一维照写。
 function assertDesignBox(cell) {
-  if (cell.shifted) return;
+  if (cell.shifted || cell.unsized) return;
   if (!(cell.width > 0) || !(cell.height > 0)) {
     fail("格子缺少设计稿格子尺寸（width / height）: " + cell.ref +
       "——布局产物必须由 gen-mw-wpf-layout.js 产出（旧产物没有这两个字段）");

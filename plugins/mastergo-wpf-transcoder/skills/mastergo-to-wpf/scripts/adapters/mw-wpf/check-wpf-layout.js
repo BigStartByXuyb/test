@@ -152,13 +152,15 @@ function checkDesignBoxes(layout, emission) {
       // 不写对齐），只把"不是设计稿那条带"这件事登记成提示，不失败。
       if (cell.shifted) {
         notice("R14", cell.ref, "该格子由推导挪位（撞格下移），不是设计稿那条带：只写控件自身尺寸，不表达间距（没有偏移真值）");
+      } else if (cell.unsized) {
+        notice("R14", cell.ref, "该格子所在带超出承载物尺寸（内容比容器宽/高）：算不出的那一维不表达尺寸与间距");
       } else if (!(cell.width > 0) || !(cell.height > 0)) {
         report("R14", cell.ref, "布局产物没有登记格子尺寸（推导必须登记格子宽高：跨格累加 + 收尾星号带残差）");
       } else {
         if (cell.width !== width) report("R14", cell.ref, "格子宽与行列定义重算不一致：产物 " + cell.width + "，重算 " + width);
         if (cell.height !== height) report("R14", cell.ref, "格子高与行列定义重算不一致：产物 " + cell.height + "，重算 " + height);
       }
-      if (!cell.shifted && (!(cell.nodeWidth > 0) || !(cell.nodeHeight > 0))) {
+      if (!cell.shifted && !cell.unsized && (!(cell.nodeWidth > 0) || !(cell.nodeHeight > 0))) {
         report("R14", cell.ref, "布局产物没有登记承载物设计尺寸（nodeWidth / nodeHeight）");
       }
       const expected = designBoxAttrs(cell);

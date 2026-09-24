@@ -218,4 +218,52 @@ function node(id, type, style, children, extra) {
     "R14 必须报出报告缺条目");
 }
 
+// ── ⑤ 格子算不出正数尺寸（内容溢出承载物）→ unsized：不写尺寸/对齐，门禁按提示登记 ─────
+{
+  const dsl = { dsl: { nodes: [node("root", "FRAME", { width: 1280, height: 1024, relativeX: 0, relativeY: 0 }, [
+    // 容器只有 100 宽，第二个子控件却从 150 开始 → 收尾星号带被吃光。
+    node("box", "FRAME", { width: 100, height: 60, relativeX: 0, relativeY: 0 }, [
+      node("a", "TEXT", { width: 40, height: 16, relativeX: 0, relativeY: 0 }),
+      node("b", "TEXT", { width: 40, height: 16, relativeX: 150, relativeY: 0 })
+    ], { flexContainerInfo: { flexDirection: "row" } }),
+    node("side", "TEXT", { width: 40, height: 16, relativeX: 300, relativeY: 0 })
+  ])] } };
+  const types = {
+    byRef: new Map([
+      ["a", { ref: "a", controlType: "TextBlock", absX: 0, absY: 85, w: 40, h: 16 }],
+      ["b", { ref: "b", controlType: "TextBlock", absX: 150, absY: 85, w: 40, h: 16 }],
+      ["side", { ref: "side", controlType: "TextBlock", absX: 300, absY: 85, w: 40, h: 16 }]
+    ])
+  };
+  const derived = deriveLayout({
+    dsl: dsl, types: types, map: MAP, containers: new Set(["IOGroupBox"]),
+    tokens: { headerHeight: 85, bottomHeight: 180 }, pageTarget: "P", visibility: null
+  });
+  const cells = new Map();
+  (function walk(grid) {
+    grid.cells.forEach(function (item) { cells.set(item.ref, item); if (item.children) walk(item.children); });
+  })(derived.regions.find(function (region) { return region.emit !== false; }).grid);
+  const overflow = cells.get("b");
+  assert.strictEqual(overflow.unsized, true, "溢出带的格子必须登记 unsized");
+  assert.strictEqual(overflow.width, undefined, "算不出正数尺寸时不写格子宽");
+  assert.deepStrictEqual(designBoxAttrs(overflow), { Height: "16", VerticalAlignment: "Top" },
+    "算不出的那一维不写，另一维照写");
+
+  const layoutPath = writeJson("unsized-layout.json", derived);
+  const typesPath = writeJson("unsized-types.json", { schemaVersion: 1, nodes: Array.from(types.byRef.values()), pending: [], unmappedComponents: [] });
+  const reportPath = writeJson("unsized-report.json", {
+    designBox: Array.from(cells.values()).map(function (cell) {
+      return { ref: cell.ref, container: !!cell.container, attrs: designBoxAttrs(cell) };
+    })
+  });
+  const outPath = path.join(tmp, "unsized-gate.json");
+  const run = spawnSync(process.execPath, [CHECK, "--layout", layoutPath, "--types", typesPath, "--map", ROUTE_MAP,
+    "--xaml-report", reportPath, "--json", outPath], { encoding: "utf8" });
+  assert.strictEqual(run.status, 0, "溢出带的格子只提示、不失败: " + run.stdout + run.stderr);
+  const report = JSON.parse(fs.readFileSync(outPath, "utf8"));
+  assert.ok(report.notices.some(function (item) { return item.rule === "R14" && item.ref === "b"; }),
+    "R14 必须把溢出带的格子登记成提示");
+  assert.strictEqual(report.findings.length, 0, "溢出带的格子不得产生失败项");
+}
+
 console.log("design-box.test.js: 全部通过");
