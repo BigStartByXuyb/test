@@ -297,4 +297,51 @@ function node(id, type, style, children, extra) {
     "R14 必须报出自报算不出但重算 > 0");
 }
 
+// ── ⑥ 撞格下移（shifted）不豁免格子尺寸：缺尺寸时发射器与门禁都必须失败 ──────────────
+{
+  const layout = {
+    schemaVersion: 1, adapter: "mw-wpf", pageTarget: "P", design: { width: 1280, height: 1024 },
+    regions: [{
+      id: "work-area", name: "工作区", ref: null, role: "work-area", emit: true,
+      x: 0, y: 85, w: 1280, h: 759,
+      grid: {
+        rows: [{ size: "Pixel", value: 120, source: "design" }, { size: "Star", source: "design" }],
+        columns: [{ size: "Star", source: "design" }],
+        cells: [{
+          ref: "moved", controlType: "IconButton", row: 1, column: 0, rowSpan: 1, columnSpan: 1, shifted: true,
+          height: 300, nodeWidth: 170, nodeHeight: 80
+        }]
+      }
+    }],
+    pending: []
+  };
+  const types = {
+    schemaVersion: 1, nodes: [{ ref: "moved", controlType: "IconButton", absX: 0, absY: 205, w: 170, h: 80 }],
+    pending: [], unmappedComponents: []
+  };
+  // 发射器：shifted 也不能缺格子尺寸。
+  const layoutPath = writeJson("shifted-layout.json", layout);
+  const typesPath = writeJson("shifted-types.json", types);
+  const outXaml = path.join(tmp, "shifted", "View.xaml");
+  const emit = spawnSync(process.execPath, [
+    path.join(SCRIPT_DIR, "adapters", "mw-wpf", "gen-mw-wpf-xaml.js"),
+    "--layout", layoutPath, "--types", typesPath, "--map", ROUTE_MAP,
+    "--page", "P", "--x-class", "X.P", "--assembly", "X", "--out", outXaml, "--overwrite"
+  ], { encoding: "utf8" });
+  assert.notStrictEqual(emit.status, 0, "shifted 格子缺格子宽时发射器必须失败");
+  assert.match(emit.stderr + emit.stdout, /缺少设计稿格子宽/, "失败信息必须点名缺的是格子宽");
+
+  // 门禁：同样必须失败（重算值有机械真值，不能静默放过）。
+  const reportPath = writeJson("shifted-report.json", {
+    designBox: [{ ref: "moved", container: false, attrs: {} }]
+  });
+  const outGate = path.join(tmp, "shifted-gate.json");
+  const gate = spawnSync(process.execPath, [CHECK, "--layout", layoutPath, "--types", typesPath, "--map", ROUTE_MAP,
+    "--xaml-report", reportPath, "--json", outGate], { encoding: "utf8" });
+  assert.strictEqual(gate.status, 2, "shifted 格子缺格子宽时门禁必须失败");
+  const gateReport = JSON.parse(fs.readFileSync(outGate, "utf8"));
+  assert.ok(gateReport.findings.some(function (item) { return item.rule === "R14" && /没有登记格子宽/.test(item.message); }),
+    "R14 必须报出 shifted 格子缺格子宽");
+}
+
 console.log("design-box.test.js: 全部通过");

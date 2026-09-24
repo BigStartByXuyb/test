@@ -178,7 +178,7 @@ function checkDesignBoxes(layout, emission) {
           report("R14", cell.ref, label + "与行列定义重算不一致：产物 " + size + "，重算 " + recomputed);
         }
       });
-      if (!cell.shifted && (!(cell.nodeWidth > 0) || !(cell.nodeHeight > 0))) {
+      if (!(cell.nodeWidth > 0) || !(cell.nodeHeight > 0)) {
         report("R14", cell.ref, "布局产物没有登记承载物设计尺寸（nodeWidth / nodeHeight）");
       }
       const expected = designBoxAttrs(cell);

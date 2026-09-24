@@ -170,11 +170,11 @@ function indentOf(depth) { return "    ".repeat(depth); }
 
 // 格子契约：设计稿格子尺寸必须由布局推导登记（跨格累加 + 收尾星号带残差）。缺了就没法表达
 // "格子尺寸 − 控件尺寸 = 间距"，宁可停在这里，也不要发射一个尺寸静默丢失的页面。
-// 例外有两类，都由推导登记在格子上（按维判定，只免掉真正没有真值的那一维）：
-//   cell.shifted（为避让撞格被挪出设计带）——没有偏移真值，只写控件自身尺寸、不写对齐；
-//   cell.unsized = {width?,height?}（该维算不出正数格子尺寸，内容溢出承载物）——该维什么都不写。
+// 例外有两类，都按维判定（只免掉真正没有真值的那一维）：
+//   cell.shifted（为避让撞格被挪出设计带）——没有偏移真值，只写控件自身尺寸、不表达间距/对齐，
+//     但格子尺寸照登记、缺了照样在这里失败（它照样会被写成 Width/Height）；
+//   cell.unsized = {width?,height?}（该维算不出正数格子尺寸，内容溢出承载物）——该维允许缺尺寸。
 function assertDesignBox(cell) {
-  if (cell.shifted) return;
   const unsized = cell.unsized || {};
   if (!(cell.width > 0) && !unsized.width) {
     fail("格子缺少设计稿格子宽（width）: " + cell.ref +
