@@ -74,7 +74,7 @@ flowchart LR
 | 容器嵌套 | `apply-container-containment.js` | **Bundle 默认自动调用**（在模板解析之后、语言键派生之前）：把命中 `childPolicy=nested-page-templates` 的容器按「坐标完全包含」重挂子控件、改写 `parent`/`layoutParent` 并重算 `expectedLeft/expectedTop`；报告 `Generated/<页面名>.nesting-report.json`；`manifest.nesting.enabled=false` 可关闭 |
 | Layout | `gen-mtslg-layout-manifest.js`、`gen-mtslg-layout.js` | 机械推导 `menuItems` 清单、发射/增量更新 Layout.xml |
 | 页面发射 | `gen-iocontrol-xml.js` | 发射页面 IOContorl XML（fresh / merge） |
-| 页面发射（作业A） | `adapters/mw-wpf/gen-mw-wpf-layout.js`、`adapters/mw-wpf/gen-mw-wpf-xaml.js` | 从类型判定 + DSL 结构推导 Grid 布局产物（分区 → 行列 → 格子），再按 A 写法表发射真控件 `View.xaml`（含本页 Icon 字典合并点）；框架固定区不发射 |
+| 页面发射（作业A） | `adapters/mw-wpf/gen-mw-wpf-layout.js`、`adapters/mw-wpf/gen-mw-wpf-xaml.js` | 从类型判定 + DSL 结构推导 Grid 布局产物（分区 → 行列 → 格子；声明的 flex 主轴显式成带：条目带 + 间隙带，间隙落成 Auto + 空 Grid 固定尺寸），再按 A 写法表发射真控件 `View.xaml`（含本页 Icon 字典合并点）；框架固定区不发射 |
 | 多语言 | `gen-mtslg-lang-keys-from-dsl.js`、`gen-mtslg-page-lang.js` | 派生语言键、发射 CN/EN 字典 |
 | 宿主 | `gen-mw-wpf-page.js` | 生成 View / code-behind / ViewModel 与 csproj 登记 |
 | 编排 | **`gen-mastergo-page-bundle.js`（主入口）** | 串起模板解析 → 容器嵌套重挂 → 语言键 → LangName → XML → 校验 → Icon → Layout → 宿主 → 最终校验 |

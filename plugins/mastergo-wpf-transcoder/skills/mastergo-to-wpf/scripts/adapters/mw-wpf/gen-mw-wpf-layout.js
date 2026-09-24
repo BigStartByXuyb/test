@@ -23,8 +23,11 @@
 //     nodeWidth / nodeHeight 承载物（控件 / 容器）自身设计稿尺寸
 //     offsetX / offsetY     承载物起点相对格子起点的偏移（撞格下移的格子不写）
 //     shifted:true          该格子由推导挪位（撞格下移），不是设计稿那条带（只免间距/对齐，未免尺寸）
-//     unsized:{width?,height?} 哪一维算不出正数格子尺寸（收尾星号带被前面的像素带吃光＝内容溢出承载物）
+//     unsized:{width?,height?} 哪一维算不出正数格子尺寸（自适应带被前面的固定带吃光＝内容溢出承载物）
+//     spacer:{axis,size}    间隙格（主轴上的空隙）：空 Grid 的固定宽/高，轴上的带是 Auto + gap
 //     发射器与门禁（R14）按 width/height/nodeWidth/nodeHeight/offsetX/offsetY 出尺寸与对齐。
+//   网格带：rows[] / columns[] 的每项是 {size:"Pixel"|"Star"|"Auto", value?/weight?/gap?, source:"design"|"gap"}；
+//     grid.owner = {ref,direction,gap,root} 记录该层对应的 flex 容器（主轴显式成带用它）。
 //   constraintExempt 由本脚本登记「本页不发射的带约束节点」（页面根 / 不可见 / 框架固定区）及原因，
 //   门禁据此把 R12 从失败降为提示（见 page-build-rules.md 第 5 节）。
 //
@@ -263,14 +266,21 @@ function buildFlexItems(entries, tree) {
       }
       items.push({
         ref: containerRef, container: true,
-        x: record.x, y: record.y, w: record.w, h: record.h, items: inner
+        x: record.x, y: record.y, w: record.w, h: record.h, items: inner,
+        flex: record.flex || null
       });
     });
     return items;
   };
   let items = build(null);
-  while (items.length === 1 && items[0].container && !carriesConstraints(tree, items[0].ref)) items = build(items[0].ref);
-  return items;
+  // 区域根网格不做 1×1 空壳：顶层是单容器链时把最内层提上来，同时记住那一层属于哪个容器
+  // —— 主轴显式成带要用它的 flex 方向与 gap。
+  let ownerRef = null;
+  while (items.length === 1 && items[0].container && !carriesConstraints(tree, items[0].ref)) {
+    ownerRef = items[0].ref;
+    items = build(ownerRef);
+  }
+  return { items: items, owner: ownerRef ? tree.byRef.get(ownerRef) : null };
 }
 
 // 只有"同一条带里出现 ≥2 个 flex 条目"才需要拆带：一个条目独占一条带时拆了也没有信息量。
@@ -310,8 +320,8 @@ function splitBands(bands, splitStarts) {
   return out;
 }
 
-// 尺寸照设计稿：一条带的尺寸 = 到下一带起始边的距离（最后一条用星号吃掉剩余空间）。
-// 只写"节点自身高度"会把设计稿里两条带之间的间隔压掉，位置就不再忠实。
+// 交叉轴（没有声明 flex 主轴的层级）：一条带的尺寸 = 到下一带起始边的距离（最后一条用星号吃掉剩余空间）。
+// 主轴改用 mainAxisSizes（条目带 + 间隙带显式成带），间距不再并进上一带。
 function bandSizes(bands, axis) {
   return bands.map(function (band, index) {
     const next = bands[index + 1];
@@ -320,15 +330,121 @@ function bandSizes(bands, axis) {
   });
 }
 
-// 格子尺寸照设计稿：像素带照值；唯一的收尾星号带 = 本网格可用尺寸 − 其余像素带之和。
+// ---------- 主轴带（声明了 flex 主轴的容器）----------
+// 声明的 flex 主轴不再"按起点聚类、间距并进上一带"，而是显式成带：条目带与间隙带交替。
+// 间隙带 = DSL gap，单位置放一个空 Grid（列方向写固定 Width、行方向写固定 Height），该带的行列定义用 Auto。
+// 列宽策略（主轴是 row）：固定项照设计稿像素，其余自适应（单个 → 裸星号；多个 → 按设计稿比例加权星号）。
+// 固定项 = 子树里只有相机控件的条目（相机所在的 Grid），或**区域根网格里**贴主轴末端的最末条目（页面常驻右栏）。
+// 行高策略（主轴是 column）：条目行照设计稿像素 + 间隙行（上下间隙与左右一致），不动条目行。
+const GAP_MIN = 1;
+
+function itemControlTypes(item) {
+  const types = [];
+  (function walk(node) {
+    if (node.controlType) types.push(node.controlType);
+    (node.items || []).forEach(walk);
+  })(item);
+  return types;
+}
+
+// 相机所在的 Grid：条目本身是相机控件，或它的子树里只有相机（相机链 / 只为相机服务的容器）。
+function cameraOnlyItem(item) {
+  const types = itemControlTypes(item);
+  return types.length > 0 && types.every(function (type) { return type === "Camera"; });
+}
+
+function mainAxisBands(items, owner) {
+  const horizontal = owner.direction === "row";
+  const along = function (item) { return horizontal ? item.x : item.y; };
+  const extent = function (item) { return horizontal ? item.w : item.h; };
+  const record = owner.record;
+  const containerEnd = horizontal ? record.x + record.w : record.y + record.h;
+  const ordered = items.slice().sort(function (a, b) { return along(a) - along(b); });
+  const bands = [];
+  // 同一起点（同一列 / 同一行）的条目合并成同一条带：它们共用一条定义，靠撞格下移落到不同交叉带。
+  ordered.forEach(function (item) {
+    const start = along(item);
+    const size = Math.max(1, Math.round(extent(item)));
+    const last = bands[bands.length - 1];
+    if (last && last.kind === "item" && Math.abs(last.start - start) <= EPSILON) {
+      last.items.push(item);
+      last.end = Math.max(last.end, start + size);
+      last.size = Math.max(last.size, size);
+      last.fixed = last.fixed || cameraOnlyItem(item);
+      return;
+    }
+    bands.push({
+      kind: "item", items: [item], start: start, end: start + size, size: size,
+      fixed: cameraOnlyItem(item)
+    });
+  });
+  // 页面常驻右栏判据（只在区域根网格）：贴主轴末端的那条粒子带固定。
+  if (owner.root && bands.length) {
+    const last = bands[bands.length - 1];
+    if (Math.abs(last.end - containerEnd) <= EPSILON) last.fixed = true;
+  }
+  // 条目带之间插间隙带：尺寸 = 设计稿的实测间距（flex 行/列的声明 gap 就体现在这里）。
+  const withGaps = [];
+  bands.forEach(function (band, index) {
+    withGaps.push(band);
+    const next = bands[index + 1];
+    if (!next) return;
+    const gap = Math.round(next.start - band.end);
+    if (gap > GAP_MIN) withGaps.push({ kind: "gap", items: [], start: band.end, end: next.start, gap: gap });
+  });
+  return withGaps;
+}
+
+// 主轴带的尺寸：行（主轴 column）照设计稿像素；列（主轴 row）里固定项照设计稿像素、
+// 容器条目自适应（多个按设计稿比例加权）、叶子控件照设计稿像素；间隙带一律 Auto（由空 Grid 的固定尺寸决定）。
+function mainAxisSizes(bands, direction) {
+  const autoItems = bands.filter(function (band) {
+    return band.kind === "item" && direction === "row" && !band.fixed && isAutoItem(band.items[0]);
+  });
+  return bands.map(function (band) {
+    if (band.kind === "gap") return { size: "Auto", source: "gap", gap: band.gap };
+    if (direction !== "row") return { size: "Pixel", value: band.size, source: "design" };
+    if (band.fixed || !isAutoItem(band.items[0])) return { size: "Pixel", value: band.size, source: "design" };
+    return autoItems.length > 1
+      ? { size: "Star", weight: band.size, source: "design" }
+      : { size: "Star", source: "design" };
+  });
+}
+
+// 自适应条目 = 容器（中间区就是容器）；叶子控件保持设计稿像素，避免窗口缩放时被拉变形。
+function isAutoItem(item) {
+  return Boolean(item && item.container);
+}
+
+// 成层容器的 flex 描述（方向 / gap / 绝对 bbox）：主轴显式成带用它；没有 flex 声明时返回 null。
+function flexOwnerOf(record) {
+  const direction = record && record.flex && record.flex.flexDirection;
+  if (direction !== "row" && direction !== "column") return null;
+  return {
+    ref: record.ref, direction: direction, record: record,
+    gap: Math.max(0, Math.round(Number(String((record.flex && record.flex.gap) || "0").replace(/[^\d.-]/g, "")) || 0))
+  };
+}
+
+// 格子尺寸照设计稿：像素带照值、间隙带照 gap；自适应带平分剩余（带权重的按权重分）。
 // 这样"格子尺寸 − 控件尺寸 = 间距"才有真值可对（星号带的残差是设计稿的剩余空间，不是猜的）。
 function bandExtents(sizes, available) {
   const fixed = sizes.map(function (item) {
-    return item && item.size === "Pixel" ? Number(item.value || 0) : null;
+    if (!item) return 0;
+    if (item.size === "Pixel") return Number(item.value || 0);
+    if (item.size === "Auto") return Number(item.gap || 0);
+    return null;
   });
   const used = fixed.reduce(function (total, value) { return total + (value || 0); }, 0);
+  const weight = sizes.reduce(function (total, item) {
+    return total + (item && item.size === "Star" ? Number(item.weight || 1) : 0);
+  }, 0);
   const rest = Math.max(0, Math.round(Number(available) || 0) - used);
-  return fixed.map(function (value) { return value === null ? rest : value; });
+  return fixed.map(function (value, index) {
+    if (value !== null) return value;
+    if (!weight) return rest;
+    return Math.round(rest * (Number(sizes[index].weight || 1) / weight));
+  });
 }
 
 function extentOf(extents, index, span) {
@@ -378,24 +494,46 @@ function buildContainmentTree(entries, containers, pending) {
 
 // 同层节点 → Grid（列按 x 区间重叠聚、行按起始边聚），容器节点带上自己的嵌套 Grid。
 // size 是本网格的可用尺寸（内容区 = 分区尺寸；嵌套网格 = 父格子尺寸）：收尾星号带的残差靠它算。
-function buildGridFrom(nodes, ctx, size) {
+// owner = 本网格对应的成层容器（{ref, direction, record}）：声明了 flex 主轴时，主轴按 owner 显式成带
+// （条目带 + 间隙带），交叉轴仍按聚类；没有 owner（或约束成层但无 flex 声明）时两轴都按聚类。
+function buildGridFrom(nodes, ctx, size, owner) {
   if (!nodes.length) return { rows: [], columns: [], cells: [] };
   const xOf = function (n) { return n.x; };
   const yOf = function (n) { return n.y; };
+  const direction = owner && owner.direction;
   // 列按 x 区间重叠聚（同一列的控件横向重叠）；行按**起始边**聚（容器跨多行是常态，
   // 按 y 区间重叠会把整页并成一行，位置就丢了）。
   const baseColumns = clusterByOverlap(nodes, xOf, function (n) { return Math.max(n.w, 1); });
   const baseRows = clusterBands(nodes, yOf, function (n) { return Math.max(n.h, 1); });
   // 设计稿声明了 flex 主轴的地方，主轴上的每个条目独占一条带——否则"同一行横向排列的条目
   // 被并进同一条列带"后会被撞格规则竖排（设计稿语义丢失）。没有声明的层级仍按上面的聚类。
-  const columns = splitBands(baseColumns, flexSplitStarts(baseColumns, nodes, ctx.dslTree, "column"));
-  const rows = splitBands(baseRows, flexSplitStarts(baseRows, nodes, ctx.dslTree, "row"));
+  const mainBands = direction ? mainAxisBands(nodes, owner) : null;
+  const columns = direction === "row" ? mainBands
+    : splitBands(baseColumns, flexSplitStarts(baseColumns, nodes, ctx.dslTree, "column"));
+  const rows = direction === "column" ? mainBands
+    : splitBands(baseRows, flexSplitStarts(baseRows, nodes, ctx.dslTree, "row"));
   const cells = [];
   // 落格阶段只决定"谁落在哪个格"；格子尺寸要等所有撞格插行做完再算（插行会把收尾星号行变成像素行，
   // 先算出来的尺寸会与最终行列定义不一致）。
   const childSets = [];
   const occupied = new Set();
-  let rowSizes = bandSizes(rows, "y");
+  let rowSizes = direction === "column" ? mainAxisSizes(rows, "column") : bandSizes(rows, "y");
+  const columnSizes = direction === "row" ? mainAxisSizes(columns, "row") : bandSizes(columns, "x");
+  // 间隙带独立成格：格子里放一个空 Grid（列方向固定宽 / 行方向固定高），尺寸 = DSL gap。
+  // 先占位再排条目，撞格下移会绕开间隙格；跨格数等行列定义定稿后再补。
+  const spacerCells = [];
+  if (mainBands) {
+    mainBands.forEach(function (band, index) {
+      if (band.kind !== "gap") return;
+      spacerCells.push({
+        ref: "gap:" + owner.ref + ":" + index,
+        spacer: { axis: direction === "row" ? "column" : "row", size: band.gap },
+        row: direction === "row" ? 0 : index,
+        column: direction === "row" ? index : 0
+      });
+    });
+    spacerCells.forEach(function (cell) { occupied.add(cell.row + ":" + cell.column); });
+  }
   // 撞格时在收尾星号行之前插入一个像素行（保留"最后一行吃剩余空间"的形态）。
   const appendRow = function (node) {
     const tailIsStar = rowSizes.length && rowSizes[rowSizes.length - 1].size === "Star";
@@ -443,10 +581,23 @@ function buildGridFrom(nodes, ctx, size) {
     cells.push(cell);
     childSets.push(childNodes);
   });
+  // 间隙格：跨满交叉轴（列方向的间隙跨所有行、行方向的间隙跨所有列），不带控件类型、不带尺寸约束。
+  spacerCells.forEach(function (cell) {
+    if (cell.spacer.axis === "column") {
+      cell.rowSpan = Math.max(1, rowSizes.length);
+      cell.columnSpan = 1;
+    } else {
+      cell.rowSpan = 1;
+      cell.columnSpan = Math.max(1, columnSizes.length);
+    }
+    cells.push(cell);
+    childSets.push([]);
+  });
   // 第二遍：按最终行列定义算每格的格子尺寸（跨格累加 + 收尾星号带残差），再递归内层网格。
-  const columnExtents = bandExtents(bandSizes(columns, "x"), size && size.w);
+  const columnExtents = bandExtents(columnSizes, size && size.w);
   const rowExtents = bandExtents(rowSizes, size && size.h);
   cells.forEach(function (cell, index) {
+    if (cell.spacer) return;   // 间隙格没有承载物：尺寸由它自己的固定宽/高表达
     const cellWidth = extentOf(columnExtents, cell.column, cell.columnSpan);
     const cellHeight = extentOf(rowExtents, cell.row, cell.rowSpan);
     // 算不出正数的格子尺寸（收尾星号带被前面的像素带吃光：设计稿内容溢出了承载物）→ 登记 unsized，
@@ -457,13 +608,14 @@ function buildGridFrom(nodes, ctx, size) {
     if (cellHeight > 0) cell.height = cellHeight;
     else unsized.height = true;
     if (Object.keys(unsized).length) cell.unsized = unsized;
-    if (childSets[index].length) cell.children = buildGridFrom(childSets[index], ctx, contentSizeOf(cell));
+    if (childSets[index].length) {
+      const childRecord = ctx.dslTree && ctx.dslTree.byRef.get(cell.ref);
+      cell.children = buildGridFrom(childSets[index], ctx, contentSizeOf(cell), flexOwnerOf(childRecord));
+    }
   });
-  return {
-    rows: rowSizes,
-    columns: bandSizes(columns, "x"),
-    cells: cells
-  };
+  const grid = { rows: rowSizes, columns: columnSizes, cells: cells };
+  if (owner && owner.direction) grid.owner = { ref: owner.ref, direction: owner.direction, gap: owner.gap, root: Boolean(owner.root) };
+  return grid;
 }
 
 // 内层网格的可用尺寸＝本格承载物（容器 / 被容纳控件）的设计稿尺寸：它会被写成 Width/Height，
@@ -477,7 +629,11 @@ function contentSizeOf(cell) {
 
 function buildRegionGrid(entries, containers, pending, dslTree, size) {
   const tree = buildContainmentTree(entries, containers, pending);
-  return buildGridFrom(buildFlexItems(tree.roots, dslTree), { childrenOf: tree.childrenOf, dslTree: dslTree }, size);
+  const flex = buildFlexItems(tree.roots, dslTree);
+  const owner = flexOwnerOf(flex.owner);
+  // 区域根网格是页面内容区那一层：页面常驻右栏（贴主轴末端的最末条目）在这一层固定。
+  if (owner) owner.root = true;
+  return buildGridFrom(flex.items, { childrenOf: tree.childrenOf, dslTree: dslTree }, size, owner);
 }
 
 // 区间重叠聚类：x/y 区间相交的算同一条带。用于"互不包含"的同层节点——

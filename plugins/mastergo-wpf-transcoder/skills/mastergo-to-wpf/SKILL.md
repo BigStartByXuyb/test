@@ -74,7 +74,7 @@ description: 将明确要求的 MasterGo 设计稿转换为 MTSLG IOContorl XML�
 | 11 | `gates` | 严格门禁（审计逐条断言） |
 | 12 | `verify` | 四项独立验证（provenance / 坐标 / Icon / 结构） |
 
-- **作业 A 的差异**（步骤号与名称不变，步内命令与产物不同）：第 5 步 = 共享类型判定（只读共享类型表，产出 `Generated/<Target>.component-types.json`）；第 8 步 = 共用 Layout 清单推导 **+** 布局产物推导 `Generated/<Target>.wpf-layout.json`（分区 → 行列 → 格子；格子登记设计稿尺寸与控件在格内的偏移）；第 10 步 = 真控件 `View.xaml`（含本页 Icon 字典合并点）+ 宿主壳 + 本页 Icon/语言字典 + Layout 注册，**不发射 IOContorl 页面 XML**；第 11/12 步 = 布局门禁（越界 / 锚点格冲突 / 禁止类型 / 尺寸来源 / 协议 / 资源键 / 硬编码文本 / 尺寸约束一致性与落格 / 格子尺寸与尺寸·对齐发射；失败与提示的逐条口径见 `references/adapters/mw-wpf/page-build-rules.md` 第 4 节，布局规则见 `references/adapters/mw-wpf/mw-wpf-mode.md` 第 2 节，此处不复述）。第 1–4、6、7、9 步两条路线沿用同一套。
+- **作业 A 的差异**（步骤号与名称不变，步内命令与产物不同）：第 5 步 = 共享类型判定（只读共享类型表，产出 `Generated/<Target>.component-types.json`）；第 8 步 = 共用 Layout 清单推导 **+** 布局产物推导 `Generated/<Target>.wpf-layout.json`（分区 → 行列 → 格子；声明的主轴显式成带：条目带 + 间隙带，格子登记设计稿尺寸与控件在格内的偏移）；第 10 步 = 真控件 `View.xaml`（含本页 Icon 字典合并点）+ 宿主壳 + 本页 Icon/语言字典 + Layout 注册，**不发射 IOContorl 页面 XML**；第 11/12 步 = 布局门禁（越界 / 锚点格冲突 / 禁止类型 / 尺寸来源 / 协议 / 资源键 / 硬编码文本 / 尺寸约束一致性与落格 / 格子尺寸与尺寸·对齐发射；失败与提示的逐条口径见 `references/adapters/mw-wpf/page-build-rules.md` 第 4 节，布局规则见 `references/adapters/mw-wpf/mw-wpf-mode.md` 第 2 节，此处不复述）。第 1–4、6、7、9 步两条路线沿用同一套。
 
 - **每一步的输入 / 产物 / 失败语义 / 怎么修：`references/adapters/mtslg-iocontrol/pipeline-contract.md`**。该文件由 `run-all.ps1` 的步骤定义生成（`node scripts/core/gen-pipeline-contract.mjs`），**真值源是脚本**；要改契约就改脚本再重新生成，手改文档会挂测试。
 - 运行登记表：`<项目>/Generated/runs/<Target>/run.json`，规则是「**产出即登记、消费只按登记取、未登记的旧同名文件一律拒绝**」；清单里的采集输入（`dslPath` / `visibilityPath` / `svgPath`）都从登记表解析并校验 `sha256`。断点续跑用 `-Progress <步骤名>`（续跑的身份与登记表口径、可改语义输入见 `references/adapters/mtslg-iocontrol/bundle-manifest.md` 第 7 节）。
@@ -113,7 +113,7 @@ pwsh -NoProfile -File <skill>\scripts\entry\run-all.ps1 -List -Format json -OutF
 
 作业 A（`-Mode mw-wpf`）另有这些硬门禁，细则见对应 reference：
 
-- **尺寸照设计稿，外观只走样式族**：Grid 行列、控件尺寸与对齐都照设计稿（格子尺寸 − 控件尺寸 = 间距，差值落在哪一侧由设计稿偏移决定，唯一实现 `scripts/lib/design-box.js`）；配色、边框、状态、模板一律用样式族键，设计稿与样式族冲突时停下报告，不得散写属性凑 → `references/adapters/mw-wpf/mw-wpf-mode.md`
+- **尺寸照设计稿，外观只走样式族**：Grid 行列、控件尺寸与对齐都照设计稿；间距是独立的间隙带（`Auto` + 空的固定尺寸 Grid），列宽固定项（相机所在 Grid / 区域根网格里贴主轴末端的最末条目＝常驻右栏）照设计稿像素、容器条目自适应、叶子控件照设计稿像素（根：`scripts/lib/design-box.js` 与 `mw-wpf-mode.md` 第 2 节第 3 条）；配色、边框、状态、模板一律用样式族键，设计稿与样式族冲突时停下报告，不得散写属性凑 → `references/adapters/mw-wpf/mw-wpf-mode.md`
 - **框架固定区不进页面**：顶部栏 / 底部栏由框架渲染（尺寸用框架 Token），设计稿里的对应区域只用于生成 Layout 注册与菜单项；设计稿的右下角常驻分组与 IOContorl 同口径（不发射 / 不计格 / 不登记图标）→ `references/adapters/mw-wpf/mw-wpf-mode.md`
 - **页面必须合并本页 Icon 字典**：A 页面用 `{StaticResource …Geometry}` 引用图形，缺合并点会在加载期抛 `XamlParseException` → `references/adapters/mw-wpf/page-build-rules.md`
 - **无对应条目的类型 fail-closed**：写法表把 `Border` 登记为待确认（A 侧没有 Border 控件），遇到即挂待确认、不发射；`Camera` 是 `manual-only`（手册与真实页面都没有该控件，仅用户确认作业A 侧就是 `s:Camera`），可以发射，首次用新框架生成后回填手册条目 → `references/adapters/mw-wpf/mw-wpf-map.json`

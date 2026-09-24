@@ -3,8 +3,9 @@
 
 // 作业A（mw-wpf）布局推导回归：设计稿声明的 flex 主轴必须参与分格，没有声明才回退坐标聚类。
 // 锁定四件事：
-//   1) 容器声明 flexDirection=row 时，主轴上的每个条目独占一条列带（尺寸=相邻起点差，末带 Star）；
-//   2) 容器声明 flexDirection=column 时同理拆行；
+//   1) 容器声明 flexDirection=row 时，主轴显式成带：条目带（固定项照设计稿像素、容器条目自适应）
+//      + 间隙带（尺寸=实测间距，落成 Auto 带 + 空 Grid 固定尺寸）；
+//   2) 容器声明 flexDirection=column 时同理拆行（行照设计稿像素 + 间隙行）；
 //   3) 没有 flex 声明的层级仍按 x 区间重叠聚类（同一条列带里的控件靠撞格下移）；
 //   4) 落格按「起始边」判定，横跨多行的控件不会把整页算进第一行。
 // 另：成层容器（设计稿声明的 flex 容器，或带尺寸约束的容器）在页面里要保留层级——容器 = 一层 Grid，≥2 条目的容器成层，
@@ -77,7 +78,11 @@ function cellOf(region, ref) {
 }
 
 function sizes(bands) {
-  return bands.map(function (band) { return band.size === "Star" ? "Star" : band.value; });
+  return bands.map(function (band) {
+    if (band.size === "Star") return band.weight ? "Star*" + band.weight : "Star";
+    if (band.size === "Auto") return "Auto(" + band.gap + ")";
+    return band.value;
+  });
 }
 
 // ---------- 1. flexDirection=row：条目独占一条列带 ----------
@@ -103,13 +108,18 @@ function sizes(bands) {
   assert.strictEqual(region.grid.cells.length, 2, "区域根网格 = 标签 + 容器层");
   const boxCell = region.grid.cells.filter(function (cell) { return cell.container; })[0];
   assert.ok(boxCell && boxCell.children, "row 容器成层，带内层 Grid");
-  assert.deepStrictEqual(sizes(boxCell.children.columns), [160, 160, "Star"],
-    "容器内三个条目各占一条列带，尺寸取相邻起点差");
+  assert.deepStrictEqual(sizes(boxCell.children.columns), [120, "Auto(40)", 120, "Auto(40)", 120],
+    "条目带照设计稿尺寸、间隙带独立成带（Auto + 空 Grid 固定 40）");
   assert.strictEqual(boxCell.children.rows.length, 1, "三个条目同一行 → 内层只有一行");
   assert.strictEqual(layout.pending.length, 0, "不得有待确认项");
-  const inner = boxCell.children.cells;
-  assert.deepStrictEqual([inner[0].column, inner[1].column, inner[2].column], [0, 1, 2], "三个条目必须落在三条列带上");
-  assert.deepStrictEqual([inner[0].row, inner[1].row, inner[2].row], [0, 0, 0], "三个条目必须在同一行");
+  const items = boxCell.children.cells.filter(function (cell) { return !cell.spacer; });
+  const spacers = boxCell.children.cells.filter(function (cell) { return cell.spacer; });
+  assert.deepStrictEqual(spacers.map(function (cell) { return [cell.spacer.axis, cell.spacer.size]; }), [["column", 40], ["column", 40]],
+    "两条间隙格各带固定尺寸 40（空 Grid 固定宽）");
+  assert.deepStrictEqual(items.map(function (cell) { return cell.column; }), [0, 2, 4],
+    "三个条目落在条目带上（间隙带插在中间）");
+  assert.deepStrictEqual(items.map(function (cell) { return cell.row; }), [0, 0, 0], "三个条目必须在同一行");
+  const inner = items;
   assert.strictEqual(cellOf(region, "wideLabel").row, 0, "上方的标签落在第一行");
   assert.strictEqual(inner[1].columnSpan, 1, "单个条目的占格不跨列");
 }
@@ -145,18 +155,22 @@ function sizes(bands) {
   const colBox = node("colBox", "FRAME", { width: 200, height: 120, relativeX: 700, relativeY: 215 },
     [
       node("rowA", "INSTANCE", { width: 200, height: 60, relativeX: 0, relativeY: 0 }),
-      node("rowB", "INSTANCE", { width: 200, height: 60, relativeX: 0, relativeY: 6 })
+      node("rowB", "INSTANCE", { width: 200, height: 60, relativeX: 0, relativeY: 66 })
     ],
     { flexContainerInfo: { flexDirection: "column", gap: "6px" } });
   const layout = derive(snapshot([], [colBox]),
     typesOf([
       { ref: "rowA", controlType: "IconButton", absX: 700, absY: 300, w: 200, h: 60 },
-      { ref: "rowB", controlType: "IconButton", absX: 700, absY: 306, w: 200, h: 60 }
+      { ref: "rowB", controlType: "IconButton", absX: 700, absY: 366, w: 200, h: 60 }
     ]));
   const region = workArea(layout);
 
   // 区域根网格是"单容器链"时把最内层提上来：根网格直接就是该容器的两个条目。
-  assert.deepStrictEqual(sizes(region.grid.rows), [6, "Star"], "column 容器的条目必须各占一条行带");
+  assert.deepStrictEqual(sizes(region.grid.rows), [60, "Auto(6)", 60],
+    "column 容器：条目行照设计稿像素 + 上下间隙独立成带（Auto + 空 Grid 固定 6）");
+  assert.deepStrictEqual(region.grid.cells.filter(function (cell) { return cell.spacer; })
+    .map(function (cell) { return [cell.spacer.axis, cell.spacer.size]; }), [["row", 6]],
+    "行方向间隙用空 Grid 固定高");
   assert.notStrictEqual(cellOf(region, "rowA").row, cellOf(region, "rowB").row, "两个条目不得挤在同一行");
 }
 
@@ -202,17 +216,24 @@ function sizes(bands) {
   const region = workArea(layout);
 
   // 区域根网格 = 外层 row 容器的两个条目：相机（singleWrap 已展平）+ 竖排容器
-  assert.strictEqual(region.grid.cells.length, 2, "区域根网格应有两个条目");
+  assert.strictEqual(region.grid.cells.filter(function (cell) { return !cell.spacer; }).length, 2, "区域根网格应有两个条目");
+  assert.strictEqual(region.grid.cells.filter(function (cell) { return cell.spacer; }).length, 1, "两个条目之间应有一条间隙带");
   const cameraCell = cellOf(region, "camera");
   assert.strictEqual(cameraCell.container, undefined, "相机是控件格子");
+  assert.deepStrictEqual(sizes(region.grid.columns).slice(0, 1), [600], "相机所在列固定成设计稿像素");
+  assert.strictEqual(sizes(region.grid.columns)[2], "Star", "非固定条目（容器）自适应");
   const columnCell = region.grid.cells.filter(function (cell) { return cell.container; });
   assert.strictEqual(columnCell.length, 1, "≥2 条目的容器必须成层");
   assert.strictEqual(columnCell[0].ref, "column", "成层的是竖排容器");
   assert.notStrictEqual(cameraCell.column, columnCell[0].column, "两个条目分列");
   assert.ok(columnCell[0].children, "容器格子必须带内层 Grid");
-  assert.strictEqual(columnCell[0].children.cells.length, 2, "内层 Grid 装容器自己的两个条目");
-  assert.deepStrictEqual(columnCell[0].children.cells.map(function (cell) { return cell.ref; }), ["labelA", "labelB"],
+  const innerItems = columnCell[0].children.cells.filter(function (cell) { return !cell.spacer; });
+  assert.strictEqual(innerItems.length, 2, "内层 Grid 装容器自己的两个条目");
+  assert.deepStrictEqual(innerItems.map(function (cell) { return cell.ref; }), ["labelA", "labelB"],
     "内层条目的顺序与设计稿一致");
-  assert.strictEqual(columnCell[0].children.rows.length, 2, "column 容器的两个条目各占一行");
+  assert.strictEqual(columnCell[0].children.cells.filter(function (cell) { return cell.spacer; }).length, 1,
+    "内层两个条目之间有一条间隙带");
+  assert.deepStrictEqual(sizes(columnCell[0].children.rows), [16, "Auto(24)", 16],
+    "内层 column 容器：条目行照设计稿像素 + 间隙行");
 }
 

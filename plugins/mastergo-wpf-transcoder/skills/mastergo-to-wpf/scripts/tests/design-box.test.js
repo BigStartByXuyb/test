@@ -62,19 +62,17 @@ function node(id, type, style, children, extra) {
     { Width: "140" }, "没有偏移来源：只写尺寸，不猜对齐");
 }
 
-// ── ② 布局推导：像素带 / 星号带残差 / 跨格累加 / 容器内层可用尺寸 = 容器自身设计尺寸 ──
+// ── ② 布局推导：主轴条目带 + 间隙带（空 Grid 固定尺寸）/ 交叉轴聚类 ──────────────────
 {
   const dsl = {
     dsl: {
       nodes: [node("root", "FRAME", { width: 1280, height: 1024, relativeX: 0, relativeY: 0 }, [
         node("body", "FRAME", { width: 1280, height: 902, relativeX: 0, relativeY: 85 }, [
-          // 容器 600×320：列 0 / 200 两条带（星号残差 400），行 120 / 120 / 星号残差 80。
+          // 容器 600×320，column + gap 40：行 = 条目行 80 ×3 + 间隙行 40 ×2。
           node("col", "FRAME", { width: 600, height: 320, relativeX: 0, relativeY: 0 }, [
             node("b1", "TEXT", { width: 170, height: 80, relativeX: 0, relativeY: 0 }),
             node("b2", "TEXT", { width: 170, height: 80, relativeX: 0, relativeY: 120 }),
-            node("b3", "TEXT", { width: 170, height: 80, relativeX: 0, relativeY: 240 }),
-            // 跨两行（120 + 120 = 240 = 自身高度），列落在星号带里（400 宽 > 自身 300）。
-            node("big", "TEXT", { width: 300, height: 240, relativeX: 200, relativeY: 0 })
+            node("b3", "TEXT", { width: 170, height: 80, relativeX: 0, relativeY: 240 })
           ], { flexContainerInfo: { flexDirection: "column", gap: "40px" } }),
           // 第二个顶层条目：让内容区不会把容器链收口掉（收口后容器就没有自己的格子了）。
           node("side", "TEXT", { width: 140, height: 48, relativeX: 700, relativeY: 0 })
@@ -87,7 +85,6 @@ function node(id, type, style, children, extra) {
       ["b1", { ref: "b1", controlType: "IconButton", absX: 0, absY: 85, w: 170, h: 80 }],
       ["b2", { ref: "b2", controlType: "IconButton", absX: 0, absY: 205, w: 170, h: 80 }],
       ["b3", { ref: "b3", controlType: "IconButton", absX: 0, absY: 325, w: 170, h: 80 }],
-      ["big", { ref: "big", controlType: "TextBlock", absX: 200, absY: 85, w: 300, h: 240 }],
       ["side", { ref: "side", controlType: "TextBlock", absX: 700, absY: 85, w: 140, h: 48 }]
     ])
   };
@@ -96,12 +93,26 @@ function node(id, type, style, children, extra) {
     tokens: { headerHeight: 85, bottomHeight: 180 }, pageTarget: "P", visibility: null
   });
   const cells = new Map();
+  const grids = [];
   (function walk(grid) {
+    grids.push(grid);
     grid.cells.forEach(function (item) {
       cells.set(item.ref, item);
       if (item.children) walk(item.children);
     });
   })(derived.regions.find(function (region) { return region.emit !== false; }).grid);
+
+  const containerGrid = grids.find(function (grid) { return grid.owner && grid.owner.direction === "column"; });
+  assert.ok(containerGrid, "容器的内层网格必须登记 owner（flex 方向与 gap）");
+  assert.deepStrictEqual(containerGrid.owner, { ref: "col", direction: "column", gap: 40, root: false },
+    "owner 记录容器 ref / 方向 / gap");
+  assert.deepStrictEqual(containerGrid.rows.map(function (band) {
+    return band.size === "Auto" ? "Auto(" + band.gap + ")" : band.value;
+  }), [80, "Auto(40)", 80, "Auto(40)", 80], "主轴成带：条目行照设计稿像素 + 间隙行（Auto）");
+  const rowSpacers = containerGrid.cells.filter(function (cell) { return cell.spacer; });
+  assert.deepStrictEqual(rowSpacers.map(function (cell) { return [cell.spacer.axis, cell.spacer.size]; }),
+    [["row", 40], ["row", 40]], "上下间隙 = 空 Grid 固定高 40");
+  assert.strictEqual(rowSpacers[0].controlType, undefined, "间隙格里没有控件类型");
 
   const column = cells.get("col");
   assert.strictEqual(column.container, true, "容器成层");
@@ -115,21 +126,13 @@ function node(id, type, style, children, extra) {
     { Width: "140", Height: "48", HorizontalAlignment: "Left", VerticalAlignment: "Top" },
     "顶层控件同样照格子与自身尺寸的差写属性");
 
-  assert.strictEqual(cells.get("b1").height, 120, "行 1 = 控件 80 + 间距 40");
+  assert.strictEqual(cells.get("b1").height, 80, "条目行 = 控件自身高度（间距不再并进行高）");
   assert.strictEqual(cells.get("b1").offsetY, 0, "控件贴带起点");
   assert.deepStrictEqual(designBoxAttrs(cells.get("b1")),
-    { Width: "170", Height: "80", HorizontalAlignment: "Left", VerticalAlignment: "Top" },
-    "控件写自身尺寸 + 贴起始边（间距留在下方）");
-  assert.strictEqual(cells.get("b3").height, 80, "末带星号残差 = 可用高 − 前面像素带");
+    { Width: "170", HorizontalAlignment: "Left" },
+    "控件写自身尺寸 + 贴起始边（高度与格子相等 → 不写 Height）");
   assert.deepStrictEqual(designBoxAttrs(cells.get("b3")), { Width: "170", HorizontalAlignment: "Left" },
-    "格子高与控件高相等 → 不写 Height");
-
-  const big = cells.get("big");
-  assert.strictEqual(big.height, 240, "跨格按 span 累加（120 + 120）");
-  assert.strictEqual(big.width, 400, "跨列落在星号带里按残差算");
-  assert.deepStrictEqual(designBoxAttrs(big),
-    { Width: "300", HorizontalAlignment: "Left" },
-    "跨格后高度相等 → 只写宽与左对齐");
+    "末条条目带同样照设计稿（不再被星号撑开）");
 }
 
 // ── ③ 发射器：属性落到 XAML，并逐格进发射报告 ────────────────────────────────────
@@ -222,17 +225,21 @@ function node(id, type, style, children, extra) {
 // ── ⑤ 格子算不出正数尺寸（内容溢出承载物）→ unsized：不写尺寸/对齐，门禁按提示登记 ─────
 {
   const dsl = { dsl: { nodes: [node("root", "FRAME", { width: 1280, height: 1024, relativeX: 0, relativeY: 0 }, [
-    // 容器只有 100 宽，第二个子控件却从 150 开始 → 收尾星号带被吃光。
+    // 容器只有 100 宽：条目 40 + 间隙 70 已经 110 > 100 → 自适应的容器列算不出正数。
     node("box", "FRAME", { width: 100, height: 60, relativeX: 0, relativeY: 0 }, [
       node("a", "TEXT", { width: 40, height: 16, relativeX: 0, relativeY: 0 }),
-      node("b", "TEXT", { width: 40, height: 16, relativeX: 150, relativeY: 0 })
-    ], { flexContainerInfo: { flexDirection: "row" } }),
+      node("y", "FRAME", { width: 300, height: 20, relativeX: 110, relativeY: 0 }, [
+        node("y1", "TEXT", { width: 80, height: 16, relativeX: 0, relativeY: 0 }),
+        node("y2", "TEXT", { width: 80, height: 16, relativeX: 0, relativeY: 20 })
+      ], { flexContainerInfo: { flexDirection: "column" } })
+    ], { flexContainerInfo: { flexDirection: "row", gap: "70px" } }),
     node("side", "TEXT", { width: 40, height: 16, relativeX: 300, relativeY: 0 })
   ])] } };
   const types = {
     byRef: new Map([
       ["a", { ref: "a", controlType: "TextBlock", absX: 0, absY: 85, w: 40, h: 16 }],
-      ["b", { ref: "b", controlType: "TextBlock", absX: 150, absY: 85, w: 40, h: 16 }],
+      ["y1", { ref: "y1", controlType: "TextBlock", absX: 110, absY: 85, w: 80, h: 16 }],
+      ["y2", { ref: "y2", controlType: "TextBlock", absX: 110, absY: 105, w: 80, h: 16 }],
       ["side", { ref: "side", controlType: "TextBlock", absX: 300, absY: 85, w: 40, h: 16 }]
     ])
   };
@@ -244,17 +251,20 @@ function node(id, type, style, children, extra) {
   (function walk(grid) {
     grid.cells.forEach(function (item) { cells.set(item.ref, item); if (item.children) walk(item.children); });
   })(derived.regions.find(function (region) { return region.emit !== false; }).grid);
-  const overflow = cells.get("b");
+  const overflow = cells.get("y");
   assert.deepStrictEqual(overflow.unsized, { width: true }, "溢出带的格子必须按维登记 unsized");
   assert.strictEqual(overflow.width, undefined, "算不出正数尺寸时不写格子宽");
-  assert.deepStrictEqual(designBoxAttrs(overflow), { Height: "16", VerticalAlignment: "Top" },
+  assert.deepStrictEqual(designBoxAttrs(overflow), { Height: "20", VerticalAlignment: "Top" },
     "算不出的那一维不写，另一维照写");
 
   const layoutPath = writeJson("unsized-layout.json", derived);
   const typesPath = writeJson("unsized-types.json", { schemaVersion: 1, nodes: Array.from(types.byRef.values()), pending: [], unmappedComponents: [] });
   const reportPath = writeJson("unsized-report.json", {
-    designBox: Array.from(cells.values()).map(function (cell) {
+    designBox: Array.from(cells.values()).filter(function (cell) { return !cell.spacer; }).map(function (cell) {
       return { ref: cell.ref, container: !!cell.container, attrs: designBoxAttrs(cell) };
+    }),
+    spacers: Array.from(cells.values()).filter(function (cell) { return cell.spacer; }).map(function (cell) {
+      return { ref: cell.ref, axis: cell.spacer.axis, size: cell.spacer.size };
     })
   });
   const outPath = path.join(tmp, "unsized-gate.json");
@@ -262,14 +272,14 @@ function node(id, type, style, children, extra) {
     "--xaml-report", reportPath, "--json", outPath], { encoding: "utf8" });
   assert.strictEqual(run.status, 0, "溢出带的格子只提示、不失败: " + run.stdout + run.stderr);
   const report = JSON.parse(fs.readFileSync(outPath, "utf8"));
-  assert.ok(report.notices.some(function (item) { return item.rule === "R14" && item.ref === "b"; }),
+  assert.ok(report.notices.some(function (item) { return item.rule === "R14" && item.ref === "y"; }),
     "R14 必须把溢出带的格子登记成提示");
   assert.strictEqual(report.findings.length, 0, "溢出带的格子不得产生失败项");
 
   // 分维强度：unsized 只免宽度，高度被改坏仍必须失败。
   const tampered = JSON.parse(JSON.stringify(derived));
   (function find(grid) {
-    grid.cells.forEach(function (cell) { if (cell.ref === "b") cell.height = 999; if (cell.children) find(cell.children); });
+    grid.cells.forEach(function (cell) { if (cell.ref === "y1") cell.height = 999; if (cell.children) find(cell.children); });
   })(tampered.regions.find(function (region) { return region.emit !== false; }).grid);
   const tamperedPath = writeJson("unsized-layout-tampered.json", tampered);
   const tamperedRun = spawnSync(process.execPath, [CHECK, "--layout", tamperedPath, "--types", typesPath, "--map", ROUTE_MAP,

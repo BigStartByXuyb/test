@@ -23,6 +23,8 @@
 //   - 文本一律走 `{DynamicResource <LangName>}`；没有语言键的文本走待确认，不写字面量。
 //   - 尺寸与对齐照设计稿：控件写自身 bbox，格子尺寸与控件在格内的偏移取自布局产物；
 //     格子尺寸 − 控件尺寸 = 间距，差值落在哪一侧由偏移决定（唯一实现在 lib/design-box.js）。
+//   - 间距是独立的间隙格：主轴带里的间隙带落成 Auto + 一个空的固定尺寸 Grid（列 Width / 行 Height）；
+//     列宽固定项照设计稿像素、容器条目自适应（多条目时按设计稿比例加权星号）、叶子控件照设计稿像素。
 
 const fs = require("fs");
 const path = require("path");
@@ -149,7 +151,10 @@ function rowDefinition(size) {
     return "  <RowDefinition Height=\"" + xmlAttr(Math.round(size.value)) + "\" />";
   }
   if (size.size === "Auto") return "  <RowDefinition Height=\"Auto\" />";
-  if (size.size === "Star") return "  <RowDefinition />";
+  if (size.size === "Star") {
+    // 加权星号（同一轴上多个自适应条目时按设计稿比例分剩余空间）。
+    return size.weight ? "  <RowDefinition Height=\"" + xmlAttr(Math.round(size.weight)) + "*\" />" : "  <RowDefinition />";
+  }
   fail("未知的行列尺寸类型: " + size.size);
   return null;
 }
@@ -161,7 +166,9 @@ function columnDefinition(size) {
     return "  <ColumnDefinition Width=\"" + xmlAttr(Math.round(size.value)) + "\" />";
   }
   if (size.size === "Auto") return "  <ColumnDefinition Width=\"Auto\" />";
-  if (size.size === "Star") return "  <ColumnDefinition />";
+  if (size.size === "Star") {
+    return size.weight ? "  <ColumnDefinition Width=\"" + xmlAttr(Math.round(size.weight)) + "*\" />" : "  <ColumnDefinition />";
+  }
   fail("未知的行列尺寸类型: " + size.size);
   return null;
 }
@@ -313,6 +320,17 @@ function renderGrid(grid, ctx, depth, gridAttrs) {
   const multi = grid.rows.length > 1 || grid.columns.length > 1;
   const childCtx = Object.assign({}, ctx, { gridIsMulti: multi });
   grid.cells.forEach(function (cell) {
+    // 间隙格：一个空的固定尺寸 Grid（列方向写固定 Width、行方向写固定 Height）——"间距"在产物里是有形的一格。
+    if (cell.spacer) {
+      const spacerAttrs = Object.assign({}, gridCellAttrs(cell, childCtx) || {});
+      spacerAttrs[cell.spacer.axis === "column" ? "Width" : "Height"] = String(Math.round(cell.spacer.size));
+      ctx.report.spacers.push({ ref: cell.ref, axis: cell.spacer.axis, size: Math.round(cell.spacer.size) });
+      const spacerText = Object.keys(spacerAttrs).map(function (name) {
+        return " " + name + "=\"" + xmlAttr(spacerAttrs[name]) + "\"";
+      }).join("");
+      lines.push(pad + "  <Grid" + spacerText + " />");
+      return;
+    }
     const node = ctx.byRef.get(cell.ref);
     // 容器格子（产物里 container: true）：成层容器（flex 容器或带尺寸约束的容器）没有控件类型，
     // 它自己就是一层 <Grid>。
@@ -357,7 +375,9 @@ function renderXaml(args, layout, typeInfo, map) {
   const report = {
     styleHits: [], styleFallback: [], textPending: [], skippedRegions: [], pending: layout.pending || [],
     // 每个格子发射的尺寸/对齐（门禁按 lib/design-box.js 的同一实现复核）。
-    designBox: []
+    designBox: [],
+    // 间隙格（空 Grid 的固定尺寸），门禁按件数与尺寸复核。
+    spacers: []
   };
   const ctx = {
     map: map, byRef: typeInfo.byRef, report: report,
@@ -431,6 +451,7 @@ function main() {
     styleFallback: result.report.styleFallback.length,
     textPending: result.report.textPending.length,
     designBox: result.report.designBox.length,
+    spacers: result.report.spacers.length,
     pending: result.report.pending.length
   }, null, 2));
 }

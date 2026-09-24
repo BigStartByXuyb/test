@@ -29,7 +29,8 @@
 //       容器子树里没有可发射的控件（补内容或交设计确认）、待确认类型 / 无尺寸等不进格子的节点
 //       （先按 R1 / R9 修类型判定与映射）、产物与本次输入不同步（先重跑第 8 步）
 //   R13 尺寸约束未发射：带约束的格子必须在 View.xaml 里出现对应的 MinWidth/MaxWidth/MinHeight/MaxHeight
-//   R14 格子尺寸与尺寸/对齐发射：每个格子必须登记格子尺寸与承载物设计尺寸（含跨格累加、收尾星号带残差），
+//   R14 格子尺寸与尺寸/对齐发射：每个格子必须登记格子尺寸与承载物设计尺寸（含跨格累加、间隙带与自适应带），
+//       间隙带必须是 Auto 且与空 Grid 的固定尺寸一致（发射报告 spacers 逐条对齐），间隙格里不得有控件；
 //       且发射报告里该格子的 Width/Height/对齐/Margin 必须与 lib/design-box.js 的同一实现一致
 //       （shifted / unsized 两类例外按类、按维，见 page-build-rules.md 第 4 节第 14 条）
 //   R6 资源键闭环：{StaticResource <键>} 必须来自写法表样式族、本页 Icon 台账或 Icon 字典合并点
@@ -142,11 +143,34 @@ function checkDesignBoxes(layout, emission) {
     emitted.set(item.ref, item.attrs || {});
   });
   const seen = new Set();
+  // 间隙格（空 Grid 的固定尺寸）：与发射报告的 spacers 逐条对齐，并核对承载它的那条带是 Auto、尺寸等于 gap。
+  const spacers = new Map();
+  (emission.spacers || []).forEach(function (item) {
+    if (item && item.ref) spacers.set(item.ref, item);
+  });
   const visitGrid = function (grid, size) {
     const columnExtents = bandExtents(grid.columns || [], size.w);
     const rowExtents = bandExtents(grid.rows || [], size.h);
     (grid.cells || []).forEach(function (cell) {
       seen.add(cell.ref);
+      if (cell.spacer) {
+        const axis = cell.spacer.axis === "row" ? "row" : "column";
+        const band = axis === "column" ? (grid.columns || [])[cell.column] : (grid.rows || [])[cell.row];
+        if (cell.controlType || cell.nodeWidth || cell.constraints) {
+          report("R14", cell.ref, "间隙格里不得有控件类型 / 承载物尺寸 / 尺寸约束");
+        }
+        if (!band || band.size !== "Auto" || Number(band.gap || 0) !== Number(cell.spacer.size || 0)) {
+          report("R14", cell.ref, "间隙格必须落在 Auto 带上、且尺寸等于该带的 gap");
+        }
+        const emittedSpacer = spacers.get(cell.ref);
+        if (!emittedSpacer) {
+          report("R14", cell.ref, "发射报告里没有这个间隙格（空 Grid 固定尺寸）");
+        } else if (emittedSpacer.axis !== axis || Number(emittedSpacer.size) !== Number(cell.spacer.size)) {
+          report("R14", cell.ref, "间隙格与发射报告不一致：产物 " + axis + " " + cell.spacer.size +
+            "，发射 " + emittedSpacer.axis + " " + emittedSpacer.size);
+        }
+        return;
+      }
       const width = extentOf(columnExtents, cell.column, cell.columnSpan);
       const height = extentOf(rowExtents, cell.row, cell.rowSpan);
       // 撞格下移的格子没有设计稿偏移真值：期望值仍是 designBoxAttrs(cell)（有格子尺寸就写控件自身尺寸、
@@ -206,6 +230,9 @@ function checkDesignBoxes(layout, emission) {
   emitted.forEach(function (attrs, ref) {
     if (!seen.has(ref)) report("R14", ref, "发射报告里有布局产物中不存在的格子");
   });
+  spacers.forEach(function (item, ref) {
+    if (!seen.has(ref)) report("R14", ref, "发射报告里的间隙格在布局产物中不存在");
+  });
 }
 
 function checkCells(region, map, layout) {
@@ -216,6 +243,13 @@ function checkCells(region, map, layout) {
   region.grid.rows.concat(region.grid.columns).forEach(function (size) {
     if (!size || !size.source) {
       report("R8", region.id, "行列尺寸缺少 source");
+      return;
+    }
+    // 间隙带（source=gap）：尺寸来自设计稿的条目间距，由空 Grid 的固定尺寸承载（见 R14 的间隙格校验）。
+    if (size.source === "gap") {
+      if (size.size !== "Auto" || !(Number(size.gap) > 0)) {
+        report("R8", region.id, "间隙带必须是 Auto 且带正数 gap，当前: " + JSON.stringify(size));
+      }
       return;
     }
     // 框架固定区只在**被框架钉住的那一维**上用 Token（顶部栏 / 底部栏都钉在高度上）；
@@ -232,6 +266,15 @@ function checkCells(region, map, layout) {
     const entry = (map.controlTypes || {})[cell.controlType];
     if (region.emit === false) {
       report("R1", cell.ref, "框架固定区（" + region.id + "）里不得有控件");
+      return;
+    }
+    // 间隙格（空 Grid 固定尺寸）：没有控件类型，类型/尺寸约束校验由 R14 的间隙格分支负责。
+    if (cell.spacer) {
+      const rowSpan = cell.rowSpan || 1;
+      const columnSpan = cell.columnSpan || 1;
+      if (cell.row < 0 || cell.column < 0 || cell.row + rowSpan > rows || cell.column + columnSpan > columns) {
+        report("R3", cell.ref, "间隙格越界: row=" + cell.row + "/" + rows + " column=" + cell.column + "/" + columns);
+      }
       return;
     }
     // 容器格子（成层容器：flex 容器或带尺寸约束的容器）没有控件类型：类型检查交给内层 Grid 里的控件。
