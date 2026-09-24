@@ -8,8 +8,9 @@
 //        --types <类型判定 json 或 mapping.json> --map <mw-wpf-map.json>
 //        [--xaml <发射出的 View.xaml>] [--xaml-report <发射器报告>] [--dsl <带约束的 DSL 快照>]
 //        [--icon-map <本页图标台账>] [--json <报告路径>]
-//   --dsl 供 R11 / R12 / R13 用（R13 还要 --xaml 才能比对发射结果），--xaml 另供 R6 / R7 用，
-//   --xaml-report 供 R14 用；不传就跳过对应条目。
+//   入参前提：--dsl 是 R11 / R12 / R13 的前提（不传这三条整体跳过；R13 还要 --xaml 才能比对发射结果）；
+//   --xaml-report 是 R14 的前提（不传整条跳过）；--xaml 对 R13 是前提，对 R6 / R7 只是可选输入
+//   （不传只少校验 XAML 侧那一半，布局产物侧照常检查）。
 //
 // 退出码：0 通过；2 有 findings（门禁失败）；1 输入/契约错误。
 //
