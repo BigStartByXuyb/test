@@ -22,7 +22,7 @@
 //     width / height        格子尺寸（跨格累加 + 收尾星号带残差；推导给不出正数时不写）
 //     nodeWidth / nodeHeight 承载物（控件 / 容器）自身设计稿尺寸
 //     offsetX / offsetY     承载物起点相对格子起点的偏移（撞格下移的格子不写）
-//     shifted:true          该格子由推导挪位（撞格下移），不是设计稿那条带
+//     shifted:true          该格子由推导挪位（撞格下移），不是设计稿那条带（只免间距/对齐，未免尺寸）
 //     unsized:{width?,height?} 哪一维算不出正数格子尺寸（收尾星号带被前面的像素带吃光＝内容溢出承载物）
 //     发射器与门禁（R14）按 width/height/nodeWidth/nodeHeight/offsetX/offsetY 出尺寸与对齐。
 //   constraintExempt 由本脚本登记「本页不发射的带约束节点」（页面根 / 不可见 / 框架固定区）及原因，
@@ -427,7 +427,8 @@ function buildGridFrom(nodes, ctx, size) {
       rowSpan: rowSpan, columnSpan: columnSpan
     };
     // 承载物设计尺寸与"是否被撞格挪位"：撞格下移过的格子设计稿位置不在这个格子里，
-    // 尺寸/间距没有真值 —— 登记 shifted，发射器不写尺寸与对齐。
+    // 设计稿偏移没有真值 —— 登记 shifted，发射器只写承载物自身尺寸、不表达间距/对齐；
+    // 格子尺寸与承载物尺寸照常登记（门禁照常核对）。
     cell.nodeWidth = Math.round(Number(node.w) || 0);
     cell.nodeHeight = Math.round(Number(node.h) || 0);
     if (target !== row.index) cell.shifted = true;

@@ -31,6 +31,7 @@
 //   R13 尺寸约束未发射：带约束的格子必须在 View.xaml 里出现对应的 MinWidth/MaxWidth/MinHeight/MaxHeight
 //   R14 格子尺寸与尺寸/对齐发射：每个格子必须登记格子尺寸与承载物设计尺寸（含跨格累加、收尾星号带残差），
 //       且发射报告里该格子的 Width/Height/对齐/Margin 必须与 lib/design-box.js 的同一实现一致
+//       （shifted / unsized 两类例外按类、按维，见 page-build-rules.md 第 4 节第 14 条）
 //   R6 资源键闭环：{StaticResource <键>} 必须来自写法表样式族、本页 Icon 台账或 Icon 字典合并点
 //   R7 文本零硬编码中文：发射区不得出现字面中文
 //   R8 尺寸来源：框架固定区必须是 framework:<Token>，其余必须是 design

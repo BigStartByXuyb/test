@@ -98,7 +98,7 @@ flowchart LR
 | `scripts/adapters/mtslg-iocontrol/lib/icon-ownership.js` | 图标归属判据（树包含优先、前缀回退、取最深命中） | `gen-mtslg-mapping-from-dsl.js`、`discover-mtslg-page-icon-map.js` |
 | `scripts/adapters/mtslg-iocontrol/lib/icon-registration-policy.js` | 图标**登记判据**的唯一实现（「这个 PATH 要不要进本页台账」：模板族变体的 `iconPolicy`、布局族底部栏 MenuItem、常驻分组、宿主壳标记、装饰名；取值全部读映射表） | `discover-mtslg-page-icon-map.js` |
 | `scripts/lib/constraints.js` | 尺寸约束（min/max 宽高）的唯一实现：键集、`> 0 才算设置`的归一化、键名 → WPF 属性名、DSL 遍历与收集 | `core/apply-constraints.js`、`adapters/mw-wpf/gen-mw-wpf-layout.js`、`adapters/mw-wpf/gen-mw-wpf-xaml.js`、`adapters/mw-wpf/check-wpf-layout.js` |
-| `scripts/lib/design-box.js` | 控件在格子里的「尺寸 + 对齐」唯一实现：格子尺寸 − 控件尺寸 = 间距，差值落在哪一侧由格内偏移决定（贴边 / 居中 / 非对称内缩用 `Margin`） | `adapters/mw-wpf/gen-mw-wpf-xaml.js`、`adapters/mw-wpf/check-wpf-layout.js` |
+| `scripts/lib/design-box.js` | 控件在格子里的「尺寸 + 对齐」唯一实现：格子尺寸 − 控件尺寸 = 间距，差值落在哪一侧由格内偏移决定（贴边 / 居中 / 非对称内缩用 `Margin`；`shifted` / `unsized` 例外见 `page-build-rules.md` 第 4 节第 14 条） | `adapters/mw-wpf/gen-mw-wpf-xaml.js`、`adapters/mw-wpf/check-wpf-layout.js` |
 
 规则：**同一个功能要复用，不许反复造轮子**。新脚本需要已存在的工具就 `require` 共享模块；确实职责不同但同名的函数，登记到 `scripts/lib/script-reuse-registry.json` 并写清 `reason`（登记是显式决定，不是隐藏白名单）。发版前 `tests/script-duplication.test.js` 必须 PASS。
 
