@@ -19,7 +19,8 @@
 // 消费者：adapters/mw-wpf/gen-mw-wpf-xaml.js（发射属性并写进发射报告）、
 //         adapters/mw-wpf/check-wpf-layout.js（按同一实现核对发射报告）。
 
-// 与布局推导同一容差：只有"完全贴合"才按贴边/居中处理，其余一律走 Margin 精确复现。
+// 与布局推导同一容差：贴边 / 居中只在"完全贴合"时成立（偏移或剩余 ≤ EPS，或两侧相等）；
+// 其余（非对称内缩）一律走 Margin 精确复现。
 const EPSILON = 2;
 
 function round(value) {
