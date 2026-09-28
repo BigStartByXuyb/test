@@ -1,0 +1,14 @@
+{
+  "_note": [
+    "允许在正文里逐个列举映射表变体名的文件（键 = 相对插件根的 POSIX 路径，值 = 理由）。",
+    "变体名的真值源只有映射表；这里登记的每一份都必须有门禁逐字核对它与映射表一致，",
+    "或者本身只是测试自建的 fixture。没有登记又出现同一族 ≥2 个变体名的文件，由",
+    "tests/variant-mention-coverage.test.js 报错。"
+  ],
+  "skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/feishu-component-library-mapping.md":
+    "组件库映射文档：每个变体要写自己的固定模板与 XML，必须逐个列出；audit-mtslg-feishu-map.js 与 doc-rule-consistency.test.js 双向核对它与映射表。",
+  "skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/feishu-layout-mapping.md":
+    "Layout 规范文档：底部栏变体只有这一份文档逐一描述槽位结构，必须逐个列出；doc-rule-consistency.test.js 核对总数、逐字与小节名。",
+  "skills/mastergo-to-wpf/scripts/adapters/mtslg-iocontrol/audit-mtslg-feishu-map.js":
+    "注释里的标题解析规则示例（「组件集=…，变体=A/B」），不是可用清单；真实期望值由脚本解析文档得到。"
+}
