@@ -10,9 +10,9 @@
     "③ 纯注释/示例 —— 不是可用清单，并写明真实触发它的那处枚举在哪个文件的哪一行。"
   ],
   "skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/feishu-component-library-mapping.md":
-    "组件库映射文档：每个变体要写自己的固定模板与 XML，必须逐个列出；audit-mtslg-feishu-map.js 与 doc-rule-consistency.test.js 双向核对它与映射表。",
+    "① 逐变体写模板的文档：组件库映射文档，每个变体要写自己的固定模板与 XML，必须逐个列出；audit-mtslg-feishu-map.js 与 doc-rule-consistency.test.js 双向核对它与映射表。",
   "skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/feishu-layout-mapping.md":
-    "Layout 规范文档：底部栏变体只有这一份文档逐一描述槽位结构，必须逐个列出；doc-rule-consistency.test.js 核对总数、逐字与小节名。",
+    "① 逐变体写模板的文档：Layout 规范文档，底部栏变体只有这一份逐一描述槽位结构，必须逐个列出；doc-rule-consistency.test.js 核对总数、逐字与小节名。",
   "skills/mastergo-to-wpf/scripts/adapters/mtslg-iocontrol/audit-mtslg-feishu-map.js":
     "③ 纯注释/示例：触发点是本文件第 38 行注释里标题解析规则的举例（顿号连写两个选择框变体名），不是可用清单；真实期望值由脚本解析文档得到。"
 }

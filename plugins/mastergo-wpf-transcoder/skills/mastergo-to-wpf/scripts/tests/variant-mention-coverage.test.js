@@ -80,13 +80,16 @@ function enumerationHits(text, names) {
 }
 
 // 真值源自己当然会列出全部变体名。
+// 豁免范围必须与 routeMapFiles() 的取法同一条约定：<路线目录>/<路线目录>-map.json。
 function isTruthSource(key) {
   return key === "skills/mastergo-to-wpf/references/component-types.json" ||
-    /^skills\/mastergo-to-wpf\/references\/adapters\/[^/]+\/[^/]+-map\.json$/.test(key);
+    /^skills\/mastergo-to-wpf\/references\/adapters\/([^/]+)\/\1-map\.json$/.test(key);
 }
 
-// 族清单取自**全部**路线映射表：isTruthSource 豁免的是所有 <路线>-map.json，
-// 两者范围必须一致，否则某条路线日后新增自己的变体族就没有任何门禁覆盖。
+// 族清单取自全部路线映射表，取法与上面豁免的约定一致（<路线目录>/<路线目录>-map.json）——
+// 只按目录名找同名文件，不扫目录下的其它 *-map.json，免得豁免范围与扫描范围错开。
+// 已知边界：只有形状是顶层 `variants` 的族会被收进来（如 mw-wpf 把变体写在 styleRules.byVariant
+// 下，不是模板族，族定义走共享类型表），日后若某条路线把族写成别的形状，这里要同步扩。
 function routeMapFiles() {
   return fs.readdirSync(ADAPTERS_DIR, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
