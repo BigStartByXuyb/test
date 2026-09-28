@@ -3,8 +3,9 @@
 
 // 变体名只能有一处真值源：映射表。
 //
-// 任何文件里若出现「同一族 ≥2 个变体名」的枚举，要么它本身就是真值源（共享类型表 / 路线映射表），
-// 要么必须在 scripts/lib/variant-mention-registry.json 里登记理由。
+// 判据：同一族的变体名被顿号/逗号连成枚举串（形态说明见 enumerationHits）。命中的文件
+// 要么本身就是真值源（共享类型表 / 路线映射表），要么必须在 scripts/lib/variant-mention-registry.json
+// 里登记理由。
 //
 // 背景：2026-09-29 加「底部栏/非首页-长方形」时全仓库扫描发现，同一族的名字散落在
 // 映射表、布局映射文档、测试 fixture 三处；而既有的 doc-rule-consistency 只挡住几个指定文档
@@ -86,10 +87,11 @@ function isTruthSource(key) {
     /^skills\/mastergo-to-wpf\/references\/adapters\/([^/]+)\/\1-map\.json$/.test(key);
 }
 
-// 族清单取自全部路线映射表，取法与上面豁免的约定一致（<路线目录>/<路线目录>-map.json）——
+// 族清单取自全部路线映射表，取法与上面豁免的约定一致（<路线目录>/<路线目录>-map.json）：
 // 只按目录名找同名文件，不扫目录下的其它 *-map.json，免得豁免范围与扫描范围错开。
-// 已知边界：只有形状是顶层 `variants` 的族会被收进来（如 mw-wpf 把变体写在 styleRules.byVariant
-// 下，不是模板族，族定义走共享类型表），日后若某条路线把族写成别的形状，这里要同步扩。
+// 取族范围以 familiesOf() 的两处分支为准（map 顶层带 variants 的各族 + layoutRules.bottomBar
+// 的 variants）；两条分支之外没有兜底 —— 某条路线若把族写成别的形状（如 mw-wpf 的变体写在
+// styleRules.byVariant 下，不是模板族）不会被收进来，届时要在 familiesOf() 里补分支。
 function routeMapFiles() {
   return fs.readdirSync(ADAPTERS_DIR, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
