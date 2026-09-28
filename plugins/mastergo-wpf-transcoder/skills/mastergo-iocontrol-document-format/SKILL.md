@@ -128,6 +128,8 @@ description: 强制规范 MasterGo → MTSLG IOContorl 映射文档的写法，�
 
 新增模板族时不必先判断它属于哪类写法：直接跑下面的覆盖审计，报告里的阻断字段 `unregisteredFamilies`、`unregisteredVariants`、`undocumented`、`duplicateMatchKeys` 会指出该族还差哪一项（映射表条目、映射文档条目，或文档里没用结构化写法写明），按报告补齐后再重跑，直到这四项全部为空；`unresolvedSections` 是同一问题的定位视图（孤儿章节），`labels` / `unconfirmed` 只是提示，都不单独阻断。这四项全空**不代表**新增族已完工——生成器侧按第 1 项另跑族分支门禁。
 
+**底部栏变体有一条命令做完第 1、2、5 项并自动跑第 3、4 项**：`node skills/mastergo-to-wpf/scripts/tools/mapping-change.js add-variant --family layoutRules.bottomBar --name <新名字> (--like <现有变体> | --template <小节片段文件>)`，删除用同一脚本的 `remove-variant`。它会改映射表、人读文档（总数行 + 枚举 + 变体小节）与版本号，然后跑覆盖审计、`node --test` 与两个 `.tests.ps1`；任何一项失败就把已改文件写回原文。其余族仍要手工同步 —— 组件库文档是「一节覆盖多个变体」（如 `组件集=输入框，变体=整数`），与映射表的粒度（`输入框-整数-40`）不一致，工具不猜。
+
 改完后按顺序自检，任何一步非零退出都必须修完再提交：
 
 ```text
