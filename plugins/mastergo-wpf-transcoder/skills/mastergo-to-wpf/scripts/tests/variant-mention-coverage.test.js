@@ -18,7 +18,7 @@ const { loadTemplateMap } = require(path.join(__dirname, "..", "lib", "load-temp
 
 const SKILL_ROOT = path.join(__dirname, "..", "..");
 const PLUGIN_ROOT = path.join(SKILL_ROOT, "..", "..");
-const MAP = path.join(SKILL_ROOT, "references", "adapters", "mtslg-iocontrol", "mtslg-iocontrol-map.json");
+const ADAPTERS_DIR = path.join(SKILL_ROOT, "references", "adapters");
 const REGISTRY = path.join(__dirname, "..", "lib", "variant-mention-registry.json");
 
 const SCAN_EXTENSIONS = new Set([".md", ".json", ".js", ".mjs", ".ps1"]);
@@ -58,9 +58,12 @@ function escapeRe(text) {
 }
 
 /*
- * 手抄清单的形态是「A、B、C」——同一族的名字被顿号/逗号/斜杠连成一串。
+ * 手抄清单的形态是「A、B、C」——同一族的名字被顿号/逗号连成一串。
  * 只按「文件里出现 ≥2 个名字」判定会把 start / exit / 方向 / 扫描 这类通用词算进去
  * （任何脚本里都有 process.exit），误报淹掉真信号，所以判据只认这种枚举串。
+ *
+ * 覆盖边界以本判据为准：顿号/逗号连写的枚举串会被拦；斜杠、英文逗号、空格换行，
+ * 以及代码里的数组字面量都不在判据内 —— 这条门禁只兜「文档式手抄清单」这一种形态。
  */
 function enumerationHits(text, names) {
   const alt = names.slice().sort((left, right) => right.length - left.length).map(escapeRe).join("|");
@@ -82,8 +85,33 @@ function isTruthSource(key) {
     /^skills\/mastergo-to-wpf\/references\/adapters\/[^/]+\/[^/]+-map\.json$/.test(key);
 }
 
-const map = loadTemplateMap(MAP);
-const families = familiesOf(map);
+// 族清单取自**全部**路线映射表：isTruthSource 豁免的是所有 <路线>-map.json，
+// 两者范围必须一致，否则某条路线日后新增自己的变体族就没有任何门禁覆盖。
+function routeMapFiles() {
+  return fs.readdirSync(ADAPTERS_DIR, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => path.join(ADAPTERS_DIR, entry.name, entry.name + "-map.json"))
+    .filter((file) => fs.existsSync(file));
+}
+
+function allFamilies() {
+  const byKey = new Map();
+  for (const file of routeMapFiles()) {
+    for (const family of familiesOf(loadTemplateMap(file))) {
+      const current = byKey.get(family.key);
+      if (!current) {
+        byKey.set(family.key, { key: family.key, names: family.names.slice() });
+        continue;
+      }
+      for (const name of family.names) {
+        if (!current.names.includes(name)) current.names.push(name);
+      }
+    }
+  }
+  return Array.from(byKey.values());
+}
+
+const families = allFamilies();
 assert.ok(families.length > 0, "映射表必须登记模板族或底部栏变体");
 
 const registry = JSON.parse(fs.readFileSync(REGISTRY, "utf8"));
