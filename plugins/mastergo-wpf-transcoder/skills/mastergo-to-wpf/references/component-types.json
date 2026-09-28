@@ -1275,6 +1275,9 @@
         "非首页-长方形": {
           "topLeftContent": "text"
         },
+        "底部栏/非首页-长方形": {
+          "topLeftContent": "text"
+        },
         "方-icon+文案": {
           "topLeftContent": "none"
         },
