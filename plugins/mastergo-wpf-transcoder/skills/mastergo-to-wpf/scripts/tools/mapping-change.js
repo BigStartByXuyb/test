@@ -33,6 +33,10 @@ const fs = require("fs");
 const path = require("path");
 const { spawnSync } = require("child_process");
 
+// 真值源的读取入口只有一个（见规范「新增/修改映射的同步清单」第 1 项）：
+// 校验一律走它读合并结果，不自己拼两份文件。
+const { loadTemplateMap } = require(path.join(__dirname, "..", "lib", "load-template-map.js"));
+
 const SKILL_ROOT = path.join(__dirname, "..", "..");
 const PLUGIN_ROOT = path.join(SKILL_ROOT, "..", "..");
 const SCRIPTS_DIR = path.join(SKILL_ROOT, "scripts");
@@ -228,6 +232,29 @@ function variantsOf(shared) {
   return bar.variants;
 }
 
+/*
+ * 允许写回的那份文件必须**确实是这个键的主人**：`layoutRules.bottomBar.variants` 目前登记在
+ * 共享类型表里，但规范把它归在「跨路线共用的 layoutRules」，日后可能挪到路线映射表去。
+ * 校验读的是加载器合并结果（键在哪都看得见），写回只能落到具体文件，所以这里显式确认归属，
+ * 确认不了就停 —— 不在不知情的情况下改错文件。
+ */
+function ownerOfBottomBarVariants(mapText) {
+  let raw = null;
+  try {
+    raw = JSON.parse(mapText);
+  }
+  catch (error) {
+    fail("共享类型表不是合法 JSON：" + error.message);
+  }
+  if (!raw.layoutRules || !raw.layoutRules.bottomBar || !raw.layoutRules.bottomBar.variants) {
+    fail(
+      "共享类型表里没有 layoutRules.bottomBar.variants —— 这个键可能已挪到路线映射表",
+      "本工具只按原文改写共享类型表，不做跨文件猜测；请手工同步那一处。"
+    );
+  }
+  return raw;
+}
+
 function insertVariant(variants, name, entry, afterName) {
   const out = {};
   for (const [key, value] of Object.entries(variants)) {
@@ -338,11 +365,24 @@ function commandAdd(args) {
   if (!args.like && !args.template) fail("必须给 --like <现有变体> 或 --template <小节片段文件>");
   if (args.like && args.template) fail("--like 与 --template 只能给一个");
 
+  // 校验读加载器的合并结果；写回用原文（保留缩进与行尾），并先确认键的主人。
+  const merged = loadTemplateMap(ROUTE_MAP);
+  const mergedVariants = variantsOf(merged);
   const mapText = fs.readFileSync(SHARED_MAP, "utf8");
-  const shared = JSON.parse(mapText);
+  const shared = ownerOfBottomBarVariants(mapText);
   const variants = variantsOf(shared);
   if (variants[name]) fail("映射表里已经有「" + name + "」");
-  if (args.like && !variants[args.like]) fail("映射表里没有参照变体「" + args.like + "」");
+  if (args.like && !mergedVariants[args.like]) fail("映射表里没有参照变体「" + args.like + "」");
+  if (args.like) {
+    const mergedEntry = mergedVariants[args.like];
+    const ownEntry = variants[args.like];
+    if (JSON.stringify(mergedEntry) !== JSON.stringify(ownEntry)) {
+      fail(
+        "参照变体「" + args.like + "」在合并结果里与共享表不一致（路线映射表可能覆盖了它）",
+        "本工具只改写共享表，遇到覆盖会写错来源；请手工同步。"
+      );
+    }
+  }
 
   const likeEntry = args.like ? variants[args.like] : {};
   const values = {};
@@ -408,10 +448,17 @@ function commandRemove(args) {
   const name = String(args.name || "");
   if (!name) fail("缺少 --name");
 
+  const merged = loadTemplateMap(ROUTE_MAP);
+  if (!variantsOf(merged)[name]) fail("映射表里没有「" + name + "」");
   const mapText = fs.readFileSync(SHARED_MAP, "utf8");
-  const shared = JSON.parse(mapText);
+  const shared = ownerOfBottomBarVariants(mapText);
   const variants = variantsOf(shared);
-  if (!variants[name]) fail("映射表里没有「" + name + "」");
+  if (!variants[name]) {
+    fail(
+      "变体「" + name + "」在合并结果里有、在共享类型表里没有",
+      "它可能登记在路线映射表里；本工具只按原文改写共享类型表，请手工同步那一处。"
+    );
+  }
   const next = Object.assign({}, variants);
   delete next[name];
 
