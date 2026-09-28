@@ -243,23 +243,20 @@ function variantsOf(shared) {
  * 找不到就停 —— 说明这个键不在本文件里，工具不去猜它在哪。
  */
 
-// 路线映射表若也登记 layoutRules，合并结果会覆盖共享表；此时「按共享表原文写回」会写错来源。
-function assertRouteDoesNotOverrideLayout(routeText) {
-  if (routeText.includes("\"layoutRules\"")) {
-    fail(
-      "路线映射表也登记了 layoutRules，合并结果会覆盖共享类型表",
-      "本工具只改共享类型表，遇到覆盖请手工同步（避免写出被覆盖的重复登记）。"
-    );
-  }
+// 条目收尾行：不是最后一条要带逗号，是最后一条不能带 —— 这是 JSON 的逗号分隔，必须维护。
+function withTrailingComma(line, want) {
+  const body = line.replace(/\s+$/, "");
+  if (want) return body.endsWith(",") ? body : body + ",";
+  return body.endsWith(",") ? body.slice(0, -1) : body;
 }
 
-function entryLines(indent, name, fields) {
+function entryLines(indent, name, fields, isLast) {
   const keys = Object.keys(fields);
   const out = [indent + "\"" + name + "\": {"];
   keys.forEach((key, index) => {
     out.push(indent + "  \"" + key + "\": " + JSON.stringify(fields[key]) + (index === keys.length - 1 ? "" : ","));
   });
-  out.push(indent + "},");
+  out.push(indent + (isLast ? "}" : "},"));
   return out;
 }
 
@@ -302,12 +299,17 @@ function insertVariantEntry(mapText, name, fields, afterName) {
   if (afterName) {
     const anchor = anchorIndentOfEntry(lines, afterName);
     if (!anchor) fail("共享类型表里找不到参照条目「" + afterName + "」");
-    lines.splice(anchor.end + 1, 0, ...entryLines(anchor.indent, name, fields));
+    // 参照条目原本是不是最后一条：决定新条目要不要带逗号，以及要不要给参照条目补逗号。
+    const anchorWasLast = !lines[anchor.end].replace(/\s+$/, "").endsWith(",");
+    lines[anchor.end] = withTrailingComma(lines[anchor.end], true);
+    lines.splice(anchor.end + 1, 0, ...entryLines(anchor.indent, name, fields, anchorWasLast));
   }
   else {
     const block = bottomBarVariantsBlock(lines);
     if (!block) fail("共享类型表里找不到 bottomBar.variants");
-    lines.splice(block.end, 0, ...entryLines(block.indent + "  ", name, fields));
+    // block.end - 1 === block.start 说明这个 variants 块是空的，没有条目需要补逗号。
+    if (block.end - 1 > block.start) lines[block.end - 1] = withTrailingComma(lines[block.end - 1], true);
+    lines.splice(block.end, 0, ...entryLines(block.indent + "  ", name, fields, true));
   }
   return lines.join(eol);
 }
@@ -322,7 +324,12 @@ function removeVariantEntry(mapText, name) {
       "它可能只登记在路线映射表里；本工具只改共享类型表，请手工同步那一处。"
     );
   }
+  // 删掉的是最后一条时，前一条的尾逗号要一起收掉，否则 JSON 少一条分隔。
+  const wasLast = !lines[anchor.end].replace(/\s+$/, "").endsWith(",");
   lines.splice(anchor.start, anchor.end - anchor.start + 1);
+  if (wasLast && anchor.start > 0 && lines[anchor.start - 1].trim().endsWith(",")) {
+    lines[anchor.start - 1] = withTrailingComma(lines[anchor.start - 1], false);
+  }
   return lines.join(eol);
 }
 
@@ -397,10 +404,21 @@ function rollback(changes) {
   for (const item of changes) fs.writeFileSync(item.file, item.originalText, "utf8");
 }
 
-function apply(changes, dryRun) {
+// verify：写回后立刻做的自检（用加载器读合并结果，见调用处）。不通过就回滚。
+function apply(changes, dryRun, verify) {
   writeAll(changes, dryRun);
   if (dryRun) return true;
   console.log("改动的文件：" + changes.map((item) => path.relative(PLUGIN_ROOT, item.file).replace(/\\/g, "/")).join("、"));
+  if (verify) {
+    try {
+      verify();
+    }
+    catch (error) {
+      rollback(changes);
+      console.error("✗ 写回自检失败，已回滚：" + (error && error.message ? error.message : error));
+      process.exit(1);
+    }
+  }
   console.log("跑门禁：");
   if (!reportGates(runGates())) {
     rollback(changes);
@@ -423,7 +441,6 @@ function commandAdd(args) {
   const mergedVariants = variantsOf(merged);
   if (mergedVariants[name]) fail("映射表里已经有「" + name + "」");
   if (args.like && !mergedVariants[args.like]) fail("映射表里没有参照变体「" + args.like + "」");
-  assertRouteDoesNotOverrideLayout(fs.readFileSync(ROUTE_MAP, "utf8"));
 
   const likeEntry = args.like ? mergedVariants[args.like] : {};
   const values = {};
@@ -476,7 +493,13 @@ function commandAdd(args) {
     { file: PLUGIN_JSON, originalText: pluginText, text: bumpVersion(pluginText) }
   ];
   console.log("新增变体 " + name + "（参照：" + (args.like || "模板片段") + "）");
-  return apply(changes, args.dryRun === true);
+  return apply(changes, args.dryRun === true, function () {
+    // 写回后用加载器复验合并结果：路线映射表若覆盖了 layoutRules，这一条就不会出现，
+    // 此时回滚 —— 不需要去读路线映射表的原文来判断。
+    if (!variantsOf(loadTemplateMap(ROUTE_MAP))[name]) {
+      throw new Error("合并结果里没有「" + name + "」：路线映射表可能覆盖了 layoutRules");
+    }
+  });
 }
 
 function commandRemove(args) {
@@ -486,7 +509,6 @@ function commandRemove(args) {
 
   const merged = loadTemplateMap(ROUTE_MAP);
   if (!variantsOf(merged)[name]) fail("映射表里没有「" + name + "」");
-  assertRouteDoesNotOverrideLayout(fs.readFileSync(ROUTE_MAP, "utf8"));
   const mapText = fs.readFileSync(SHARED_MAP, "utf8");
 
   const doc = loadDoc(LAYOUT_DOC);
@@ -504,7 +526,11 @@ function commandRemove(args) {
     { file: PLUGIN_JSON, originalText: pluginText, text: bumpVersion(pluginText) }
   ];
   console.log("删除变体 " + name + (range ? "（小节一并删除）" : "（没有小节）"));
-  return apply(changes, args.dryRun === true);
+  return apply(changes, args.dryRun === true, function () {
+    if (variantsOf(loadTemplateMap(ROUTE_MAP))[name]) {
+      throw new Error("合并结果里仍然有「" + name + "」：路线映射表可能覆盖了 layoutRules");
+    }
+  });
 }
 
 function commandCheck() {
