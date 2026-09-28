@@ -233,44 +233,97 @@ function variantsOf(shared) {
 }
 
 /*
- * 允许写回的那份文件必须**确实是这个键的主人**：`layoutRules.bottomBar.variants` 目前登记在
- * 共享类型表里，但规范把它归在「跨路线共用的 layoutRules」，日后可能挪到路线映射表去。
- * 校验读的是加载器合并结果（键在哪都看得见），写回只能落到具体文件，所以这里显式确认归属，
- * 确认不了就停 —— 不在不知情的情况下改错文件。
+ * 写回**只在原文上按缩进插入/删除一行条目**，不解析、不重排整份文件。
+ *
+ * 两个理由：一是规范第 1 项要求真值源的读取只走 scripts/lib/load-template-map.js
+ * （校验用的都是那个合并结果），这里就只剩「按原文改文本」这一件事；二是重排整份文件
+ * 会让 diff 淹没真正的那一行。
+ *
+ * 归属同理靠锚点证明：锚点（参照条目行 / bottomBar 的 variants 块）在共享类型表原文里
+ * 找不到就停 —— 说明这个键不在本文件里，工具不去猜它在哪。
  */
-function ownerOfBottomBarVariants(mapText) {
-  let raw = null;
-  try {
-    raw = JSON.parse(mapText);
-  }
-  catch (error) {
-    fail("共享类型表不是合法 JSON：" + error.message);
-  }
-  if (!raw.layoutRules || !raw.layoutRules.bottomBar || !raw.layoutRules.bottomBar.variants) {
+
+// 路线映射表若也登记 layoutRules，合并结果会覆盖共享表；此时「按共享表原文写回」会写错来源。
+function assertRouteDoesNotOverrideLayout(routeText) {
+  if (routeText.includes("\"layoutRules\"")) {
     fail(
-      "共享类型表里没有 layoutRules.bottomBar.variants —— 这个键可能已挪到路线映射表",
-      "本工具只按原文改写共享类型表，不做跨文件猜测；请手工同步那一处。"
+      "路线映射表也登记了 layoutRules，合并结果会覆盖共享类型表",
+      "本工具只改共享类型表，遇到覆盖请手工同步（避免写出被覆盖的重复登记）。"
     );
   }
-  return raw;
 }
 
-function insertVariant(variants, name, entry, afterName) {
-  const out = {};
-  for (const [key, value] of Object.entries(variants)) {
-    out[key] = value;
-    if (afterName && key === afterName) out[name] = entry;
-  }
-  if (!(name in out)) out[name] = entry;
+function entryLines(indent, name, fields) {
+  const keys = Object.keys(fields);
+  const out = [indent + "\"" + name + "\": {"];
+  keys.forEach((key, index) => {
+    out.push(indent + "  \"" + key + "\": " + JSON.stringify(fields[key]) + (index === keys.length - 1 ? "" : ","));
+  });
+  out.push(indent + "},");
   return out;
 }
 
-/*
- * 共享类型表用 JSON 往返改写：本仓库这份文件在「2 空格缩进 + 原行尾」下往返后字节一致，
- * 所以不会产生整文件 diff。路由映射表不是这个格式（往返会变），本工具不改它。
- */
-function serializeJson(value, originalText) {
-  return (JSON.stringify(value, null, 2) + "\n").split("\n").join(eolOf(originalText));
+function anchorIndentOfEntry(lines, name) {
+  const openRe = new RegExp("^(\\s*)\"" + escapeRe(name) + "\":\\s*\\{\\s*$");
+  for (let index = 0; index < lines.length; index += 1) {
+    const hit = openRe.exec(lines[index]);
+    if (!hit) continue;
+    const indent = hit[1];
+    for (let cursor = index + 1; cursor < lines.length; cursor += 1) {
+      if (/^\s*\}\s*,?\s*$/.test(lines[cursor]) && lines[cursor].match(/^\s*/)[0] === indent) {
+        return { start: index, end: cursor, indent: indent };
+      }
+    }
+    fail("条目「" + name + "」没有找到收尾行（写法不是本工具认识的常规缩进）");
+  }
+  return null;
+}
+
+function bottomBarVariantsBlock(lines) {
+  const barAt = lines.findIndex((line) => /"bottomBar"\s*:\s*\{/.test(line));
+  if (barAt < 0) fail("共享类型表里找不到 layoutRules.bottomBar");
+  for (let index = barAt + 1; index < lines.length; index += 1) {
+    if (!/"variants"\s*:\s*\{\s*$/.test(lines[index])) continue;
+    const indent = lines[index].match(/^\s*/)[0];
+    for (let cursor = index + 1; cursor < lines.length; cursor += 1) {
+      if (/^\s*\}/.test(lines[cursor]) && lines[cursor].match(/^\s*/)[0] === indent) {
+        return { start: index, end: cursor, indent: indent };
+      }
+    }
+    fail("bottomBar.variants 没有找到收尾行");
+  }
+  fail("共享类型表里找不到 bottomBar.variants");
+  return null;
+}
+
+function insertVariantEntry(mapText, name, fields, afterName) {
+  const eol = eolOf(mapText);
+  const lines = mapText.split(/\r?\n/);
+  if (afterName) {
+    const anchor = anchorIndentOfEntry(lines, afterName);
+    if (!anchor) fail("共享类型表里找不到参照条目「" + afterName + "」");
+    lines.splice(anchor.end + 1, 0, ...entryLines(anchor.indent, name, fields));
+  }
+  else {
+    const block = bottomBarVariantsBlock(lines);
+    if (!block) fail("共享类型表里找不到 bottomBar.variants");
+    lines.splice(block.end, 0, ...entryLines(block.indent + "  ", name, fields));
+  }
+  return lines.join(eol);
+}
+
+function removeVariantEntry(mapText, name) {
+  const eol = eolOf(mapText);
+  const lines = mapText.split(/\r?\n/);
+  const anchor = anchorIndentOfEntry(lines, name);
+  if (!anchor) {
+    fail(
+      "共享类型表里没有条目「" + name + "」",
+      "它可能只登记在路线映射表里；本工具只改共享类型表，请手工同步那一处。"
+    );
+  }
+  lines.splice(anchor.start, anchor.end - anchor.start + 1);
+  return lines.join(eol);
 }
 
 function bumpVersion(text) {
@@ -365,26 +418,14 @@ function commandAdd(args) {
   if (!args.like && !args.template) fail("必须给 --like <现有变体> 或 --template <小节片段文件>");
   if (args.like && args.template) fail("--like 与 --template 只能给一个");
 
-  // 校验读加载器的合并结果；写回用原文（保留缩进与行尾），并先确认键的主人。
+  // 校验全部读加载器的合并结果（真值源的唯一读取入口）；写回只在共享类型表原文上插一行。
   const merged = loadTemplateMap(ROUTE_MAP);
   const mergedVariants = variantsOf(merged);
-  const mapText = fs.readFileSync(SHARED_MAP, "utf8");
-  const shared = ownerOfBottomBarVariants(mapText);
-  const variants = variantsOf(shared);
-  if (variants[name]) fail("映射表里已经有「" + name + "」");
+  if (mergedVariants[name]) fail("映射表里已经有「" + name + "」");
   if (args.like && !mergedVariants[args.like]) fail("映射表里没有参照变体「" + args.like + "」");
-  if (args.like) {
-    const mergedEntry = mergedVariants[args.like];
-    const ownEntry = variants[args.like];
-    if (JSON.stringify(mergedEntry) !== JSON.stringify(ownEntry)) {
-      fail(
-        "参照变体「" + args.like + "」在合并结果里与共享表不一致（路线映射表可能覆盖了它）",
-        "本工具只改写共享表，遇到覆盖会写错来源；请手工同步。"
-      );
-    }
-  }
+  assertRouteDoesNotOverrideLayout(fs.readFileSync(ROUTE_MAP, "utf8"));
 
-  const likeEntry = args.like ? variants[args.like] : {};
+  const likeEntry = args.like ? mergedVariants[args.like] : {};
   const values = {};
   for (const pair of args.value || []) {
     const at = pair.indexOf("=");
@@ -428,14 +469,9 @@ function commandAdd(args) {
   assertSectionSet(sectionsBefore, sectionNames(doc), sectionsBefore.concat([name]), "新增 " + name);
 
   const pluginText = fs.readFileSync(PLUGIN_JSON, "utf8");
+  const mapText = fs.readFileSync(SHARED_MAP, "utf8");
   const changes = [
-    { file: SHARED_MAP, originalText: mapText, text: serializeJson(Object.assign({}, shared, {
-      layoutRules: Object.assign({}, shared.layoutRules, {
-        bottomBar: Object.assign({}, shared.layoutRules.bottomBar, {
-          variants: insertVariant(variants, name, Object.assign({}, likeEntry, values), args.like)
-        })
-      })
-    }), mapText) },
+    { file: SHARED_MAP, originalText: mapText, text: insertVariantEntry(mapText, name, Object.assign({}, likeEntry, values), args.like) },
     { file: LAYOUT_DOC, originalText: fs.readFileSync(LAYOUT_DOC, "utf8"), text: docText(doc) },
     { file: PLUGIN_JSON, originalText: pluginText, text: bumpVersion(pluginText) }
   ];
@@ -450,17 +486,8 @@ function commandRemove(args) {
 
   const merged = loadTemplateMap(ROUTE_MAP);
   if (!variantsOf(merged)[name]) fail("映射表里没有「" + name + "」");
+  assertRouteDoesNotOverrideLayout(fs.readFileSync(ROUTE_MAP, "utf8"));
   const mapText = fs.readFileSync(SHARED_MAP, "utf8");
-  const shared = ownerOfBottomBarVariants(mapText);
-  const variants = variantsOf(shared);
-  if (!variants[name]) {
-    fail(
-      "变体「" + name + "」在合并结果里有、在共享类型表里没有",
-      "它可能登记在路线映射表里；本工具只按原文改写共享类型表，请手工同步那一处。"
-    );
-  }
-  const next = Object.assign({}, variants);
-  delete next[name];
 
   const doc = loadDoc(LAYOUT_DOC);
   const sectionsBefore = sectionNames(doc);
@@ -472,11 +499,7 @@ function commandRemove(args) {
 
   const pluginText = fs.readFileSync(PLUGIN_JSON, "utf8");
   const changes = [
-    { file: SHARED_MAP, originalText: mapText, text: serializeJson(Object.assign({}, shared, {
-      layoutRules: Object.assign({}, shared.layoutRules, {
-        bottomBar: Object.assign({}, shared.layoutRules.bottomBar, { variants: next })
-      })
-    }), mapText) },
+    { file: SHARED_MAP, originalText: mapText, text: removeVariantEntry(mapText, name) },
     { file: LAYOUT_DOC, originalText: fs.readFileSync(LAYOUT_DOC, "utf8"), text: docText(doc) },
     { file: PLUGIN_JSON, originalText: pluginText, text: bumpVersion(pluginText) }
   ];
