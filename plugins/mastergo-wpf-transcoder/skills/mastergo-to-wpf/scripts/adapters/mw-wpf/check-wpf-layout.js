@@ -34,7 +34,10 @@
 //       且发射报告里该格子的 Width/Height/对齐/Margin 必须与 lib/design-box.js 的同一实现一致
 //       （shifted / unsized 两类例外按类、按维，见 page-build-rules.md 第 4 节第 14 条）
 //   R6 资源键闭环：{StaticResource <键>} 必须来自写法表样式族、本页 Icon 台账或 Icon 字典合并点
-//   R7 文本零硬编码中文：发射区不得出现字面中文
+//   R7 文本：发射区不得出现字面中文；发射区每个有设计文本的控件必须挂语言键
+//       （attrs.LangName）——唯一例外是映射表在值槽位登记 langRefPolicy=none 的节点
+//       （当前只有选择框的 Value）：该值运行时由数据决定，Bundle 侧记入 valueLangExempt，
+//       门禁不得反过来判它缺键
 //   R8 尺寸来源：框架固定区必须是 framework:<Token>（未被框架钉住的那一维是自由伸展的星号，来源仍是 design）；
 //       发射区取 design，主轴间隙带取 gap（Auto + 空 Grid 固定尺寸）
 //   R9 推导待确认：布局推导阶段挂起的节点（未归格 / 无尺寸 / 结构对不上 / 类型无处发射）逐条失败
@@ -380,9 +383,12 @@ function checkHardcodedText(xamlText, layout, typesByRef) {
     (region.grid.cells || []).forEach(function (cell) {
       const node = typesByRef.get(cell.ref);
       if (!node) return;
+      // 值槽位登记 langRefPolicy=none：该值不参与多语言（Bundle 侧记入 valueLangExempt），
+      // 与"全量产键"是同一条规则的例外，门禁按同一口径放行。
+      if (node.langRefPolicy === "none") return;
       const hasLang = Boolean(node.langName || (node.attrs && node.attrs.LangName));
       const text = String(node.sourceText || "").trim();
-      if (text && !hasLang && !cell.textPending) {
+      if (text && !hasLang) {
         report("R7", cell.ref, "有设计文本但没有语言键（必须产键挂 DynamicResource）: " + text);
       }
     });

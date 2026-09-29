@@ -47,7 +47,7 @@
 
 - **外观只走样式族**：`Style`、`Background`、边框与状态模板一律取 `mw-wpf-map.json` 的样式族键；设计稿的配色/边框与样式族冲突时**停下报告**，不散写属性凑。
 - **样式族选择键是 `(ControlType, 设计稿变体名)`**：命中 `styleRules.byVariant` 用具名键；未命中则用该类型的 `pageDefault`（`"implicit"` 表示走框架隐式默认样式），并记入发射报告供人工评审。两者都取不到即 fail-closed。
-- **文本**：一律走 `{DynamicResource <LangName>}`，挂载属性由 `textBinding` 决定（按钮默认 `Content`，`RightButtonStyle` / `UpDownRightButtonStyle` 这类"图标上+文字下"的样式族改挂 `IconText`，`TextBlock` 挂 `Text`，`GroupBox` 挂 `Header`）。没有语言键的文本不写字面量，进发射报告的待办。
+- **文本**：一律走 `{DynamicResource <LangName>}`，挂载属性由 `textBinding` 决定（按钮默认 `Content`，`RightButtonStyle` / `UpDownRightButtonStyle` 这类"图标上+文字下"的样式族改挂 `IconText`，`TextBlock` 挂 `Text`，`GroupBox` 挂 `Header`）。没有语言键的文本不写字面量，进发射报告的待办（值槽位登记 `langRefPolicy: "none"` 的值不在此列：它不参与多语言，门禁按同一条登记放行）。
 - **图形**：`Icon="{StaticResource <图形名>}"`，图形名取自本页 Icon 台账。
 - **协议**（`Click="{s:Action …}"`、`PageName="Jump:…"`、`IOEnable`、`IOVisible`、`IOName`）：只在有来源时发射，A 侧不写空串占位（与作业B 的"恒写空串"口径不同，因为 A 侧没有宿主恒写字段）。
 
