@@ -378,20 +378,28 @@ function checkHardcodedText(xamlText, layout, typesByRef) {
       report("R7", null, "文本必须走 {DynamicResource <LangName>}，不得写字面文案: " + match[1]);
     }
   }
+  // 递归到每一层 Grid（与 R1/R3/R5/R8 的 walkNested、R2 的 walkProtocols 同深度）：
+  // 容器里的控件同样是"发射区的控件"，只查顶层会让「分组框套分组框」的内层文本漏过。
+  const walk = function (grid) {
+    (grid.cells || []).forEach(function (cell) {
+      const node = typesByRef.get(cell.ref);
+      if (node) {
+        // 值槽位登记 langRefPolicy=none：该值不参与多语言（Bundle 侧记入 valueLangExempt），
+        // 与"全量产键"是同一条规则的例外，门禁按同一口径放行。
+        if (node.langRefPolicy !== "none") {
+          const hasLang = Boolean(node.langName || (node.attrs && node.attrs.LangName));
+          const text = String(node.sourceText || "").trim();
+          if (text && !hasLang) {
+            report("R7", cell.ref, "有设计文本但没有语言键（必须产键挂 DynamicResource）: " + text);
+          }
+        }
+      }
+      if (cell.children) walk(cell.children);
+    });
+  };
   layout.regions.forEach(function (region) {
     if (region.emit === false) return;
-    (region.grid.cells || []).forEach(function (cell) {
-      const node = typesByRef.get(cell.ref);
-      if (!node) return;
-      // 值槽位登记 langRefPolicy=none：该值不参与多语言（Bundle 侧记入 valueLangExempt），
-      // 与"全量产键"是同一条规则的例外，门禁按同一口径放行。
-      if (node.langRefPolicy === "none") return;
-      const hasLang = Boolean(node.langName || (node.attrs && node.attrs.LangName));
-      const text = String(node.sourceText || "").trim();
-      if (text && !hasLang) {
-        report("R7", cell.ref, "有设计文本但没有语言键（必须产键挂 DynamicResource）: " + text);
-      }
-    });
+    walk(region.grid);
   });
 }
 

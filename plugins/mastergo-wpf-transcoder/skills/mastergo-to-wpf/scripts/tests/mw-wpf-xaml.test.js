@@ -205,6 +205,29 @@ function emitArgs(layoutPath, typesPath, outPath, extra = []) {
   assert.strictEqual(report.textPending[0].text, "工件厚度");
 }
 
+// 4b) 值槽位登记 langRefPolicy=none（选择框的 Value，如 "Auto"）：不写字面量、不算待办文本，
+//     单列进 valueLangExempt —— 与 Bundle 审计同名同义，A 门禁 R7 也按这条登记放行。
+{
+  const layout = baseLayout();
+  layout.regions[1].grid.cells = [cell("work/select", "ComboBox", 1, 0, designBox(600, 522, 170, 40))];
+  const layoutPath = writeJson("layout.valueexempt.json", layout);
+  const typesPath = writeJson("types.valueexempt.json", baseTypes([
+    {
+      ref: "work/select", sourceRef: "work/select", controlType: "ComboBox", variant: "选择框-40",
+      sourceText: "Auto", valueSource: "dsl.text", langRefPolicy: "none", absX: 16, absY: 106, w: 170, h: 40
+    }
+  ]));
+  const outPath = path.join(tmpRoot, "valueexempt", "View.xaml");
+  const reportPath = path.join(tmpRoot, "valueexempt", "report.json");
+  run(emitArgs(layoutPath, typesPath, outPath, ["--report", reportPath, "--overwrite"]));
+  const xaml = fs.readFileSync(outPath, "utf8");
+  const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
+  assert.ok(!xaml.includes("Auto"), "豁免值不得写成字面量");
+  assert.strictEqual(report.textPending.length, 0, "值槽位豁免不算待办文本");
+  assert.strictEqual(report.valueLangExempt.length, 1);
+  assert.strictEqual(report.valueLangExempt[0].text, "Auto");
+}
+
 // 5) 目标已存在且未加 --overwrite → 拒绝覆盖。
 {
   const layoutPath = writeJson("layout.exists.json", baseLayout());

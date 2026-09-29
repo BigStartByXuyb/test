@@ -54,7 +54,7 @@
 13. **尺寸约束未发射**：带约束的格子必须在 `View.xaml` 里出现对应的 `MinWidth / MaxWidth / MinHeight / MaxHeight`（入参前提见 `check-wpf-layout.js` 头部 CLI 注释）。
 14. **格子尺寸与尺寸/对齐发射**：每个格子必须登记格子尺寸（像素带照值、间隙带照 gap、自适应带吃剩余、跨格按 span 累加）与承载物设计尺寸；间隙带必须是 `Auto` 且带正数 gap，间隙格里不得有控件类型 / 承载物尺寸 / 尺寸约束，空 Grid 的固定尺寸必须与该带的 gap 一致（发射报告的 `spacers` 与产物逐条对齐）；发射报告里该格子的 `Width / Height / HorizontalAlignment / VerticalAlignment / Margin` 必须与 `scripts/lib/design-box.js` 的同一实现一致（格子尺寸 − 控件尺寸 = 间距，差值落在哪一侧由设计稿偏移决定）。缺格子尺寸、格子尺寸与行列定义重算不一致、报告缺条目或取值不一致都失败（入参前提见 `check-wpf-layout.js` 头部 CLI 注释）。**例外按类说明**（只免掉真正没有真值的那部分）：`cell.shifted`（为避让撞格被挪出设计带）设计稿偏移没有真值——只写控件自身尺寸、不表达间距 / 对齐，只有这一半按提示登记，格子尺寸与承载物设计尺寸照常要求与核对；`cell.unsized = {width?,height?}`（自适应带被前面的固定带 / 间隙带吃光＝内容溢出承载物）按维免尺寸——该维什么都不写，且只在该维重算值非正数时才放行（重算 > 0 即失败，说明产物被改坏）。发射报告缺条目、取值不一致与第 11 / 13 条照常失败。
 
-门禁报告落在 `Generated/_inputs/<页面名>.wpf-gate.json`；发射器自己的报告（命中的样式键、未命中变体、待办文本、跳过的固定区）落在 `Generated/_inputs/<页面名>.wpf-xaml.report.json`。
+门禁报告落在 `Generated/_inputs/<页面名>.wpf-gate.json`；发射器自己的报告（命中的样式键、未命中变体、待办文本、值槽位豁免的值、跳过的固定区）落在 `Generated/_inputs/<页面名>.wpf-xaml.report.json`。
 
 ## 5. 尺寸约束（min/max 宽高）
 

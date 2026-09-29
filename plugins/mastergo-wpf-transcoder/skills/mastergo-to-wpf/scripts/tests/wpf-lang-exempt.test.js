@@ -109,4 +109,41 @@ function runGate(node) {
   assert.strictEqual(outcome.report.counts.R7, undefined, "挂了 LangName 的节点不得报 R7");
 }
 
+// ④ 容器内层 Grid 同样要查：R7 不递归的话，"分组框套控件"的文本会整层漏过。
+{
+  const nested = JSON.parse(JSON.stringify(LAYOUT));
+  nested.regions[0].grid.cells = [
+    {
+      ref: "1:2",
+      row: 0,
+      column: 0,
+      rowSpan: 1,
+      columnSpan: 1,
+      controlType: "GroupBox",
+      container: true,
+      children: {
+        rows: [{ size: "Pixel", value: 40, source: "design" }],
+        columns: [{ size: "Pixel", value: 200, source: "design" }],
+        cells: [{ ref: "1:2/9:1", row: 0, column: 0, rowSpan: 1, columnSpan: 1, controlType: "ComboBox" }]
+      }
+    }
+  ];
+  const layoutPath = writeJson("layout-nested.json", nested);
+  const typesPath = writeJson("types-nested.json", {
+    nodes: [
+      { ref: "1:2", sourceRef: "1:2", controlType: "GroupBox", container: true, attrs: {} },
+      { ref: "1:2/9:1", sourceRef: "1:2/9:1", sourceText: "Auto", valueSource: "dsl.text", controlType: "ComboBox", attrs: { Value: "Auto" } }
+    ]
+  });
+  const reportPath = path.join(tmp, "nested-report.json");
+  const result = spawnSync(
+    process.execPath,
+    [CHECK, "--layout", layoutPath, "--types", typesPath, "--map", MAP, "--json", reportPath],
+    { encoding: "utf8" }
+  );
+  const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
+  assert.strictEqual(report.counts.R7, 1, "容器内层没有语言键的文本必须被 R7 拦下");
+  assert.strictEqual(result.status, 2, "内层缺键同样失败（exit 2）");
+}
+
 console.log("wpf-lang-exempt 全部通过");

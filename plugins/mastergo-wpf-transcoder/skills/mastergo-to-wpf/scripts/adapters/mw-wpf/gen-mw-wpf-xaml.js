@@ -261,6 +261,10 @@ function renderControl(node, cell, ctx, depth) {
     attr(textAttr, "{DynamicResource " + langName + "}");
   } else if (langName && !textAttr) {
     fail(node.controlType + " 的文本挂载属性未登记（写法表 textBinding）：" + node.ref);
+  } else if (node.langRefPolicy === "none") {
+    // 值槽位登记 langRefPolicy=none（选择框的 Value）：该值运行时由数据决定，不参与多语言 ——
+    // 既不写字面量、也不算待办文本，与 Bundle 审计的 valueLangExempt 同名同义，单列供交付说明登记。
+    ctx.report.valueLangExempt.push({ ref: node.ref, controlType: node.controlType, text: node.sourceText });
   } else if (!langName && (node.sourceText || "").trim()) {
     ctx.report.textPending.push({ ref: node.ref, controlType: node.controlType, text: node.sourceText });
   }
@@ -374,6 +378,8 @@ function renderResources(ctx) {
 function renderXaml(args, layout, typeInfo, map) {
   const report = {
     styleHits: [], styleFallback: [], textPending: [], skippedRegions: [], pending: layout.pending || [],
+    // 值槽位登记 langRefPolicy=none 的值（选择框的 Value）：不参与多语言，单列而不进 textPending。
+    valueLangExempt: [],
     // 每个格子发射的尺寸/对齐（门禁按 lib/design-box.js 的同一实现复核）。
     designBox: [],
     // 间隙格（空 Grid 的固定尺寸），门禁按件数与尺寸复核。
