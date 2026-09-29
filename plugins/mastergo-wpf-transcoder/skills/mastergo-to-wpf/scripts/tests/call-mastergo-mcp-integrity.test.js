@@ -12,7 +12,7 @@ const { test } = require("node:test");
 const cli = path.join(__dirname, "..", "core", "call-mastergo-mcp.js");
 const marker = "PRIVATE_DESIGN_PAYLOAD_MUST_NOT_ENTER_CONTEXT";
 
-function captureWithStub(t, config) {
+function captureWithStub(config) {
   const root = tmpDir("mastergo-stream-");
   const stubPath = path.join(root, "stub.cjs");
   const tool = config.tool || "getDsl";
@@ -70,9 +70,9 @@ input.on("line", (line) => {
 }
 
 for (const splitCharacter of ["汉", "🙂", "é"]) {
-  test("MCP preserves UTF-8 when a pipe chunk splits " + splitCharacter, (t) => {
+  test("MCP preserves UTF-8 when a pipe chunk splits " + splitCharacter, () => {
     const payload = JSON.stringify({ text: "汉字🙂é", marker });
-    const result = captureWithStub(t, {
+    const result = captureWithStub({
       content: [{ type: "text", text: payload }], splitCharacter
     });
     assert.equal(result.status, 0, result.stderr);
@@ -88,8 +88,8 @@ for (const content of [
   [{ type: "image", mimeType: "image/png", data: marker }],
   [{ type: "text", text: { marker } }]
 ]) {
-  test("unsupported MCP content cannot truncate, overwrite, or leak a capture: " + content[0].type + "/" + content.length, (t) => {
-    const result = captureWithStub(t, { content });
+  test("unsupported MCP content cannot truncate, overwrite, or leak a capture: " + content[0].type + "/" + content.length, () => {
+    const result = captureWithStub({ content });
     assert.equal(result.status, 4, result.stderr);
     assert.equal(result.captured, result.previous);
     assert.equal((result.stdout + result.stderr).includes(marker), false);
@@ -99,10 +99,10 @@ for (const content of [
 
 // extractSvg 是分页接口（pageSize 上限 100）。只取第一页会让 >100 个图标的页面静默漏条目，
 // 因此聚合必须是"拉全 + 合并 + 与 totalCount 对齐"，且不完整时**不写输出文件**。
-test("extractSvg aggregation fetches every page and merges them into one capture", (t) => {
+test("extractSvg aggregation fetches every page and merges them into one capture", () => {
   const page0 = { totalCount: 3, count: 2, page: 0, pageSize: 2, hasMore: true, svgs: [{ id: "a" }, { id: "b" }] };
   const page1 = { totalCount: 3, count: 1, page: 1, pageSize: 2, hasMore: false, svgs: [{ id: "c" }] };
-  const result = captureWithStub(t, { tool: "extractSvg", pageSize: 2, pages: { 0: page0, 1: page1 } });
+  const result = captureWithStub({ tool: "extractSvg", pageSize: 2, pages: { 0: page0, 1: page1 } });
 
   assert.equal(result.status, 0, result.stderr);
   const merged = JSON.parse(result.captured);
@@ -115,22 +115,22 @@ test("extractSvg aggregation fetches every page and merges them into one capture
   assert.deepEqual(summary.svgPaging, { pages: 2, entries: 3, totalCount: 3 });
 });
 
-test("extractSvg aggregation refuses a truncated page set instead of writing it", (t) => {
+test("extractSvg aggregation refuses a truncated page set instead of writing it", () => {
   // 服务端声称有 3 条却只给 1 条且 hasMore=false：聚合结果与 totalCount 不符 → 失败且保留旧文件。
   const page0 = { totalCount: 3, count: 1, page: 0, pageSize: 2, hasMore: false, svgs: [{ id: "a" }] };
-  const result = captureWithStub(t, { tool: "extractSvg", pageSize: 2, pages: { 0: page0 } });
+  const result = captureWithStub({ tool: "extractSvg", pageSize: 2, pages: { 0: page0 } });
 
   assert.equal(result.status, 4, result.stderr);
   assert.equal(result.captured, result.previous);
   assert.match(result.stderr, /分页聚合不完整/);
 });
 
-test("extractSvg aggregation stops at the page cap when hasMore never clears", (t) => {
+test("extractSvg aggregation stops at the page cap when hasMore never clears", () => {
   const pages = {};
   for (let index = 0; index < 200; index += 1) {
     pages[index] = { totalCount: 999, count: 1, page: index, pageSize: 1, hasMore: true, svgs: [{ id: "x" + index }] };
   }
-  const result = captureWithStub(t, { tool: "extractSvg", pageSize: 1, pages });
+  const result = captureWithStub({ tool: "extractSvg", pageSize: 1, pages });
 
   assert.equal(result.status, 4, result.stderr);
   assert.equal(result.captured, result.previous);
@@ -139,10 +139,10 @@ test("extractSvg aggregation stops at the page cap when hasMore never clears", (
 
 // 回归（v1.0.246 语义审计 REVIEW-002）：分页聚合会发多次 tools/call，超时窗口必须**按请求重新武装**。
 // 改造前定时器在首个响应后就被清掉，第 2 页及以后卡住会让脚本永久挂起（而不是按契约以非零码退出）。
-test("extractSvg pagination keeps each page request under the timeout window", (t) => {
+test("extractSvg pagination keeps each page request under the timeout window", () => {
   const page0 = { totalCount: 2, count: 1, page: 0, pageSize: 1, hasMore: true, svgs: [{ id: "a" }] };
   const page1 = { totalCount: 2, count: 1, page: 1, pageSize: 1, hasMore: false, svgs: [{ id: "b" }] };
-  const result = captureWithStub(t, {
+  const result = captureWithStub({
     tool: "extractSvg", pageSize: 1, timeoutMs: 400,
     pages: { 0: page0, 1: page1 }, delayPages: { 1: 2000 }
   });

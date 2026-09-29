@@ -11,7 +11,7 @@ const { test } = require("node:test");
 const registry = require("../lib/run-registry.js");
 const cli = path.join(__dirname, "..", "core", "run-registry.mjs");
 
-function registeredRun(t, overrides = {}) {
+function registeredRun(overrides = {}) {
   const projectRoot = tmpDir("mastergo-integrity-");
   const options = {
     projectRoot, target: "Demo", fileId: "file-A", layerId: "layer-A",
@@ -36,8 +36,8 @@ for (const [field, changed] of [
   ["fileId", "file-B"], ["layerId", "layer-B"], ["ui", "F3"],
   ["designPageName", "设计页 B"], ["target", "AnotherPage"]
 ]) {
-  test("resume rejects changed " + field + " without rewriting the registry", (t) => {
-    const run = registeredRun(t);
+  test("resume rejects changed " + field + " without rewriting the registry", () => {
+    const run = registeredRun();
     const before = fs.readFileSync(run.file);
     assert.throws(() => registry.createRegistry({
       ...run.options, keep: true, out: run.file, [field]: changed
@@ -47,15 +47,15 @@ for (const [field, changed] of [
   });
 }
 
-test("resume cannot assign a source identity to already registered anonymous bytes", (t) => {
-  const run = registeredRun(t, { fileId: null });
+test("resume cannot assign a source identity to already registered anonymous bytes", () => {
+  const run = registeredRun({ fileId: null });
   const before = fs.readFileSync(run.file);
   assert.throws(() => registry.createRegistry({ ...run.options, keep: true, fileId: "file-B" }), /fileId/);
   assert.deepEqual(fs.readFileSync(run.file), before);
 });
 
-test("resume rejects a different project root even with an explicit registry path", (t) => {
-  const run = registeredRun(t);
+test("resume rejects a different project root even with an explicit registry path", () => {
+  const run = registeredRun();
   const before = fs.readFileSync(run.file);
   assert.throws(() => registry.createRegistry({
     ...run.options, keep: true, out: run.file, projectRoot: path.join(run.options.projectRoot, "another")
@@ -63,8 +63,8 @@ test("resume rejects a different project root even with an explicit registry pat
   assert.deepEqual(fs.readFileSync(run.file), before);
 });
 
-test("resume preserves identity and artifacts while allowing semantic input updates", (t) => {
-  const run = registeredRun(t);
+test("resume preserves identity and artifacts while allowing semantic input updates", () => {
+  const run = registeredRun();
   const resumed = registry.createRegistry({
     projectRoot: path.join(run.options.projectRoot, "."), target: "Demo", keep: true,
     pageTitleText: "新标题", translations: { path: "translations.json", sha256: "new-input" }
@@ -78,8 +78,8 @@ test("resume preserves identity and artifacts while allowing semantic input upda
 });
 
 for (const corrupt of [null, [], { schemaVersion: "unsupported" }]) {
-  test("resume rejects invalid registry " + JSON.stringify(corrupt), (t) => {
-    const run = registeredRun(t);
+  test("resume rejects invalid registry " + JSON.stringify(corrupt), () => {
+    const run = registeredRun();
     fs.writeFileSync(run.file, JSON.stringify(corrupt));
     const before = fs.readFileSync(run.file);
     assert.throws(() => registry.createRegistry({ ...run.options, keep: true }), /schemaVersion/);
@@ -87,8 +87,8 @@ for (const corrupt of [null, [], { schemaVersion: "unsupported" }]) {
   });
 }
 
-test("resume requires an existing registry; fresh init can intentionally change source", (t) => {
-  const run = registeredRun(t);
+test("resume requires an existing registry; fresh init can intentionally change source", () => {
+  const run = registeredRun();
   const fresh = registry.createRegistry({ ...run.options, fileId: "file-B" });
   assert.notEqual(fresh.registry.runId, run.registry.runId);
   assert.deepEqual(fresh.registry.artifacts, {});
@@ -98,16 +98,16 @@ test("resume requires an existing registry; fresh init can intentionally change 
 });
 
 for (const args of [["--key", "snapshot"], ["--key", "snapshop"], ["--key"], ["--key", ""]]) {
-  test("explicit artifact check fails closed: " + JSON.stringify(args), (t) => {
-    const run = registeredRun(t);
+  test("explicit artifact check fails closed: " + JSON.stringify(args), () => {
+    const run = registeredRun();
     const result = registryCommand(["check", "--run", run.file, ...args]);
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /snapshot|snapshop|--key/);
   });
 }
 
-test("implicit checks allow partial runs; explicit checks still verify hashes", (t) => {
-  const run = registeredRun(t);
+test("implicit checks allow partial runs; explicit checks still verify hashes", () => {
+  const run = registeredRun();
   assert.equal(registryCommand(["check", "--run", run.file]).status, 0);
   assert.equal(registryCommand(["check", "--run", run.file, "--key", "getDsl"]).status, 0);
   fs.appendFileSync(run.capture, "\n");
@@ -116,8 +116,8 @@ test("implicit checks allow partial runs; explicit checks still verify hashes", 
   assert.match(changed.stderr, /与磁盘不一致/);
 });
 
-test("CLI resume uses the same immutable identity guard", (t) => {
-  const run = registeredRun(t);
+test("CLI resume uses the same immutable identity guard", () => {
+  const run = registeredRun();
   const before = fs.readFileSync(run.file);
   const result = registryCommand([
     "init", "--project-root", run.options.projectRoot, "--target", "Demo",
