@@ -128,7 +128,12 @@ description: 强制规范 MasterGo → MTSLG IOContorl 映射文档的写法，�
 
 新增模板族时不必先判断它属于哪类写法：直接跑下面的覆盖审计，报告里的阻断字段 `unregisteredFamilies`、`unregisteredVariants`、`undocumented`、`duplicateMatchKeys` 会指出该族还差哪一项（映射表条目、映射文档条目，或文档里没用结构化写法写明），按报告补齐后再重跑，直到这四项全部为空；`unresolvedSections` 是同一问题的定位视图（孤儿章节），`labels` / `unconfirmed` 只是提示，都不单独阻断。这四项全空**不代表**新增族已完工——生成器侧按第 1 项另跑族分支门禁。
 
-**底部栏变体有一条命令把这类改动做齐**：`node skills/mastergo-to-wpf/scripts/tools/mapping-change.js add-variant --family layoutRules.bottomBar --name <新名字> (--like <现有变体> | --template <小节片段文件>)`，删除用同一脚本的 `remove-variant`。它只改这三个文件：共享类型表 `references/component-types.json`、Layout 规范文档 `references/adapters/mtslg-iocontrol/feishu-layout-mapping.md`（总数行 + 枚举 + 变体小节）、`.claude-plugin/plugin.json`（版本号）；改完自动跑覆盖审计、`node --test` 与两个 `.tests.ps1`，任何一项失败就把这 3 个文件写回原文。它对真值源的读取只走第 1 项的 `scripts/lib/load-template-map.js`（校验与写回后的复验都用那份合并结果；不自行解析真值源，也不直接读路线映射表）；写回是在共享类型表**原文里按缩进锚点插入或删除一条条目**，并维护条目之间的逗号分隔；锚点找不到就停（说明这个键不在那份文件里）；写回后立刻用加载器复验「新增的确实出现 / 删除的确实消失」，路线映射表若覆盖了 `layoutRules` 就不会生效，此时回滚。第 2 项的组件库映射文档 `feishu-component-library-mapping.md` **不在它的改动范围内**，组件库族仍要手工同步 —— 那份文档是「一节覆盖多个变体」（如 `组件集=输入框，变体=整数`），与映射表的粒度（`输入框-整数-40`）不一致，工具不猜。
+**映射变更有一条命令把这类改动做齐**：`node skills/mastergo-to-wpf/scripts/tools/mapping-change.js add-variant --family <族键> --name <新名字> (--like <现有变体> | --template <小节片段文件>)`，删除用同一脚本的 `remove-variant`；`check` 只跑门禁，`audit` 拉最近一次 CI 语义审计结果。族键取 `layoutRules.bottomBar` 或共享类型表里任一带 `variants` 的顶层族键，工具按族键自动分派两种形态：
+
+- `layoutRules.bottomBar`：改总数行 + 枚举 + 插入「### 变体：」小节。`--template` 片段的第一行必须是 `### 变体：<新名字>`；`--like` 克隆时小节里若还有别处提到参照变体（说明不只是换名字），要么加 `--allow-residual-mentions` 确认，要么改用 `--template`。
+- 组件库族：不接受 `--template`，落点由参照变体在 `feishu-component-library-mapping.md` 里的位置决定 —— 标题取值整节克隆（标题里并列多个取值就停）、`MasterGo 变体：` 清单行插名字并同步本节「N者」数词、对照表首格停（取值要人定）；落点不是恰好一处也停，工具不猜。
+
+它只改这三个文件：共享类型表 `references/component-types.json`、该形态对应的人读文档（`feishu-layout-mapping.md` 或 `feishu-component-library-mapping.md`）、`.claude-plugin/plugin.json`（版本号）；改完自动跑覆盖审计、`node --test` 与全部 `.tests.ps1`，任何一项失败就把这 3 个文件写回原文。它对真值源的读取只走第 1 项的 `scripts/lib/load-template-map.js`（校验与写回后的复验都用那份合并结果；不自行解析真值源，也不直接读路线映射表）；写回是在共享类型表**原文里按缩进锚点插入或删除一条条目**，并维护条目之间的逗号分隔；锚点找不到就停（说明这个键不在那份文件里）；写回后立刻用加载器复验「新增的确实出现 / 删除的确实消失」，路线映射表若覆盖了这一段就不会生效，此时回滚。
 
 改完后按顺序自检，任何一步非零退出都必须修完再提交：
 
