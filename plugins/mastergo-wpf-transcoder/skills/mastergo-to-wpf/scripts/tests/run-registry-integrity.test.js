@@ -3,16 +3,16 @@
 
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
-const os = require("node:os");
 const path = require("node:path");
+
+const { tmpDir } = require(path.join(__dirname, "helpers", "tmp-dir.js"));
 const { spawnSync } = require("node:child_process");
 const { test } = require("node:test");
 const registry = require("../lib/run-registry.js");
 const cli = path.join(__dirname, "..", "core", "run-registry.mjs");
 
 function registeredRun(t, overrides = {}) {
-  const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), "mastergo-integrity-"));
-  t.after(() => fs.rmSync(projectRoot, { recursive: true, force: true }));
+  const projectRoot = tmpDir("mastergo-integrity-");
   const options = {
     projectRoot, target: "Demo", fileId: "file-A", layerId: "layer-A",
     ui: "F2", designPageName: "设计页 A", ...overrides

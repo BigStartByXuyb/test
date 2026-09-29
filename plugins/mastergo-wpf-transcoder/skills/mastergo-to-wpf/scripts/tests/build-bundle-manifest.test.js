@@ -6,14 +6,15 @@
 
 const assert = require("assert");
 const fs = require("fs");
-const os = require("os");
 const path = require("path");
+
+const { tmpDir } = require(path.join(__dirname, "helpers", "tmp-dir.js"));
 const { spawnSync } = require("child_process");
 
 const script = path.join(__dirname, "..", "adapters/mtslg-iocontrol", "build-bundle-manifest.mjs");
 const registryCli = path.join(__dirname, "..", "core", "run-registry.mjs");
 
-const root = fs.mkdtempSync(path.join(os.tmpdir(), "mastergo-bundle-manifest-"));
+const root = tmpDir("mastergo-bundle-manifest-");
 const write = (relative, data) => {
   const file = path.join(root, relative);
   fs.mkdirSync(path.dirname(file), { recursive: true });

@@ -3,8 +3,9 @@
 
 const assert = require("assert");
 const fs = require("fs");
-const os = require("os");
 const path = require("path");
+
+const { tmpDir } = require(path.join(__dirname, "helpers", "tmp-dir.js"));
 const {
   loadTemplateMap,
   resolveTemplateMapping
@@ -431,13 +432,12 @@ assert.throws(
   /组件集与公开属性值不一致/
 );
 
-const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "mtslg-template-resolver-"));
+const tempDir = tmpDir("mtslg-template-resolver-");
 const inputPath = path.join(tempDir, "input.json");
 const outputPath = path.join(tempDir, "output.json");
 fs.writeFileSync(inputPath, JSON.stringify(makeMapping("加减快捷操作-有标题", slotsForWithTitle())), "utf8");
 fs.writeFileSync(outputPath, JSON.stringify(resolved), "utf8");
 assert.ok(fs.existsSync(inputPath) && fs.existsSync(outputPath));
-fs.rmSync(tempDir, { recursive: true, force: true });
 
 // 轴操作-快慢：8 个方向键槽位；optional 的 SCAN 在设计稿不存在时允许缺席，必经槽位仍不得缺失。
 const axisSlots = ['up_inner', 'up_outer', 'down_inner', 'down_outer',

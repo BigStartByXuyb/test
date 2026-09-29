@@ -2,12 +2,13 @@
 
 const assert = require('assert');
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
+
+const { tmpDir } = require(path.join(__dirname, "helpers", "tmp-dir.js"));
 const { spawnSync } = require('child_process');
 const { loadTemplateMap } = require(path.join(__dirname, '..', 'lib', 'load-template-map.js'));
 
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mastergo-mtslg-mapping-'));
+const dir = tmpDir('mastergo-mtslg-mapping-');
 const dslPath = path.join(dir, 'dsl.snapshot.json');
 const visibilityPath = path.join(dir, 'visibility.json');
 const iconMapPath = path.join(dir, 'icon-map.json');

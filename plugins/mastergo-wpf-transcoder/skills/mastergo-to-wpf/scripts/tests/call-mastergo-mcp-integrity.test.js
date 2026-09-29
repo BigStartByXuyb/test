@@ -4,16 +4,16 @@
 // Real subprocess/stdio tests: no MasterGo credentials, network, or PowerShell.
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
-const os = require("node:os");
 const path = require("node:path");
+
+const { tmpDir } = require(path.join(__dirname, "helpers", "tmp-dir.js"));
 const { spawnSync } = require("node:child_process");
 const { test } = require("node:test");
 const cli = path.join(__dirname, "..", "core", "call-mastergo-mcp.js");
 const marker = "PRIVATE_DESIGN_PAYLOAD_MUST_NOT_ENTER_CONTEXT";
 
 function captureWithStub(t, config) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "mastergo-stream-"));
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const root = tmpDir("mastergo-stream-");
   const stubPath = path.join(root, "stub.cjs");
   const tool = config.tool || "getDsl";
   const out = path.join(root, tool + ".json");

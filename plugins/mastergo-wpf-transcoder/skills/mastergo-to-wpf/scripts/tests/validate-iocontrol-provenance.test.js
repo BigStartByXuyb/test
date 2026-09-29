@@ -1,11 +1,12 @@
 'use strict';
 
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
+
+const { tmpDir } = require(path.join(__dirname, "helpers", "tmp-dir.js"));
 const { validate, validateTextAudit } = require('../adapters/mtslg-iocontrol/validate-iocontrol-provenance');
 
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'iocontrol-provenance-'));
+const dir = tmpDir('iocontrol-provenance-');
 const xmlPath = path.join(dir, 'bad.xml');
 const manifestPath = path.join(dir, 'mapping.json');
 

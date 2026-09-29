@@ -7,12 +7,13 @@
 
 const assert = require("assert");
 const fs = require("fs");
-const os = require("os");
 const path = require("path");
+
+const { tmpDir } = require(path.join(__dirname, "helpers", "tmp-dir.js"));
 const { spawnSync } = require("child_process");
 
 const script = path.join(__dirname, "..", "adapters/mtslg-iocontrol", "scan-icon-coords.js");
-const root = fs.mkdtempSync(path.join(os.tmpdir(), "mastergo-icon-coords-"));
+const root = tmpDir("mastergo-icon-coords-");
 
 // 1) 现行形态 + 一个未归一化的图标（最小坐标 -40）
 const xaml = [

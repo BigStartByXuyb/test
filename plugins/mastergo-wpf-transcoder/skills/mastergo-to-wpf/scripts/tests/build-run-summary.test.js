@@ -6,8 +6,9 @@
 
 const assert = require("assert");
 const fs = require("fs");
-const os = require("os");
 const path = require("path");
+
+const { tmpDir } = require(path.join(__dirname, "helpers", "tmp-dir.js"));
 const { spawnSync } = require("child_process");
 
 const scripts = path.join(__dirname, "..");
@@ -17,7 +18,7 @@ const summaryCli = path.join(scripts, "core", "build-run-summary.mjs");
 const runNode = (cli, args) => spawnSync(process.execPath, [cli].concat(args), { encoding: "utf8" });
 
 function newProject() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "mastergo-run-summary-"));
+  const root = tmpDir("mastergo-run-summary-");
   const write = (relative, data) => {
     const file = path.join(root, relative);
     fs.mkdirSync(path.dirname(file), { recursive: true });

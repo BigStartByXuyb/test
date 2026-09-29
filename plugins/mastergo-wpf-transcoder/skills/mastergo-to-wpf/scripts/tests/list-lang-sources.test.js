@@ -8,12 +8,13 @@
 
 const assert = require("assert");
 const fs = require("fs");
-const os = require("os");
 const path = require("path");
+
+const { tmpDir } = require(path.join(__dirname, "helpers", "tmp-dir.js"));
 const { spawnSync } = require("child_process");
 
 const cli = path.join(__dirname, "..", "adapters/mtslg-iocontrol", "list-lang-sources.mjs");
-const root = fs.mkdtempSync(path.join(os.tmpdir(), "mtslg-lang-sources-"));
+const root = tmpDir("mtslg-lang-sources-");
 
 const mappingFile = path.join(root, "Demo.mapping.json");
 fs.writeFileSync(mappingFile, JSON.stringify({

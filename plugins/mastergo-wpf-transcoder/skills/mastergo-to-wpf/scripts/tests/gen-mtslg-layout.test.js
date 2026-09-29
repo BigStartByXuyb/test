@@ -3,13 +3,14 @@
 
 const assert = require("assert");
 const fs = require("fs");
-const os = require("os");
 const path = require("path");
+
+const { tmpDir } = require(path.join(__dirname, "helpers", "tmp-dir.js"));
 const { spawnSync } = require("child_process");
 const { loadTemplateMap } = require(path.join(__dirname, "..", "lib", "load-template-map.js"));
 
 const script = path.join(__dirname, "..", "adapters/mtslg-iocontrol", "gen-mtslg-layout.js");
-const root = fs.mkdtempSync(path.join(os.tmpdir(), "mtslg-layout-"));
+const root = tmpDir("mtslg-layout-");
 const manifest = path.join(root, "layout.json");
 const layout = path.join(root, "Layout.xml");
 

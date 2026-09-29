@@ -10,8 +10,9 @@
 
 const assert = require("assert");
 const fs = require("fs");
-const os = require("os");
 const path = require("path");
+
+const { tmpDir } = require(path.join(__dirname, "helpers", "tmp-dir.js"));
 const { spawnSync } = require("child_process");
 
 const SCRIPT_DIR = path.join(__dirname, "..");
@@ -66,7 +67,7 @@ assert.ok(/script-helpers\.js/.test(map.textNewlinePolicy.implementationSource |
   "映射表必须登记实现真值源（scripts/lib/script-helpers.js）");
 
 // 5) 端到端：语言键派生 + 字典发射保留换行；页面 XML 写 &#x0a;；provenance 仍 PASS。
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), "mastergo-newline-"));
+const dir = tmpDir("mastergo-newline-");
 const ref = "page/btn";
 const sourceText = "保存\u2028激光- JF";
 const mapping = {

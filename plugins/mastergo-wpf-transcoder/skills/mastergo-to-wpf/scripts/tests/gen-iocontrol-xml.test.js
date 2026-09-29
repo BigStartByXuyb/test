@@ -2,11 +2,12 @@
 
 const assert = require('assert');
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
+
+const { tmpDir } = require(path.join(__dirname, "helpers", "tmp-dir.js"));
 const { spawnSync } = require('child_process');
 
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'iocontrol-xml-'));
+const dir = tmpDir('iocontrol-xml-');
 const mapping = path.join(dir, 'mapping.json');
 const output = path.join(dir, 'page.xml');
 fs.writeFileSync(mapping, JSON.stringify({

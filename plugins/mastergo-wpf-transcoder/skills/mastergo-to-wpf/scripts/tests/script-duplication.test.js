@@ -9,8 +9,9 @@
 
 const assert = require("assert");
 const fs = require("fs");
-const os = require("os");
 const path = require("path");
+
+const { tmpDir } = require(path.join(__dirname, "helpers", "tmp-dir.js"));
 const { spawnSync } = require("child_process");
 
 const SCRIPT_DIR = path.join(__dirname, "..");
@@ -27,7 +28,7 @@ assert.strictEqual(real.status, 0, real.stderr);
 assert.match(real.stdout, /PASS 脚本复用检查/);
 
 // 2) 复制体（同一函数体两个脚本）→ R1 失败。
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "script-dup-"));
+const tmp = tmpDir("script-dup-");
 fs.writeFileSync(path.join(tmp, "a.js"), "function sharedHelper(value) { return String(value).trim(); }\n", "utf8");
 fs.writeFileSync(path.join(tmp, "b.js"), "function sharedHelper(value) { return String(value).trim(); }\n", "utf8");
 const copied = runAudit(["--scripts", tmp, "--registry", REGISTRY]);

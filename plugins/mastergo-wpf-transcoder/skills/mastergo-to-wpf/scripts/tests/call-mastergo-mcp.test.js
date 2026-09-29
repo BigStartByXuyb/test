@@ -4,12 +4,13 @@
 // 契约测试：MasterGo MCP 调用必须"只落盘"，响应内容不得出现在 stdout/stderr。
 const assert = require("assert");
 const fs = require("fs");
-const os = require("os");
 const path = require("path");
+
+const { tmpDir } = require(path.join(__dirname, "helpers", "tmp-dir.js"));
 const { spawnSync } = require("child_process");
 
 const script = path.join(__dirname, "..", "core", "call-mastergo-mcp.js");
-const root = fs.mkdtempSync(path.join(os.tmpdir(), "mastergo-mcp-call-"));
+const root = tmpDir("mastergo-mcp-call-");
 
 const PAYLOAD_MARKER = "PAYLOAD_MARKER_SHOULD_NOT_APPEAR_IN_CONTEXT";
 const payload = JSON.stringify({

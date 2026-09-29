@@ -5,12 +5,13 @@
 
 const assert = require('assert');
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
+
+const { tmpDir } = require(path.join(__dirname, 'helpers', 'tmp-dir.js'));
 const { spawnSync } = require('child_process');
 
 const script = path.join(__dirname, '..', 'adapters/mtslg-iocontrol', 'apply-container-containment.js');
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'containment-'));
+const dir = tmpDir('containment-');
 
 const templateMap = path.join(dir, 'map.json');
 fs.writeFileSync(templateMap, JSON.stringify({

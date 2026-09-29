@@ -10,15 +10,15 @@
 
 const assert = require("assert");
 const fs = require("fs");
-const os = require("os");
 const path = require("path");
+const { tmpDir } = require(path.join(__dirname, "helpers", "tmp-dir.js"));
 const { spawnSync } = require("child_process");
 
 const SCRIPT_DIR = path.join(__dirname, "..");
 const XAML_SCRIPT = path.join(SCRIPT_DIR, "adapters", "mw-wpf", "gen-mw-wpf-xaml.js");
 const ROUTE_MAP = path.join(SCRIPT_DIR, "..", "references", "adapters", "mw-wpf", "mw-wpf-map.json");
 
-const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "mw-wpf-xaml-"));
+const tmpRoot = tmpDir("mw-wpf-xaml-");
 let caseIndex = 0;
 
 function writeJson(name, value) {

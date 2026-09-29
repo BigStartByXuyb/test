@@ -3,12 +3,13 @@
 
 const assert = require("assert");
 const fs = require("fs");
-const os = require("os");
 const path = require("path");
+
+const { tmpDir } = require(path.join(__dirname, "helpers", "tmp-dir.js"));
 const { spawnSync } = require("child_process");
 
 const script = path.join(__dirname, "..", "adapters/mtslg-iocontrol", "discover-mtslg-page-icon-map.js");
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), "mastergo-icon-discovery-"));
+const dir = tmpDir("mastergo-icon-discovery-");
 const svgFile = path.join(dir, "extractSvg.json");
 const mappingFile = path.join(dir, "mapping.json");
 const confirmedFile = path.join(dir, "confirmed.json");

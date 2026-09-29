@@ -3,12 +3,13 @@
 
 const assert = require("assert");
 const fs = require("fs");
-const os = require("os");
 const path = require("path");
+
+const { tmpDir } = require(path.join(__dirname, "helpers", "tmp-dir.js"));
 const { spawnSync } = require("child_process");
 
 const script = path.join(__dirname, "..", "adapters/mtslg-iocontrol", "gen-mtslg-layout-manifest.js");
-const root = fs.mkdtempSync(path.join(os.tmpdir(), "mtslg-layout-manifest-"));
+const root = tmpDir("mtslg-layout-manifest-");
 
 function text(text, id) {
   return { type: "TEXT", id: id, name: "固定文本框", layoutStyle: { width: 100, height: 16, relativeX: 0, relativeY: 0 }, text: [{ text: text }] };

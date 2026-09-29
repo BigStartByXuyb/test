@@ -3,12 +3,13 @@
 
 const assert = require('assert');
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
+
+const { tmpDir } = require(path.join(__dirname, "helpers", "tmp-dir.js"));
 const { spawnSync } = require('child_process');
 
 const script = path.join(__dirname, '..', 'host', 'gen-mw-wpf-page.js');
-const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'mw-wpf-page-'));
+const projectRoot = tmpDir('mw-wpf-page-');
 const csprojPath = path.join(projectRoot, 'Demo.Pages.csproj');
 const manifestPath = path.join(projectRoot, 'page.json');
 
@@ -164,7 +165,7 @@ assert.strictEqual(
   (csproj.match(/<DependentUpon>F2NewOperationView\.xaml<\/DependentUpon>/g) || []).length, 1,
   'DependentUpon 必须唯一');
 
-const fallbackRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'mw-wpf-pages-fallback-'));
+const fallbackRoot = tmpDir('mw-wpf-pages-fallback-');
 const fallbackCsproj = path.join(fallbackRoot, 'Fallback.csproj');
 const fallbackManifest = path.join(fallbackRoot, 'fallback.json');
 fs.writeFileSync(fallbackCsproj, '<Project><PropertyGroup><RootNamespace>Fallback</RootNamespace></PropertyGroup></Project>\n', 'utf8');
@@ -181,7 +182,7 @@ assert.ok(fs.existsSync(path.join(fallbackRoot, 'Pages', 'FallbackPageView.xaml'
 assert.ok(fs.existsSync(path.join(fallbackRoot, 'Pages', 'FallbackPageViewModel.cs')));
 
 // 撞名是输入错误：与 ViewModel 固定成员同名、或两个按钮算出同一方法名 → 直接失败（不静默改名）。
-const clashRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'mw-wpf-page-clash-'));
+const clashRoot = tmpDir('mw-wpf-page-clash-');
 fs.writeFileSync(path.join(clashRoot, 'Demo.Pages.csproj'),
   '<Project><PropertyGroup><RootNamespace>Demo.Pages</RootNamespace></PropertyGroup></Project>\n', 'utf8');
 function writeClashManifest(name, menuItems) {
@@ -212,7 +213,7 @@ assert.notStrictEqual(clash.status, 0, '两个按钮算出同一方法名必须�
 assert.match(clash.stderr, /同一个处理方法名/);
 
 // 老项目重跑：已存在的平级 code-behind 条目必须被就地升级成嵌套块（不新增、不重复）。
-const upgradeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'mw-wpf-page-upgrade-'));
+const upgradeRoot = tmpDir('mw-wpf-page-upgrade-');
 fs.writeFileSync(path.join(upgradeRoot, 'Up.Pages.csproj'),
   '<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">\n' +
   '  <PropertyGroup><RootNamespace>Up.Pages</RootNamespace></PropertyGroup>\n' +

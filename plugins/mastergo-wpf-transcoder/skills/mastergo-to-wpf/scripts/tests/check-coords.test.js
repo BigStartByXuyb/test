@@ -7,13 +7,14 @@
 
 const assert = require('assert');
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
+
+const { tmpDir } = require(path.join(__dirname, "helpers", "tmp-dir.js"));
 const { spawnSync } = require('child_process');
 
 const { outputOrigin } = require(path.join(__dirname, '..', 'lib', 'script-helpers.js'));
 const script = path.join(__dirname, '..', 'adapters/mtslg-iocontrol', 'check-coords.mjs');
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'check-coords-'));
+const dir = tmpDir('check-coords-');
 
 // ① 唯一实现本身：根级 / 贴顶边（0）/ 缺值。
 assert.deepStrictEqual(outputOrigin({ parentIsRoot: true }), { x: 0, y: 192 },

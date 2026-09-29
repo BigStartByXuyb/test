@@ -11,8 +11,8 @@
 
 const assert = require("assert");
 const fs = require("fs");
-const os = require("os");
 const path = require("path");
+const { tmpDir } = require(path.join(__dirname, "helpers", "tmp-dir.js"));
 const { spawnSync } = require("child_process");
 
 const SCRIPT_DIR = path.join(__dirname, "..");
@@ -23,7 +23,7 @@ const CHECK = path.join(SCRIPT_DIR, "adapters", "mw-wpf", "check-wpf-layout.js")
 const ROUTE_MAP = path.join(SCRIPT_DIR, "..", "references", "adapters", "mw-wpf", "mw-wpf-map.json");
 const MAP = JSON.parse(fs.readFileSync(ROUTE_MAP, "utf8"));
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "design-box-"));
+const tmp = tmpDir("design-box-");
 let seq = 0;
 
 function writeJson(name, value) {

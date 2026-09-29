@@ -3,8 +3,9 @@
 
 const assert = require("assert");
 const fs = require("fs");
-const os = require("os");
 const path = require("path");
+
+const { tmpDir } = require(path.join(__dirname, "helpers", "tmp-dir.js"));
 const { spawnSync } = require("child_process");
 
 const script = path.join(__dirname, "..", "entry", "gen-mastergo-page-bundle.js");
@@ -17,7 +18,7 @@ assert.match(
 assert.match(scriptText, /run\(ICON_DISCOVERY_SCRIPT,/, "bundle 必须先执行页面 Icon 候选发现");
 assert.match(scriptText, /PathGeometry\|GeometryGroup.*MatrixTransform|MatrixTransform.*PathGeometry\|GeometryGroup/, "bundle 必须拒绝旧式 Icon 几何结构");
 assert.match(scriptText, /o:Freeze=\[\"'\]True\[\"'\].*x:Key=|x:Key=\[\"'\].*o:Freeze=\[\"'\]True/, "bundle 必须校验 Geometry 的冻结和资源键");
-const root = fs.mkdtempSync(path.join(os.tmpdir(), "mastergo-bundle-"));
+const root = tmpDir("mastergo-bundle-");
 const project = path.join(root, "Demo.Pages");
 fs.mkdirSync(project, { recursive: true });
 const csproj = path.join(project, "Demo.Pages.csproj");

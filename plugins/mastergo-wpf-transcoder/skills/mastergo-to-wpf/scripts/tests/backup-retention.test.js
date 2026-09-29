@@ -6,12 +6,13 @@
 
 const assert = require('assert');
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
+
+const { tmpDir } = require(path.join(__dirname, 'helpers', 'tmp-dir.js'));
 
 const helpers = require(path.join(__dirname, '..', 'lib', 'script-helpers.js'));
 
-const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mw-backup-retention-'));
+const root = tmpDir('mw-backup-retention-');
 const target = path.join(root, 'View.xaml');
 fs.writeFileSync(target, 'v0\n', 'utf8');
 
@@ -50,5 +51,4 @@ helpers.backupFile(other);
 assert.strictEqual(helpers.listBackups(target).length, 2, '其他文件的备份不得影响本文件保留数');
 assert.strictEqual(helpers.listBackups(other).length, 2, '其他文件同样按 2 份保留');
 
-fs.rmSync(root, { recursive: true, force: true });
 console.log('PASS backup retention regression test');

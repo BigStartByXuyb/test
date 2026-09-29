@@ -3,15 +3,16 @@
 
 const assert = require("assert");
 const fs = require("fs");
-const os = require("os");
 const path = require("path");
+
+const { tmpDir } = require(path.join(__dirname, "helpers", "tmp-dir.js"));
 const { spawnSync } = require("child_process");
 
 const script = path.join(__dirname, "..", "adapters/mtslg-iocontrol", "gen-mtslg-lang-keys-from-dsl.js");
 const LANG = require(path.join(__dirname, "..", "adapters/mtslg-iocontrol", "gen-mtslg-page-lang.js"));
 const KEYS = require(script);
 
-const root = fs.mkdtempSync(path.join(os.tmpdir(), "mtslg-lang-keys-"));
+const root = tmpDir("mtslg-lang-keys-");
 const write = (name, data) => {
   const file = path.join(root, name);
   fs.writeFileSync(file, typeof data === "string" ? data : JSON.stringify(data, null, 2), "utf8");

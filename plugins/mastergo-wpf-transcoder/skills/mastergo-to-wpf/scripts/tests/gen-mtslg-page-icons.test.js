@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 const assert = require('assert');
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
+
+const { tmpDir } = require(path.join(__dirname, "helpers", "tmp-dir.js"));
 const { spawnSync } = require('child_process');
 
 const script = path.join(__dirname, '..', 'adapters/mtslg-iocontrol', 'gen-mtslg-page-icons.js');
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mastergo-icons-'));
+const dir = tmpDir('mastergo-icons-');
 const svgFile = path.join(dir, 'extractSvg.json');
 const mapFile = path.join(dir, 'icon-map.json');
 const outFile = path.join(dir, 'nested', 'PageIcon.xaml');

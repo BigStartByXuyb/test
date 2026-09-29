@@ -7,12 +7,13 @@
 
 const assert = require("assert");
 const fs = require("fs");
-const os = require("os");
 const path = require("path");
+
+const { tmpDir } = require(path.join(__dirname, "helpers", "tmp-dir.js"));
 const { spawnSync } = require("child_process");
 
 const script = path.join(__dirname, "..", "adapters/mtslg-iocontrol", "build-icon-ledger.mjs");
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), "icon-ledger-"));
+const dir = tmpDir("icon-ledger-");
 const candidatesFile = path.join(dir, "candidates.json");
 const namingFile = path.join(dir, "naming.json");
 const outFile = path.join(dir, "icon-map.json");

@@ -3,14 +3,15 @@
 
 const assert = require("assert");
 const fs = require("fs");
-const os = require("os");
 const path = require("path");
+
+const { tmpDir } = require(path.join(__dirname, "helpers", "tmp-dir.js"));
 const { spawnSync } = require("child_process");
 
 const script = path.join(__dirname, "..", "adapters/mtslg-iocontrol", "gen-mtslg-page-lang.js");
 const LANG = require(script);
 
-const root = fs.mkdtempSync(path.join(os.tmpdir(), "mtslg-lang-"));
+const root = tmpDir("mtslg-lang-");
 const specPath = path.join(root, "lang.json");
 // 命名约定：页面标题 {页面名}PageTitle、菜单项 MenuItem{名称}、页面内容 {页面名}{名称}。
 const spec = {

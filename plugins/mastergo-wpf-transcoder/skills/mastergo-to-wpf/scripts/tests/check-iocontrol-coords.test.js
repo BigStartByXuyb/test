@@ -1,11 +1,12 @@
 'use strict';
 
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
+
+const { tmpDir } = require(path.join(__dirname, "helpers", "tmp-dir.js"));
 const { spawnSync } = require('child_process');
 
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'iocontrol-coords-'));
+const dir = tmpDir('iocontrol-coords-');
 const xmlPath = path.join(dir, 'page.xml');
 const nodesPath = path.join(dir, 'nodes.json');
 
