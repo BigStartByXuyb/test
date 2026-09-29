@@ -15,11 +15,12 @@
 //
 // 支持范围：两类族，按族键自动分派。
 //   layoutRules.bottomBar —— 「一个变体一节」（feishu-layout-mapping.md 的 ### 变体：<名>）
-//   组件库族（component-types.json 里带 variants 的顶层族）—— 「一节覆盖多个变体」
+//   组件库族（component-types.json 里带 variants 的顶层族）—— 小节粒度不固定：既有一节覆盖多个取值，
+//   也有一节只讲一个变体（只有后者能整节克隆）
 //
 // 组件库族的落点由参照变体在 feishu-component-library-mapping.md 里的位置决定：
-//   标题里的取值 → 克隆整节；MasterGo 变体清单行 → 往清单里插名字 + 同步「N者」数词；
-//   对照表的表格行 → 停（取值要人定）。落点不是恰好一处就停，工具不猜。
+//   标题里的取值 → 克隆整节（标题里并列多个取值就停，要人定）；MasterGo 变体清单行 →
+//   往清单里插名字 + 同步「N者」数词；对照表的表格行 → 停（取值要人定）。落点不是恰好一处就停，工具不猜。
 //
 // 用法：
 //   node scripts/tools/mapping-change.js add-variant --family <族键> --name <新名字> \
@@ -41,6 +42,8 @@ const { spawnSync } = require("child_process");
 // 真值源的读取入口只有一个（见规范「新增/修改映射的同步清单」第 1 项）：
 // 校验一律走它读合并结果，不自己拼两份文件。
 const { loadTemplateMap } = require(path.join(__dirname, "..", "lib", "load-template-map.js"));
+// 标题取值的解析只有一处实现（scripts/lib/heading-tokens.js），覆盖审计走同一份。
+const { headingValues } = require(path.join(__dirname, "..", "lib", "heading-tokens.js"));
 
 const SKILL_ROOT = path.join(__dirname, "..", "..");
 const PLUGIN_ROOT = path.join(SKILL_ROOT, "..", "..");
@@ -58,8 +61,6 @@ const COUNT_LINE_RE = /(`layoutRules\.bottomBar\.variants`\s*共\s*)(\d+)(\s*个
 const ENUM_RE = /(\*\*逐个列全\*\*——)([^。]*)(。)/;
 
 // 组件库文档的三种落点：标题取值、MasterGo 变体清单行、对照表首格。
-const HEADING_RE = /^###\s+(固定模板|待确认变体)\s*[：:]\s*(.*)$/;
-const HEADING_VALUE_SEP_RE = /[、，,/]/;
 const VARIANT_LIST_PREFIX = "MasterGo 变体：";
 const NUMERAL_WORDS = ["零", "一", "二", "三", "四", "五", "六", "七", "八", "九", "十"];
 const NUMERAL_RE = /[一二三四五六七八九十]者/g;
@@ -246,27 +247,12 @@ function cloneSection(doc, likeName, newName, allowResidualMentions) {
 // ---------- 组件库族：文档落点 ----------
 
 /*
- * 组件库文档一节覆盖多个变体，所以「参照变体在哪」不看名字看位置。三种落点：
- *   标题取值（### 固定模板：属性 1=轴操作）       → 整节克隆
+ * 组件库文档的小节粒度不固定，所以「参照变体在哪」不看名字看位置。三种落点：
+ *   标题取值（### 固定模板：属性 1=轴操作）       → 整节克隆（并列多个取值就停，要人定）
  *   清单行（MasterGo 变体：A、B、C。…）           → 清单里插名字
  *   对照表首格（| start | RightButtonStyle | …）  → 停，取值要人定
+ * 标题取值本身怎么解析见 scripts/lib/heading-tokens.js。
  */
-
-// 标题行的取值：### 固定模板：组件集=输入框，变体=整数 → ["输入框","整数"]。
-// 取值按 、，, / 切，每段去掉「标签=」前缀；不是「固定模板/待确认变体」标题返回 null。
-function headingValues(line) {
-  const hit = HEADING_RE.exec(line.trim());
-  if (!hit) return null;
-  const out = [];
-  for (const chunk of hit[2].split(HEADING_VALUE_SEP_RE)) {
-    const piece = chunk.trim();
-    if (!piece) continue;
-    const at = piece.indexOf("=");
-    const value = (at < 0 ? piece : piece.slice(at + 1)).trim();
-    if (value) out.push(value);
-  }
-  return out;
-}
 
 // 清单行拆成三段（前缀 / 名字体 / 句号之后的尾巴），插删后按原样拼回。
 function variantListParts(text) {
@@ -727,19 +713,25 @@ function failTableAnchor(lines, name, anchor) {
   );
 }
 
+// 标题落点的前置判据：只有「一节只讲一个变体」才机械处理，并列多个取值要人定 —— 新增与删除共用同一条。
+function requireSingleHeadingValue(lines, anchor, action) {
+  const values = headingValues(lines[anchor.index]);
+  if (!values || values.length !== 1) {
+    fail(
+      "落点标题并列了 " + (values ? values.length : 0) + " 个取值，不是「一节只讲一个变体」",
+      "  " + lines[anchor.index].trim() + "\n  " + action + "：请手工同步这一条后跑 `mapping-change check`。"
+    );
+  }
+  return values[0];
+}
+
 /*
  * 标题落点：只有「一节只讲一个变体」才克隆。标题里并列多个取值（集成图像 / 晶圆图、
  * 选择框-40/选择框-36/…、独立组件=…／…／start）时，新变体套哪块模板要人定 —— 停。
  * 克隆时整节里的参照名统一换成新名（正文常有一处「该规则对应属性 1=<名>」的自指）。
  */
 function cloneHeadingSection(doc, anchor, name, likeName) {
-  const values = headingValues(doc.lines[anchor.index]);
-  if (!values || values.length !== 1) {
-    fail(
-      "落点标题并列了 " + (values ? values.length : 0) + " 个取值，不是「一节只讲一个变体」",
-      "  " + doc.lines[anchor.index].trim() + "\n  新变体套哪块模板要人定：请手工同步这一条后跑 `mapping-change check`。"
-    );
-  }
+  requireSingleHeadingValue(doc.lines, anchor, "新变体套哪块模板要人定");
   const range = componentSection(doc.lines, anchor.index);
   if (range.start !== anchor.index) fail("落点标题不在小节开头，无法整节克隆");
   const block = doc.lines.slice(range.start, range.end).map((line) => line.split(likeName).join(name));
@@ -820,6 +812,7 @@ function removeComponentDoc(doc, name) {
     insertListVariants(doc, anchor, name, name, -1);
     return "清单里去掉名字";
   }
+  requireSingleHeadingValue(doc.lines, anchor, "删掉哪一块要人定");
   const range = componentSection(doc.lines, anchor.index);
   if (range.start !== anchor.index) fail("落点标题不在小节开头，无法整节删除");
   let end = range.end;
@@ -886,14 +879,16 @@ function main() {
 
 // 纯函数留给回归用例直接调用（scripts/tests/mapping-change.test.js）。
 module.exports = {
+  availableFamilies: availableFamilies,
   blockEnd: blockEnd,
   componentFamilyKeys: componentFamilyKeys,
   componentSection: componentSection,
   docFileOf: docFileOf,
+  editComponentDoc: editComponentDoc,
   familyVariants: familyVariants,
   headingValues: headingValues,
-  availableFamilies: availableFamilies,
-    parseArgs: parseArgs,
+  parseArgs: parseArgs,
+  removeComponentDoc: removeComponentDoc,
   resolveComponentAnchor: resolveComponentAnchor,
   sectionRange: sectionRange,
   shapeOf: shapeOf,

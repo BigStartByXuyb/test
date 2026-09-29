@@ -28,7 +28,7 @@ const layoutLines = fs.readFileSync(LAYOUT_DOC, "utf8").split(/\r?\n/);
 function runInChild(callSource) {
   const script = "const t=require(" + JSON.stringify(TOOL) + ");" + callSource + ";";
   const result = spawnSync(process.execPath, ["-e", script], { encoding: "utf8" });
-  return { status: result.status, stderr: String(result.stderr || "") };
+  return { status: result.status, stdout: String(result.stdout || ""), stderr: String(result.stderr || "") };
 }
 
 // ---------- parseArgs：文档里写的选项名（带连字符）必须真的落到读它的那个键上 ----------
@@ -188,5 +188,64 @@ assert.strictEqual(layoutLines[range.start].trim(), "### 变体：首页-长方�
 assert.ok(range.end <= layoutLines.length, "小节范围不能越界");
 assert.ok(!/^#{1,3} /.test(layoutLines[range.end] || ""), "小节范围不能吞掉下一个标题");
 assert.strictEqual(tool.sectionRange(doc, "文档里没有的变体"), null);
+
+// ---------- 落点标题的取值口径：值 = 第一个 `=` 之后（变体名本身可以含 `=`） ----------
+// 拆分与取值只有一处实现（scripts/lib/heading-tokens.js），覆盖审计走同一份；
+// 两侧曾各写一份且切法不同（一处第一个 `=`、一处最后一个 `=`），含 `=` 的变体名会切出两个结果。
+assert.deepStrictEqual(
+  tool.headingValues("### 固定模板：属性 1=集成图像=结果检查（预对准）展开"),
+  ["集成图像=结果检查（预对准）展开"],
+  "取值到行尾，不被值里的等号截断"
+);
+
+// ---------- 改文档的两个函数必须被直接钉住（门禁查不出「改错了一节」） ----------
+// 背景：新增路径有「标题并列多个取值就停」的判据、删除路径没有，`remove-variant` 会把同一节里
+// 其它变体的模板一起删掉；这个真空正落在「只测纯函数」上，所以这里直接调改文档的函数。
+const twoValueHeading = [
+  "### 固定模板：组件集=集成图像 / 晶圆图",
+  "正文：二者代码映射固定为 `Image`。",
+  "",
+  "## 下一节"
+];
+const addOnTwoValues = runInChild(
+  "t.editComponentDoc({lines:" + JSON.stringify(twoValueHeading) + "},\"新变体\",\"集成图像\")"
+);
+assert.strictEqual(addOnTwoValues.status, 2, "新增：落点标题并列多个取值必须停下");
+assert.ok(addOnTwoValues.stderr.includes("并列了 2 个取值"), addOnTwoValues.stderr);
+const removeOnTwoValues = runInChild(
+  "t.removeComponentDoc({lines:" + JSON.stringify(twoValueHeading) + "},\"集成图像\")"
+);
+assert.strictEqual(removeOnTwoValues.status, 2, "删除：落点标题并列多个取值必须停下");
+assert.ok(removeOnTwoValues.stderr.includes("并列了 2 个取值"), removeOnTwoValues.stderr);
+assert.ok(removeOnTwoValues.stderr.includes("删掉哪一块要人定"), removeOnTwoValues.stderr);
+
+// 一节只讲一个变体时才机械处理，且只动它自己那一节。
+const oneValueDoc = [
+  "### 固定模板：属性 1=扫描",
+  "正文：该规则对应属性 1=扫描。",
+  "",
+  "### 固定模板：属性 1=主菜单button",
+  "正文：不要动我。"
+];
+const removedSection = runInChild(
+  "const d={lines:" + JSON.stringify(oneValueDoc) +
+  "};console.log(JSON.stringify(t.removeComponentDoc(d,\"扫描\"))+\"|\"+JSON.stringify(d.lines))"
+);
+assert.strictEqual(removedSection.status, 0, removedSection.stderr);
+assert.ok(removedSection.stdout.includes("小节一并删除"), removedSection.stdout);
+assert.ok(removedSection.stdout.includes("主菜单button"), "删除只动参照变体自己那一节");
+assert.ok(!removedSection.stdout.includes("扫描"), "被删的那一节不能残留");
+
+// 清单落点：插名字 + 同步本节「N者」数词。
+const listedDoc = [
+  "### 固定模板：组件集=Table",
+  "MasterGo 变体：样例-大、样例-小。二者代码映射固定为 `Table`。"
+];
+const addedToList = runInChild(
+  "const d={lines:" + JSON.stringify(listedDoc) + "};t.editComponentDoc(d,\"新变体\",\"样例-大\");console.log(JSON.stringify(d.lines))"
+);
+assert.strictEqual(addedToList.status, 0, addedToList.stderr);
+assert.ok(addedToList.stdout.includes("样例-大、新变体、样例-小"), addedToList.stdout);
+assert.ok(addedToList.stdout.includes("三者"), "插一个变体后「二者」要变成「三者」");
 
 console.log("mapping-change.test.js：全部断言通过");

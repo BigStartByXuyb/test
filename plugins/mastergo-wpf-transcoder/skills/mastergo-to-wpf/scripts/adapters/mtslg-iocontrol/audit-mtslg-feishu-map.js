@@ -5,6 +5,8 @@ const fs = require("fs");
 const path = require("path");
 // 映射表读取的唯一实现（含共享类型域的 extends 合并）：scripts/lib/load-template-map.js
 const { loadTemplateMap } = require(path.join(__dirname, "..", "..", "lib", "load-template-map.js"));
+// 标题取值的拆分与取值只有一处实现（与 mapping-change.js 同一份）。
+const { headingPieces, splitKeyValue } = require(path.join(__dirname, "..", "..", "lib", "heading-tokens.js"));
 
 // 组件库映射文档（人读的、也是飞书在线文档的离线副本）↔ 映射表（机器真值源）的覆盖审计。
 //
@@ -33,9 +35,10 @@ function splitVariants(text) {
 //                报 `unregisteredVariants`（连"取值恰为某变体名子串"也不放过），提示作者改成
 //                真实变体值标题（`属性 1=` / `按钮类型=`），或改成 `组件集=` / `结构分支=` 这类
 //                合规标题（前者是章节名、需同组变体锚定，后者只算标签）。
-// 标题值的拆法：先剥掉括注说明（如「聚合集合=右侧栏（全部按钮类型变体）」里的括号），再按列举分隔符切开，
-// 每段取**最后一个** `=` 之后的内容；没有 `=` 的段继承上一段的键 ——
+// 标题值的拆法：先剥掉括注说明（如「聚合集合=右侧栏（全部按钮类型变体）」里的括号），再按列举分隔符切开；
+// 每段是「键=值」，键取自固定集合、值取第一个 `=` 之后的内容（变体名本身可含 `=`）；没有 `=` 的段继承上一段的键 ——
 // `组件集=选择框，变体=选择框-40/选择框-36` → 组件集段(选择框) + 变体段(选择框-40、选择框-36)。
+// 拆分与取值由 lib/heading-tokens.js 实现，这里只做键的分类。
 const VARIANT_KEYS = ["属性 1", "按钮类型", "变体"];
 const SECTION_KEYS = ["组件集", "聚合集合", "独立组件"];
 const LABEL_KEYS = ["结构分支"];
@@ -59,20 +62,19 @@ function extractDocumentedRules(markdown) {
       pushToken(variantLine[1], "variant");
       continue;
     }
-    const heading = line.match(/^#{2,3}\s*(?:固定模板|待确认变体)：(.+)$/);
-    if (!heading) continue;
-    const raw = heading[1].replace(/（[^）]*）/g, "");
+    const pieces = headingPieces(line, { stripNotes: true });
+    if (!pieces) continue;
     let kind = "variant";
-    for (const part of raw.split(/[、，,/]/)) {
-      if (part.indexOf("=") >= 0) {
-        const key = part.slice(0, part.indexOf("=")).trim();
-        kind = LABEL_KEYS.includes(key) ? "label"
-          : (SECTION_KEYS.includes(key) ? "section"
-            : (VARIANT_KEYS.includes(key) ? "variant" : "forbidden"));
-        pushToken(part.slice(part.lastIndexOf("=") + 1), kind);
+    for (const piece of pieces) {
+      const token = splitKeyValue(piece);
+      if (token.key) {
+        kind = LABEL_KEYS.includes(token.key) ? "label"
+          : (SECTION_KEYS.includes(token.key) ? "section"
+            : (VARIANT_KEYS.includes(token.key) ? "variant" : "forbidden"));
+        pushToken(token.value, kind);
         continue;
       }
-      pushToken(part, kind);
+      pushToken(piece, kind);
     }
   }
   const tokens = groups.reduce((all, group) => all.concat(group.tokens), []);
