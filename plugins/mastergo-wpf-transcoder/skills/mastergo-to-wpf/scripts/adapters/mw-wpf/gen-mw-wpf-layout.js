@@ -24,7 +24,7 @@
 //     offsetX / offsetY     承载物起点相对格子起点的偏移（撞格下移的格子不写）
 //     shifted:true          该格子由推导挪位（撞格下移），不是设计稿那条带（只免间距/对齐，未免尺寸）
 //     unsized:{width?,height?} 哪一维算不出正数格子尺寸（星号带被前面的固定带吃光＝内容溢出承载物）
-//     synth:true            由代码补出来的容器（设计稿没打组：同列同类叶子 + 大空档，见 buildRegionGrid）
+//     synth:true            由代码补出来的容器（设计稿没打组：同一条列带里 ≥2 个条目，见 buildRegionGrid）
 //   网格带：rows[] / columns[] 的每项是 {size:"Pixel"|"Star", value?, source:"design"}（星号带带 gap 便于核对）；
 //     grid.owner = {ref,direction,gap,root} 记录该层对应的 flex 容器（推导内部用它成带）。
 //     发射器与门禁（R14）按 width/height/nodeWidth/nodeHeight/offsetX/offsetY 出尺寸与对齐。
@@ -49,8 +49,9 @@
 //   - 落格按起始边判定归属；控件 bbox 覆盖到的带全部占住（跨带即写 RowSpan / ColumnSpan）。
 //   - flex 主轴优先：容器声明了 flexContainerInfo.flexDirection（row/column）时，主轴上的每个条目独占一条带
 //     （同一起点的条目合并成一条带），尺寸与星号位置仍走口径 A；没有声明的层级、以及声明层级的交叉轴按 bbox 聚类。
-//   - 设计稿没打组的地方由代码补组：区域根网格里同一条列带（或行带）里 ≥2 个**同类叶子**、且它们之间有一段空档（同一条判据）
-//     → 收进一个合成容器（cell.synth，一层 Grid），这一层照常按口径 A 成带；已经成层的（owner 非空）不再补组。
+//   - 设计稿没打组的地方由代码补组：区域根网格里的散条目按**栏**收成合成容器——同一条列带（x 区间重叠）
+//     里 ≥2 个条目 → 一个列容器（栏内再按口径 A 成行）；容器条目同样参与。判据只看位置，不猜语义；
+//     收出来的容器（cell.synth，一层 Grid）与设计稿打的组同口径成带；已经成层的（owner 非空）不再补组。
 //   - 层级照设计稿：成层容器各自发射一个内层 Grid（格子带 container:true），它的条目（直接子控件 /
 //     更内层的容器）进该层格子。成层容器 = 声明了 flex 主轴（flexDirection）的容器，或**带尺寸约束的容器**
 //     （约束是设计意图，展平会让它没有落到产物的位置）；没有 flex 声明、也没有尺寸约束的包裹层展平到最近一层；
@@ -662,46 +663,37 @@ function buildRegionGrid(entries, containers, pending, dslTree, size, origin) {
   // 区域根网格是页面内容区那一层：页面常驻右栏（贴主轴末端的最末条目）在这一层固定。
   if (owner) owner.root = true;
   // 设计稿已经打了组（这一层由某个容器提上来的，owner 非空）就不再补组；只有散落条目才补。
-  const items = owner ? flex.items : synthLeafGroups(flex.items);
+  const items = owner ? flex.items : synthRegionGroups(flex.items);
   return buildGridFrom(items, { childrenOf: tree.childrenOf, dslTree: dslTree }, size, owner, origin);
 }
 
-// 设计稿没打组的地方，代码补组：区域根网格里，**同一条列带（竖直）或同一条行带（横向）**里
-// ≥2 个**同类叶子**条目，且它们之间出现"空档"（同一条判据：结构读不到时按"比周围间距明显大"）
-// → 收进一个合成容器（页面里就是一层 Grid）。判据只看"同一带 + 同类控件 + 有那段空档"，不猜语义。
-function synthLeafGroups(items) {
-  const leaves = items.filter(function (item) { return !item.container; });
-  if (leaves.length < 2) return items;
+// 设计稿没打组的地方，代码补组：区域根网格里的散条目按**栏**收成合成容器。
+// 判据只有一条——位置：同一条列带（x 区间重叠，条目在竖直方向排）里 ≥2 个条目 → 一个列容器
+// （axis="y"，栏内再按口径 A 成行）。容器条目与叶子同等参与。
+// 这样"没打组的页"与"设计稿打了组的页"产物同构：一栏 = 一层 Grid，加控件只动栏内那一层。
+//
+// 只按栏补、不按行补（两条都有实测证据，见 tests/gen-mw-wpf-layout.test.js 用例 1/2/4）：
+//   ① 行方向合并会把本该撑满主轴的容器钉死在自己的设计稿高度上（可用高度变成新容器自己的高度）；
+//   ② y 区间重叠 ≠ 一行——它会把页面两端互不相干的条目（左标签 + 右侧高控件）也并进来，
+//      把顶层本来分开的列并成一格，反而丢结构。
+// 行语义另有来源：设计稿打了组时由容器的 flex 主轴（column）表达；没打组时，每一栏内部本来
+// 就是按口径 A 成行的，加控件同样只动栏内那一层。
+function synthRegionGroups(items) {
+  if (items.length < 2) return items;
   const consumed = new Set();
   const groups = [];
-  // 两个方向各扫一遍：竖直方向按 x 区间重叠聚成列，横向按 y 区间重叠聚成行。
-  [["y", function (n) { return n.x; }, function (n) { return Math.max(n.w, 1); }],
-    ["x", function (n) { return n.y; }, function (n) { return Math.max(n.h, 1); }]]
-    .forEach(function (axisSpec) {
-      const axis = axisSpec[0];
-      const along = function (item) { return axis === "y" ? item.y : item.x; };
-      const extent = function (item) { return axis === "y" ? item.h : item.w; };
-      const pool = leaves.filter(function (item) { return !consumed.has(item.ref); });
-      clusterByOverlap(pool, axisSpec[1], axisSpec[2]).forEach(function (band) {
-        if (band.items.length < 2) return;
-        const sorted = band.items.slice().sort(function (a, b) { return along(a) - along(b); });
-        if (sorted.some(function (item) { return consumed.has(item.ref); })) return;
-        const sameType = sorted.every(function (item) { return item.controlType === sorted[0].controlType; });
-        if (!sameType) return;
-        // 同一带里是否存在"空档"：复用星号带判据（散条目 → 相对判据）。
-        const probe = sorted.map(function (item) {
-          return { start: along(item), end: along(item) + extent(item), items: [item] };
-        });
-        if (starGapIndex(probe) < 0) return;
-        const left = Math.min.apply(null, sorted.map(function (item) { return item.x; }));
-        const right = Math.max.apply(null, sorted.map(function (item) { return item.x + item.w; }));
-        const top = Math.min.apply(null, sorted.map(function (item) { return item.y; }));
-        const bottom = Math.max.apply(null, sorted.map(function (item) { return item.y + item.h; }));
-        sorted.forEach(function (item) { consumed.add(item.ref); });
-        groups.push({
-          ref: "synth:" + sorted[0].ref, container: true, synth: true, axis: axis, items: sorted,
-          x: left, y: top, w: right - left, h: bottom - top
-        });
+  clusterByOverlap(items, function (n) { return n.x; }, function (n) { return Math.max(n.w, 1); })
+    .forEach(function (band) {
+      if (band.items.length < 2) return;
+      const sorted = band.items.slice().sort(function (a, b) { return a.y - b.y; });
+      const left = Math.min.apply(null, sorted.map(function (item) { return item.x; }));
+      const right = Math.max.apply(null, sorted.map(function (item) { return item.x + item.w; }));
+      const top = Math.min.apply(null, sorted.map(function (item) { return item.y; }));
+      const bottom = Math.max.apply(null, sorted.map(function (item) { return item.y + item.h; }));
+      sorted.forEach(function (item) { consumed.add(item.ref); });
+      groups.push({
+        ref: "synth:" + sorted[0].ref, container: true, synth: true, axis: "y", items: sorted,
+        x: left, y: top, w: right - left, h: bottom - top
       });
     });
   if (!groups.length) return items;

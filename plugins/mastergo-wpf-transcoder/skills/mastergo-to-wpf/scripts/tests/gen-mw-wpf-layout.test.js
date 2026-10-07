@@ -9,7 +9,7 @@
 //   3) 主轴 row 且没有大空档时：固定项（相机链 / 区域根网格最末条目＝常驻右栏）照设计稿像素、
 //      容器条目自适应（单个裸星号、多个按设计稿比例加权）、叶子控件照设计稿像素；
 //   4) 没有 flex 声明的层级仍按 x 区间重叠 / y 起始边聚类，同一套口径 A 成带；
-//   5) 设计稿没打组的地方由代码补组：区域根网格里同一条列带里 ≥2 个同类叶子、且它们之间有一段空档（同一条判据） → 合成容器；
+//   5) 设计稿没打组的地方由代码补组：区域根网格里同一条列带（x 区间重叠）里 ≥2 个条目 → 合成一个栏容器（栏内再成行）；
 //   6) 落格按「起始边」判定，横跨多行的控件不会把整页算进第一行。
 // 另：成层容器（设计稿声明的 flex 容器，或带尺寸约束的容器）在页面里要保留层级——容器 = 一层 Grid，≥2 条目的容器成层，
 // 单条目容器展平（没有主轴关系可表达）、区域根网格不做 1×1 空壳——这两条收口规则都对带尺寸约束的容器例外（约束必须有承载物）。
@@ -108,8 +108,14 @@ function sizes(bands) {
     ]));
   const region = workArea(layout);
 
-  assert.strictEqual(region.grid.cells.length, 2, "区域根网格 = 标签 + 容器层");
-  const boxCell = region.grid.cells.filter(function (cell) { return cell.container; })[0];
+  // 散标签与容器同栏（x 区间重叠）→ 代码补成一个栏容器：区域根网格只留这一栏，
+  // 栏内再按口径 A 成行（标签一行、容器一行）。加控件只动栏内那一层，顶层不动。
+  assert.strictEqual(region.grid.cells.length, 1, "区域根网格：散标签与容器同栏 → 补成一个栏容器");
+  const synthCell = region.grid.cells[0];
+  assert.strictEqual(synthCell.synth, true, "合成容器必须登记 synth");
+  assert.strictEqual(synthCell.synthAxis, "y", "栏容器的主轴是竖直（栏内成行）");
+  const wideLabelCell = synthCell.children.cells.filter(function (cell) { return cell.ref === "wideLabel"; })[0];
+  const boxCell = synthCell.children.cells.filter(function (cell) { return cell.container; })[0];
   assert.ok(boxCell && boxCell.children, "row 容器成层，带内层 Grid");
   assert.deepStrictEqual(sizes(boxCell.children.columns), [160, 160, 120],
     "口径 A：带 = 条目 + 它后面的间距（120+40、120+40、末条 120），不发射间隙元素");
@@ -123,9 +129,10 @@ function sizes(bands) {
     "三个条目各占一条条目带");
   assert.deepStrictEqual(items.map(function (cell) { return cell.row; }), [0, 0, 0], "三个条目必须在同一行");
   const inner = items;
-  // 分区顶边到第一个条目之间的空档也成带（首段空档成带）：标签落在第 2 行，第一条带是那段空档。
-  assert.strictEqual(cellOf(region, "wideLabel").row, 1, "上方的标签落在第 2 行（第 1 行是首段空档带）");
-  assert.strictEqual(region.grid.rows[0].value, 115, "首段空档带尺寸＝标签起点 − 分区原点");
+  // 栏内的行序照设计稿：标签在前、容器在后，中间那段空档单独成星号带。
+  assert.deepStrictEqual([wideLabelCell.row, boxCell.row], [0, 2], "标签一行、容器一行，中间是那条空档带");
+  assert.strictEqual(synthCell.children.rows[1].size, "Star", "标签与容器之间的那段空档 → 星号带");
+  assert.deepStrictEqual([wideLabelCell.offsetX, boxCell.offsetX], [0, 0], "栏容器原点起点 → 两行横向偏移为 0");
   assert.strictEqual(inner[1].columnSpan, 1, "单个条目的占格不跨列");
 }
 
@@ -147,15 +154,25 @@ function sizes(bands) {
     ]));
   const region = workArea(layout);
 
-  assert.deepStrictEqual(sizes(region.grid.columns), [100, "Star"],
-    "首段空档（分区左边 → 第一个条目）成带，剩下的按 x 区间重叠聚成一条列带");
-  const cols = ["btnA", "btnB", "btnC"].map(function (ref) { return cellOf(region, ref).column; });
-  assert.deepStrictEqual(cols, [1, 1, 1], "同一条列带里的三个控件共列（第 0 列是首段空档带）");
-  const rows = ["btnA", "btnB", "btnC"].map(function (ref) { return cellOf(region, ref).row; });
+  // 标签与三个按钮同栏（x 区间重叠）→ 先补成一个栏容器；栏内仍按 x 区间重叠聚类 + 撞格下移。
+  assert.strictEqual(region.grid.cells.length, 1, "同栏的散条目补成一个栏容器");
+  const synth = region.grid.cells[0];
+  assert.strictEqual(synth.synth, true, "合成容器必须登记 synth");
+  assert.strictEqual(synth.synthAxis, "y", "栏容器的主轴是竖直（栏内成行）");
+  const innerGrid = synth.children;
+  const innerOf = function (ref) {
+    const hit = innerGrid.cells.filter(function (cell) { return cell.ref === ref; });
+    assert.strictEqual(hit.length, 1, "每个控件必须恰好落一格: " + ref);
+    return hit[0];
+  };
+  assert.deepStrictEqual(sizes(innerGrid.columns), ["Star"], "没有 flex 声明 → 回退 x 区间重叠聚类（同一条列带）");
+  const cols = ["btnA", "btnB", "btnC"].map(function (ref) { return innerOf(ref).column; });
+  assert.deepStrictEqual(cols, [0, 0, 0], "同一条列带里的三个控件共列");
+  const rows = ["btnA", "btnB", "btnC"].map(function (ref) { return innerOf(ref).row; });
   assert.strictEqual(new Set(rows).size, 3, "共列时靠撞格逐行下移，三个控件各占一行");
   assert.ok(rows[0] < rows[1] && rows[1] < rows[2], "撞格下移按 y 向后找空格");
-  assert.ok(cellOf(region, "wideLabel").row < rows[0], "上方标签在更前面的行");
-  assert.ok(region.grid.rows.length >= 4, "撞格必须插入新行，而不是丢控件");
+  assert.ok(innerOf("wideLabel").row < rows[0], "上方标签在更前面的行");
+  assert.ok(innerGrid.rows.length >= 4, "撞格必须插入新行，而不是丢控件");
 }
 
 // ---------- 3. flexDirection=column：同一起点带里的条目独占一条行带 ----------
@@ -277,7 +294,7 @@ function sizes(bands) {
   assert.strictEqual(layout.pending.length, 0, "不得有待确认项");
 }
 
-// ---------- 7. 设计稿没打组 → 代码补组（同列同类叶子 + 大空档）----------
+// ---------- 7. 设计稿没打组 → 代码补组（同一栏里 ≥2 个条目）----------
 {
   const camera = node("camera", "INSTANCE", { width: 600, height: 600, relativeX: 20, relativeY: 115 });
   const railButtons = [
@@ -299,7 +316,7 @@ function sizes(bands) {
   const region = workArea(layout);
 
   const synth = region.grid.cells.filter(function (cell) { return cell.container && cell.synth; });
-  assert.strictEqual(synth.length, 1, "同列同类的 5 个按钮 + 144 的空档 → 补出一个容器");
+  assert.strictEqual(synth.length, 1, "同一栏里的 5 个按钮 → 补出一个栏容器");
   assert.strictEqual(cellOf(region, "camera").container, undefined, "相机仍是控件格子");
   assert.deepStrictEqual(sizes(synth[0].children.rows), [100, 100, 80, "Star", 108, 80],
     "补出来的容器里同样是口径 A 的 6 行");
