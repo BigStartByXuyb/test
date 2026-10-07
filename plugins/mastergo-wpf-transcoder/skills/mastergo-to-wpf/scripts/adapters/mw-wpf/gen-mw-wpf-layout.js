@@ -672,7 +672,7 @@ function buildRegionGrid(entries, containers, pending, dslTree, size, origin) {
 // （axis="y"，栏内再按口径 A 成行）。容器条目与叶子同等参与。
 // 这样"没打组的页"与"设计稿打了组的页"产物同构：一栏 = 一层 Grid，加控件只动栏内那一层。
 //
-// 只按栏补、不按行补（两条都有实测证据，见 tests/gen-mw-wpf-layout.test.js 用例 1/2/4）：
+// 只按栏补、不按行补（回归网：② 见 tests/gen-mw-wpf-layout.test.js 用例 4，① 见 tests/design-box.test.js 的布局推导块）：
 //   ① 行方向合并会把本该撑满主轴的容器钉死在自己的设计稿高度上（可用高度变成新容器自己的高度）；
 //   ② y 区间重叠 ≠ 一行——它会把页面两端互不相干的条目（左标签 + 右侧高控件）也并进来，
 //      把顶层本来分开的列并成一格，反而丢结构。
