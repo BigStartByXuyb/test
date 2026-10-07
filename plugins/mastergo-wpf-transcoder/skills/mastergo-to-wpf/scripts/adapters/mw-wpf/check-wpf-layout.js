@@ -223,7 +223,7 @@ function checkCells(region, map, layout) {
       report("R8", region.id, "行列尺寸缺少 source");
       return;
     }
-    // 星号带（原语）：口径 A 下每层最多一条（相邻条目之间最大的那段空档），其余带一律照设计稿像素。
+    // 星号带（原语）：口径 A 下每层最多一条（结构优先；散条目按相对判据），其余带一律照设计稿像素。
     if (size.size === "Star") return;
     // 框架固定区只在**被框架钉住的那一维**上用 Token（顶部栏 / 底部栏都钉在高度上）；
     // 另一维是自由伸展的星号，来源仍是设计稿。
@@ -265,7 +265,7 @@ function checkCells(region, map, layout) {
     for (let c = cell.column; c < cell.column + (cell.columnSpan || 1); c += 1) coveredColumns.add(c);
   });
   region.grid.rows.forEach(function (size, index) {
-    // 口径 A 的星号带（相邻条目之间最大的一段空档）本来就不承载控件，不给提示。
+    // 口径 A 的星号带本来就不承载控件，不给提示。
     if (!coveredRows.has(index) && size.size !== "Star") {
       notice("R4", region.id, "第 " + (index + 1) + " 行没有控件覆盖（也不是星号带）");
     }

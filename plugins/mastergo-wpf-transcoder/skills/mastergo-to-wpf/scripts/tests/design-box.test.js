@@ -114,7 +114,7 @@ function node(id, type, style, children, extra) {
 
   const column = cells.get("col");
   assert.strictEqual(column.container, true, "容器成层");
-  assert.strictEqual(column.width, 600, "容器格子＝容器自己的列带（右边 100 的空档≥BIG_GAP，单独成星号列）");
+  assert.strictEqual(column.width, 600, "容器格子＝容器自己的列带（右边 100 的空档是设计稿留下的空档，单独成星号列）");
   assert.strictEqual(grids[0].columns.filter(function (band) { return band.size === "Star"; }).length, 1,
     "100 的空档是这一层唯一的星号带");
   assert.strictEqual(column.height, 1024 - 85 - 180, "容器格子高＝收尾星号带残差（内容区可用高 − 前面像素带）");
