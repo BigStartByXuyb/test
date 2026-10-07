@@ -113,7 +113,7 @@ pwsh -NoProfile -File <skill>\scripts\entry\run-all.ps1 -List -Format json -OutF
 
 作业 A（`-Mode mw-wpf`）另有这些硬门禁，细则见对应 reference：
 
-- **尺寸照设计稿，外观只走样式族**：Grid 行列、控件尺寸与对齐都照设计稿；成带走**口径 A**——一条带 = 条目 + 它后面的间距，相邻条目之间哪一段间距落成星号带只看设计稿自身（分组结构优先；散条目里最大的一段 ≥ 同层其余间距中位数 ×2、只有一段间距时 ≥ 相邻条目较小者的一半），每层最多一条星号带，**不发射任何间距元素**；没打组的地方（同列同类叶子 + 同一条空档判据）由代码补合成容器；列宽固定项（相机所在 Grid / 区域根网格里贴主轴末端的最末条目＝常驻右栏）照设计稿像素、容器条目自适应、叶子控件照设计稿像素（根：`scripts/lib/design-box.js` 与 `mw-wpf-mode.md` 第 2 节第 3 条）；配色、边框、状态、模板一律用样式族键，设计稿与样式族冲突时停下报告，不得散写属性凑 → `references/adapters/mw-wpf/mw-wpf-mode.md`
+- **尺寸照设计稿，外观只走样式族**：Grid 行列、控件尺寸与对齐都照设计稿；成带走**口径 A**——一条带 = 条目 + 它后面的间距，相邻条目之间哪一段间距落成星号带只看设计稿自身（分组结构优先，散条目按相对判据），每层最多一条星号带，**不发射任何间距元素**；没打组的地方（同列同类叶子 + 同一条空档判据）由代码补合成容器；列宽固定项（相机所在 Grid / 区域根网格里贴主轴末端的最末条目＝常驻右栏）照设计稿像素、容器条目自适应、叶子控件照设计稿像素（根：`scripts/lib/design-box.js` 与 `mw-wpf-mode.md` 第 2 节第 3 条）；配色、边框、状态、模板一律用样式族键，设计稿与样式族冲突时停下报告，不得散写属性凑 → `references/adapters/mw-wpf/mw-wpf-mode.md`
 - **框架固定区不进页面**：顶部栏 / 底部栏由框架渲染（尺寸用框架 Token），设计稿里的对应区域只用于生成 Layout 注册与菜单项；设计稿的右下角常驻分组与 IOContorl 同口径（不发射 / 不计格 / 不登记图标）→ `references/adapters/mw-wpf/mw-wpf-mode.md`
 - **页面必须合并本页 Icon 字典**：A 页面用 `{StaticResource …Geometry}` 引用图形，缺合并点会在加载期抛 `XamlParseException` → `references/adapters/mw-wpf/page-build-rules.md`
 - **无对应条目的类型 fail-closed**：写法表把 `Border` 登记为待确认（A 侧没有 Border 控件），遇到即挂待确认、不发射；`Camera` 是 `manual-only`（手册与真实页面都没有该控件，仅用户确认作业A 侧就是 `s:Camera`），可以发射，首次用新框架生成后回填手册条目 → `references/adapters/mw-wpf/mw-wpf-map.json`
