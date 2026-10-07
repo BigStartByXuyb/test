@@ -241,8 +241,8 @@ function sizes(bands) {
     "内层条目的顺序与设计稿一致");
   assert.strictEqual(columnCell[0].children.cells.filter(function (cell) { return cell.spacer; }).length, 0,
     "口径 A 不发射间隙格");
-  assert.deepStrictEqual(sizes(columnCell[0].children.rows), [40, "Star"],
-    "内层 column 容器：24 的间距并进上一条带（16+24），末条吃剩余");
+  assert.deepStrictEqual(sizes(columnCell[0].children.rows), [16, "Star", 16],
+    "内层 column 容器：这一层只有一段间距、且它比相邻条目的一半还大 → 落成星号带（设计尺寸下等于 24）");
 }
 
 // ---------- 6. 口径 A 的星号位置：大空档（≥60）单独成带，末条写死 ----------

@@ -37,7 +37,9 @@
 //     不进页面，因此页面外层只有**一个** Grid（内容网格本身）；设计稿的业务内容（含容器链条）
 //     全部落在同一个内容区里，内部再按行列分格。
 //   - 成带只有一条口径（口径 A）：一条带 = 条目 + 它后面的间距（= 到下一带起始边的距离）；
-//     相邻条目之间最大的一段间距 ≥ BIG_GAP(60) 时，把它单独落成一条星号带（设计稿里"分组之间的空档"）；
+//     哪一段间距成星号带走两条判据（**不写死像素阈值**）：① 结构——相邻条目分属不同子组时那段是"组间空档"
+//     （容器的 flexContainerInfo.gap 就体现在这里）；② 相对——散条目按"最大的一段 ≥ 其余间距中位数 × 2"、
+//     只有一段间距时按"≥ 相邻条目较小者的一半"判；
 //     每层最多一条星号带；没有大空档时最后一条带吃剩余（星号），有大空档时最后一条按条目自身尺寸写死。
 //     **不发射任何间距元素**：间距要么并进前一带，要么就是那段星号带。
 //     **首段空档也成带**：第一个条目与网格原点之间那段（容器内缩 / 分区顶边到内容的空白）是第一条带。
@@ -47,7 +49,7 @@
 //   - 落格按起始边判定归属；控件 bbox 覆盖到的带全部占住（跨带即写 RowSpan / ColumnSpan）。
 //   - flex 主轴优先：容器声明了 flexContainerInfo.flexDirection（row/column）时，主轴上的每个条目独占一条带
 //     （同一起点的条目合并成一条带），尺寸与星号位置仍走口径 A；没有声明的层级、以及声明层级的交叉轴按 bbox 聚类。
-//   - 设计稿没打组的地方由代码补组：区域根网格里同一条列带里 ≥2 个**同类叶子**、且它们之间有一段 ≥ BIG_GAP 的空档
+//   - 设计稿没打组的地方由代码补组：区域根网格里同一条列带（或行带）里 ≥2 个**同类叶子**、且它们之间有一段空档（同一条判据）
 //     → 收进一个合成容器（cell.synth，一层 Grid），这一层照常按口径 A 成带；已经成层的（owner 非空）不再补组。
 //   - 层级照设计稿：成层容器各自发射一个内层 Grid（格子带 container:true），它的条目（直接子控件 /
 //     更内层的容器）进该层格子。成层容器 = 声明了 flex 主轴（flexDirection）的容器，或**带尺寸约束的容器**
@@ -231,6 +233,8 @@ function buildFlexItems(entries, tree) {
     chain.forEach(function (info) { containers.add(info.containerRef); });
     const key = chain.length ? chain[0].containerRef : null;
     if (!membersOf.has(key)) membersOf.set(key, []);
+    // 记下这个条目直接属于哪个成层容器：同轴叶堆展平后，用它区分"组间空档"与"组内间距"。
+    entry.group = key;
     membersOf.get(key).push(entry);
   });
   const childContainers = new Map();
@@ -261,7 +265,7 @@ function buildFlexItems(entries, tree) {
       items.push({
         ref: containerRef, container: true,
         x: record.x, y: record.y, w: record.w, h: record.h, items: inner,
-        flex: record.flex || null
+        flex: record.flex || null, group: key
       });
     });
     return items;
@@ -278,24 +282,66 @@ function buildFlexItems(entries, tree) {
 }
 
 // 口径 A（唯一成带口径）：一条带 = 条目 + 它后面的间距（= 到下一带起始边的距离）；
-// 相邻条目之间最大的一段间距只要 ≥ BIG_GAP，就把它单独落成一条星号带（设计稿里"分组之间的空档"）；
-// 每层最多一条星号带；没有大空档时最后一条带吃剩余（星号带），有大空档时最后一条按条目自身尺寸写死。
-const BIG_GAP = 60;
+// 哪一段间距单独落成星号带，用两条判据（都不写死像素阈值）：
+//   ① 结构优先：相邻条目分属**不同的子组**时，那一段就是设计稿声明的"组间空档"
+//      （容器的 flexContainerInfo.gap 就体现在这里）——读设计稿的结构，不猜；
+//   ② 散条目（设计师没打组、读不到结构）：同层最大的一段间距 ≥ 其余间距中位数 × STAR_RATIO 才算空档
+//      —— 判的是"比周围大得多"这个相对关系，设计稿放大缩小都成立，与绝对像素无关。
+// 两条都不命中就不给星号（全固定，末条带吃剩余）。每层最多一条星号带。
+const STAR_RATIO = 2;      // 多段间距时：最大的一段 ≥ 其余间距中位数 × 2 才算"空档"
+const GUTTER_RATIO = 0.5;  // 只有一段间距时：它 ≥ 相邻条目较小者的一半才算"空档"，否则是槽间距
 
-// 在按起点聚出来的带里插入"大空档"星号带：带数组与尺寸数组必须一一对应，所以星号也占一条带。
-function insertBigGapStar(bands) {
-  if (bands.length < 2) return bands;
-  let index = -1;
-  let gap = 0;
+function bandGroup(band) {
+  const item = (band.items || [])[0];
+  const group = item ? item.group : band.group;
+  return group === undefined ? null : group;
+}
+
+// 星号带插在哪一段之后：返回带下标；没有就返回 -1。
+function starGapIndex(bands) {
+  const gaps = [];
   for (let i = 0; i < bands.length - 1; i += 1) {
     const space = bands[i + 1].start - bands[i].end;
-    if (space >= BIG_GAP && space > gap) { gap = space; index = i; }
+    if (!(space > 0)) continue;
+    gaps.push({ index: i, space: space });
   }
+  if (!gaps.length) return -1;
+  // ① 结构：相邻条目属于不同子组（且两边都读得到组）→ 组间空档
+  const structural = gaps.filter(function (gap) {
+    const left = bandGroup(bands[gap.index]);
+    const right = bandGroup(bands[gap.index + 1]);
+    return left !== null && right !== null && left !== right;
+  });
+  if (structural.length) {
+    return structural.sort(function (a, b) { return b.space - a.space; })[0].index;
+  }
+  // ② 相对：最大的一段 ≥ 其余间距中位数 × STAR_RATIO（多段间距时）
+  const sorted = gaps.slice().sort(function (a, b) { return b.space - a.space; });
+  if (sorted.length >= 2) {
+    const rest = sorted.slice(1).map(function (gap) { return gap.space; })
+      .sort(function (a, b) { return a - b; });
+    const median = rest[Math.floor((rest.length - 1) / 2)];
+    if (sorted[0].space >= median * STAR_RATIO) return sorted[0].index;
+    return -1;
+  }
+  // ③ 只有一段间距：它比相邻条目里较小那个（沿主轴方向的尺寸）的一半还大，才算设计稿留的"空档"，
+  //    否则是普通槽间距（38 / 21 这类）。
+  const only = sorted[0];
+  const leftBand = bands[only.index];
+  const rightBand = bands[only.index + 1];
+  const near = Math.min(leftBand.end - leftBand.start, rightBand.end - rightBand.start);
+  return only.space >= near * GUTTER_RATIO ? only.index : -1;
+}
+
+// 在带里插入星号带：带数组与尺寸数组必须一一对应，所以星号也占一条带。
+function insertBigGapStar(bands) {
+  const index = starGapIndex(bands);
   if (index < 0) return bands;
+  const gap = Math.max(1, Math.round(bands[index + 1].start - bands[index].end));
   const out = bands.slice();
   out.splice(index + 1, 0, {
     kind: "star", star: true, items: [],
-    start: bands[index].end, end: bands[index + 1].start, size: Math.max(1, Math.round(gap))
+    start: bands[index].end, end: bands[index + 1].start, size: gap
   });
   return out;
 }
@@ -326,7 +372,7 @@ function bandSizes(bands, axis) {
 
 // ---------- 主轴带（声明了 flex 主轴的容器）----------
 // 条目独占一条带（否则"同一行横向排列的条目被并进同一条列带"后会被撞格规则竖排，设计稿语义丢失），
-// 尺寸与星号位置都走口径 A（bandSizes）：间距并进前一带，只有 ≥ BIG_GAP 的那一段空档单独成星号带。
+// 尺寸与星号位置都走口径 A（bandSizes）：间距并进前一带，只有判据认定的那段空档单独成星号带。
 // 列宽策略（主轴是 row 且没有大空档）：固定项照设计稿像素，其余容器条目自适应
 // （单个 → 裸星号；多个 → 按设计稿比例加权星号）。
 // 固定项 = 子树里只有相机控件的条目（相机所在的 Grid），或**区域根网格里**贴主轴末端的最末条目（页面常驻右栏）。
@@ -620,33 +666,42 @@ function buildRegionGrid(entries, containers, pending, dslTree, size, origin) {
   return buildGridFrom(items, { childrenOf: tree.childrenOf, dslTree: dslTree }, size, owner, origin);
 }
 
-// 设计稿没打组的地方，代码补组：区域根网格里，同一条列带（x 区间重叠）里 ≥2 个**同类叶子**条目，
-// 且它们之间有一段 ≥ BIG_GAP 的空档 → 收进一个合成容器（页面里就是一层 Grid）。
-// 判据只看"同一列 + 同类控件 + 有大空档"，不猜语义；满足不了就散在区域根网格里。
+// 设计稿没打组的地方，代码补组：区域根网格里，**同一条列带（竖直）或同一条行带（横向）**里
+// ≥2 个**同类叶子**条目，且它们之间出现"空档"（同一条判据：结构读不到时按"比周围间距明显大"）
+// → 收进一个合成容器（页面里就是一层 Grid）。判据只看"同一带 + 同类控件 + 有那段空档"，不猜语义。
 function synthLeafGroups(items) {
   const leaves = items.filter(function (item) { return !item.container; });
   if (leaves.length < 2) return items;
   const consumed = new Set();
   const groups = [];
-  clusterByOverlap(leaves, function (n) { return n.x; }, function (n) { return Math.max(n.w, 1); })
-    .forEach(function (band) {
-      if (band.items.length < 2) return;
-      const sorted = band.items.slice().sort(function (a, b) { return a.y - b.y; });
-      const sameType = sorted.every(function (item) { return item.controlType === sorted[0].controlType; });
-      if (!sameType) return;
-      let big = false;
-      for (let i = 0; i < sorted.length - 1; i += 1) {
-        if (sorted[i + 1].y - (sorted[i].y + sorted[i].h) >= BIG_GAP) big = true;
-      }
-      if (!big) return;
-      const left = Math.min.apply(null, sorted.map(function (item) { return item.x; }));
-      const right = Math.max.apply(null, sorted.map(function (item) { return item.x + item.w; }));
-      const top = Math.min.apply(null, sorted.map(function (item) { return item.y; }));
-      const bottom = Math.max.apply(null, sorted.map(function (item) { return item.y + item.h; }));
-      sorted.forEach(function (item) { consumed.add(item.ref); });
-      groups.push({
-        ref: "synth:" + sorted[0].ref, container: true, synth: true, axis: "y", items: sorted,
-        x: left, y: top, w: right - left, h: bottom - top
+  // 两个方向各扫一遍：竖直方向按 x 区间重叠聚成列，横向按 y 区间重叠聚成行。
+  [["y", function (n) { return n.x; }, function (n) { return Math.max(n.w, 1); }],
+    ["x", function (n) { return n.y; }, function (n) { return Math.max(n.h, 1); }]]
+    .forEach(function (axisSpec) {
+      const axis = axisSpec[0];
+      const along = function (item) { return axis === "y" ? item.y : item.x; };
+      const extent = function (item) { return axis === "y" ? item.h : item.w; };
+      const pool = leaves.filter(function (item) { return !consumed.has(item.ref); });
+      clusterByOverlap(pool, axisSpec[1], axisSpec[2]).forEach(function (band) {
+        if (band.items.length < 2) return;
+        const sorted = band.items.slice().sort(function (a, b) { return along(a) - along(b); });
+        if (sorted.some(function (item) { return consumed.has(item.ref); })) return;
+        const sameType = sorted.every(function (item) { return item.controlType === sorted[0].controlType; });
+        if (!sameType) return;
+        // 同一带里是否存在"空档"：复用星号带判据（散条目 → 相对判据）。
+        const probe = sorted.map(function (item) {
+          return { start: along(item), end: along(item) + extent(item), items: [item] };
+        });
+        if (starGapIndex(probe) < 0) return;
+        const left = Math.min.apply(null, sorted.map(function (item) { return item.x; }));
+        const right = Math.max.apply(null, sorted.map(function (item) { return item.x + item.w; }));
+        const top = Math.min.apply(null, sorted.map(function (item) { return item.y; }));
+        const bottom = Math.max.apply(null, sorted.map(function (item) { return item.y + item.h; }));
+        sorted.forEach(function (item) { consumed.add(item.ref); });
+        groups.push({
+          ref: "synth:" + sorted[0].ref, container: true, synth: true, axis: axis, items: sorted,
+          x: left, y: top, w: right - left, h: bottom - top
+        });
       });
     });
   if (!groups.length) return items;
