@@ -29,8 +29,7 @@
 //       容器子树里没有可发射的控件（补内容或交设计确认）、待确认类型 / 无尺寸等不进格子的节点
 //       （先按 R1 / R9 修类型判定与映射）、产物与本次输入不同步（先重跑第 8 步）
 //   R13 尺寸约束未发射：带约束的格子必须在 View.xaml 里出现对应的 MinWidth/MaxWidth/MinHeight/MaxHeight
-//   R14 格子尺寸与尺寸/对齐发射：每个格子必须登记格子尺寸与承载物设计尺寸（含跨格累加、间隙带与自适应带），
-//       间隙带必须是 Auto 且与空 Grid 的固定尺寸一致（发射报告 spacers 逐条对齐），间隙格里不得有控件；
+//   R14 格子尺寸与尺寸/对齐发射：每个格子必须登记格子尺寸与承载物设计尺寸（含跨格累加与星号带），
 //       且发射报告里该格子的 Width/Height/对齐/Margin 必须与 lib/design-box.js 的同一实现一致
 //       （shifted / unsized 两类例外按类、按维，见 page-build-rules.md 第 4 节第 14 条）
 //   R6 资源键闭环：{StaticResource <键>} 必须来自写法表样式族、本页 Icon 台账或 Icon 字典合并点
@@ -39,7 +38,7 @@
 //       （当前只有选择框的 Value）：该值运行时由数据决定，Bundle 侧记入 valueLangExempt，
 //       门禁不得反过来判它缺键
 //   R8 尺寸来源：框架固定区必须是 framework:<Token>（未被框架钉住的那一维是自由伸展的星号，来源仍是 design）；
-//       发射区取 design，主轴间隙带取 gap（Auto + 空 Grid 固定尺寸）
+//       发射区一律取 design（口径 A 不发射间距元素，没有 gap 来源的带）
 //   R9 推导待确认：布局推导阶段挂起的节点（未归格 / 无尺寸 / 结构对不上 / 类型无处发射）逐条失败
 
 const fs = require("fs");
@@ -48,7 +47,7 @@ const { readJson } = require(path.join(__dirname, "..", "..", "lib", "script-hel
 const {
   CONSTRAINT_KEYS, CONSTRAINT_ATTRS, normalizeConstraints, collectConstraints
 } = require(path.join(__dirname, "..", "..", "lib", "constraints.js"));
-const { designBoxAttrs } = require(path.join(__dirname, "..", "..", "lib", "design-box.js"));
+const { designBoxAttrs, containerBoxAttrs } = require(path.join(__dirname, "..", "..", "lib", "design-box.js"));
 const {
   bandExtents, extentOf, contentSizeOf
 } = require(path.join(__dirname, "gen-mw-wpf-layout.js"));
@@ -136,7 +135,7 @@ function checkConstraints(layout, dslConstraints, xamlText) {
 }
 
 // R14：格子尺寸与"尺寸/对齐"发射。逐格复核两件事：
-//   ① 布局产物自己算出来的格子尺寸必须与按行列定义（含跨格累加、间隙带与自适应带）重算的一致；
+//   ① 布局产物自己算出来的格子尺寸必须与按行列定义（含跨格累加与星号带）重算的一致；
 //   ② 发射报告里该格子的 Width/Height/对齐/Margin 必须等于 lib/design-box.js 的同一实现给出的结果。
 // 判据只比对集合与取值，不判断成因；产物与输入不同步同样命中。
 function checkDesignBoxes(layout, emission) {
@@ -147,34 +146,11 @@ function checkDesignBoxes(layout, emission) {
     emitted.set(item.ref, item.attrs || {});
   });
   const seen = new Set();
-  // 间隙格（空 Grid 的固定尺寸）：与发射报告的 spacers 逐条对齐，并核对承载它的那条带是 Auto、尺寸等于 gap。
-  const spacers = new Map();
-  (emission.spacers || []).forEach(function (item) {
-    if (item && item.ref) spacers.set(item.ref, item);
-  });
   const visitGrid = function (grid, size) {
     const columnExtents = bandExtents(grid.columns || [], size.w);
     const rowExtents = bandExtents(grid.rows || [], size.h);
     (grid.cells || []).forEach(function (cell) {
       seen.add(cell.ref);
-      if (cell.spacer) {
-        const axis = cell.spacer.axis === "row" ? "row" : "column";
-        const band = axis === "column" ? (grid.columns || [])[cell.column] : (grid.rows || [])[cell.row];
-        if (cell.controlType || cell.nodeWidth || cell.constraints) {
-          report("R14", cell.ref, "间隙格里不得有控件类型 / 承载物尺寸 / 尺寸约束");
-        }
-        if (!band || band.size !== "Auto" || Number(band.gap || 0) !== Number(cell.spacer.size || 0)) {
-          report("R14", cell.ref, "间隙格必须落在 Auto 带上、且尺寸等于该带的 gap");
-        }
-        const emittedSpacer = spacers.get(cell.ref);
-        if (!emittedSpacer) {
-          report("R14", cell.ref, "发射报告里没有这个间隙格（空 Grid 固定尺寸）");
-        } else if (emittedSpacer.axis !== axis || Number(emittedSpacer.size) !== Number(cell.spacer.size)) {
-          report("R14", cell.ref, "间隙格与发射报告不一致：产物 " + axis + " " + cell.spacer.size +
-            "，发射 " + emittedSpacer.axis + " " + emittedSpacer.size);
-        }
-        return;
-      }
       const width = extentOf(columnExtents, cell.column, cell.columnSpan);
       const height = extentOf(rowExtents, cell.row, cell.rowSpan);
       // 撞格下移的格子没有设计稿偏移真值：期望值仍是 designBoxAttrs(cell)（有格子尺寸就写控件自身尺寸、
@@ -200,7 +176,7 @@ function checkDesignBoxes(layout, emission) {
             }
             return;
           }
-          report("R14", cell.ref, "布局产物没有登记" + label + "（推导必须登记：跨格累加 + 像素/间隙带照值 + 自适应带吃剩余）");
+          report("R14", cell.ref, "布局产物没有登记" + label + "（推导必须登记：跨格累加 + 像素带照值 + 星号带吃剩余）");
           return;
         }
         if (size !== recomputed) {
@@ -210,7 +186,8 @@ function checkDesignBoxes(layout, emission) {
       if (!(cell.nodeWidth > 0) || !(cell.nodeHeight > 0)) {
         report("R14", cell.ref, "布局产物没有登记承载物设计尺寸（nodeWidth / nodeHeight）");
       }
-      const expected = designBoxAttrs(cell);
+      // 容器格子与控件格子共用 lib/design-box.js 的实现（容器还要按主轴撑满 / 交叉轴锚点，同一实现）。
+      const expected = cell.container ? containerBoxAttrs(cell) : designBoxAttrs(cell);
       const actual = emitted.get(cell.ref);
       if (!actual) {
         report("R14", cell.ref, "发射报告里没有这个格子的尺寸/对齐记录");
@@ -234,9 +211,6 @@ function checkDesignBoxes(layout, emission) {
   emitted.forEach(function (attrs, ref) {
     if (!seen.has(ref)) report("R14", ref, "发射报告里有布局产物中不存在的格子");
   });
-  spacers.forEach(function (item, ref) {
-    if (!seen.has(ref)) report("R14", ref, "发射报告里的间隙格在布局产物中不存在");
-  });
 }
 
 function checkCells(region, map, layout) {
@@ -249,13 +223,8 @@ function checkCells(region, map, layout) {
       report("R8", region.id, "行列尺寸缺少 source");
       return;
     }
-    // 间隙带（source=gap）：尺寸来自设计稿的条目间距，由空 Grid 的固定尺寸承载（见 R14 的间隙格校验）。
-    if (size.source === "gap") {
-      if (size.size !== "Auto" || !(Number(size.gap) > 0)) {
-        report("R8", region.id, "间隙带必须是 Auto 且带正数 gap，当前: " + JSON.stringify(size));
-      }
-      return;
-    }
+    // 星号带（原语）：口径 A 下每层最多一条（相邻条目之间最大的那段空档），其余带一律照设计稿像素。
+    if (size.size === "Star") return;
     // 框架固定区只在**被框架钉住的那一维**上用 Token（顶部栏 / 底部栏都钉在高度上）；
     // 另一维是自由伸展的星号，来源仍是设计稿。
     if (isFramework && size.size === "Pixel" && size.source.indexOf("framework:") !== 0) {
@@ -270,15 +239,6 @@ function checkCells(region, map, layout) {
     const entry = (map.controlTypes || {})[cell.controlType];
     if (region.emit === false) {
       report("R1", cell.ref, "框架固定区（" + region.id + "）里不得有控件");
-      return;
-    }
-    // 间隙格（空 Grid 固定尺寸）：没有控件类型，类型/尺寸约束校验由 R14 的间隙格分支负责。
-    if (cell.spacer) {
-      const rowSpan = cell.rowSpan || 1;
-      const columnSpan = cell.columnSpan || 1;
-      if (cell.row < 0 || cell.column < 0 || cell.row + rowSpan > rows || cell.column + columnSpan > columns) {
-        report("R3", cell.ref, "间隙格越界: row=" + cell.row + "/" + rows + " column=" + cell.column + "/" + columns);
-      }
       return;
     }
     // 容器格子（成层容器：flex 容器或带尺寸约束的容器）没有控件类型：类型检查交给内层 Grid 里的控件。
@@ -305,13 +265,14 @@ function checkCells(region, map, layout) {
     for (let c = cell.column; c < cell.column + (cell.columnSpan || 1); c += 1) coveredColumns.add(c);
   });
   region.grid.rows.forEach(function (size, index) {
-    if (!coveredRows.has(index) && !(index === rows - 1 && size.size === "Star")) {
-      notice("R4", region.id, "第 " + (index + 1) + " 行没有控件覆盖（也不是收尾星号行）");
+    // 口径 A 的星号带（相邻条目之间最大的一段空档）本来就不承载控件，不给提示。
+    if (!coveredRows.has(index) && size.size !== "Star") {
+      notice("R4", region.id, "第 " + (index + 1) + " 行没有控件覆盖（也不是星号带）");
     }
   });
   region.grid.columns.forEach(function (size, index) {
-    if (!coveredColumns.has(index) && !(index === columns - 1 && size.size === "Star")) {
-      notice("R4", region.id, "第 " + (index + 1) + " 列没有控件覆盖（也不是收尾星号列）");
+    if (!coveredColumns.has(index) && size.size !== "Star") {
+      notice("R4", region.id, "第 " + (index + 1) + " 列没有控件覆盖（也不是星号带）");
     }
   });
 

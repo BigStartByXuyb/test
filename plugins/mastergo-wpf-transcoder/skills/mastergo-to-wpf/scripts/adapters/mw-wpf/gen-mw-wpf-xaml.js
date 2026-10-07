@@ -23,8 +23,10 @@
 //   - 文本一律走 `{DynamicResource <LangName>}`；没有语言键的文本走待确认，不写字面量。
 //   - 尺寸与对齐照设计稿：控件写自身 bbox，格子尺寸与控件在格内的偏移取自布局产物；
 //     格子尺寸 − 控件尺寸 = 间距，差值落在哪一侧由偏移决定（唯一实现在 lib/design-box.js）。
-//   - 间距是独立的间隙格：主轴带里的间隙带落成 Auto + 一个空的固定尺寸 Grid（列 Width / 行 Height）；
+//   - 不发射任何间距元素（口径 A）：间距并进前一带，或就是那一条星号带；
 //     列宽固定项照设计稿像素、容器条目自适应（多条目时按设计稿比例加权星号）、叶子控件照设计稿像素。
+//   - 容器格子撑满主轴：主轴那一维不写尺寸与对齐（变化由星号带吸收，顶部贴顶、底部贴底、中间那段随高度变长），
+//     位置偏移改用 Margin；交叉轴照设计稿。唯一实现在 lib/design-box.js 的 containerBoxAttrs。
 
 const fs = require("fs");
 const path = require("path");
@@ -32,7 +34,7 @@ const {
   fail, xmlAttr, readJson
 } = require(path.join(__dirname, "..", "..", "lib", "script-helpers.js"));
 const { constraintAttributes } = require(path.join(__dirname, "..", "..", "lib", "constraints.js"));
-const { designBoxAttrs } = require(path.join(__dirname, "..", "..", "lib", "design-box.js"));
+const { designBoxAttrs, containerBoxAttrs } = require(path.join(__dirname, "..", "..", "lib", "design-box.js"));
 
 function parseArgs(argv) {
   const args = { overwrite: false };
@@ -175,7 +177,7 @@ function columnDefinition(size) {
 
 function indentOf(depth) { return "    ".repeat(depth); }
 
-// 格子契约：设计稿格子尺寸必须由布局推导登记（跨格累加；像素/间隙带照值、自适应带（星号带）吃剩余）。缺了就没法表达
+// 格子契约：设计稿格子尺寸必须由布局推导登记（跨格累加；像素带照值、星号带吃剩余）。缺了就没法表达
 // "格子尺寸 − 控件尺寸 = 间距"，宁可停在这里，也不要发射一个尺寸静默丢失的页面。
 // 例外按类说明（只免掉真正没有真值的那部分）：
 //   cell.shifted（为避让撞格被挪出设计带）——设计稿偏移没有真值：只写承载物自身尺寸、不表达间距/对齐，
@@ -193,6 +195,7 @@ function assertDesignBox(cell) {
   }
 }
 
+// 格子定位属性：只有多行/多列的 Grid 才写 Grid.Row/Column（单行单列不写，与真实页面一致），
 // 格子定位属性：只有多行/多列的 Grid 才写 Grid.Row/Column（单行单列不写，与真实页面一致），
 // 跨格再写 RowSpan/ColumnSpan。控件与容器 Grid 共用同一套口径。
 function gridCellAttrs(cell, ctx) {
@@ -324,25 +327,13 @@ function renderGrid(grid, ctx, depth, gridAttrs) {
   const multi = grid.rows.length > 1 || grid.columns.length > 1;
   const childCtx = Object.assign({}, ctx, { gridIsMulti: multi });
   grid.cells.forEach(function (cell) {
-    // 间隙格：一个空的固定尺寸 Grid（列方向写固定 Width、行方向写固定 Height）——"间距"在产物里是有形的一格。
-    if (cell.spacer) {
-      const spacerAttrs = Object.assign({}, gridCellAttrs(cell, childCtx) || {});
-      spacerAttrs[cell.spacer.axis === "column" ? "Width" : "Height"] = String(Math.round(cell.spacer.size));
-      ctx.report.spacers.push({ ref: cell.ref, axis: cell.spacer.axis, size: Math.round(cell.spacer.size) });
-      const spacerText = Object.keys(spacerAttrs).map(function (name) {
-        return " " + name + "=\"" + xmlAttr(spacerAttrs[name]) + "\"";
-      }).join("");
-      lines.push(pad + "  <Grid" + spacerText + " />");
-      return;
-    }
     const node = ctx.byRef.get(cell.ref);
     // 容器格子（产物里 container: true）：成层容器（flex 容器或带尺寸约束的容器）没有控件类型，
     // 它自己就是一层 <Grid>。
     if (cell.container) {
       if (!cell.children) fail("容器格子缺少内层 Grid: " + cell.ref);
       assertDesignBox(cell);
-      // 容器 Grid 自己也照设计稿写尺寸与对齐：格子比容器大时，多出来的部分就是间距。
-      const containerBox = designBoxAttrs(cell);
+      const containerBox = containerBoxAttrs(cell);
       ctx.report.designBox.push({ ref: cell.ref, container: true, attrs: containerBox });
       lines.push(renderGrid(cell.children, ctx, depth + 1, Object.assign({},
         gridCellAttrs(cell, childCtx) || {}, containerBox, constraintAttrs(cell) || {})));
@@ -381,9 +372,7 @@ function renderXaml(args, layout, typeInfo, map) {
     // 值槽位登记 langRefPolicy=none 的值（选择框的 Value）：不参与多语言，单列而不进 textPending。
     valueLangExempt: [],
     // 每个格子发射的尺寸/对齐（门禁按 lib/design-box.js 的同一实现复核）。
-    designBox: [],
-    // 间隙格（空 Grid 的固定尺寸），门禁按件数与尺寸复核。
-    spacers: []
+    designBox: []
   };
   const ctx = {
     map: map, byRef: typeInfo.byRef, report: report,
@@ -457,7 +446,6 @@ function main() {
     styleFallback: result.report.styleFallback.length,
     textPending: result.report.textPending.length,
     designBox: result.report.designBox.length,
-    spacers: result.report.spacers.length,
     pending: result.report.pending.length
   }, null, 2));
 }

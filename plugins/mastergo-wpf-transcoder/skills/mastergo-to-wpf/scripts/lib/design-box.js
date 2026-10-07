@@ -8,7 +8,7 @@
 // 非对称内缩（两侧都不为 0 且不等）贴起始边并用 Margin 补偏移，精确复现设计稿位置。
 //
 // 输入只有一个「设计稿格子」（布局产物的 cell），字段都由 gen-mw-wpf-layout.js 从 DSL 推出并登记：
-//   cell.width / cell.height           格子尺寸（含跨格累加；像素/间隙带照值，自适应带（星号带）吃剩余）
+//   cell.width / cell.height           格子尺寸（含跨格累加；像素带照值，星号带吃剩余）
 //   cell.nodeWidth / cell.nodeHeight   控件（或容器）自身的设计稿尺寸
 //   cell.offsetX / cell.offsetY        控件起点相对格子起点的偏移（撞格下移的格子不登记）
 // 三种落空的情况各写各的：
@@ -65,4 +65,36 @@ function designBoxAttrs(cell) {
   return attrs;
 }
 
-module.exports = { EPSILON, designBoxAttrs, axisPlan };
+// 容器 Grid 的尺寸与对齐（发射器与门禁都调它，唯一实现）：
+//   ① 主轴（flex 方向 / 补组方向）不写尺寸与对齐 —— 容器撑满格子，那一维的变化由星号带吸收：
+//      顶部内容贴顶、底部内容贴底、中间（或末尾）那段空档随高度 / 宽度变长；位置偏移改用 Margin 表达；
+//   ② 交叉轴照设计稿写尺寸与对齐；但设计稿本身让容器越过格子末端（end < 0）时，位置锚点按上边 / 左边，
+//      写成 start + Margin —— 否则窗口一变容器就跟着末端漂。
+function containerBoxAttrs(cell) {
+  const box = designBoxAttrs(cell);
+  const axis = cell.synthAxis || (cell.children && cell.children.owner && cell.children.owner.direction) || null;
+  const stretchY = axis === "column" || axis === "y";
+  const stretchX = axis === "row" || axis === "x";
+  const margins = String(box.Margin || "0,0,0,0").split(",").map(function (value) { return Number(value) || 0; });
+  const known = function (value) { return typeof value === "number" && isFinite(value); };
+  if (stretchY) {
+    delete box.Height;
+    delete box.VerticalAlignment;
+    margins[1] = Math.max(0, Math.round(known(cell.offsetY) ? cell.offsetY : 0));
+  } else if (known(cell.offsetY) && cell.offsetY > EPSILON && (cell.height - cell.nodeHeight - cell.offsetY) < 0) {
+    box.VerticalAlignment = "Top";
+    margins[1] = Math.round(cell.offsetY);
+  }
+  if (stretchX) {
+    delete box.Width;
+    delete box.HorizontalAlignment;
+    margins[0] = Math.max(0, Math.round(known(cell.offsetX) ? cell.offsetX : 0));
+  } else if (known(cell.offsetX) && cell.offsetX > EPSILON && (cell.width - cell.nodeWidth - cell.offsetX) < 0) {
+    box.HorizontalAlignment = "Left";
+    margins[0] = Math.round(cell.offsetX);
+  }
+  if (margins[0] || margins[1]) box.Margin = margins[0] + "," + margins[1] + ",0,0";
+  return box;
+}
+
+module.exports = { EPSILON, designBoxAttrs, axisPlan, containerBoxAttrs };

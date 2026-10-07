@@ -16,7 +16,7 @@ const { tmpDir } = require(path.join(__dirname, "helpers", "tmp-dir.js"));
 const { spawnSync } = require("child_process");
 
 const SCRIPT_DIR = path.join(__dirname, "..");
-const { designBoxAttrs } = require(path.join(SCRIPT_DIR, "lib", "design-box.js"));
+const { designBoxAttrs, containerBoxAttrs } = require(path.join(SCRIPT_DIR, "lib", "design-box.js"));
 const { deriveLayout } = require(path.join(SCRIPT_DIR, "adapters", "mw-wpf", "gen-mw-wpf-layout.js"));
 const { renderXaml } = require(path.join(SCRIPT_DIR, "adapters", "mw-wpf", "gen-mw-wpf-xaml.js"));
 const CHECK = path.join(SCRIPT_DIR, "adapters", "mw-wpf", "check-wpf-layout.js");
@@ -62,13 +62,13 @@ function node(id, type, style, children, extra) {
     { Width: "140" }, "没有偏移来源：只写尺寸，不猜对齐");
 }
 
-// ── ② 布局推导：主轴条目带 + 间隙带（空 Grid 固定尺寸）/ 交叉轴聚类 ──────────────────
+// ── ② 布局推导：口径 A 成带（带 = 条目 + 间距；大空档成星号带；无间隙元素）/ 交叉轴聚类 ──
 {
   const dsl = {
     dsl: {
       nodes: [node("root", "FRAME", { width: 1280, height: 1024, relativeX: 0, relativeY: 0 }, [
         node("body", "FRAME", { width: 1280, height: 902, relativeX: 0, relativeY: 85 }, [
-          // 容器 600×320，column + gap 40：行 = 条目行 80 ×3 + 间隙行 40 ×2。
+          // 容器 600×320，column + gap 40：行 = 80+40 / 80+40 / 80（口径 A，不再有间隙行）。
           node("col", "FRAME", { width: 600, height: 320, relativeX: 0, relativeY: 0 }, [
             node("b1", "TEXT", { width: 170, height: 80, relativeX: 0, relativeY: 0 }),
             node("b2", "TEXT", { width: 170, height: 80, relativeX: 0, relativeY: 120 }),
@@ -107,35 +107,51 @@ function node(id, type, style, children, extra) {
   assert.deepStrictEqual(containerGrid.owner, { ref: "col", direction: "column", gap: 40, root: false },
     "owner 记录容器 ref / 方向 / gap");
   assert.deepStrictEqual(containerGrid.rows.map(function (band) {
-    return band.size === "Auto" ? "Auto(" + band.gap + ")" : band.value;
-  }), [80, "Auto(40)", 80, "Auto(40)", 80], "主轴成带：条目行照设计稿像素 + 间隙行（Auto）");
-  const rowSpacers = containerGrid.cells.filter(function (cell) { return cell.spacer; });
-  assert.deepStrictEqual(rowSpacers.map(function (cell) { return [cell.spacer.axis, cell.spacer.size]; }),
-    [["row", 40], ["row", 40]], "上下间隙 = 空 Grid 固定高 40");
-  assert.strictEqual(rowSpacers[0].controlType, undefined, "间隙格里没有控件类型");
+    return band.size === "Star" ? "Star" : band.value;
+  }), [120, 120, "Star"], "口径 A：间距并进前一带（80+40），没有大空档时末条吃剩余");
+  assert.strictEqual(containerGrid.cells.filter(function (cell) { return cell.spacer; }).length, 0,
+    "口径 A 不发射空 Grid 间隙格");
 
   const column = cells.get("col");
   assert.strictEqual(column.container, true, "容器成层");
-  assert.strictEqual(column.width, 700, "容器格子宽＝到下一列带起点的距离（容器 600 + 右侧空 100）");
+  assert.strictEqual(column.width, 600, "容器格子＝容器自己的列带（右边 100 的空档≥BIG_GAP，单独成星号列）");
+  assert.strictEqual(grids[0].columns.filter(function (band) { return band.size === "Star"; }).length, 1,
+    "100 的空档是这一层唯一的星号带");
   assert.strictEqual(column.height, 1024 - 85 - 180, "容器格子高＝收尾星号带残差（内容区可用高 − 前面像素带）");
   assert.strictEqual(column.nodeWidth, 600, "登记容器自身设计尺寸");
   assert.deepStrictEqual(designBoxAttrs(column),
-    { Width: "600", Height: "320", HorizontalAlignment: "Left", VerticalAlignment: "Top" },
-    "容器格子比容器大 → 容器写自身尺寸并贴起始边");
+    { Height: "320", VerticalAlignment: "Top" },
+    "容器格子宽＝容器自身宽（不写 Width），格子高大于容器 → 贴起始边");
   assert.deepStrictEqual(designBoxAttrs(cells.get("side")),
-    { Width: "140", Height: "48", HorizontalAlignment: "Left", VerticalAlignment: "Top" },
-    "顶层控件同样照格子与自身尺寸的差写属性");
+    { Height: "48", VerticalAlignment: "Top" },
+    "顶层控件落在自己的列带里（列宽＝控件宽），只表达纵向偏移");
 
-  assert.strictEqual(cells.get("b1").height, 80, "条目行 = 控件自身高度（间距不再并进行高）");
+  assert.strictEqual(cells.get("b1").height, 120, "格子高 = 控件 + 它后面的间距（80+40）");
   assert.strictEqual(cells.get("b1").offsetY, 0, "控件贴带起点");
   assert.deepStrictEqual(designBoxAttrs(cells.get("b1")),
-    { Width: "170", HorizontalAlignment: "Left" },
-    "控件写自身尺寸 + 贴起始边（高度与格子相等 → 不写 Height）");
-  assert.deepStrictEqual(designBoxAttrs(cells.get("b3")), { Width: "170", HorizontalAlignment: "Left" },
-    "末条条目带同样照设计稿（不再被星号撑开）");
+    { Width: "170", Height: "80", HorizontalAlignment: "Left", VerticalAlignment: "Top" },
+    "控件写自身尺寸 + 贴带起点（剩下 40 就是间距）");
+  assert.ok(cells.get("b3").height > 0, "末条带吃剩余，尺寸为正");
 }
 
-// ── ③ 发射器：属性落到 XAML，并逐格进发射报告 ────────────────────────────────────
+// ── ③ 容器格子：主轴撑满（不写主轴尺寸/对齐），交叉轴照设计稿 ─────────────────────
+{
+  const columnOwner = { owner: { direction: "column" }, rows: [{ size: "Pixel", value: 120 }, { size: "Star", source: "design" }], columns: [{ size: "Star", source: "design" }] };
+  const rowOwner = { owner: { direction: "row" }, rows: [{ size: "Star", source: "design" }], columns: [{ size: "Pixel", value: 638 }, { size: "Star", source: "design" }] };
+  // 右栏：主轴 column → 高度不写（撑满格子，星号带吸收），位置偏移改用 Margin。
+  assert.deepStrictEqual(containerBoxAttrs({
+    ref: "rail", container: true, children: columnOwner,
+    width: 210, height: 759, nodeWidth: 210, nodeHeight: 608, offsetX: 1, offsetY: 157
+  }), { Margin: "0,157,0,0" }, "主轴那一维不写尺寸/对齐，偏移落成 Margin；交叉轴同尺寸也不写");
+  // 左中区：主轴 row → 宽度不写；交叉轴照设计稿写尺寸，越过格子末端时锚点按上边。
+  assert.deepStrictEqual(containerBoxAttrs({
+    ref: "left", container: true, children: rowOwner,
+    width: 1070, height: 759, nodeWidth: 1026, nodeHeight: 600, offsetX: 0, offsetY: 161
+  }), { Height: "600", VerticalAlignment: "Top", Margin: "0,161,0,0" },
+  "主轴撑满、交叉轴照设计稿；设计稿越过格子末端 → 锚点按上边 + Margin（窗口变化时不漂）");
+}
+
+// ── ④ 发射器：属性落到 XAML，并逐格进发射报告 ────────────────────────────────────
 {
   const layout = {
     schemaVersion: 1, adapter: "mw-wpf", pageTarget: "P", design: { width: 1280, height: 1024 },
@@ -223,30 +239,47 @@ function node(id, type, style, children, extra) {
 }
 
 // ── ⑤ 格子算不出正数尺寸（内容溢出承载物）→ unsized：不写尺寸/对齐，门禁按提示登记 ─────
+// 口径 A 下星号带只承载"大空档"，正常推导不会出现载体落进零尺寸星号带；这一节按格子级
+// （手写布局 JSON）验证门禁对 unsized 的判别强度，形态与"溢出"一致。
 {
-  const dsl = { dsl: { nodes: [node("root", "FRAME", { width: 1280, height: 1024, relativeX: 0, relativeY: 0 }, [
-    // 容器只有 100 宽：条目 40 + 间隙 70 已经 110 > 100 → 自适应的容器列算不出正数。
-    node("box", "FRAME", { width: 100, height: 60, relativeX: 0, relativeY: 0 }, [
-      node("a", "TEXT", { width: 40, height: 16, relativeX: 0, relativeY: 0 }),
-      node("y", "FRAME", { width: 300, height: 20, relativeX: 110, relativeY: 0 }, [
-        node("y1", "TEXT", { width: 80, height: 16, relativeX: 0, relativeY: 0 }),
-        node("y2", "TEXT", { width: 80, height: 16, relativeX: 0, relativeY: 20 })
-      ], { flexContainerInfo: { flexDirection: "column" } })
-    ], { flexContainerInfo: { flexDirection: "row", gap: "70px" } }),
-    node("side", "TEXT", { width: 40, height: 16, relativeX: 300, relativeY: 0 })
-  ])] } };
   const types = {
     byRef: new Map([
       ["a", { ref: "a", controlType: "TextBlock", absX: 0, absY: 85, w: 40, h: 16 }],
       ["y1", { ref: "y1", controlType: "TextBlock", absX: 110, absY: 85, w: 80, h: 16 }],
-      ["y2", { ref: "y2", controlType: "TextBlock", absX: 110, absY: 105, w: 80, h: 16 }],
-      ["side", { ref: "side", controlType: "TextBlock", absX: 300, absY: 85, w: 40, h: 16 }]
+      ["y2", { ref: "y2", controlType: "TextBlock", absX: 110, absY: 105, w: 80, h: 16 }]
     ])
   };
-  const derived = deriveLayout({
-    dsl: dsl, types: types, map: MAP, containers: new Set(["IOGroupBox"]),
-    tokens: { headerHeight: 85, bottomHeight: 180 }, pageTarget: "P", visibility: null
-  });
+  // 手写布局：容器只有 100 宽，列定义 340 + 星号 → 星号带被前面的固定带吃光（重算为 0）。
+  const derived = {
+    schemaVersion: 1, adapter: "mw-wpf", pageTarget: "P", design: { width: 1280, height: 1024 },
+    regions: [{
+      id: "work-area", name: "工作区", ref: null, role: "work-area", emit: true,
+      x: 0, y: 85, w: 1280, h: 759,
+      grid: {
+        rows: [{ size: "Star", source: "design" }],
+        columns: [{ size: "Star", source: "design" }],
+        cells: [{
+          ref: "box", container: true, row: 0, column: 0, rowSpan: 1, columnSpan: 1,
+          width: 1280, height: 759, nodeWidth: 100, nodeHeight: 60, offsetX: 0, offsetY: 0,
+          children: {
+            rows: [{ size: "Pixel", value: 20, source: "design" }, { size: "Star", source: "design" }],
+            columns: [{ size: "Pixel", value: 340, source: "design" }, { size: "Star", source: "design" }],
+            cells: [
+              {
+                ref: "a", controlType: "TextBlock", row: 0, column: 0, rowSpan: 1, columnSpan: 1,
+                width: 340, height: 20, nodeWidth: 40, nodeHeight: 16, offsetX: 0, offsetY: 0
+              },
+              {
+                ref: "y", controlType: "TextBlock", row: 1, column: 1, rowSpan: 1, columnSpan: 1,
+                height: 40, nodeWidth: 300, nodeHeight: 20, offsetY: 0, unsized: { width: true }
+              }
+            ]
+          }
+        }]
+      }
+    }],
+    pending: [], constraintExempt: []
+  };
   const cells = new Map();
   (function walk(grid) {
     grid.cells.forEach(function (item) { cells.set(item.ref, item); if (item.children) walk(item.children); });
@@ -262,9 +295,6 @@ function node(id, type, style, children, extra) {
   const reportPath = writeJson("unsized-report.json", {
     designBox: Array.from(cells.values()).filter(function (cell) { return !cell.spacer; }).map(function (cell) {
       return { ref: cell.ref, container: !!cell.container, attrs: designBoxAttrs(cell) };
-    }),
-    spacers: Array.from(cells.values()).filter(function (cell) { return cell.spacer; }).map(function (cell) {
-      return { ref: cell.ref, axis: cell.spacer.axis, size: cell.spacer.size };
     })
   });
   const outPath = path.join(tmp, "unsized-gate.json");
@@ -279,7 +309,7 @@ function node(id, type, style, children, extra) {
   // 分维强度：unsized 只免宽度，高度被改坏仍必须失败。
   const tampered = JSON.parse(JSON.stringify(derived));
   (function find(grid) {
-    grid.cells.forEach(function (cell) { if (cell.ref === "y1") cell.height = 999; if (cell.children) find(cell.children); });
+    grid.cells.forEach(function (cell) { if (cell.ref === "y") cell.height = 999; if (cell.children) find(cell.children); });
   })(tampered.regions.find(function (region) { return region.emit !== false; }).grid);
   const tamperedPath = writeJson("unsized-layout-tampered.json", tampered);
   const tamperedRun = spawnSync(process.execPath, [CHECK, "--layout", tamperedPath, "--types", typesPath, "--map", ROUTE_MAP,
