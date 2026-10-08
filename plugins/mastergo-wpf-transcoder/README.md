@@ -34,7 +34,7 @@ Layout 增量注册与 `--overwrite` 的语义：
 
 Agent 的完整工作流是：MasterGo MCP 一次性 `getDsl` → DSL pipeline `Capture` → coverage complete → 组件映射 → page bundle。完整页面或容器只允许用这一次 `getDsl` 响应作为设计数据源，不得拆成 section 分段采集，也不得用多个局部响应拼接页面；DSL pipeline 不负责猜测控件、资源键或运行时业务绑定。
 
-MasterGo 转换只从 MasterGo MCP 取数：`getDsl` 不可调用或报错时**停止转换并报告原因**，不换用浏览器、截图或其他设计稿来源继续，也不读图做判断。
+MasterGo 转换只从 MasterGo MCP 取数：`getDsl` 不可调用或报错时**停止转换并报告原因**，不换用浏览器、截图或其他设计稿来源继续。读图按路线分：作业 B 不读图；作业 A 读图，但只用于判断 DSL 里没有真值的空间关系与分组意图，结论落成结构化标注（枚举 + DSL 节点 ref），外观、朝向与坐标仍以 DSL 为唯一真值。
 
 ## 真实项目接入
 
