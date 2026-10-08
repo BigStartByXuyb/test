@@ -94,7 +94,7 @@ pwsh -NoProfile -File <skill>\scripts\entry\run-all.ps1 -List -Format json -OutF
 | 图标命名表 | `Generated/_inputs/<Target>.icon-naming.json` | 候选下标 → 英文资源名（`…Geometry`）+ 中文注释（可选 `fromDsl`）；下标**只能**取候选清单的 `mustName`（= `discover` 判定的要登记项，多一个少一个都失败） |
 | 译文清单 | `Generated/_inputs/<Target>.lang-translations.json` | 中文 → 英文译文；脚本不做翻译、不调机翻服务 |
 | 术语表 | `Generated/_inputs/<Target>.lang-glossary.json` | 无英文语义或单字符文案的稳定标识符 |
-| 分组表 | `Generated/_inputs/<Target>.layout-groups.json` | **仅作业A**：看图后产出的分组意图（`kind` 只取 `column` / `row`，成员是 `members` 里的 DSL ref）；有设计稿位图而缺它，第 8 步停下报告 |
+| 分组表 | `Generated/_inputs/<Target>.layout-groups.json` | **仅作业A**：看图后产出的分组意图（`kind` 只取 `column` / `row`，成员是 `members` 里的 DSL ref；`pageTarget` 写本次页面，写了就必须与本次页面一致）；有设计稿位图而缺它，第 8 步停下报告 |
 
 ## 硬门禁索引
 
