@@ -842,6 +842,11 @@ function deriveLayout(options) {
   };
   if (!design.width || !design.height) fail("DSL 根节点缺少画板尺寸");
 
+  // 分组表标的页面必须与本次页面一致：防止把另一页的表套到这一页（表里只有 ref，套错了会静默错组）。
+  if (options.groups && options.groups.pageTarget && options.groups.pageTarget !== options.pageTarget) {
+    fail("分组表的 pageTarget（" + options.groups.pageTarget + "）与本次页面（" + options.pageTarget + "）不一致");
+  }
+
   const entries = [];
   byRef.forEach(function (node) {
     if (!node.controlType) return;

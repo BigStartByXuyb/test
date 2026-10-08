@@ -411,6 +411,11 @@ function sizes(bands) {
   assert.throws(function () {
     derive(snapshot([], boxes), types, { groups: { groups: [{ id: "wide", kind: "column", members: ["a", "b", "d"] }] } });
   }, /还有未归组的条目/, "组的地盘里夹着未归组条目 → 失败（标注与设计稿几何矛盾）");
+  assert.throws(function () {
+    derive(snapshot([], boxes), types, {
+      groups: { pageTarget: "OtherPage", groups: [{ id: "g", kind: "column", members: ["a", "b"] }] }
+    });
+  }, /pageTarget/, "分组表标的页面与本次页面不一致 → 失败（防套错页）");
 
   // 文件形状：schema 版本、kind、成员数量都在读表时就失败。
   const tmp = path.join(os.tmpdir(), "layout-groups-" + process.pid + ".json");
