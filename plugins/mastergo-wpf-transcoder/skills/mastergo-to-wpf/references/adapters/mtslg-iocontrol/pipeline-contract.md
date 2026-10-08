@@ -143,11 +143,14 @@ pwsh -NoProfile -File <skill>\scripts\entry\run-all.ps1 -ProjectRoot <项目> -T
 
 - **输入**：
   - dsl.snapshot.json + 图标台账 + 正式映射表
+  - （作业A）分组表 Generated/_inputs/<Target>.layout-groups.json——可选，但有设计稿位图时必须先产出它
 - **产物**：
   - Layout 清单与推导报告 Generated/_inputs/<Target>.layout-manifest.json(.report.json)
 - **失败语义**：
   - layoutStatus 不属于 complete/none
   - layoutEvidence.unresolvedBottomBarItems≠0
+  - （作业A）有设计稿位图但没有分组表
+  - （作业A）分组表校验失败（未知 ref / 一个 ref 进多个分组 / 组的地盘里夹着未归组条目）
 - **怎么修**：
   - 补齐底部栏变体命中后重跑：-Progress layout（校验失败表示清单不完整，不是拒绝生成页面）；本页确实没有菜单项与常驻分组时 none 是合法终态（此时 menuItems 与两个计数必须全为 0）
 
