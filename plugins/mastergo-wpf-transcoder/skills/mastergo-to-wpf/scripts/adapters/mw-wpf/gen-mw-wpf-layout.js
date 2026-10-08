@@ -11,7 +11,9 @@
 //   --map          references/adapters/mw-wpf/mw-wpf-map.json（判定哪些类型是容器）
 //   --page-target  页面名
 //   --out          Generated/<页面名>.wpf-layout.json
-//   [--report]     推导报告（分区摘要 / 未归格节点）
+//   [--report]     推导报告（分区摘要 / 未归格节点 / 未归宿条目 / 分组表来源与指纹）
+//   [--groups]     分组表（意图输入，可选）：Generated/_inputs/<页面名>.layout-groups.json。
+//                  只写"哪些 ref 同属一组"，不写坐标尺寸；覆盖到的条目按表分组，没覆盖到的走机械判据
 //
 // 输出（冻结；发射器与门禁按它读）
 //   { schemaVersion, adapter:"mw-wpf", pageTarget, design:{width,height},
@@ -63,6 +65,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 const { fail, readJson } = require(path.join(__dirname, "..", "..", "lib", "script-helpers.js"));
 const { normalizeConstraints } = require(path.join(__dirname, "..", "..", "lib", "constraints.js"));
 
@@ -77,6 +80,7 @@ function parseArgs(argv) {
     else if (token === "--dsl") args.dslPath = argv[++i];
     else if (token === "--visibility") args.visibilityPath = argv[++i];
     else if (token === "--map") args.mapPath = argv[++i];
+    else if (token === "--groups") args.groupsPath = argv[++i];
     else if (token === "--page-target") args.pageTarget = argv[++i];
     else if (token === "--out") args.outPath = argv[++i];
     else if (token === "--report") args.reportPath = argv[++i];
@@ -656,48 +660,139 @@ function contentSizeOf(cell) {
   };
 }
 
-function buildRegionGrid(entries, containers, pending, dslTree, size, origin) {
+function buildRegionGrid(entries, containers, pending, dslTree, size, origin, groupsDoc) {
   const tree = buildContainmentTree(entries, containers, pending);
   const flex = buildFlexItems(tree.roots, dslTree);
   const owner = flexOwnerOf(flex.owner);
   // 区域根网格是页面内容区那一层：页面常驻右栏（贴主轴末端的最末条目）在这一层固定。
   if (owner) owner.root = true;
   // 设计稿已经打了组（这一层由某个容器提上来的，owner 非空）就不再补组；只有散落条目才补。
-  const items = owner ? flex.items : synthRegionGroups(flex.items);
-  return buildGridFrom(items, { childrenOf: tree.childrenOf, dslTree: dslTree }, size, owner, origin);
+  const synth = owner ? { items: flex.items, unresolved: [] } : synthRegionGroups(flex.items, groupsDoc);
+  return {
+    grid: buildGridFrom(synth.items, { childrenOf: tree.childrenOf, dslTree: dslTree }, size, owner, origin),
+    unresolved: synth.unresolved
+  };
 }
 
-// 设计稿没打组的地方，代码补组：区域根网格里的散条目按**栏**收成合成容器。
-// 判据只有一条——位置：同一条列带（x 区间重叠，条目在竖直方向排）里 ≥2 个条目 → 一个列容器
+// 区域根网格的成栏：**分组表**（模型/人给的意图输入）优先，没覆盖到的散条目再走机械判据。
+// 分组表只写"哪些条目同属一组"，不写坐标与尺寸——事实一律来自 DSL 快照。
+// 机械判据只有一条——位置：同一条列带（x 区间重叠，条目在竖直方向排）里 ≥2 个条目 → 一个栏容器
 // （axis="y"，栏内再按口径 A 成行）。容器条目与叶子同等参与。
 // 这样"没打组的页"与"设计稿打了组的页"产物同构：一栏 = 一层 Grid，加控件只动栏内那一层。
 //
-// 只按栏补、不按行补（回归网：② 见 tests/gen-mw-wpf-layout.test.js 用例 4，① 见 tests/design-box.test.js 的布局推导块）：
+// 机械判据只按栏补、不按行补（回归网：② 见 tests/gen-mw-wpf-layout.test.js 用例 4，① 见 tests/design-box.test.js 的布局推导块）：
 //   ① 行方向合并会把本该撑满主轴的容器钉死在自己的设计稿高度上（可用高度变成新容器自己的高度）；
 //   ② y 区间重叠 ≠ 一行——它会把页面两端互不相干的条目（左标签 + 右侧高控件）也并进来，
 //      把顶层本来分开的列并成一格，反而丢结构。
 // 行语义另有来源：设计稿打了组时由容器的 flex 主轴（column）表达；没打组时，每一栏内部本来
-// 就是按口径 A 成行的，加控件同样只动栏内那一层。
-function synthRegionGroups(items) {
-  if (items.length < 2) return items;
-  const consumed = new Set();
+// 就是按口径 A 成行的。分组表要行就显式写 kind="row"——那是人的判断，不由几何猜。
+
+const LAYOUT_GROUPS_SCHEMA = "mw-wpf-layout-groups/1";
+
+// 分组表形状（只写关系，不写事实）：
+//   { "schemaVersion": "mw-wpf-layout-groups/1", "pageTarget": "<页面名>",
+//     "groups": [ { "id": "g1", "kind": "column" | "row", "members": ["<DSL ref>", ...] } ] }
+function readLayoutGroups(filePath) {
+  const doc = readJson(filePath, "分组表");
+  if (doc.schemaVersion !== LAYOUT_GROUPS_SCHEMA) {
+    fail("分组表 schemaVersion 必须是 " + LAYOUT_GROUPS_SCHEMA + "，当前: " + doc.schemaVersion);
+  }
+  if (doc.groups !== undefined && !Array.isArray(doc.groups)) fail("分组表的 groups 必须是数组");
+  const list = doc.groups || [];
+  list.forEach(function (group, index) {
+    const label = "分组表第 " + (index + 1) + " 项";
+    if (!group || typeof group !== "object") fail(label + "不是对象");
+    if (!group.id) fail(label + "缺 id");
+    if (group.kind !== "column" && group.kind !== "row") fail(label + "（" + group.id + "）的 kind 必须是 column 或 row");
+    if (!Array.isArray(group.members) || group.members.length < 2) fail(label + "（" + group.id + "）的 members 至少 2 个 ref");
+    group.members.forEach(function (ref) {
+      if (typeof ref !== "string" || !ref) fail(label + "（" + group.id + "）的 members 只能是非空字符串 ref");
+    });
+  });
+  return { pageTarget: doc.pageTarget || null, groups: list };
+}
+
+// 合成容器条目：bbox 取成员并集，只登记关系，坐标仍来自成员自己（DSL）。
+function synthItem(ref, members, axis) {
+  const left = Math.min.apply(null, members.map(function (item) { return item.x; }));
+  const right = Math.max.apply(null, members.map(function (item) { return item.x + item.w; }));
+  const top = Math.min.apply(null, members.map(function (item) { return item.y; }));
+  const bottom = Math.max.apply(null, members.map(function (item) { return item.y + item.h; }));
+  return {
+    ref: ref, container: true, synth: true, axis: axis, items: members,
+    x: left, y: top, w: right - left, h: bottom - top
+  };
+}
+
+// 机械判据：同一条列带（x 区间重叠）里 ≥2 个条目 → 一个栏容器。
+function synthColumns(items) {
   const groups = [];
+  if (items.length < 2) return groups;
   clusterByOverlap(items, function (n) { return n.x; }, function (n) { return Math.max(n.w, 1); })
     .forEach(function (band) {
       if (band.items.length < 2) return;
       const sorted = band.items.slice().sort(function (a, b) { return a.y - b.y; });
-      const left = Math.min.apply(null, sorted.map(function (item) { return item.x; }));
-      const right = Math.max.apply(null, sorted.map(function (item) { return item.x + item.w; }));
-      const top = Math.min.apply(null, sorted.map(function (item) { return item.y; }));
-      const bottom = Math.max.apply(null, sorted.map(function (item) { return item.y + item.h; }));
-      sorted.forEach(function (item) { consumed.add(item.ref); });
-      groups.push({
-        ref: "synth:" + sorted[0].ref, container: true, synth: true, axis: "y", items: sorted,
-        x: left, y: top, w: right - left, h: bottom - top
-      });
+      groups.push(synthItem("synth:" + sorted[0].ref, sorted, "y"));
     });
-  if (!groups.length) return items;
-  return items.filter(function (item) { return !consumed.has(item.ref); }).concat(groups);
+  return groups;
+}
+
+// 分组表落成栏/行容器。校验（任一不成立即失败，不静默采纳）：
+//   ① ref 必须在本层条目里；② 一个 ref 只能出现在一个分组里；
+//   ③ 组的地盘里不得有"组外、且没被任何分组收走"的条目——那是标注与设计稿几何矛盾的机械判据
+//      （例如声明把互相隔着别人的两块并成一组）。成员之间不要求 x/y 区间重叠：设计稿里同一个栏的
+//      条目本来就允许横向错开（标签贴着组的左边、数值贴着右边）。
+function declaredGroups(items, groupsDoc) {
+  const byRef = new Map();
+  items.forEach(function (item) { byRef.set(item.ref, item); });
+  const used = new Set();
+  const built = groupsDoc.groups.map(function (group) {
+    const members = group.members.map(function (ref) {
+      const item = byRef.get(ref);
+      if (!item) fail("分组 " + group.id + " 的 ref 不在本层条目里: " + ref);
+      if (used.has(ref)) fail("ref 出现在多个分组里: " + ref);
+      used.add(ref);
+      return item;
+    });
+    const horizontal = group.kind === "row";
+    const sorted = members.slice().sort(function (a, b) { return horizontal ? a.x - b.x : a.y - b.y; });
+    return { id: group.id, item: synthItem("declared:" + group.id, sorted, horizontal ? "x" : "y") };
+  });
+  built.forEach(function (entry) {
+    const box = entry.item;
+    items.forEach(function (item) {
+      if (used.has(item.ref)) return;
+      const inside = item.x >= box.x - EPSILON && item.y >= box.y - EPSILON &&
+        item.x + item.w <= box.x + box.w + EPSILON &&
+        item.y + item.h <= box.y + box.h + EPSILON;
+      if (inside) {
+        fail("分组 " + entry.id + " 的范围内还有未归组的条目: " + item.ref + "（标注与设计稿几何矛盾）");
+      }
+    });
+  });
+  return built.map(function (entry) { return entry.item; });
+}
+
+// 区域根网格的成栏：分组表优先，没覆盖到的散条目再按机械判据补；
+// 两处都没落到的条目保持扁平，并登记进 unresolved（下次看图要看的清单）。
+function synthRegionGroups(items, groupsDoc) {
+  if (items.length < 2) return { items: items, unresolved: [] };
+  const declared = groupsDoc ? declaredGroups(items, groupsDoc) : [];
+  const taken = new Set();
+  declared.forEach(function (group) {
+    group.items.forEach(function (item) { taken.add(item.ref); });
+  });
+  const mechanical = synthColumns(items.filter(function (item) { return !taken.has(item.ref); }));
+  mechanical.forEach(function (group) {
+    group.items.forEach(function (item) { taken.add(item.ref); });
+  });
+  const unresolved = items
+    .filter(function (item) { return !taken.has(item.ref); })
+    .map(function (item) { return { ref: item.ref, reason: "单条目栏：几何判不出它跟谁同组，分组表里也没有它" }; });
+  return {
+    items: items.filter(function (item) { return !taken.has(item.ref); }).concat(mechanical, declared),
+    unresolved: unresolved
+  };
 }
 
 // 区间重叠聚类：x/y 区间相交的算同一条带。用于"互不包含"的同层节点——
@@ -785,13 +880,15 @@ function deriveLayout(options) {
     frameworkRegion("bottom-bar", "底部栏", "framework-bottom", "MaxwellFramework_BottomHeight", tokens.bottomHeight, design, "y")
   ];
   if (content.length) {
+    const work = buildRegionGrid(content, containers, pending, tree, {
+      w: design.width, h: design.height - tokens.bottomHeight - tokens.headerHeight
+    }, { x: 0, y: tokens.headerHeight }, options.groups || null);
     regions.push({
       id: "work-area", name: "工作区", ref: null, role: "work-area", emit: true,
       x: 0, y: tokens.headerHeight, w: design.width,
       h: design.height - tokens.bottomHeight - tokens.headerHeight,
-      grid: buildRegionGrid(content, containers, pending, tree, {
-        w: design.width, h: design.height - tokens.bottomHeight - tokens.headerHeight
-      }, { x: 0, y: tokens.headerHeight })
+      grid: work.grid,
+      unresolved: work.unresolved
     });
   }
   // 归位核对：发射分区里的每个节点（含嵌套 Grid 内的）都必须被某个格子引用，否则挂待确认——
@@ -835,7 +932,8 @@ function deriveLayout(options) {
     design: { width: Math.round(design.width), height: Math.round(design.height) },
     regions: regions,
     pending: pending,
-    constraintExempt: constraintExempt
+    constraintExempt: constraintExempt,
+    layoutGroups: options.groupsSource || null
   };
 }
 
@@ -850,6 +948,8 @@ function loadInputs(args) {
       .filter(function (entry) { return entry[1] && entry[1].holdsChildren === true; })
       .map(function (entry) { return entry[0]; })
   );
+  const groupsPath = args.groupsPath || "";
+  if (groupsPath && !fs.existsSync(groupsPath)) fail("分组表不存在: " + groupsPath);
   return {
     types: { doc: typesDoc, byRef: byRef },
     dsl: readJson(args.dslPath, "DSL 快照"),
@@ -858,7 +958,12 @@ function loadInputs(args) {
     map: map,
     containers: containers,
     tokens: (map.frameworkTokens && typeof map.frameworkTokens === "object") ? map.frameworkTokens : {},
-    pageTarget: args.pageTarget
+    pageTarget: args.pageTarget,
+    groups: groupsPath ? readLayoutGroups(groupsPath) : null,
+    groupsSource: groupsPath ? {
+      path: groupsPath,
+      sha256: crypto.createHash("sha256").update(fs.readFileSync(groupsPath)).digest("hex")
+    } : null
   };
 }
 
@@ -881,7 +986,11 @@ function main() {
         };
       }),
       pending: layout.pending,
-      constraintExempt: layout.constraintExempt
+      constraintExempt: layout.constraintExempt,
+      layoutGroups: layout.layoutGroups,
+      unresolved: layout.regions.reduce(function (all, region) {
+        return all.concat(region.unresolved || []);
+      }, [])
     };
     fs.mkdirSync(path.dirname(args.reportPath), { recursive: true });
     fs.writeFileSync(args.reportPath, JSON.stringify(summary, null, 2) + "\n", "utf8");
@@ -902,4 +1011,8 @@ if (require.main === module) {
 
 // bandExtents / extentOf / contentSizeOf 同时被布局门禁（check-wpf-layout.js）复用来复核格子尺寸，
 // 避免"格子尺寸怎么算"出现第二份实现。
-module.exports = { deriveLayout, clusterBands, bandExtents, extentOf, contentSizeOf };
+// 分组表读取（readLayoutGroups）与落组（declaredGroups）导出给布局门禁复核，避免出现第二份形状判据。
+module.exports = {
+  deriveLayout, clusterBands, bandExtents, extentOf, contentSizeOf,
+  readLayoutGroups, LAYOUT_GROUPS_SCHEMA
+};

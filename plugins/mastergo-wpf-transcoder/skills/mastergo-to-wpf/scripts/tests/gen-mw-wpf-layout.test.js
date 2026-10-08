@@ -20,9 +20,10 @@
 
 const assert = require("assert");
 const fs = require("fs");
+const os = require("os");
 const path = require("path");
 
-const { deriveLayout } = require(path.join(__dirname, "..", "adapters", "mw-wpf", "gen-mw-wpf-layout.js"));
+const { deriveLayout, readLayoutGroups } = require(path.join(__dirname, "..", "adapters", "mw-wpf", "gen-mw-wpf-layout.js"));
 
 const TOKENS = { headerHeight: 85, bottomHeight: 180 };
 const ROUTE_MAP = path.join(__dirname, "..", "..", "references", "adapters", "mw-wpf", "mw-wpf-map.json");
@@ -56,8 +57,8 @@ function typesOf(nodes) {
   return { byRef: byRef };
 }
 
-function derive(dsl, types) {
-  return deriveLayout({
+function derive(dsl, types, extra) {
+  return deriveLayout(Object.assign({
     dsl: dsl,
     types: types,
     map: MAP,
@@ -65,7 +66,7 @@ function derive(dsl, types) {
     tokens: TOKENS,
     pageTarget: "SamplePage",
     visibility: null
-  });
+  }, extra || {}));
 }
 
 function workArea(layout) {
@@ -354,5 +355,75 @@ function sizes(bands) {
     "条目落在带里 → 偏移为 0（不会被贴到容器左边）");
   assert.deepStrictEqual(inner.cells.map(function (cell) { return cell.offsetY; }), [0, 0],
     "第一条条目带与容器顶边齐平");
+}
+
+// ---------- 9. 分组表（意图输入）：只写关系，不写事实 ----------
+{
+  const mk = function (id, x, y) {
+    return node(id, "TEXT", { width: 60, height: 16, relativeX: x, relativeY: y });
+  };
+  const typeOf = function (ref, x, y) {
+    return { ref: ref, controlType: "TextBlock", absX: x, absY: y + 85, w: 60, h: 16 };
+  };
+  const boxes = [mk("a", 100, 115), mk("b", 100, 215), mk("c", 400, 115), mk("d", 400, 215)];
+  const types = typesOf([typeOf("a", 100, 115), typeOf("b", 100, 215), typeOf("c", 400, 115), typeOf("d", 400, 215)]);
+
+  // 没有分组表：机械判据只看位置 → 两条列带各补一个栏容器。
+  const mechanical = workArea(derive(snapshot([], boxes), types));
+  assert.strictEqual(mechanical.grid.cells.filter(function (cell) { return cell.synth; }).length, 2,
+    "没有分组表：机械判据按两条列带各补一个栏容器");
+  assert.strictEqual(mechanical.unresolved.length, 0, "两条列带都收走了，没有未归宿条目");
+
+  // 有分组表：四条并成一个声明的栏容器，顶层只剩这一个格子。
+  const declared = workArea(derive(snapshot([], boxes), types, {
+    groups: { groups: [{ id: "all", kind: "column", members: ["a", "b", "c", "d"] }] }
+  }));
+  const declaredCells = declared.grid.cells.filter(function (cell) { return cell.ref === "declared:all"; });
+  assert.strictEqual(declaredCells.length, 1, "分组表把四条收成一个声明的栏容器");
+  assert.strictEqual(declared.grid.cells.length, 1, "四条都被声明收走 → 顶层只剩这一个容器格子");
+  assert.deepStrictEqual(declaredCells[0].children.cells.map(function (cell) { return cell.ref; }).sort(),
+    ["a", "b", "c", "d"], "声明容器的成员就是分组表里那几个 ref，一个不多一个不少");
+
+  // 分组表没覆盖到的散条目仍走机械判据；既不在表里、又凑不成一条栏的条目进未归宿清单。
+  const mixedBoxes = boxes.concat([mk("e", 700, 115)]);
+  const mixedTypes = typesOf([
+    typeOf("a", 100, 115), typeOf("b", 100, 215), typeOf("c", 400, 115), typeOf("d", 400, 215), typeOf("e", 700, 115)
+  ]);
+  const mixed = workArea(derive(snapshot([], mixedBoxes), mixedTypes, {
+    groups: { groups: [{ id: "left", kind: "column", members: ["a", "b"] }] }
+  }));
+  assert.strictEqual(mixed.grid.cells.filter(function (cell) { return cell.ref === "declared:left"; }).length, 1,
+    "声明的那一栏按表落成");
+  assert.strictEqual(mixed.grid.cells.filter(function (cell) { return cell.ref === "synth:c"; }).length, 1,
+    "表没覆盖到的两条同栏条目仍由机械判据补成栏容器");
+  assert.deepStrictEqual(mixed.unresolved.map(function (item) { return item.ref; }), ["e"],
+    "既不在分组表里、又凑不成一条栏的条目 → 进未归宿清单");
+
+  // 失败面：ref 不存在 / 一个 ref 进两个分组 / 组的地盘里夹着未归组条目（标注与几何矛盾）。
+  assert.throws(function () {
+    derive(snapshot([], boxes), types, { groups: { groups: [{ id: "bad", kind: "column", members: ["a", "nope"] }] } });
+  }, /不在本层条目里/, "分组表引用了不存在的 ref → 失败");
+  assert.throws(function () {
+    derive(snapshot([], boxes), types, {
+      groups: { groups: [{ id: "g1", kind: "column", members: ["a", "b"] }, { id: "g2", kind: "column", members: ["a", "c"] }] }
+    });
+  }, /出现在多个分组里/, "同一个 ref 出现在两个分组 → 失败");
+  assert.throws(function () {
+    derive(snapshot([], boxes), types, { groups: { groups: [{ id: "wide", kind: "column", members: ["a", "b", "d"] }] } });
+  }, /还有未归组的条目/, "组的地盘里夹着未归组条目 → 失败（标注与设计稿几何矛盾）");
+
+  // 文件形状：schema 版本、kind、成员数量都在读表时就失败。
+  const tmp = path.join(os.tmpdir(), "layout-groups-" + process.pid + ".json");
+  try {
+    const write = function (doc) { fs.writeFileSync(tmp, JSON.stringify(doc), "utf8"); };
+    write({ schemaVersion: "nope", groups: [] });
+    assert.throws(function () { readLayoutGroups(tmp); }, /schemaVersion/, "分组表 schema 版本不对 → 失败");
+    write({ schemaVersion: "mw-wpf-layout-groups/1", groups: [{ id: "g", kind: "diagonal", members: ["a", "b"] }] });
+    assert.throws(function () { readLayoutGroups(tmp); }, /kind/, "分组表的 kind 只能是 column / row");
+    write({ schemaVersion: "mw-wpf-layout-groups/1", groups: [{ id: "g", kind: "column", members: ["a"] }] });
+    assert.throws(function () { readLayoutGroups(tmp); }, /至少 2 个 ref/, "分组至少要有 2 个成员");
+  } finally {
+    fs.unlinkSync(tmp);
+  }
 }
 

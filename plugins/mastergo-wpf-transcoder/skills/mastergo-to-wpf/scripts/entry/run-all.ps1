@@ -767,11 +767,16 @@ foreach ($step in $Steps) {
                     # 作业A 另做一步布局推导：分区 → 行列 → 格子（Grid 布局是 A 的坐标载体，不再是绝对坐标）。
                     # 尺寸约束（可选）：把外部导出的 min/max 合并进 DSL 快照，布局与门禁共用合并后的快照。
                     $LayoutDslJson = Resolve-LayoutDslSnapshot -LogFile $log
-                    Invoke-StepCommand -Label 'wpf layout' -LogFile $log -File 'node' -Arguments @(
+                    # 分组表（可选）：与约束同一套「固定路径自动找」口径——存在就消费，不存在就走机械判据。
+                    # 表只写"哪些 ref 同属一组"，坐标尺寸仍以 DSL 为唯一真值（校验在推导入口 fail-closed）。
+                    $GroupsArgs = @()
+                    $groupsAuto = Join-Path $Inputs "$Target.layout-groups.json"
+                    if (Test-Path -LiteralPath $groupsAuto) { $GroupsArgs = @('--groups', $groupsAuto) }
+                    Invoke-StepCommand -Label 'wpf layout' -LogFile $log -File 'node' -Arguments (@(
                         (Get-AdapterScript 'wpfLayout'), '--types', $TypeAuditJson,
                         '--dsl', $LayoutDslJson, '--visibility', $VisibilityJson,
                         '--map', $TemplateMap, '--page-target', $Target,
-                        '--out', $WpfLayoutJson, '--report', $WpfLayoutReportJson) | Out-Null
+                        '--out', $WpfLayoutJson, '--report', $WpfLayoutReportJson) + $GroupsArgs) | Out-Null
                     $wpf = Get-Content -LiteralPath $WpfLayoutJson -Raw -Encoding UTF8 | ConvertFrom-Json
                     $emitRegions = @($wpf.regions | Where-Object { $_.emit -ne $false })
                     $note = "菜单项 $(@($layout.menuItems).Count) 个；发射分区 $($emitRegions.Count) 个 / 框架固定区 $(@($wpf.regions).Count - $emitRegions.Count) 个；待确认 $(@($wpf.pending).Count) 个"
