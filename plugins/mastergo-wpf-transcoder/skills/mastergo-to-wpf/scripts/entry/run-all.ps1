@@ -773,8 +773,10 @@ foreach ($step in $Steps) {
                     # 有图无表属于流程漏步——停下报告，不静默退化成纯机械推导。
                     $GroupsArgs = @()
                     $groupsAuto = Join-Path $Inputs "$Target.layout-groups.json"
-                    $designImages = @("$Target.design.png", "$Target.design.jpg", "$Target.design.jpeg") |
-                        ForEach-Object { Join-Path $Inputs $_ } | Where-Object { Test-Path -LiteralPath $_ }
+                    # 整条管道包在 @() 里：一张都没有时 Results 是 $null，而 Set-StrictMode 下 $null.Count 直接抛
+                    # （与上面 $pages 同一写法）——没图是合法情形，不能变成第 8 步必失败。
+                    $designImages = @(@("$Target.design.png", "$Target.design.jpg", "$Target.design.jpeg") |
+                        ForEach-Object { Join-Path $Inputs $_ } | Where-Object { Test-Path -LiteralPath $_ })
                     if (Test-Path -LiteralPath $groupsAuto) { $GroupsArgs = @('--groups', $groupsAuto) }
                     elseif ($designImages.Count) {
                         throw "有设计稿位图但没有分组表：先看图产出 $groupsAuto（图: $($designImages -join ', ')；口径见 mw-wpf-mode.md 第 2 节）"
@@ -784,11 +786,12 @@ foreach ($step in $Steps) {
                         '--dsl', $LayoutDslJson, '--visibility', $VisibilityJson,
                         '--map', $TemplateMap, '--page-target', $Target,
                         '--out', $WpfLayoutJson, '--report', $WpfLayoutReportJson) + $GroupsArgs) | Out-Null
-                    $wpf = Get-Content -LiteralPath $WpfLayoutJson -Raw -Encoding UTF8 | ConvertFrom-Json
-                    $emitRegions = @($wpf.regions | Where-Object { $_.emit -ne $false })
-                    # 未归宿条目 = 既没进分组表、也没被机械判据收成栏的散条目：报给人抽查（分组表要不要补它）。
-                    $unresolvedCount = @($wpf.regions | Where-Object { $_.unresolved } | ForEach-Object { $_.unresolved }).Count
-                    $note = "菜单项 $(@($layout.menuItems).Count) 个；发射分区 $($emitRegions.Count) 个 / 框架固定区 $(@($wpf.regions).Count - $emitRegions.Count) 个；待确认 $(@($wpf.pending).Count) 个；未归宿条目 $unresolvedCount 个"
+                    # 步骤 note 只读布局报告：报告是布局产物的摘要件，未归宿条目（= 既没进分组表、也没被机械
+                    # 判据收成栏的散条目，报给人抽查）在那里已按分区拍平，本处不再自己遍历 regions。
+                    # 框架固定区（顶部栏/底部栏）没有 unresolved 字段，直接遍历在 Set-StrictMode 下必抛。
+                    $wpfReport = Get-Content -LiteralPath $WpfLayoutReportJson -Raw -Encoding UTF8 | ConvertFrom-Json
+                    $emitRegions = @($wpfReport.regions | Where-Object { $_.emit -ne $false })
+                    $note = "菜单项 $(@($layout.menuItems).Count) 个；发射分区 $($emitRegions.Count) 个 / 框架固定区 $(@($wpfReport.regions).Count - $emitRegions.Count) 个；待确认 $(@($wpfReport.pending).Count) 个；未归宿条目 $(@($wpfReport.unresolved).Count) 个"
                 }
             }
             'inputs' {
