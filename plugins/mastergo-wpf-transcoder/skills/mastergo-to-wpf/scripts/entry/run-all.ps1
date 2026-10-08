@@ -767,11 +767,18 @@ foreach ($step in $Steps) {
                     # 作业A 另做一步布局推导：分区 → 行列 → 格子（Grid 布局是 A 的坐标载体，不再是绝对坐标）。
                     # 尺寸约束（可选）：把外部导出的 min/max 合并进 DSL 快照，布局与门禁共用合并后的快照。
                     $LayoutDslJson = Resolve-LayoutDslSnapshot -LogFile $log
-                    # 分组表（可选）：与约束同一套「固定路径自动找」口径——存在就消费，不存在就走机械判据。
+                    # 分组表：与约束同一套「固定路径自动找」口径——存在就消费，不存在就走机械判据。
                     # 表只写"哪些 ref 同属一组"，坐标尺寸仍以 DSL 为唯一真值（校验在推导入口 fail-closed）。
+                    # 读图开关：有设计稿位图就必须先由图产出这张表（看图是模型那一步的产物）；
+                    # 有图无表属于流程漏步——停下报告，不静默退化成纯机械推导。
                     $GroupsArgs = @()
                     $groupsAuto = Join-Path $Inputs "$Target.layout-groups.json"
+                    $designImages = @("$Target.design.png", "$Target.design.jpg", "$Target.design.jpeg") |
+                        ForEach-Object { Join-Path $Inputs $_ } | Where-Object { Test-Path -LiteralPath $_ }
                     if (Test-Path -LiteralPath $groupsAuto) { $GroupsArgs = @('--groups', $groupsAuto) }
+                    elseif ($designImages.Count) {
+                        throw "有设计稿位图但没有分组表：先看图产出 $groupsAuto（图: $($designImages -join ', ')；口径见 mw-wpf-mode.md 第 2 节）"
+                    }
                     Invoke-StepCommand -Label 'wpf layout' -LogFile $log -File 'node' -Arguments (@(
                         (Get-AdapterScript 'wpfLayout'), '--types', $TypeAuditJson,
                         '--dsl', $LayoutDslJson, '--visibility', $VisibilityJson,
