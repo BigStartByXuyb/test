@@ -108,6 +108,7 @@
 - 英文文案由 AI/工程师产出，并以 `languages.translations` 显式落盘（`{ "中文文案": "English Text" }`，可内联或给 JSON 文件路径）。脚本不做翻译、不调用机翻服务，只机械套用这份清单。
 - 同一份译文清单同时用于两处：**键名语义名**（第 3.1 节第 3 条第 4 级来源）与**字典 EN 值**（`translatedFromInput` 计数）。译文清单与术语表是页面级输入，写在 `Generated/_inputs/<Target>.lang-translations.json` / `.lang-glossary.json`（人工/AI 产出，`run-all` 的 init 会把它们的指纹记进运行登记表 `inputs`）；Bundle 再把**读入的 JSON 重新序列化（两空格缩进 + 行尾换行）**后写到 `Generated/<Target>.lang-translations.json` / `.lang-glossary.json`，作为随产物归档的副本——内容等价，但**不保证与输入文件逐字节相同**（输入会被重新格式化）。两处用途不同（前者是输入，后者是归档），都不做跨页面共享。
 - 英文取值优先级：目标项目已登记字典同 key 的英文 > `translations` 译文 > 中文占位；前两者分别记入 `translatedFromCatalog` 与 `translatedFromInput`。
+- **含义不明的文案不猜译文**：只在"能对上同一条文案 / 同一个 key"时复用既有字典（第 3.1 节第 3 条第 4 级来源与上一条的 `translatedFromCatalog`）。不得从"别的页面上位置、数值、形状看起来对应的那条"反推本页文本的含义——测试文案、乱写的占位文本属于这一类：照原样进 CN 字典、落临时键（`<Target>TextNN`）列进待确认清单，等人工给译文，不自行编一个"看起来正确"的英文。
 - 页面标题来源必须逐页核对：`languages.titleSource=mapping.textAudit` 表示取自设计稿原文；`=manifest.pageTitleText` 表示工程师显式覆盖（交付前与 `sourceText` 逐字比对）；`=dslRoot` 表示退回设计画板框名（交付说明单列并要求人工确认）。
 - 未翻译条目保留中文占位并记入 `languages.derivation.pendingTranslations`，交付说明必须单列，不得当已完成翻译交付。
 
