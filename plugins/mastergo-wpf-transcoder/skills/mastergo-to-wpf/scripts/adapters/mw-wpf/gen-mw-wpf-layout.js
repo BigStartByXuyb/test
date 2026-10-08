@@ -1011,8 +1011,6 @@ if (require.main === module) {
 
 // bandExtents / extentOf / contentSizeOf 同时被布局门禁（check-wpf-layout.js）复用来复核格子尺寸，
 // 避免"格子尺寸怎么算"出现第二份实现。
-// 分组表读取（readLayoutGroups）与落组（declaredGroups）导出给布局门禁复核，避免出现第二份形状判据。
-module.exports = {
-  deriveLayout, clusterBands, bandExtents, extentOf, contentSizeOf,
-  readLayoutGroups, LAYOUT_GROUPS_SCHEMA
-};
+// 分组表的形状校验只有推导入口这一份（readLayoutGroups 读表、declaredGroups 落组）：门禁复核的是产物，
+// 不重复校验输入文件；readLayoutGroups 另外供回归用例直接验证表形状。
+module.exports = { deriveLayout, clusterBands, bandExtents, extentOf, contentSizeOf, readLayoutGroups };

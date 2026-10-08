@@ -786,7 +786,9 @@ foreach ($step in $Steps) {
                         '--out', $WpfLayoutJson, '--report', $WpfLayoutReportJson) + $GroupsArgs) | Out-Null
                     $wpf = Get-Content -LiteralPath $WpfLayoutJson -Raw -Encoding UTF8 | ConvertFrom-Json
                     $emitRegions = @($wpf.regions | Where-Object { $_.emit -ne $false })
-                    $note = "菜单项 $(@($layout.menuItems).Count) 个；发射分区 $($emitRegions.Count) 个 / 框架固定区 $(@($wpf.regions).Count - $emitRegions.Count) 个；待确认 $(@($wpf.pending).Count) 个"
+                    # 未归宿条目 = 既没进分组表、也没被机械判据收成栏的散条目：报给人抽查（分组表要不要补它）。
+                    $unresolvedCount = @($wpf.regions | Where-Object { $_.unresolved } | ForEach-Object { $_.unresolved }).Count
+                    $note = "菜单项 $(@($layout.menuItems).Count) 个；发射分区 $($emitRegions.Count) 个 / 框架固定区 $(@($wpf.regions).Count - $emitRegions.Count) 个；待确认 $(@($wpf.pending).Count) 个；未归宿条目 $unresolvedCount 个"
                 }
             }
             'inputs' {
