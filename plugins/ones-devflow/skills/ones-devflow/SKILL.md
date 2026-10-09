@@ -37,11 +37,11 @@ MCP 地址按团队分配，当前地址只对团队 `4nbVNB2Z`（work）有效�
 ## 回写状态
 
 1. `get_issue_executable_workflows` 取当前合法流转。
-2. `execute_issue_workflow` 执行流转，目标状态必须是业务确认过的下一个状态。
+2. `execute_issue_workflow` 执行流转，目标必须是 `get_issue_executable_workflows` 返回的、业务确认过的 workflow id。
 3. `post_issue_comment` 记录做了什么、依据是什么。
 
 ## 边界
 
 - 不新建工作项类型，不改字段结构，不改工作流定义。
 - 不删除工作项或用例，除非用户明确要求并逐条确认。
-- 回写只做三件事：评论、合法流转、创建用例。
+- 回写只做四件事：评论、合法流转、建模块、创建用例。
