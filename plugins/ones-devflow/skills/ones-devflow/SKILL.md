@@ -7,7 +7,7 @@ description: 通过 ONES MCP 在 ONES 平台上读需求与缺陷、按验收标
 
 ## 连接
 
-插件携带 `ones` MCP server，地址为 `https://sz.ones.cn/mcp`。首次连接会打开浏览器走 OAuth，勾选全部九类 scope；授权后 token 缓存在 `~/.mcp-auth`，之后免登录。
+插件携带 `ones` MCP server，地址为 `https://sz.ones.cn/mcp`。首次连接会打开浏览器走 OAuth，勾选授权页列出的全部 scope；授权后 token 缓存在 `~/.mcp-auth`，之后免登录。
 
 MCP 地址按团队分配，当前地址只对团队 `4nbVNB2Z`（work）有效。换团队时修改 `.mcp.json` 中的地址。
 
@@ -15,7 +15,7 @@ MCP 地址按团队分配，当前地址只对团队 `4nbVNB2Z`（work）有效�
 
 以下约束来自实测，违反会直接失败。
 
-1. 状态只能走工作流。改状态前必须调 `get_issue_executable_workflows` 取当前状态下合法的目标，只能选它返回的、业务确认过的 workflow id；直接写状态字段无效。
+1. 状态只能走工作流。改状态前必须调 `get_issue_executable_workflows` 取当前状态下合法的目标，只能选它返回的 workflow id，执行前向用户逐项确认；直接写状态字段无效。
 2. 工作项 ID 是 UUID。`MASTERGO-28` 这类展示号不能直接传入，先用 `query_issues_by_onesql` 解析成 UUID。
 3. 查询先用 ONESQL 帮助。调 `query_issues_by_onesql` 前必须先调 `get_onesql_grammar_help`，且 SELECT 必须包含 `field001`（标题）。
 4. 建用例先查库字段。`get_testcase_library_fields` 返回优先级与用例类型的选项 ID，创建时必须传 ID。下面这组 ID 只适用于默认用例库 `SYn8WKFx`（名称 test）：优先级 `9sqx41sR`(P0)、`PcoQvbh9`(P1)、`FKhyHELM`(P2)、`MTcn282p`(P3)、`Y5Mx8vTM`(P4)；用例类型「功能测试」为 `35meTuAu`。目标库不是 `SYn8WKFx` 时，以 `get_testcase_library_fields` 的返回值为准。
@@ -24,7 +24,7 @@ MCP 地址按团队分配，当前地址只对团队 `4nbVNB2Z`（work）有效�
 
 1. `search_for_projects` 定位项目，记下项目 ID。
 2. `get_onesql_grammar_help` 后调 `query_issues_by_onesql` 取目标工作项列表。
-3. `get_issue_details` 取单条详情；`get_list_of_issue_comments` 取工作项描述与验收标准，评论正文优先读 `markdown` 字段。
+3. `get_issue_details` 取工作项基本信息；工作项描述与验收标准取 `get_list_of_issue_comments` 的评论文本，正文优先读 `markdown` 字段。
 
 ## 生成测试用例
 
@@ -37,7 +37,7 @@ MCP 地址按团队分配，当前地址只对团队 `4nbVNB2Z`（work）有效�
 ## 回写状态
 
 1. `get_issue_executable_workflows` 取当前合法流转。
-2. `execute_issue_workflow` 执行流转，目标必须是 `get_issue_executable_workflows` 返回的、业务确认过的 workflow id。
+2. `execute_issue_workflow` 执行流转，目标必须是 `get_issue_executable_workflows` 返回的、向用户逐项确认过的 workflow id。
 3. `post_issue_comment` 记录做了什么、依据是什么。
 
 ## 边界
