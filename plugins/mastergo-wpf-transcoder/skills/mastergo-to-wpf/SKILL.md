@@ -33,8 +33,8 @@ description: 将明确要求的 MasterGo 设计稿转换为 MTSLG IOContorl XML�
 
 1. **只认一次 `getDsl`**：用 `scripts/core/call-mastergo-mcp.js` 调 `getDsl(fileId, layerId, format=json)` 读当前图层完整 DSL，**响应只落盘**（`<runDir>/getDsl.json`）不进上下文；不得分段读取，不得用浏览器、截图或视觉猜测替代。MCP 不可调用或 `getDsl` 报错时**停止本次转换并报告原因**，不得换成其他设计数据来源继续。`extractSvg` 是 `getDsl` 成功后的独立图标步骤（`<runDir>/extractSvg.json`），不参与页面结构。
 2. **读图按路线分**：作业 B 不读图；作业 A 读图，但只用来判断 DSL 里没有真值的**空间关系与分组意图**，
-   结论必须落成**分组表**（`Generated/_inputs/<页面名>.layout-groups.json`）再进布局推导；**有设计稿位图就必须先产出分组表**，
-   否则布局推导那一步停下。读图只补关系、不增删控件；读图结论**不得覆盖或否决** DSL 机械真值
+   结论必须落成**分组表**（`Generated/_inputs/<Target>.layout-groups.json`）再进 `layout`；**有设计稿位图就必须先产出分组表**，
+   否则 `layout` 停下。读图只补关系、不增删控件；读图结论**不得覆盖或否决** DSL 机械真值
    （外观、图标含义与朝向、坐标、尺寸一律以 DSL 为准）。
    完整口径与分组表 schema 只在 `references/adapters/mw-wpf/mw-wpf-mode.md` 第 2 节。
 3. **不降级、不伪造**：没有正式映射的组件只进来源清单与待确认，不得改成 `Button`、`Border`、无类型容器或近似控件；存在未映射组件时不得宣称「完整可运行页面」。
@@ -78,7 +78,7 @@ description: 将明确要求的 MasterGo 设计稿转换为 MTSLG IOContorl XML�
 | 11 | `gates` | 严格门禁（审计逐条断言） |
 | 12 | `verify` | 四项独立验证（provenance / 坐标 / Icon / 结构） |
 
-- **作业 A 的差异**（步骤号与名称不变，步内命令与产物不同）：「映射草稿」那一步 = 共享类型判定（只读共享类型表，产出 `Generated/<Target>.component-types.json`）；「布局推导」那一步 = 共用 Layout 清单推导 **+** 布局产物推导 `Generated/<Target>.wpf-layout.json`（分区 → 行列 → 格子；口径 A 成带：带＝条目＋它后面的间距、大空档单独成星号带、没打组的地方补合成容器；格子登记设计稿尺寸与控件在格内的偏移）；「生成页面」那一步 = 真控件 `View.xaml`（含本页 Icon 字典合并点）+ 宿主壳 + 本页 Icon/语言字典 + Layout 注册，**不发射 IOContorl 页面 XML**；「门禁」/「验证」那一步 = 布局门禁（越界 / 锚点格冲突 / 禁止类型 / 尺寸来源 / 协议 / 资源键 / 硬编码文本 / 尺寸约束一致性与落格 / 格子尺寸与尺寸·对齐发射；失败与提示的逐条口径见 `references/adapters/mw-wpf/page-build-rules.md` 第 4 节，布局规则见 `references/adapters/mw-wpf/mw-wpf-mode.md` 第 2 节，此处不复述）。取数、固化快照、图标几何、显隐、图标候选、图标台账、Bundle 清单这些步骤两条路线沿用同一套。
+- **作业 A 的差异**（步骤号与名称不变，步内命令与产物不同）：`mapping` = 共享类型判定（只读共享类型表，产出 `Generated/<Target>.component-types.json`）；`layout` = 共用 Layout 清单推导 **+** 布局产物推导 `Generated/<Target>.wpf-layout.json`（分区 → 行列 → 格子；口径 A 成带：带＝条目＋它后面的间距、大空档单独成星号带、没打组的地方补合成容器；格子登记设计稿尺寸与控件在格内的偏移）；`bundle` = 真控件 `View.xaml`（含本页 Icon 字典合并点）+ 宿主壳 + 本页 Icon/语言字典 + Layout 注册，**不发射 IOContorl 页面 XML**；`gates` / `verify` = 布局门禁（越界 / 锚点格冲突 / 禁止类型 / 尺寸来源 / 协议 / 资源键 / 硬编码文本 / 尺寸约束一致性与落格 / 格子尺寸与尺寸·对齐发射；失败与提示的逐条口径见 `references/adapters/mw-wpf/page-build-rules.md` 第 4 节，布局规则见 `references/adapters/mw-wpf/mw-wpf-mode.md` 第 2 节，此处不复述）。`fetch`、`capture`、`svg`、`visibility`、`discover`、`ledger`、`inputs` 这些步骤两条路线沿用同一套。
 
 - **每一步的输入 / 产物 / 失败语义 / 怎么修：`references/adapters/mtslg-iocontrol/pipeline-contract.md`**。该文件由 `run-all.ps1` 的步骤定义生成（`node scripts/core/gen-pipeline-contract.mjs`），**真值源是脚本**；要改契约就改脚本再重新生成，手改文档会挂测试。
 - 运行登记表：`<项目>/Generated/runs/<Target>/run.json`，规则是「**产出即登记、消费只按登记取、未登记的旧同名文件一律拒绝**」；清单里的采集输入（`dslPath` / `visibilityPath` / `svgPath`）都从登记表解析并校验 `sha256`。断点续跑用 `-Progress <步骤名>`（续跑的身份与登记表口径、可改语义输入见 `references/adapters/mtslg-iocontrol/bundle-manifest.md` 第 7 节）。
@@ -98,7 +98,7 @@ pwsh -NoProfile -File <skill>\scripts\entry\run-all.ps1 -List -Format json -OutF
 | 图标命名表 | `Generated/_inputs/<Target>.icon-naming.json` | 候选下标 → 英文资源名（`…Geometry`）+ 中文注释（可选 `fromDsl`）；下标**只能**取候选清单的 `mustName`（= `discover` 判定的要登记项，多一个少一个都失败） |
 | 译文清单 | `Generated/_inputs/<Target>.lang-translations.json` | 中文 → 英文译文；脚本不做翻译、不调机翻服务 |
 | 术语表 | `Generated/_inputs/<Target>.lang-glossary.json` | 无英文语义或单字符文案的稳定标识符 |
-| 分组表 | `Generated/_inputs/<Target>.layout-groups.json` | **仅作业A**：看图后产出的分组意图（`kind` 只取 `column` / `row`，成员是 `members` 里的 DSL ref；`pageTarget` 写本次页面，写了就必须与本次页面一致）；有设计稿位图而缺它，「布局推导」那一步停下报告 |
+| 分组表 | `Generated/_inputs/<Target>.layout-groups.json` | **仅作业A**：看图后产出的分组意图（`kind` 只取 `column` / `row`，成员是 `members` 里的 DSL ref；`pageTarget` 写本次页面，写了就必须与本次页面一致）；有设计稿位图而缺它，`layout` 停下报告 |
 
 ## 硬门禁索引
 
@@ -118,7 +118,7 @@ pwsh -NoProfile -File <skill>\scripts\entry\run-all.ps1 -List -Format json -OutF
 
 作业 A（`-Mode mw-wpf`）另有这些硬门禁，细则见对应 reference：
 
-- **尺寸照设计稿，外观只走样式族**：Grid 行列、控件尺寸与对齐都照设计稿；成带走**口径 A**——一条带 = 条目 + 它后面的间距，相邻条目之间哪一段间距落成星号带只看设计稿自身（分组结构优先，散条目按相对判据），每层最多一条星号带，**不发射任何间距元素**；没打组的地方先按可选的分组表成栏（`Generated/_inputs/<页面名>.layout-groups.json`，只写哪些 ref 同属一组），表没覆盖到的再由机械判据兜底（同一条列带里 ≥2 个条目 → 栏容器，只按栏补、不按行补），两处都没落到的条目登记进分区 `unresolved`；列宽固定项（相机所在 Grid / 区域根网格里贴主轴末端的最末条目＝常驻右栏）照设计稿像素、容器条目自适应、叶子控件照设计稿像素（根：`scripts/lib/design-box.js` 与 `mw-wpf-mode.md` 第 2 节第 3 条）；配色、边框、状态、模板一律用样式族键，设计稿与样式族冲突时停下报告，不得散写属性凑 → `references/adapters/mw-wpf/mw-wpf-mode.md`
+- **尺寸照设计稿，外观只走样式族**：Grid 行列、控件尺寸与对齐都照设计稿；成带走**口径 A**——一条带 = 条目 + 它后面的间距，相邻条目之间哪一段间距落成星号带只看设计稿自身（分组结构优先，散条目按相对判据），每层最多一条星号带，**不发射任何间距元素**；没打组的地方先按可选的分组表成栏（`Generated/_inputs/<Target>.layout-groups.json`，只写哪些 ref 同属一组），表没覆盖到的再由机械判据兜底（同一条列带里 ≥2 个条目 → 栏容器，只按栏补、不按行补），两处都没落到的条目登记进分区 `unresolved`；列宽固定项（相机所在 Grid / 区域根网格里贴主轴末端的最末条目＝常驻右栏）照设计稿像素、容器条目自适应、叶子控件照设计稿像素（根：`scripts/lib/design-box.js` 与 `mw-wpf-mode.md` 第 2 节第 3 条）；配色、边框、状态、模板一律用样式族键，设计稿与样式族冲突时停下报告，不得散写属性凑 → `references/adapters/mw-wpf/mw-wpf-mode.md`
 - **框架固定区不进页面**：顶部栏 / 底部栏由框架渲染（尺寸用框架 Token），设计稿里的对应区域只用于生成 Layout 注册与菜单项；设计稿的右下角常驻分组与 IOContorl 同口径（不发射 / 不计格 / 不登记图标）→ `references/adapters/mw-wpf/mw-wpf-mode.md`
 - **页面必须合并本页 Icon 字典**：A 页面用 `{StaticResource …Geometry}` 引用图形，缺合并点会在加载期抛 `XamlParseException` → `references/adapters/mw-wpf/page-build-rules.md`
 - **无对应条目的类型 fail-closed**：写法表把 `Border` 登记为待确认（A 侧没有 Border 控件），遇到即挂待确认、不发射；`Camera` 是 `manual-only`（手册与真实页面都没有该控件，仅用户确认作业A 侧就是 `s:Camera`），可以发射，首次用新框架生成后回填手册条目 → `references/adapters/mw-wpf/mw-wpf-map.json`
@@ -128,7 +128,7 @@ pwsh -NoProfile -File <skill>\scripts\entry\run-all.ps1 -List -Format json -OutF
 
 - 交付物：页面 XML、本页 `Icons.xaml`、`CN`/`EN` 语言字典、Layout 注册、`View.xaml` + `View.xaml.cs` + `ViewModel.cs`、目标项目要求的宿主壳、mapping/审计与交付说明。
 - 作业 A 的交付物：真控件 `View.xaml`（+ 本页 Icon 字典合并点）、`View.xaml.cs`、`ViewModel.cs`、本页 `Icons.xaml`、`CN`/`EN` 语言字典、Layout 注册、类型判定与布局产物（`Generated/<Target>.component-types.json`、`Generated/<Target>.wpf-layout.json`）与门禁报告；**不含 IOContorl 页面 XML**。
-- 静态验收顺序：`validate-iocontrol-provenance.js`（Value/来源/坐标）→ 坐标检查 → Icon 引用闭环 → 页面结构校验；`run-all.ps1` 「门禁」/「验证」那一步就是这套门禁。
+- 静态验收顺序：`validate-iocontrol-provenance.js`（Value/来源/坐标）→ 坐标检查 → Icon 引用闭环 → 页面结构校验；`run-all.ps1` 的 `gates` / `verify` 就是这套门禁。
 - 只有项目引用、真实运行时资源、可编译宿主与加载验证都通过，才能称「完整可运行页面」；**运行时交付门禁**（部署、宿主加载、`Ctrl+R`、截图核对）只在用户明确要求时执行。
 - 交付说明必须列出：待翻译条目与临时键、槽位豁免 `valueLangExempt`、中英文写法相同的键 `identicalTextKeys`、未映射组件与待配置的运行时字段。
 - **项目内不放工具链副本**：脚本真源是本插件，页面项目只留产物与证据（页面 XML / Icon / 语言字典 / Layout / 宿主壳 / `Generated/`），不留 `_tool/` 之类的脚本拷贝。

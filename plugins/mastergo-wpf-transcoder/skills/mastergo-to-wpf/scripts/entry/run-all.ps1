@@ -102,10 +102,10 @@ $Steps = @(
     },
     [pscustomobject]@{
         Id = 2; Name = 'capture'; Title = 'DSL 结构化快照 + 覆盖校验'
-        Inputs   = @('「取数」那一步的 getDsl.json', '区域前缀 -Ui（缺失时按 run-all 取值链解析）', '设计页名 -DesignPageName（命令行或项目登记表；为空时 capture 用 DSL 根节点名兜底，再取不到用 layerId）')
+        Inputs   = @('`fetch` 那一步的 getDsl.json', '区域前缀 -Ui（缺失时按 run-all 取值链解析）', '设计页名 -DesignPageName（命令行或项目登记表；为空时 capture 用 DSL 根节点名兜底，再取不到用 layerId）')
         Outputs  = @('Generated/runs/<Target>/dsl.snapshot.json', 'coverage-report.json（节点覆盖/重复 ref/断裂父子链）')
         Failures = @('覆盖校验 status≠complete', '存在重复 ref 或断裂父子链', '区域前缀取值链取不到')
-        Recovery = @('改 fileId / layerId 后必须重取数：从「取数」那一步 -Progress fetch 重跑（capture 只消费「取数」那一步的 getDsl.json，本身不取数）；来源不变而捕获失败时才重跑：-Progress capture', '区域前缀显式传 -Ui')
+        Recovery = @('改 fileId / layerId 后必须重取数：从 `fetch` 那一步 -Progress fetch 重跑（capture 只消费 `fetch` 那一步的 getDsl.json，本身不取数）；来源不变而捕获失败时才重跑：-Progress capture', '区域前缀显式传 -Ui')
     },
     [pscustomobject]@{
         Id = 3; Name = 'svg'; Title = 'extractSvg 图标几何'
@@ -116,10 +116,10 @@ $Steps = @(
     },
     [pscustomobject]@{
         Id = 4; Name = 'visibility'; Title = '显隐事实提取'
-        Inputs   = @('「固化快照」那一步的 dsl.snapshot.json')
+        Inputs   = @('`capture` 那一步的 dsl.snapshot.json')
         Outputs  = @('Generated/runs/<Target>/visibility.json（每个节点的 visible/hidden 事实与 omit 角色）')
         Failures = @('快照缺字段（旧版快照或手工删改）')
-        Recovery = @('重跑「固化快照」那一步后重跑：-Progress visibility')
+        Recovery = @('重跑 `capture` 那一步后重跑：-Progress visibility')
     },
     [pscustomobject]@{
         Id = 5; Name = 'mapping'; Title = 'mapping 草稿（按当前台账）'
@@ -132,7 +132,7 @@ $Steps = @(
         Id = 6; Name = 'discover'; Title = '图标候选发现 + 登记结论 + 打印待命名清单'
         Inputs   = @('extractSvg.json + mapping 草稿 + dsl.snapshot.json + 正式映射表（登记判据的取值来源）')
         # 草稿 mapping 只有 componentInstances（没有 resolvedTemplates），登记判据按与解析器同一份
-        # 判据从中取变体；两种形状都要支持，否则「图标候选」那一步的结论会全落到位置兜底。
+        # 判据从中取变体；两种形状都要支持，否则 `discover` 那一步的结论会全落到位置兜底。
         Outputs  = @('Generated/_inputs/<Target>.icon-candidates.json（待命名清单：候选下标/归属控件/层名/尺寸/registration 登记结论）', 'mustName：命名表必须恰好覆盖的候选下标（= registration.register=true）')
         Failures = @('缺 svg / mapping / 映射表（前置步骤未跑）', '登记判据缺依据（registration.basis 的取值以判据实现 scripts/adapters/mtslg-iocontrol/lib/icon-registration-policy.js 为准：变体未登记，或变体已登记但漏登记 iconPolicy）')
         Recovery = @('先补跑前置步骤，再重跑：-Progress discover；登记结论由 discover 机械判定（判据实现 scripts/adapters/mtslg-iocontrol/lib/icon-registration-policy.js），不要回文档自行推断。遇"登记判据缺依据"按 registration.source 分头修——缺变体补变体、缺 iconPolicy 补字段（整批同步清单见 skills/mastergo-iocontrol-document-format/SKILL.md 的「新增/修改映射的同步清单」），改完重跑 -Progress mapping')
@@ -450,7 +450,7 @@ if (-not $Ui) {
 }
 # MasterGo 文件 id：命令行 → 项目登记表 → 报错。
 # 这里 fail-closed 而不是给默认值：插件是通用发布物，内置任何项目的文件 id 都会让别的项目
-# 在没传参数时静默取到另一个项目的设计稿（取数看着"成功"，产物却来自别的页面）。
+# 在没传参数时静默取到另一个项目的设计稿（`fetch` 看着"成功"，产物却来自别的页面）。
 if (-not $FileId) {
     throw "缺少 MasterGo 文件 id：请显式传 -FileId，或在项目登记表 docs/page-registry.json 里登记本次页面（-Target/-LayerId 命中该页）的 pages[].designSource.fileId。登记表有多页时必须先选中本次页面；脚本不内置任何项目的文件 id"
 }
@@ -491,7 +491,7 @@ $TypeAuditJson = Join-Path $Generated "$Target.component-types.json"
 $WpfLayoutJson = Join-Path $Generated "$Target.wpf-layout.json"
 $WpfLayoutReportJson = Join-Path $Inputs "$Target.wpf-layout.report.json"
 $WpfXamlReportJson = Join-Path $Inputs "$Target.wpf-xaml.report.json"
-# 尺寸约束：合并后的 DSL 快照是布局推导与门禁的共同输入（无约束时就是原始快照）。
+# 尺寸约束：合并后的 DSL 快照是 `layout` 与 `gates` 的共同输入（无约束时就是原始快照）。
 $ConstrainedDslJson = Join-Path $Generated "$Target.dsl.constrained.json"
 $ConstraintsReportJson = Join-Path $Inputs "$Target.constraints.apply-report.json"
 $WpfViewXaml = Join-Path $ProjectRoot "UI\$Ui\View\${Target}View.xaml"
@@ -500,7 +500,7 @@ $SummaryJson = Join-Path $Generated "$Target.summary.json"
 $PageXml = Join-Path $ProjectRoot "Resources\Pages\$Target\${Target}Page.xml"
 
 # 布局输入的解析入口（唯一实现）：-Constraints > <Inputs>/<Target>.constraints.json > 无约束（原始快照）。
-# 「布局推导」那一步与「门禁」/「验证」那一步都调它重算，不读磁盘上遗留的合并快照——
+# `layout` 与 `gates` / `verify` 都调它重算，不读磁盘上遗留的合并快照——
 # 否则"这一次的输入是什么"会取决于上一次运行留下过什么文件，同一份参数得不到同一个结论。
 function Resolve-LayoutDslSnapshot {
     param([string] $LogFile)
@@ -624,7 +624,7 @@ foreach ($step in $Steps) {
                        Assert-RegisteredInput 'snapshot'
                        Assert-RegisteredInput 'visibility' }
         'discover'   { Assert-File $SvgJson "缺少 $SvgJson：请先跑 -Progress svg"
-                       # 作业A 的「映射草稿」那一步产物是类型判定（component-types.json）；作业B 是 mapping 草稿（回退到审计产物）。
+                       # 作业A 的 `mapping` 那一步产物是类型判定（component-types.json）；作业B 是 mapping 草稿（回退到审计产物）。
                        $mappingForDiscover = if ($Mode -eq 'mw-wpf') { $TypeAuditJson }
                            elseif (Test-Path -LiteralPath $DraftMappingJson) { $DraftMappingJson }
                            else { $MappingAuditJson }
@@ -692,7 +692,7 @@ foreach ($step in $Steps) {
                 }
                 if ($Mode -eq 'mw-wpf') {
                     # 作业A：类型判定只读共享类型表（设计稿组件集/变体 → ControlType + 槽位），
-                    # 不掺 IOContorl 的写入规则；属性怎么写由「生成页面」那一步按 mw-wpf-map.json 决定。
+                    # 不掺 IOContorl 的写入规则；属性怎么写由 `bundle` 那一步按 mw-wpf-map.json 决定。
                     Invoke-StepCommand -Label 'component types' -LogFile $log -File 'node' -Arguments @(
                         (Get-AdapterScript 'mapping'), '--dsl', $SnapshotJson,
                         '--visibility', $VisibilityJson, '--template-map', $TypeMap,
@@ -708,7 +708,7 @@ foreach ($step in $Steps) {
                     '--icon-map', $ledgerForDraft, '--out', $DraftMappingJson) | Out-Null
             }
             'discover' {
-                # 作业A 的「映射草稿」那一步产物是类型判定（component-types.json），没有 mapping 草稿这条路径。
+                # 作业A 的 `mapping` 那一步产物是类型判定（component-types.json），没有 mapping 草稿这条路径。
                 $mappingForDiscover = if ($Mode -eq 'mw-wpf') { $TypeAuditJson }
                     elseif (Test-Path -LiteralPath $DraftMappingJson) { $DraftMappingJson }
                     else { $MappingAuditJson }
@@ -736,7 +736,7 @@ foreach ($step in $Steps) {
                 }
                 elseif (-not (Test-Path -LiteralPath $LedgerJson)) {
                     if (-not $AllowEmptyLedger) {
-                        throw "缺少命名表 $NamingJson：请按候选清单 $CandidateJson 的 registration.register=true（mustName 下标）逐条定名写进命名表（格式见 references/adapters/mtslg-iocontrol/pipeline-contract.md 「图标台账」那一步；若本页确实没有图标槽位，加 -AllowEmptyLedger）"
+                        throw "缺少命名表 $NamingJson：请按候选清单 $CandidateJson 的 registration.register=true（mustName 下标）逐条定名写进命名表（格式见 references/adapters/mtslg-iocontrol/pipeline-contract.md ledger 那一步；若本页确实没有图标槽位，加 -AllowEmptyLedger）"
                     }
                     New-Item -ItemType Directory -Force -Path $Inputs | Out-Null
                     '{ "icons": [], "candidates": [], "unmapped": [] }' | Set-Content -LiteralPath $LedgerJson -Encoding UTF8
@@ -764,7 +764,7 @@ foreach ($step in $Steps) {
                 if ($layout.layoutEvidence.unresolvedBottomBarItems -ne 0) { throw "底部栏有 $($layout.layoutEvidence.unresolvedBottomBarItems) 个未命中变体的实例（日志: $log）" }
                 $note = "菜单项 $(@($layout.menuItems).Count) 个"
                 if ($Mode -eq 'mw-wpf') {
-                    # 作业A 另做一步布局推导：分区 → 行列 → 格子（Grid 布局是 A 的坐标载体，不再是绝对坐标）。
+                    # 作业A 另做一步 `layout`：分区 → 行列 → 格子（Grid 布局是 A 的坐标载体，不再是绝对坐标）。
                     # 尺寸约束（可选）：把外部导出的 min/max 合并进 DSL 快照，布局与门禁共用合并后的快照。
                     $LayoutDslJson = Resolve-LayoutDslSnapshot -LogFile $log
                     # 分组表：与约束同一套「固定路径自动找」口径——存在就消费，不存在就走机械判据。
@@ -774,7 +774,7 @@ foreach ($step in $Steps) {
                     $GroupsArgs = @()
                     $groupsAuto = Join-Path $Inputs "$Target.layout-groups.json"
                     # 整条管道包在 @() 里：一张都没有时 Results 是 $null，而 Set-StrictMode 下 $null.Count 直接抛
-                    # （与上面 $pages 同一写法）——没图是合法情形，不能变成「布局推导」那一步必失败。
+                    # （与上面 $pages 同一写法）——没图是合法情形，不能变成 `layout` 那一步必失败。
                     $designImages = @(@("$Target.design.png", "$Target.design.jpg", "$Target.design.jpeg") |
                         ForEach-Object { Join-Path $Inputs $_ } | Where-Object { Test-Path -LiteralPath $_ })
                     if (Test-Path -LiteralPath $groupsAuto) { $GroupsArgs = @('--groups', $groupsAuto) }
@@ -835,7 +835,7 @@ foreach ($step in $Steps) {
                     # 续跑到这一步时布局步不会重跑：按同一入口重算布局输入，门禁不得静默丢掉尺寸约束。
                     $LayoutDslJson = Resolve-LayoutDslSnapshot -LogFile $log
                     # 作业A 的门禁：布局（越界/空行空列/锚点格冲突/禁止类型/尺寸来源）+ 协议/资源键/硬编码文本。
-                    # 输入用 Bundle 定稿的 mapping（语言绑定已落在节点上），不是「映射草稿」那一步的判定草稿——
+                    # 输入用 Bundle 定稿的 mapping（语言绑定已落在节点上），不是 `mapping` 那一步的判定草稿——
                     # 否则"有文本没语言键"会把已绑定的节点全判成缺键。
                     Invoke-StepCommand -Label 'wpf layout gates' -LogFile $log -File 'node' -Arguments @(
                         (Get-AdapterScript 'wpfGate'), '--layout', $WpfLayoutJson,
@@ -939,7 +939,7 @@ foreach ($step in $Steps) {
         # -Constraints / -ConfigPath 这些命令行专属输入若不复现，续跑会在不同区域前缀、不同前置条件
         # 或不同约束来源下静默继续。
         $resumeArgs = @("-ProjectRoot `"$ProjectRoot`"", "-Target $Target")
-        # 路线必须回放：不带 -Mode 续跑会让适配器描述符按缺省路线解析（「布局推导」那一步就会报"描述符缺少 scripts.wpfLayout"，
+        # 路线必须回放：不带 -Mode 续跑会让适配器描述符按缺省路线解析（`layout` 那一步就会报"描述符缺少 scripts.wpfLayout"，
         # 把人引向描述符而不是命令行）。
         $resumeArgs += "-Mode $Mode"
         if ($LayerId) { $resumeArgs += "-LayerId $LayerId" }
@@ -981,10 +981,10 @@ if ($EndStep.Id -eq 6) {
     Write-Output ("     哪些要登记已由 discover 机械判定：照候选的 registration.register=true / mustName 下标定名即可")
     Write-Output ("     （registration.basis 写明判据、registration.source 写明真值源；判据说明见 references/adapters/mtslg-iocontrol/page-build-rules.md 第 2 节——只解释依据，不要自己再推一遍）")
     Write-Output ("     格式：[{ `"index`": <候选下标>, `"name`": `"<英文资源名>Geometry`", `"comment`": `"<中文注释>`", `"fromDsl`": <bool，可选> }, ...]")
-    # 这一步只能读已存在的草稿：产物化的 Generated\<Target>.mapping.json 与 layout-manifest 分别到「生成页面」/「布局推导」那一步才有。
+    # 这一步只能读已存在的草稿：产物化的 Generated\<Target>.mapping.json 与 layout-manifest 分别到 `bundle` / `layout` 那一步才有。
     # 带 --page-name 时该脚本会用生成器的同一套派生链，列出「派生不出语义键、必须补术语表」的文案——
-    # 漏掉它们只会到「门禁」那一步门禁才失败，整段返工。
-    # 文案枚举读「映射草稿」那一步的产物：作业B 是 mapping 草稿，作业A 是类型判定（A 不产 mapping 草稿）。
+    # 漏掉它们只会到 `gates` 那一步门禁才失败，整段返工。
+    # 文案枚举读 `mapping` 那一步的产物：作业B 是 mapping 草稿，作业A 是类型判定（A 不产 mapping 草稿）。
     $langSourceJson = if ($Mode -eq 'mw-wpf') { $TypeAuditJson } else { $DraftMappingJson }
     $LangCmd = "node `"$(Join-Path $ScriptsFolder 'adapters/mtslg-iocontrol/list-lang-sources.mjs')`" `"$langSourceJson`" --page-name $Target"
     if (Test-Path -LiteralPath $TranslationsJson) { $LangCmd += " --translations `"$TranslationsJson`"" }
@@ -992,9 +992,9 @@ if ($EndStep.Id -eq 6) {
     Write-Output ("  3) 枚举本页文案，并同一次列出「必须补术语表」的文案：")
     Write-Output ("     $LangCmd")
     Write-Output ("     顺序：先写译文 → 加上 --translations 再跑一次这条命令。它会分两组报：")
-    Write-Output ("       「必须补术语表」= 派生不出语义键（单字符之类，与有没有译文无关），漏了会到「门禁」那一步才失败；")
+    Write-Output ("       「必须补术语表」= 派生不出语义键（单字符之类，与有没有译文无关），漏了会到 gates 那一步才失败；")
     Write-Output ("       「还缺译文」= 补上合格英文译文即可，不必进术语表。")
-    Write-Output ("     Layout 菜单名要等「布局推导」那一步产出，届时把 $LayoutManifestJson 作为第二个位置参数。")
+    Write-Output ("     Layout 菜单名要等 layout 那一步产出，届时把 $LayoutManifestJson 作为第二个位置参数。")
     Write-Output ("     据此把中文→英文译文写进：$TranslationsJson")
     Write-Output ("  4) 然后继续（台账由命名表生成、并自动做图标几何来源核对）：pwsh -NoProfile -File <skill>\scripts\entry\run-all.ps1 -ProjectRoot `"$ProjectRoot`" -Target $Target -Progress ledger")
 }
