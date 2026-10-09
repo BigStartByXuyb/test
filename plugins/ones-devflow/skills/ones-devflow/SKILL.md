@@ -15,7 +15,7 @@ MCP 地址按团队分配，当前地址只对团队 `4nbVNB2Z`（work）有效�
 
 以下约束来自实测，违反会直接失败。
 
-1. 状态只能走工作流。改状态前必须调 `get_issue_executable_workflows` 取当前状态下合法的目标，只能选它返回的 workflow id；直接写状态字段无效。
+1. 状态只能走工作流。改状态前必须调 `get_issue_executable_workflows` 取当前状态下合法的目标，只能选它返回的、业务确认过的 workflow id；直接写状态字段无效。
 2. 工作项 ID 是 UUID。`MASTERGO-28` 这类展示号不能直接传入，先用 `query_issues_by_onesql` 解析成 UUID。
 3. 查询先用 ONESQL 帮助。调 `query_issues_by_onesql` 前必须先调 `get_onesql_grammar_help`，且 SELECT 必须包含 `field001`（标题）。
 4. 建用例先查库字段。`get_testcase_library_fields` 返回优先级与用例类型的选项 ID，创建时必须传 ID。下面这组 ID 只适用于默认用例库 `SYn8WKFx`（名称 test）：优先级 `9sqx41sR`(P0)、`PcoQvbh9`(P1)、`FKhyHELM`(P2)、`MTcn282p`(P3)、`Y5Mx8vTM`(P4)；用例类型「功能测试」为 `35meTuAu`。目标库不是 `SYn8WKFx` 时，以 `get_testcase_library_fields` 的返回值为准。
@@ -44,4 +44,4 @@ MCP 地址按团队分配，当前地址只对团队 `4nbVNB2Z`（work）有效�
 
 - 不新建工作项类型，不改字段结构，不改工作流定义。
 - 不删除工作项或用例，除非用户明确要求并逐条确认。
-- 回写只做四件事：评论、合法流转、建模块、创建用例。
+- 写操作只做四件事：评论、合法流转、建模块、创建用例。
