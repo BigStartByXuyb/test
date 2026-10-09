@@ -29,10 +29,11 @@ MCP 地址按团队分配，当前地址只对团队 `4nbVNB2Z`（work）有效�
 ## 生成测试用例
 
 1. `search_for_testcase_libraries` 找到目标库，默认用例库为 `SYn8WKFx`（名称 test）。
-2. `create_module_in_testcase_library` 建模块，模块名带来源标识，例如「<需求标题>（自动生成）」。
-3. 每条用例用 `create_new_testcase_in_library` 写入，必传 `libraryID`、`moduleID`、`name`、`priority`、`type`、`condition`、`steps[{desc,result}]`。
-4. 一条验收标准至少对应一条用例；边界条件与幂等要求单独成条，不合并进主流程用例。
-5. 写完后在需求上用 `post_issue_comment` 回贴汇总评论，逐条列出用例名与优先级。
+2. `get_testcase_library_fields` 取目标库的 `priority` / `type` 选项 ID；仅目标库为 `SYn8WKFx` 时可用第 4 条硬约束的固定 ID。
+3. `create_module_in_testcase_library` 建模块，模块名带来源标识，例如「<需求标题>（自动生成）」。
+4. 每条用例用 `create_new_testcase_in_library` 写入，必传 `libraryID`、`moduleID`、`name`、`priority`、`type`、`condition`、`steps[{desc,result}]`。
+5. 一条验收标准至少对应一条用例；边界条件与幂等要求单独成条，不合并进主流程用例。
+6. 写完后在需求上用 `post_issue_comment` 回贴汇总评论，逐条列出用例名与优先级。
 
 ## 回写状态
 

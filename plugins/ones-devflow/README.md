@@ -1,6 +1,6 @@
 # ones-devflow
 
-ONES 研发流程协作插件，连接、约束与操作步骤的唯一契约见 `skills/ones-devflow/SKILL.md`。
+ONES 研发流程协作插件。连接流程与操作约束见 `skills/ones-devflow/SKILL.md`，端点配置见 `.mcp.json`。
 
 ## 组件
 
