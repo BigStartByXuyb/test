@@ -1,6 +1,6 @@
 ---
 name: ones-devflow
-description: 通过 ONES MCP 在 ONES 平台上读需求与缺陷、按验收标准生成测试用例写入用例库、回写评论并推进工作流状态。当任务需要读 ONES 工作项、生成测试用例或推进状态流转时必须使用本 Skill。
+description: 通过 ONES MCP 在 ONES 平台上读工作项、按验收标准生成测试用例写入用例库、回写评论并推进工作流状态。当任务需要读 ONES 工作项、生成测试用例或推进状态流转时必须使用本 Skill。
 ---
 
 # ONES 研发流程协作
@@ -24,7 +24,7 @@ description: 通过 ONES MCP 在 ONES 平台上读需求与缺陷、按验收标
 
 1. `search_for_projects` 定位项目，记下项目 ID。
 2. `get_onesql_grammar_help` 后调 `query_issues_by_onesql` 取目标工作项列表。
-3. `get_issue_details` 取工作项基本信息；工作项描述与验收标准取 `get_list_of_issue_comments` 的评论文本，正文优先读 `markdown` 字段。
+3. `get_issue_details` 取工作项详情（含描述字段）；验收标准取 `get_list_of_issue_comments` 的评论文本，正文优先读 `markdown` 字段。
 
 ## 生成测试用例
 
