@@ -764,7 +764,7 @@ foreach ($step in $Steps) {
                 if ($layout.layoutEvidence.unresolvedBottomBarItems -ne 0) { throw "底部栏有 $($layout.layoutEvidence.unresolvedBottomBarItems) 个未命中变体的实例（日志: $log）" }
                 $note = "菜单项 $(@($layout.menuItems).Count) 个"
                 if ($Mode -eq 'mw-wpf') {
-                    # 作业A 在 `layout` 步骤里另跑 `wpfLayout` 脚本：分区 → 行列 → 格子（Grid 布局是 A 的坐标载体，不再是绝对坐标）。
+                    # 作业A 另做一步布局推导：分区 → 行列 → 格子（Grid 布局是 A 的坐标载体，不再是绝对坐标）。
                     # 尺寸约束（可选）：把外部导出的 min/max 合并进 DSL 快照，布局与门禁共用合并后的快照。
                     $LayoutDslJson = Resolve-LayoutDslSnapshot -LogFile $log
                     # 分组表：与约束同一套「固定路径自动找」口径——存在就消费，不存在就走机械判据。
