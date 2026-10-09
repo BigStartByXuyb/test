@@ -9,7 +9,7 @@ description: 通过 ONES MCP 在 ONES 平台上读工作项、按验收标准生
 
 插件携带 `ones` MCP server，端点配置见 `.mcp.json`。首次连接会打开浏览器走 OAuth，勾选授权页列出的全部 scope；授权后 token 缓存在 `~/.mcp-auth`，之后免登录。
 
-`.mcp.json` 里的端点按团队分配，当前端点只对团队 `4nbVNB2Z`（work）有效。换团队时修改 `.mcp.json` 中的端点。
+`.mcp.json` 里的端点、默认用例库 `SYn8WKFx` 与固定选项 ID 都绑定团队 `4nbVNB2Z`（work）。换团队时修改 `.mcp.json` 端点，并重新用 `search_for_testcase_libraries` / `get_testcase_library_fields` 取值。
 
 ## 硬约束
 
@@ -18,7 +18,7 @@ description: 通过 ONES MCP 在 ONES 平台上读工作项、按验收标准生
 1. 状态只能走工作流。改状态前必须调 `get_issue_executable_workflows` 取当前状态下合法的目标，只能选它返回的 workflow id，执行前向用户逐项确认；直接写状态字段无效。
 2. 工作项 ID 是 UUID。`MASTERGO-28` 这类展示号不能直接传入，先用 `query_issues_by_onesql` 解析成 UUID。
 3. 查询先用 ONESQL 帮助。调 `query_issues_by_onesql` 前必须先调 `get_onesql_grammar_help`，且 SELECT 必须包含 `field001`（标题）。
-4. 建用例先查库字段。目标库是默认用例库 `SYn8WKFx`（名称 test）时，直接使用固定 ID：优先级 `9sqx41sR`(P0)、`PcoQvbh9`(P1)、`FKhyHELM`(P2)、`MTcn282p`(P3)、`Y5Mx8vTM`(P4)；用例类型「功能测试」为 `35meTuAu`。目标库不是 `SYn8WKFx` 时，必须调 `get_testcase_library_fields` 以其返回的 `priority` / `type` 选项 ID 为准。
+4. 建用例按目标库决定字段来源。目标库是默认用例库 `SYn8WKFx`（名称 test）时，直接使用固定 ID：优先级 `9sqx41sR`(P0)、`PcoQvbh9`(P1)、`FKhyHELM`(P2)、`MTcn282p`(P3)、`Y5Mx8vTM`(P4)；用例类型「功能测试」为 `35meTuAu`。目标库不是 `SYn8WKFx` 时，必须调 `get_testcase_library_fields` 以其返回的 `priority` / `type` 选项 ID 为准。
 
 ## 读工作项
 
