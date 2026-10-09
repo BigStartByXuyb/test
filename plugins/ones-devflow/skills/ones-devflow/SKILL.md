@@ -18,7 +18,7 @@ description: 通过 ONES MCP 在 ONES 平台上读工作项、按验收标准生
 1. 状态只能走工作流。改状态前必须调 `get_issue_executable_workflows` 取当前状态下合法的目标，只能选它返回的 workflow id，执行前向用户逐项确认；直接写状态字段无效。
 2. 工作项 ID 是 UUID。`MASTERGO-28` 这类展示号不能直接传入，先用 `query_issues_by_onesql` 解析成 UUID。
 3. 查询先用 ONESQL 帮助。调 `query_issues_by_onesql` 前必须先调 `get_onesql_grammar_help`，且 SELECT 必须包含 `field001`（标题）。
-4. 建用例先查库字段。`get_testcase_library_fields` 返回优先级与用例类型的选项 ID，创建时必须传 ID。下面这组 ID 只适用于默认用例库 `SYn8WKFx`（名称 test）：优先级 `9sqx41sR`(P0)、`PcoQvbh9`(P1)、`FKhyHELM`(P2)、`MTcn282p`(P3)、`Y5Mx8vTM`(P4)；用例类型「功能测试」为 `35meTuAu`。目标库不是 `SYn8WKFx` 时，以 `get_testcase_library_fields` 的返回值为准。
+4. 建用例先查库字段。目标库是默认用例库 `SYn8WKFx`（名称 test）时，直接使用固定 ID：优先级 `9sqx41sR`(P0)、`PcoQvbh9`(P1)、`FKhyHELM`(P2)、`MTcn282p`(P3)、`Y5Mx8vTM`(P4)；用例类型「功能测试」为 `35meTuAu`。目标库不是 `SYn8WKFx` 时，必须调 `get_testcase_library_fields` 以其返回的 `priority` / `type` 选项 ID 为准。
 
 ## 读工作项
 
@@ -29,7 +29,7 @@ description: 通过 ONES MCP 在 ONES 平台上读工作项、按验收标准生
 ## 生成测试用例
 
 1. `search_for_testcase_libraries` 找到目标库，默认用例库为 `SYn8WKFx`（名称 test）。
-2. `get_testcase_library_fields` 取目标库的 `priority` / `type` 选项 ID；仅目标库为 `SYn8WKFx` 时可用第 4 条硬约束的固定 ID。
+2. 目标库为默认用例库 `SYn8WKFx` 时直接使用第 4 条硬约束的固定 ID；否则先调 `get_testcase_library_fields` 取该库的 `priority` / `type` 选项 ID。
 3. `create_module_in_testcase_library` 建模块，模块名统一为「<需求标题>（自动生成）」。
 4. 每条用例用 `create_new_testcase_in_library` 写入，必传 `libraryID`、`moduleID`、`name`、`priority`、`type`、`condition`、`steps[{desc,result}]`。
 5. 一条验收标准至少对应一条用例；边界条件与幂等要求单独成条，不合并进主流程用例。
@@ -44,4 +44,5 @@ description: 通过 ONES MCP 在 ONES 平台上读工作项、按验收标准生
 ## 边界
 
 - 不新建工作项类型，不改字段结构，不改工作流定义。
-- 写操作：评论、合法流转、建模块、创建用例，以及在用户明确要求并逐项确认后删除工作项或用例。
+- 不删除工作项或用例。
+- 写操作：评论、合法流转、建模块、创建用例。
