@@ -56,7 +56,7 @@ pwsh -NoProfile -File <skill>\scripts\entry\run-all.ps1 -ProjectRoot <项目> -T
 ### 2. `capture` —— DSL 结构化快照 + 覆盖校验
 
 - **输入**：
-  - 第 1 步的 getDsl.json
+  - 「取数」那一步的 getDsl.json
   - 区域前缀 -Ui（缺失时按 run-all 取值链解析）
   - 设计页名 -DesignPageName（命令行或项目登记表；为空时 capture 用 DSL 根节点名兜底，再取不到用 layerId）
 - **产物**：
@@ -67,7 +67,7 @@ pwsh -NoProfile -File <skill>\scripts\entry\run-all.ps1 -ProjectRoot <项目> -T
   - 存在重复 ref 或断裂父子链
   - 区域前缀取值链取不到
 - **怎么修**：
-  - 改 fileId / layerId 后必须重取数：从第 1 步 -Progress fetch 重跑（capture 只消费第 1 步的 getDsl.json，本身不取数）；来源不变而捕获失败时才重跑：-Progress capture
+  - 改 fileId / layerId 后必须重取数：从「取数」那一步 -Progress fetch 重跑（capture 只消费「取数」那一步的 getDsl.json，本身不取数）；来源不变而捕获失败时才重跑：-Progress capture
   - 区域前缀显式传 -Ui
 
 ### 3. `svg` —— extractSvg 图标几何
@@ -85,13 +85,13 @@ pwsh -NoProfile -File <skill>\scripts\entry\run-all.ps1 -ProjectRoot <项目> -T
 ### 4. `visibility` —— 显隐事实提取
 
 - **输入**：
-  - 第 2 步的 dsl.snapshot.json
+  - 「固化快照」那一步的 dsl.snapshot.json
 - **产物**：
   - Generated/runs/<Target>/visibility.json（每个节点的 visible/hidden 事实与 omit 角色）
 - **失败语义**：
   - 快照缺字段（旧版快照或手工删改）
 - **怎么修**：
-  - 重跑第 2 步后重跑：-Progress visibility
+  - 重跑「固化快照」那一步后重跑：-Progress visibility
 
 ### 5. `mapping` —— mapping 草稿（按当前台账）
 
