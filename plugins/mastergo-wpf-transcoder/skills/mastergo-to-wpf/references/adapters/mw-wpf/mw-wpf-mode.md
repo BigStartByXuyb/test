@@ -4,12 +4,12 @@
 
 ## 1. 页面骨架
 
-页面是 `<UserControl>`，产物落在 `UI/<区域>/View/<页面名>View.xaml`，同名 code-behind（`.xaml.cs`）以 `<DependentUpon>` 挂在 View 下，ViewModel 在 `UI/<区域>/ViewModel/<页面名>ViewModel.cs`。
+页面是 `<UserControl>`，产物落在 `UI/<区域>/View/<Target>View.xaml`，同名 code-behind（`.xaml.cs`）以 `<DependentUpon>` 挂在 View 下，ViewModel 在 `UI/<区域>/ViewModel/<Target>ViewModel.cs`。
 
 固定头（与真实页面 `ManualView.xaml` / `AutoCutView.xaml` 同形）：
 
 ```xml
-<UserControl x:Class="<RootNamespace>.<区域>.View.<页面名>View"
+<UserControl x:Class="<RootNamespace>.<区域>.View.<Target>View"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"

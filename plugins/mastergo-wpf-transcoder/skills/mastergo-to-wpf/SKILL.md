@@ -10,7 +10,7 @@ description: 将明确要求的 MasterGo 设计稿转换为 MTSLG IOContorl XML�
 - 作业 B `mtslg-iocontrol`（缺省）：栅格绝对坐标 + 控件属性的页面 XML；
 - 作业 A `mw-wpf`：真 WPF XAML 页面（框架 `s:` 控件 + Grid 布局），`-Mode mw-wpf` 选择。
 
-路线只决定**同一份类型判定结果怎么写**、以及步骤 5/8/10/11/12 用哪个脚本；用哪些脚本、读哪张表、产物落在哪，由 `references/adapters/<路线>/adapter.json` 描述符给出，`run-all.ps1 -Mode <路线>` 按它派发。**一次运行只走一条路线**：续跑不能换路线（换路线要从 `fetch` 新开运行），也不得生成混合产物。
+路线只决定**同一份类型判定结果怎么写**、以及 `mapping` / `layout` / `bundle` / `gates` / `verify` 用哪个脚本；用哪些脚本、读哪张表、产物落在哪，由 `references/adapters/<路线>/adapter.json` 描述符给出，`run-all.ps1 -Mode <路线>` 按它派发。**一次运行只走一条路线**：续跑不能换路线（换路线要从 `fetch` 新开运行），也不得生成混合产物。
 
 本文件只写**模型必须做的判断**和**每条规则的唯一入口**。脚本已 fail-closed 强制的规则不在这里复述（复述只会与脚本漂移），完整口径一律在 reference 与脚本里。
 
@@ -78,7 +78,7 @@ description: 将明确要求的 MasterGo 设计稿转换为 MTSLG IOContorl XML�
 | 11 | `gates` | 严格门禁（审计逐条断言） |
 | 12 | `verify` | 四项独立验证（provenance / 坐标 / Icon / 结构） |
 
-- **作业 A 的差异**（步骤号与名称不变，步内命令与产物不同）：`mapping` = 共享类型判定（只读共享类型表，产出 `Generated/<Target>.component-types.json`）；`layout` = 共用 Layout 清单推导 **+** 布局产物推导 `Generated/<Target>.wpf-layout.json`（分区 → 行列 → 格子；口径 A 成带：带＝条目＋它后面的间距、大空档单独成星号带、没打组的地方补合成容器；格子登记设计稿尺寸与控件在格内的偏移）；`bundle` = 真控件 `View.xaml`（含本页 Icon 字典合并点）+ 宿主壳 + 本页 Icon/语言字典 + Layout 注册，**不发射 IOContorl 页面 XML**；`gates` / `verify` = 布局门禁（越界 / 锚点格冲突 / 禁止类型 / 尺寸来源 / 协议 / 资源键 / 硬编码文本 / 尺寸约束一致性与落格 / 格子尺寸与尺寸·对齐发射；失败与提示的逐条口径见 `references/adapters/mw-wpf/page-build-rules.md` 第 4 节，布局规则见 `references/adapters/mw-wpf/mw-wpf-mode.md` 第 2 节，此处不复述）。`fetch`、`capture`、`svg`、`visibility`、`discover`、`ledger`、`inputs` 这些步骤两条路线沿用同一套。
+- **作业 A 的差异**（步骤号与名称不变，步内命令与产物不同）：`mapping` = 共享类型判定（只读共享类型表，产出 `Generated/<Target>.component-types.json`）；`layout` = 共用 Layout 清单推导 **+** 布局产物推导 `Generated/<Target>.wpf-layout.json`（分区 → 行列 → 格子；口径 A 成带：带＝条目＋它后面的间距、大空档单独成星号带、没打组的地方补合成容器；格子登记设计稿尺寸与控件在格内的偏移）；`bundle` = 真控件 `View.xaml`（含本页 Icon 字典合并点）+ 宿主壳 + 本页 Icon/语言字典 + Layout 注册，**不发射 IOContorl 页面 XML**；`gates` / `verify` = 布局门禁（越界 / 锚点格冲突 / 禁止类型 / 尺寸来源 / 协议 / 资源键 / 硬编码文本 / 尺寸约束一致性与落格 / 格子尺寸与尺寸·对齐发射；失败与提示的逐条口径见 `references/adapters/mw-wpf/page-build-rules.md` 第 4 节，布局规则见 `references/adapters/mw-wpf/mw-wpf-mode.md` 第 2 节，此处不复述）。`fetch`、`capture`、`svg`、`visibility`、`ledger`、`inputs` 这些步骤两条路线沿用同一套；`discover` 用同一套脚本，`--template-map` 按路线取共享类型表或路线映射表。
 
 - **每一步的输入 / 产物 / 失败语义 / 怎么修：`references/adapters/mtslg-iocontrol/pipeline-contract.md`**。该文件由 `run-all.ps1` 的步骤定义生成（`node scripts/core/gen-pipeline-contract.mjs`），**真值源是脚本**；要改契约就改脚本再重新生成，手改文档会挂测试。
 - 运行登记表：`<项目>/Generated/runs/<Target>/run.json`，规则是「**产出即登记、消费只按登记取、未登记的旧同名文件一律拒绝**」；清单里的采集输入（`dslPath` / `visibilityPath` / `svgPath`）都从登记表解析并校验 `sha256`。断点续跑用 `-Progress <步骤名>`（续跑的身份与登记表口径、可改语义输入见 `references/adapters/mtslg-iocontrol/bundle-manifest.md` 第 7 节）。
