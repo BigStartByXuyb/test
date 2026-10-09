@@ -764,7 +764,7 @@ foreach ($step in $Steps) {
                 if ($layout.layoutEvidence.unresolvedBottomBarItems -ne 0) { throw "底部栏有 $($layout.layoutEvidence.unresolvedBottomBarItems) 个未命中变体的实例（日志: $log）" }
                 $note = "菜单项 $(@($layout.menuItems).Count) 个"
                 if ($Mode -eq 'mw-wpf') {
-                    # 作业A 另做一步 `layout`：分区 → 行列 → 格子（Grid 布局是 A 的坐标载体，不再是绝对坐标）。
+                    # 作业A 另做一步 `wpfLayout`：分区 → 行列 → 格子（Grid 布局是 A 的坐标载体，不再是绝对坐标）。
                     # 尺寸约束（可选）：把外部导出的 min/max 合并进 DSL 快照，布局与门禁共用合并后的快照。
                     $LayoutDslJson = Resolve-LayoutDslSnapshot -LogFile $log
                     # 分组表：与约束同一套「固定路径自动找」口径——存在就消费，不存在就走机械判据。
@@ -774,7 +774,7 @@ foreach ($step in $Steps) {
                     $GroupsArgs = @()
                     $groupsAuto = Join-Path $Inputs "$Target.layout-groups.json"
                     # 整条管道包在 @() 里：一张都没有时 Results 是 $null，而 Set-StrictMode 下 $null.Count 直接抛
-                    # （与上面 $pages 同一写法）——没图是合法情形，不能变成 `layout` 那一步必失败。
+                    # （与上面 $pages 同一写法）——没图是合法情形，不能变成 `wpfLayout` 必失败。
                     $designImages = @(@("$Target.design.png", "$Target.design.jpg", "$Target.design.jpeg") |
                         ForEach-Object { Join-Path $Inputs $_ } | Where-Object { Test-Path -LiteralPath $_ })
                     if (Test-Path -LiteralPath $groupsAuto) { $GroupsArgs = @('--groups', $groupsAuto) }
