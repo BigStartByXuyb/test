@@ -413,14 +413,6 @@ function renderXaml(args, layout, typeInfo, map) {
   ];
   // 页级样式表要在 Resources 生成之前定稿，所以先渲染一遍 body 收集命中，再拼最终文本。
   const body = bodyLines.join("\n");
-  // element 前缀的命名空间按写法表 elementNamespaces 写：只补这一页真的用到的前缀
-  // （s 是固定前缀，已在上面写死）。前缀的 clr-namespace / assembly 只有写法表这一处真值。
-  const elementNamespaces = (map && map.elementNamespaces && map.elementNamespaces.byPrefix) || {};
-  Object.keys(elementNamespaces).forEach(function (prefix) {
-    if (body.indexOf("<" + prefix + ":") < 0) return;
-    head.splice(head.length - 3, 0,
-      "             xmlns:" + prefix + "=\"" + xmlAttr(String(elementNamespaces[prefix])) + "\"");
-  });
   const xaml = head.join("\n") + "\n" + renderResources(ctx) + "\n" + body + "\n</UserControl>\n";
   return { xaml: xaml, report: report };
 }

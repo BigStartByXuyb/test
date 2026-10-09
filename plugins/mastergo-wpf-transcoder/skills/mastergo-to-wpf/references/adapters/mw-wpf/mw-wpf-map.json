@@ -70,12 +70,6 @@
       "IconButton": "Icon"
     }
   },
-  "elementNamespaces": {
-    "note": "element 前缀 → 该前缀要写的 x:Class 头部命名空间声明。发射器按本表把用到的前缀写成 xmlns:<前缀>=；只有固定前缀 s（http://www.maxwell-gp.com/）不在此表。",
-    "byPrefix": {
-      "vc": "clr-namespace:MaxWell.VisionControl;assembly=MaxWell.VisionControl"
-    }
-  },
   "frameworkTokens": {
     "note": "框架固定区尺寸 Token（Sizes.xaml 框架级布局键，取值见 framework-manual/01-resources/colors-fonts-sizes.md）。框架固定区不发射进页面，尺寸只用于布局产物登记与 Layout 注册。",
     "headerHeight": 85,
@@ -602,7 +596,7 @@
       "note": "A 侧没有 Border 控件：框架把它做成附加属性 controls:BorderElement.*（作用在承载元素上）。共享类型表把它判为 Border 的实例，A 发射前必须由人工确认落到哪个承载元素，禁止自行挑一个控件承载。"
     },
     "Camera": {
-      "element": "vc:DesignPanelEx",
+      "element": "s:Camera",
       "manualEntry": null,
       "attrs": [
         "DesignPanelID",
@@ -620,12 +614,10 @@
       "protocols": [],
       "evidence": [
         "共享类型表 cameraTemplates.controlType=Camera（9 个变体）",
-        "用户确认（2026-09-23）：作业A 侧控件就是 Camera，与作业B 的 ControlType=Camera 同名同义",
-        "MaxWell.SLGPages 真实页面（6 个页面的 Camera region）：`<vc:DesignPanelEx Grid.Column=\"0\" Height=\"500\" Width=\"550\"/>`，前缀声明 `xmlns:vc=\"clr-namespace:MaxWell.VisionControl;assembly=MaxWell.VisionControl\"`（LaserFocalLengthView / BaseLineCalibrateView / FocalLengthMaintainView / CameraCalibrateView / HighPowerTargetView / LowPowerTargetView）",
-        "编译验证（2026-10-09）：`s:Camera` 在工程里编不过（MC3074 命名空间中不存在标记 Camera），`vc:DesignPanelEx` 定义在 MaxWell.VisionControl.dll（本机有该程序集）"
+        "用户确认（2026-09-23）：作业A 侧控件就是 Camera，与作业B 的 ControlType=Camera 同名同义"
       ],
-      "status": "ready",
-      "note": "外观沿用运行时默认（不写 Style，与作业B cameraTemplates 同口径）。DesignPanelID / Value 在设计稿里没有来源：作业B 的页面 XML 按空串占位，作业A 的 XAML 不写空串占位（没有来源就不发射），由工程师或运行时绑定填写。",
+      "status": "manual-only",
+      "note": "本机框架程序集版本较旧，MaxwellControl/MaxWell.UIDesign 里查不到该控件（手册也无条目），唯一证据是用户确认；首次用新框架生成后需回填手册条目。外观沿用运行时默认（不写 Style，与作业B cameraTemplates 同口径）。DesignPanelID / Value 在设计稿里没有来源：作业B 的页面 XML 按空串占位，作业A 的 XAML 不写空串占位（没有来源就不发射），由工程师或运行时绑定填写。",
       "stylePolicy": "none"
     }
   }
