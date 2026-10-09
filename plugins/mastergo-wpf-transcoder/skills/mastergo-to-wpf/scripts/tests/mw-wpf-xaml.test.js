@@ -252,9 +252,13 @@ function emitArgs(layoutPath, typesPath, outPath, extra = []) {
   const outPath = path.join(tmpRoot, "implicit", "View.xaml");
   run(emitArgs(layoutPath, typesPath, outPath, ["--overwrite"]));
   const xaml = fs.readFileSync(outPath, "utf8");
-  assert.match(xaml, /<s:Camera/, "Camera 按写法表发射成 s:Camera");
+  // Camera 按写法表发射成 vc:DesignPanelEx（MaxWell.SLGPages 真实页面的相机区写法），
+  // 前缀声明由写法表 elementNamespaces 提供。
+  assert.match(xaml, /<vc:DesignPanelEx/, "Camera 按写法表发射成 vc:DesignPanelEx");
+  assert.match(xaml, /xmlns:vc="clr-namespace:MaxWell\.VisionControl;assembly=MaxWell\.VisionControl"/,
+    "用到 vc 前缀时必须写前缀声明");
   assert.ok(!xaml.includes("StaticResource null"), "隐式默认样式不得写成 BasedOn=\"{StaticResource null}\"");
-  assert.ok(!/BasedOn="\{StaticResource [^}]*\}" \/>\s*$/m.test(xaml.split("<s:Camera")[0].split("<UserControl.Resources>")[1] || ""),
+  assert.ok(!/BasedOn="\{StaticResource [^}]*\}" \/>\s*$/m.test(xaml.split("<vc:DesignPanelEx")[0].split("<UserControl.Resources>")[1] || ""),
     "隐式默认样式不得进页级 Resources");
 }
 
