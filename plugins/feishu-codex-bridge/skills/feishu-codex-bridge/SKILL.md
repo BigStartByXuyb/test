@@ -9,13 +9,13 @@ description: 把本机 Codex 接到飞书，用飞书消息驱动 Codex 执行�
 
 ## 执行前必须拿到用户口径的三项
 
-缺任何一项就停下来问用户，不要替他决定：
-
-| 口径 | 含义 | 取值来源 |
+| 口径 | 含义 | 取值 |
 | --- | --- | --- |
-| 谁能触发 | 白名单里的 open_id 或 chat_id | `doctor.mjs` 会给出当前登录用户的 open_id 作候选 |
+| 谁能触发 | 白名单里的 open_id 或 chat_id | 必须问用户；`doctor.mjs` 会给出当前登录用户的 open_id 作候选 |
 | 在哪个目录执行 | Codex 的工作根目录，必须是已存在的绝对路径 | 必须问用户 |
-| 开放哪些入口 | `ask`（只读问答）/ `run`（可改文件）/ 两者 | 默认两者都开，默认入口 `ask` |
+| 开放哪些入口 | `ask`（只读问答）/ `run`（可改文件）/ 两者 | 默认两者都开、默认入口 `ask`；用户没提就用默认 |
+
+前两项必须由用户给出，不要替他决定。
 
 ## 步骤
 
@@ -80,7 +80,7 @@ description: 把本机 Codex 接到飞书，用飞书消息驱动 Codex 执行�
 | `modes` | 开放入口，`ask` / `run` 的子集 |
 | `defaultMode` | 裸文本按哪个入口走 |
 | `allowOpenIds` | 允许触发的发送者 open_id |
-| `allowChatIds` | 允许触发的会话 chat_id |
+| `allowChatIds` | 允许触发的会话 chat_id；命中即该会话内任何人都能触发 |
 | `taskTimeoutMinutes` | 单任务超时，超时结束该次 Codex 进程 |
 | `queueLimit` | 排队上限，满了回「队列已满」 |
 
@@ -107,4 +107,4 @@ description: 把本机 Codex 接到飞书，用飞书消息驱动 Codex 执行�
 | `scripts/lib/lark.mjs` | 飞书侧：事件监听、回贴消息 |
 | `scripts/lib/codex.mjs` | Codex 侧：无头执行一次任务 |
 
-飞书事件字段取自 `lark-cli event schema im.message.receive_v1`：`jq_root_path` 为 `.`，`message_id`、`sender_id`、`sender_type`、`chat_id`、`chat_type`、`message_type`、`content` 都在事件顶层。
+飞书事件字段取自 `lark-cli event schema im.message.receive_v1`：`jq_root_path` 为 `.`，`message_id`、`sender_id`、`sender_type`、`chat_id`、`chat_type`、`message_type`、`content` 都在事件顶层。其中 `content` 是该 schema 定义的预渲染可读文本（text、post、图片等类型都是这个口径），命令前缀判定直接读它。
