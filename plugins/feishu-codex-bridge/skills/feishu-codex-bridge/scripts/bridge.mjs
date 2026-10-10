@@ -134,9 +134,11 @@ async function execute(job) {
   const body = existsSync(outputFile) ? readFileSync(outputFile, 'utf8').trim() : '';
   const headline = result.timedOut
     ? `超时结束（上限 ${config.taskTimeoutMinutes} 分钟）`
-    : result.code === 0 && body !== ''
-      ? `完成（${seconds}s）`
-      : `失败（退出码 ${result.code}）`;
+    : result.code !== 0
+      ? `失败（退出码 ${result.code}）`
+      : body === ''
+        ? `完成（${seconds}s，无输出）`
+        : `完成（${seconds}s）`;
 
   log('info', `结束 ${job.messageId} ${headline}`);
   state.recent.unshift(`${new Date().toISOString()} ${job.mode} ${headline} ${job.prompt.slice(0, 40)}`);

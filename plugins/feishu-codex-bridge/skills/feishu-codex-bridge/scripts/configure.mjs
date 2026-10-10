@@ -71,12 +71,14 @@ function main() {
 
   const { config: existing } = readConfig();
   const base = existing ?? {};
+  // 传了任一白名单参数就整体替换两条名单：收紧权限时不能留下上一轮的旧条目。
+  const whitelistTouched = parsed.openIds.length > 0 || parsed.chatIds.length > 0;
   const next = {
     workdir: parsed.flags.workdir ?? base.workdir ?? '',
     modes: parsed.flags.modes ?? base.modes ?? ['ask', 'run'],
     defaultMode: parsed.flags.defaultMode ?? base.defaultMode ?? 'ask',
-    allowOpenIds: parsed.openIds.length > 0 ? parsed.openIds : base.allowOpenIds ?? [],
-    allowChatIds: parsed.chatIds.length > 0 ? parsed.chatIds : base.allowChatIds ?? [],
+    allowOpenIds: whitelistTouched ? parsed.openIds : base.allowOpenIds ?? [],
+    allowChatIds: whitelistTouched ? parsed.chatIds : base.allowChatIds ?? [],
     taskTimeoutMinutes: parsed.flags.taskTimeoutMinutes ?? base.taskTimeoutMinutes ?? 30,
     queueLimit: parsed.flags.queueLimit ?? base.queueLimit ?? 5,
   };

@@ -21,13 +21,13 @@ description: 把本机 Codex 接到飞书，用飞书消息驱动 Codex 执行�
 
 全部命令里的 `<skill>` 指本 skill 目录。
 
-1. 体检（只读）：
+1. 体检：
 
    ```text
    node "<skill>/scripts/doctor.mjs"
    ```
 
-   它逐项报告 lark-cli 入口、机器人身份、codex 入口、现有配置与常驻状态，并给出建议白名单。任一项 FAIL 就先修：缺 lark-cli 或身份不是 `ready` 时先让用户跑 `lark-cli auth login`。
+   它逐项报告 lark-cli 入口、机器人身份、codex 入口、现有配置、常驻状态与事件通道，并给出建议白名单。除事件通道那一项会短暂订阅一次 `im.message.receive_v1` 验证连通性以外，只做检查：不写配置、不发消息、不注册计划任务。任一项 FAIL 就先修：缺 lark-cli 或身份不是 `ready` 时先让用户跑 `lark-cli auth login`。
 
 2. 拿到三项口径后写配置：
 
@@ -72,6 +72,8 @@ description: 把本机 Codex 接到飞书，用飞书消息驱动 Codex 执行�
 
 位置：`%USERPROFILE%\.feishu-codex-bridge\config.json`（可用环境变量 `FEISHU_BRIDGE_HOME` 换根目录）。
 
+两个 CLI 的入口默认按全局安装布局从 `PATH` 解析（`node_modules/@larksuite/cli/scripts/run.js`、`node_modules/@openai/codex/bin/codex.js`）。装法非标准时用 `FEISHU_BRIDGE_LARK_CLI`、`FEISHU_BRIDGE_CODEX` 指向入口文件；`doctor.mjs` 会打印实际解析到的路径。
+
 | 字段 | 含义 |
 | --- | --- |
 | `workdir` | Codex 执行根目录 |
@@ -89,8 +91,8 @@ description: 把本机 Codex 接到飞书，用飞书消息驱动 Codex 执行�
 - 桥接无人应答审批，所以 Codex 固定以 `approval_policy=never` 运行；需要审批的命令会直接失败，不会挂住任务。
 - 一次只跑一个任务，其余排队。
 - 回复超过 3000 字截断，完整输出只落盘。
-- 只处理文本消息；图片、文件、飞书卡片按钮都不接。
-- 非文本消息、白名单外的发送者、群聊里的裸文本、重复投递的同一 `message_id` 都会被丢弃。
+- 只处理文本消息：图片、文件、飞书卡片按钮不执行任务，回一条提示就结束。
+- 白名单外的发送者、群聊里的裸文本、重复投递的同一 `message_id` 静默丢弃，不回消息。
 
 ## 脚本职责
 
@@ -104,3 +106,5 @@ description: 把本机 Codex 接到飞书，用飞书消息驱动 Codex 执行�
 | `scripts/lib/cli.mjs` | 命令名 → 入口文件，以及跑一次命令的公共口径 |
 | `scripts/lib/lark.mjs` | 飞书侧：事件监听、回贴消息 |
 | `scripts/lib/codex.mjs` | Codex 侧：无头执行一次任务 |
+
+飞书事件字段取自 `lark-cli event schema im.message.receive_v1`：`jq_root_path` 为 `.`，`message_id`、`sender_id`、`chat_id`、`chat_type`、`message_type`、`content` 都在事件顶层。
