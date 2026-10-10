@@ -34,8 +34,8 @@ function log(level, message) {
   appendFileSync(BRIDGE_LOG_PATH, `${line}\n`, 'utf8');
 }
 
-async function reply(messageId, text) {
-  const result = await replyText({ messageId, text });
+async function reply(messageId, text, tag) {
+  const result = await replyText({ messageId, tag, text });
   if (!result || result.code !== 0) {
     log('error', `回贴失败 ${messageId}：${(result?.stderr ?? '').trim()}`);
   }
@@ -120,7 +120,7 @@ async function execute(job) {
   const outputFile = join(TASK_LOG_DIR, `${job.messageId}.md`);
   const startedAt = Date.now();
   log('info', `开始 ${job.messageId} mode=${job.mode}`);
-  await reply(job.messageId, `已受理（${job.mode}）：${job.prompt}`);
+  await reply(job.messageId, `已受理（${job.mode}）：${job.prompt}`, 'accepted');
 
   const result = await runTask({
     mode: job.mode,
@@ -143,7 +143,7 @@ async function execute(job) {
   log('info', `结束 ${job.messageId} ${headline}`);
   state.recent.unshift(`${new Date().toISOString()} ${job.mode} ${headline} ${job.prompt.slice(0, 40)}`);
   state.recent = state.recent.slice(0, 5);
-  await reply(job.messageId, composeReply({ headline, body, stderr: result.stderr, outputFile }));
+  await reply(job.messageId, composeReply({ headline, body, stderr: result.stderr, outputFile }), 'result');
 }
 
 function schedule() {
@@ -161,7 +161,7 @@ function schedule() {
 function enqueue(job) {
   if (state.queue.length >= config.queueLimit) {
     log('warn', `队列已满，丢弃 ${job.messageId}`);
-    void reply(job.messageId, `队列已满（上限 ${config.queueLimit}），稍后再发。`);
+    void reply(job.messageId, `队列已满（上限 ${config.queueLimit}），稍后再发。`, 'notice');
     return;
   }
   state.queue.push(job);
@@ -186,7 +186,7 @@ function dispatch(event) {
   markSeen(messageId);
 
   if (event.message_type !== 'text') {
-    void reply(messageId, `只处理文本消息（收到 ${event.message_type}）。发 /help 看用法。`);
+    void reply(messageId, `只处理文本消息（收到 ${event.message_type}）。发 /help 看用法。`, 'notice');
     return;
   }
 
@@ -197,27 +197,27 @@ function dispatch(event) {
   }
 
   if (command.name === 'status') {
-    void reply(messageId, statusText());
+    void reply(messageId, statusText(), 'notice');
     return;
   }
   if (command.name === 'help') {
-    void reply(messageId, HELP_TEXT);
+    void reply(messageId, HELP_TEXT, 'notice');
     return;
   }
   if (command.name === 'ask' || command.name === 'run') {
     if (!config.modes.includes(command.name)) {
-      void reply(messageId, `入口 ${command.name} 未开放，当前开放：${config.modes.join(' / ')}`);
+      void reply(messageId, `入口 ${command.name} 未开放，当前开放：${config.modes.join(' / ')}`, 'notice');
       return;
     }
     if (command.prompt === '') {
-      void reply(messageId, `/${command.name} 后面要跟内容。`);
+      void reply(messageId, `/${command.name} 后面要跟内容。`, 'notice');
       return;
     }
     enqueue({ messageId, mode: command.name, prompt: command.prompt });
     return;
   }
 
-  void reply(messageId, `未知命令。发 /help 看用法。`);
+  void reply(messageId, `未知命令。发 /help 看用法。`, 'notice');
 }
 
 function shutdown(reason) {

@@ -107,4 +107,4 @@ description: 把本机 Codex 接到飞书，用飞书消息驱动 Codex 执行�
 | `scripts/lib/lark.mjs` | 飞书侧：事件监听、回贴消息 |
 | `scripts/lib/codex.mjs` | Codex 侧：无头执行一次任务 |
 
-飞书事件字段取自 `lark-cli event schema im.message.receive_v1`：`jq_root_path` 为 `.`，`message_id`、`sender_id`、`chat_id`、`chat_type`、`message_type`、`content` 都在事件顶层。
+飞书事件字段取自 `lark-cli event schema im.message.receive_v1`：`jq_root_path` 为 `.`，`message_id`、`sender_id`、`sender_type`、`chat_id`、`chat_type`、`message_type`、`content` 都在事件顶层。

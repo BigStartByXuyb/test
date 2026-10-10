@@ -5,7 +5,7 @@ import { join } from 'node:path';
 
 import { codexEntry } from './lib/codex.mjs';
 import { CONFIG_PATH, readConfig } from './lib/config.mjs';
-import { MESSAGE_EVENT_KEY, larkEntry, runLark } from './lib/lark.mjs';
+import { MESSAGE_EVENT_KEY, larkEntry, probeEventChannel, runLark } from './lib/lark.mjs';
 import { runOnce } from './lib/cli.mjs';
 
 const TASK_SCRIPT = join(import.meta.dirname, 'Register-FeishuBridgeTask.ps1');
@@ -144,10 +144,7 @@ async function checkService() {
 }
 
 async function checkEventChannel() {
-  const result = await runLark(
-    ['event', 'consume', MESSAGE_EVENT_KEY, '--max-events', '1', '--timeout', '6s', '--as', 'bot'],
-    30_000,
-  );
+  const result = await probeEventChannel();
   if (result.stderr.includes('ready')) report('OK', '飞书事件通道可用', MESSAGE_EVENT_KEY);
   else {
     const tail = result.stderr.trim().split('\n').slice(-2).join(' ');

@@ -41,12 +41,23 @@ export function listenMessages({ onEvent, onStderrLine, onExit }) {
   return child;
 }
 
-// 回贴到原消息。幂等键用原消息 ID，重投递不会重复发。
-export function replyText({ messageId, text }) {
+// 回贴到原消息。同一条消息会有多条回贴（受理 / 结果 / 提示），幂等键必须按回贴种类区分：
+// 用同一个键发第二条，飞书会当成重复请求丢掉。重投递时同一种回贴仍然只发一次。
+export function replyText({ messageId, tag, text }) {
   return runOnce({
     entry: larkEntry(),
     timeoutMs: 60_000,
-    args: ['im', '+messages-reply', '--as', 'bot', '--message-id', messageId, '--text', text, '--idempotency-key', messageId.slice(0, 50)],
+    args: ['im', '+messages-reply', '--as', 'bot', '--message-id', messageId, '--text', text, '--idempotency-key', `${messageId}#${tag}`.slice(0, 50)],
+  });
+}
+
+// 事件通道连通性探测。有界运行（带 --max-events / --timeout）时 lark-cli 忽略 stdin 结束，
+// 所以这里不要求保持 stdin 打开；只有 listenMessages 那种长住监听才需要。
+export function probeEventChannel() {
+  return runOnce({
+    entry: larkEntry(),
+    timeoutMs: 30_000,
+    args: ['event', 'consume', MESSAGE_EVENT_KEY, '--max-events', '1', '--timeout', '6s', '--as', 'bot'],
   });
 }
 
