@@ -62,13 +62,13 @@ description: 把本机 Codex 接到飞书，用飞书消息驱动 Codex 执行�
 | `/status` | 本地即时回答：运行时长、入口、工作目录、队列、最近任务。不调 Codex |
 | `/ask <文本>` | 调 Codex，沙箱 `read-only`，不改文件 |
 | `/run <文本>` | 调 Codex，沙箱 `workspace-write`，可改工作目录下的文件 |
-| `/help` | 返回这张表 |
+| `/help` | 回一条用法说明，内容就是 `bridge.mjs` 里的 `HELP_TEXT` |
 | 裸文本 | 按 `defaultMode` 处理 |
 | 其它 `/xxx` | 回未知命令，不执行 |
 
 群聊里只认 `/` 开头的消息，不带命令的（含图片、文件）静默丢弃；单聊里裸文本也接，非文本回一条提示。每单任务先回一条「已受理」，跑完再回结果。
 
-## 配置
+## 配置与运行期产物
 
 位置：`%USERPROFILE%\.feishu-codex-bridge\config.json`。
 
@@ -90,7 +90,7 @@ description: 把本机 Codex 接到飞书，用飞书消息驱动 Codex 执行�
 
 - 桥接无人应答审批，所以 Codex 固定以 `approval_policy=never` 运行；需要审批的命令会直接失败，不会挂住任务。
 - 一次只跑一个任务，其余排队。
-- 结果回贴超过 3000 字截断，完整输出只落盘。
+- 结果回贴超过 3000 字截断，末尾给出完整输出的落盘路径；任务失败且没有输出文件时，改回 stderr 摘录（上限 1500 字）。
 - 自启那一步只支持 Windows：`Register-FeishuBridgeTask.ps1` 依赖 Windows 计划任务与 `pwsh`。其余脚本不依赖平台，非 Windows 上可以直接常驻 `bridge.mjs`。
 - 图片、文件、飞书卡片按钮不执行任务。
 - 白名单外的发送者、重复投递的同一 `message_id` 静默丢弃，不回消息。
