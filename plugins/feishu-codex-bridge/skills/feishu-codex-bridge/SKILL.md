@@ -7,7 +7,7 @@ description: 把本机 Codex 接到飞书，用飞书消息驱动 Codex 执行�
 
 装好之后：飞书里给机器人发消息 → 本机起一个无头 Codex 会话执行 → 结果自动回贴到那条消息。
 
-## 执行前必须拿到用户口径的三项
+## 执行前要定下来的三项口径
 
 | 口径 | 含义 | 取值 |
 | --- | --- | --- |
@@ -78,7 +78,7 @@ description: 把本机 Codex 接到飞书，用飞书消息驱动 Codex 执行�
 | --- | --- |
 | `workdir` | Codex 执行根目录 |
 | `modes` | 开放入口，`ask` / `run` 的子集 |
-| `defaultMode` | 裸文本按哪个入口走 |
+| `defaultMode` | 裸文本按哪个入口走，必须在 `modes` 内 |
 | `allowOpenIds` | 允许触发的发送者 open_id |
 | `allowChatIds` | 允许触发的会话 chat_id；命中即该会话内任何人都能触发 |
 | `taskTimeoutMinutes` | 单任务超时，超时结束该次 Codex 进程 |
@@ -90,7 +90,8 @@ description: 把本机 Codex 接到飞书，用飞书消息驱动 Codex 执行�
 
 - 桥接无人应答审批，所以 Codex 固定以 `approval_policy=never` 运行；需要审批的命令会直接失败，不会挂住任务。
 - 一次只跑一个任务，其余排队。
-- 回复超过 3000 字截断，完整输出只落盘。
+- 结果回贴超过 3000 字截断，完整输出只落盘。
+- 自启那一步只支持 Windows：`Register-FeishuBridgeTask.ps1` 依赖 Windows 计划任务与 `pwsh`。其余脚本不依赖平台，非 Windows 上可以直接常驻 `bridge.mjs`。
 - 图片、文件、飞书卡片按钮不执行任务。
 - 白名单外的发送者、重复投递的同一 `message_id` 静默丢弃，不回消息。
 

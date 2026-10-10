@@ -43,11 +43,23 @@ export function listenMessages({ onEvent, onStderrLine, onExit }) {
 
 // 回贴到原消息。同一条消息会有多条回贴（受理 / 结果 / 提示），幂等键必须按回贴种类区分：
 // 用同一个键发第二条，飞书会当成重复请求丢掉。重投递时同一种回贴仍然只发一次。
+// 截的是消息 ID 那一段，tag 永远保留，否则长短不一的消息 ID 会把不同种类压成同一个键。
 export function replyText({ messageId, tag, text }) {
   return runOnce({
     entry: larkEntry(),
     timeoutMs: 60_000,
-    args: ['im', '+messages-reply', '--as', 'bot', '--message-id', messageId, '--text', text, '--idempotency-key', `${messageId}#${tag}`.slice(0, 50)],
+    args: [
+      'im',
+      '+messages-reply',
+      '--as',
+      'bot',
+      '--message-id',
+      messageId,
+      '--text',
+      text,
+      '--idempotency-key',
+      `${messageId.slice(0, 50 - tag.length - 1)}#${tag}`,
+    ],
   });
 }
 
