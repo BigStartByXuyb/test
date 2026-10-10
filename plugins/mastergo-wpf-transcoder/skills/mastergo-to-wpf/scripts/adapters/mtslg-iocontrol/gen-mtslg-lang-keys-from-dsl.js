@@ -364,7 +364,14 @@ function deriveLangSpec(options) {
       : ["IconButton", "Button", "StatusButton"]
   );
 
-  const usedKeys = new Set();
+  /*
+   * key 判重按**大小写不敏感**：下游门禁（verify-page.ps1 的 Group-Object）就是这个口径，
+   * 而且只差大小写的两个 key 落在同一份字典里本来就是雷（同一份 CN/EN 字典里同时有 FocusStep 与 Focusstep）。
+   * 所以这里存的都是小写形式、查重也用小写比 —— 判据只有这一处（uniqueKey 与下面几处预占都走它）。
+   */
+  const usedKeys = new Map();
+  const normKey = function (key) { return String(key).toLowerCase(); };
+  const reserveKey = function (key) { usedKeys.set(normKey(key), key); };
   const sharedByKey = new Map();
   // 页面内“同一文案 → 同一个 LanguageKey”：文案相同的多个节点共用一个 key，
   // 其余节点登记进该 key 的 sourceRefs（运行时同一文案只维护一条翻译）。
@@ -400,11 +407,12 @@ function deriveLangSpec(options) {
   const uniqueKey = function (base) {
     let key = base;
     let n = 2;
-    while (usedKeys.has(key)) {
-      key = base + n;
+    while (usedKeys.has(normKey(key))) {
+      // 撞了（不区分大小写）：沿用已在用的那个写法加后缀，产物里不会出现只差大小写的两个 key。
+      key = usedKeys.get(normKey(key)) + n;
       n += 1;
     }
-    usedKeys.add(key);
+    reserveKey(key);
     return key;
   };
 
@@ -452,7 +460,7 @@ function deriveLangSpec(options) {
   const rawTitleText = normalizeNewlines(toText(opts.titleText)) || readDslRootName(opts.dsl) || pageName;
   const titleText = normalizeText(rawTitleText) || pageName;
   const titleKey = pageName + TITLE_SUFFIX;
-  usedKeys.add(titleKey);
+  reserveKey(titleKey);
   const titleMade = makeText(rawTitleText || titleText, "");
   const titleEntry = { key: titleKey, group: TITLE_GROUP, role: "page-title", text: titleMade.text };
   keys.push(titleEntry);
@@ -487,7 +495,7 @@ function deriveLangSpec(options) {
         comment: "复用目标项目已登记语言键"
       };
       if (index !== null && Number.isFinite(index)) entry.menuIndex = index;
-      usedKeys.add(hit.key);
+      reserveKey(hit.key);
       keys.push(entry);
       report.sources.menu += 1;
       report.sources.catalog += 1;
@@ -609,7 +617,7 @@ function deriveLangSpec(options) {
             sourceRefs: [fixedRef],
             comment: "组件级固定键（映射表登记，不由设计文本派生）"
           };
-          usedKeys.add(fixedKey);
+          reserveKey(fixedKey);
           fixedKeyByKey.set(fixedKey, entry);
           keys.push(entry);
           if (!Array.isArray(report.fixedKeys)) report.fixedKeys = [];
@@ -687,7 +695,7 @@ function deriveLangSpec(options) {
         scope: "shared",
         comment: "复用目标项目已登记语言键"
       };
-      usedKeys.add(hit.key);
+      reserveKey(hit.key);
       sharedByKey.set(hit.key, entry);
       contentEntryByText.set(text, entry);
       keys.push(entry);
