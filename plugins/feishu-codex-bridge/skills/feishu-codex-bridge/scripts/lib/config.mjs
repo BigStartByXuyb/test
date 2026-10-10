@@ -1,10 +1,11 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { isAbsolute, join } from 'node:path';
 
 export const MODES = ['ask', 'run'];
 
-export const BRIDGE_HOME = process.env.FEISHU_BRIDGE_HOME || join(homedir(), '.feishu-codex-bridge');
+// 配置根目录固定在用户主目录下：登录自启的计划任务读的就是这个位置，不做可改写的覆盖。
+export const BRIDGE_HOME = join(homedir(), '.feishu-codex-bridge');
 export const CONFIG_PATH = join(BRIDGE_HOME, 'config.json');
 export const LOG_DIR = join(BRIDGE_HOME, 'logs');
 export const BRIDGE_LOG_PATH = join(LOG_DIR, 'bridge.log');
@@ -21,6 +22,8 @@ export function validateConfig(config) {
 
   if (typeof config.workdir !== 'string' || config.workdir === '') {
     problems.push('workdir 必须是非空字符串');
+  } else if (!isAbsolute(config.workdir)) {
+    problems.push(`workdir 必须是绝对路径：${config.workdir}`);
   } else if (!existsSync(config.workdir)) {
     problems.push(`workdir 不存在：${config.workdir}`);
   }

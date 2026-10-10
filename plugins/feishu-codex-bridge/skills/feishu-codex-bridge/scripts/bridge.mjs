@@ -185,14 +185,14 @@ function dispatch(event) {
   }
   markSeen(messageId);
 
-  if (event.message_type !== 'text') {
-    void reply(messageId, `只处理文本消息（收到 ${event.message_type}）。发 /help 看用法。`, 'notice');
+  const command = parseCommand(String(event.content ?? '').trim());
+  if (event.chat_type === 'group' && !command.explicit) {
+    log('info', `群聊里不带命令的消息，已忽略 ${messageId}`);
     return;
   }
 
-  const command = parseCommand(String(event.content ?? '').trim());
-  if (event.chat_type === 'group' && !command.explicit) {
-    log('info', `群聊里的裸文本，已忽略 ${messageId}`);
+  if (event.message_type !== 'text') {
+    void reply(messageId, `只处理文本消息（收到 ${event.message_type}）。发 /help 看用法。`, 'notice');
     return;
   }
 

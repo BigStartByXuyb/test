@@ -66,11 +66,11 @@ description: 把本机 Codex 接到飞书，用飞书消息驱动 Codex 执行�
 | 裸文本 | 按 `defaultMode` 处理 |
 | 其它 `/xxx` | 回未知命令，不执行 |
 
-群聊里只认 `/` 开头的消息；单聊里裸文本也接。每单任务先回一条「已受理」，跑完再回结果。
+群聊里只认 `/` 开头的消息，不带命令的（含图片、文件）静默丢弃；单聊里裸文本也接，非文本回一条提示。每单任务先回一条「已受理」，跑完再回结果。
 
 ## 配置
 
-位置：`%USERPROFILE%\.feishu-codex-bridge\config.json`（可用环境变量 `FEISHU_BRIDGE_HOME` 换根目录）。
+位置：`%USERPROFILE%\.feishu-codex-bridge\config.json`。
 
 两个 CLI 的入口默认按全局安装布局从 `PATH` 解析（`node_modules/@larksuite/cli/scripts/run.js`、`node_modules/@openai/codex/bin/codex.js`）。装法非标准时用 `FEISHU_BRIDGE_LARK_CLI`、`FEISHU_BRIDGE_CODEX` 指向入口文件；`doctor.mjs` 会打印实际解析到的路径。
 
@@ -91,8 +91,8 @@ description: 把本机 Codex 接到飞书，用飞书消息驱动 Codex 执行�
 - 桥接无人应答审批，所以 Codex 固定以 `approval_policy=never` 运行；需要审批的命令会直接失败，不会挂住任务。
 - 一次只跑一个任务，其余排队。
 - 回复超过 3000 字截断，完整输出只落盘。
-- 只处理文本消息：图片、文件、飞书卡片按钮不执行任务，回一条提示就结束。
-- 白名单外的发送者、群聊里的裸文本、重复投递的同一 `message_id` 静默丢弃，不回消息。
+- 图片、文件、飞书卡片按钮不执行任务。
+- 白名单外的发送者、重复投递的同一 `message_id` 静默丢弃，不回消息。
 
 ## 脚本职责
 
