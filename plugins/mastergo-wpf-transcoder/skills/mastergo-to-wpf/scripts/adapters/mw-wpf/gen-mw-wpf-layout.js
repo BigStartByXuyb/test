@@ -682,8 +682,11 @@ function buildRegionGrid(entries, containers, pending, dslTree, size, origin, gr
     unresolved: synth.unresolved,
     // 分组表只在这一层被消费（declaredGroups 校验的就是这一层的 items）：可引用的 ref 清单按它给。
     // 清单在补组之前取（顺序要紧）：补出来的栏容器不是 DSL 节点，那个 ref 写进表也不认。
-    // 成层的那一层不参与分组 —— 清单按空给：这一层唯一合法的表就是空数组，清单不能给出相反的答案。
-    groupCandidates: owner ? [] : flex.items.map(function (item) { return { ref: item.ref, controlType: item.controlType }; })
+    // 不参与分组的那一层清单按空给 —— 这一层唯一合法的表就是空数组，清单不能给出相反的答案。
+    // 不参与分组有两种：这一层已由设计稿成层（owner 非空），或这一层凑不出组（条目不足 2 个）。
+    groupCandidates: owner || entries.length < 2
+      ? []
+      : flex.items.map(function (item) { return { ref: item.ref, controlType: item.controlType }; })
   };
 }
 

@@ -432,6 +432,10 @@ function sizes(bands) {
   assert.deepStrictEqual(layeredEmpty.groupCandidates, [],
     "成层的那一层不参与分组：条目清单按空给（这一层唯一合法的表就是空数组）");
   // 内容区凑不出组（不足 2 个条目）时这一层同样不参与分组：声明了组就停下报告，不静默忽略。
+  const tooFew = derive(snapshot([], [mk("only", 100, 115)]), typesOf([typeOf("only", 100, 115)]),
+    { groups: { groups: [] } });
+  assert.deepStrictEqual(tooFew.groupCandidates, [],
+    "凑不出组的那一层也不参与分组：条目清单按空给");
   assert.throws(function () {
     derive(snapshot([], [mk("only", 100, 115)]), typesOf([typeOf("only", 100, 115)]),
       { groups: { groups: [{ id: "g", kind: "column", members: ["only", "a"] }] } });
