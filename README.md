@@ -6,6 +6,7 @@
 
 - `mastergo-wpf-transcoder` — MasterGo 设计到 MW WPF 与 MTSLG IOContorl 的转换流程。
 - `agent-plugin-publisher` — 按团队统一格式打包、校验和发布插件。
+- `feishu-codex-bridge` — 把本机 Codex 接到飞书，飞书消息驱动执行并回贴结果。
 
 ## 发版
 

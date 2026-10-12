@@ -1,0 +1,16 @@
+{
+  "name": "feishu-codex-bridge",
+  "description": "把本机 Codex 接到飞书：飞书消息驱动 Codex 执行并把结果回贴原消息，含体检、配置与登录自启。",
+  "version": "1.0.0",
+  "author": {
+    "name": "xuyb"
+  },
+  "keywords": [
+    "feishu",
+    "lark",
+    "codex",
+    "bridge",
+    "remote-control"
+  ],
+  "license": "UNLICENSED"
+}
