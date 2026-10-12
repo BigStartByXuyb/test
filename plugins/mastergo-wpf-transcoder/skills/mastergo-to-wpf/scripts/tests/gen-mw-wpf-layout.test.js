@@ -369,10 +369,17 @@ function sizes(bands) {
   const types = typesOf([typeOf("a", 100, 115), typeOf("b", 100, 215), typeOf("c", 400, 115), typeOf("d", 400, 215)]);
 
   // 没有分组表：机械判据只看位置 → 两条列带各补一个栏容器。
-  const mechanical = workArea(derive(snapshot([], boxes), types));
+  const mechanicalLayout = derive(snapshot([], boxes), types);
+  const mechanical = workArea(mechanicalLayout);
   assert.strictEqual(mechanical.grid.cells.filter(function (cell) { return cell.synth; }).length, 2,
     "没有分组表：机械判据按两条列带各补一个栏容器");
   assert.strictEqual(mechanical.unresolved.length, 0, "两条列带都收走了，没有未归宿条目");
+  // 写表前看的条目清单：就是校验分组表的同一份 items（补组之前），补出来的栏容器不在里面。
+  assert.deepStrictEqual(mechanicalLayout.groupCandidates.map(function (item) { return item.ref; }).sort(),
+    ["a", "b", "c", "d"], "条目清单＝内容区根网格那一层的条目（ref 照 DSL 给）");
+  assert.ok(mechanicalLayout.groupCandidates.every(function (item) {
+    return typeof item.controlType === "string" && typeof item.text === "string";
+  }), "清单每条带 controlType 与文案：写表的人/模型据此认得出这条 ref 是界面上的哪个东西");
 
   // 有分组表：四条并成一个声明的栏容器，顶层只剩这一个格子。
   const declared = workArea(derive(snapshot([], boxes), types, {
@@ -416,6 +423,33 @@ function sizes(bands) {
       groups: { pageTarget: "OtherPage", groups: [{ id: "g", kind: "column", members: ["a", "b"] }] }
     });
   }, /pageTarget/, "分组表标的页面与本次页面不一致 → 失败（防套错页）");
+
+  // 区域根网格已由设计稿成层（这一层不参与分组）：表里还声明着组就停下报告，不静默忽略。
+  const layeredRoot = node("flexRoot", "FRAME", { width: 1280, height: 902, relativeX: 0, relativeY: 85 }, boxes, {
+    flexContainerInfo: { flexDirection: "column" }
+  });
+  const layeredEmpty = derive(snapshot([], [layeredRoot]), types, { groups: { groups: [] } });
+  assert.deepStrictEqual(layeredEmpty.groupCandidates, [],
+    "成层的那一层不参与分组：条目清单按空给（这一层唯一合法的表就是空数组）");
+  // 内容区凑不出组（不足 2 个条目）时这一层同样不参与分组：声明了组就停下报告，不静默忽略。
+  const tooFew = derive(snapshot([], [mk("only", 100, 115)]), typesOf([typeOf("only", 100, 115)]),
+    { groups: { groups: [] } });
+  assert.deepStrictEqual(tooFew.groupCandidates, [],
+    "凑不出组的那一层也不参与分组：条目清单按空给");
+  assert.throws(function () {
+    derive(snapshot([], [mk("only", 100, 115)]), typesOf([typeOf("only", 100, 115)]),
+      { groups: { groups: [{ id: "g", kind: "column", members: ["only", "a"] }] } });
+  }, /凑不出组/, "内容区不足 2 个条目却声明了组 → 失败");
+  // 判据用的是「这一层的 items」（展平之后），不是内容区条目总数：单个包裹容器里装两条照样能声明。
+  const wrapped = node("wrap", "GROUP", { width: 200, height: 200, relativeX: 100, relativeY: 115 }, [mk("w1", 0, 0), mk("w2", 0, 40)]);
+  const wrappedLayout = derive(snapshot([], [wrapped]), typesOf([typeOf("w1", 100, 200), typeOf("w2", 100, 240)]), {
+    groups: { groups: [{ id: "g", kind: "column", members: ["w1", "w2"] }] }
+  });
+  assert.deepStrictEqual(wrappedLayout.groupCandidates.map(function (item) { return item.ref; }).sort(), ["w1", "w2"],
+    "内容区只有一个包裹容器、里面两条：展平后这两条就是本层条目，清单与声明都按它算");
+  assert.throws(function () {
+    derive(snapshot([], [layeredRoot]), types, { groups: { groups: [{ id: "g", kind: "column", members: ["a", "b"] }] } });
+  }, /已由设计稿成层/, "成层的那一层还声明分组 → 失败（声明的意图不会无声丢掉）");
 
   // 文件形状：schema 版本、kind、成员数量都在读表时就失败。
   const tmp = path.join(os.tmpdir(), "layout-groups-" + process.pid + ".json");

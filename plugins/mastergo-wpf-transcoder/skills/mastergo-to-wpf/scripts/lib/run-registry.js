@@ -36,8 +36,9 @@ const LEGACY_SHADOWS = {
 const ARTIFACT_KEYS = [
   "getDsl", "snapshot", "coverage", "dslManifest", "timing", "visibility", "extractSvg",
   "mappingDraft", "iconCandidates", "iconMap", "layoutManifest", "bundleManifest",
-  // 作业A（mw-wpf）产物：类型判定 / Grid 布局产物 / 发射出的真控件 View.xaml。
-  "componentTypes", "wpfLayout", "wpfXaml"
+  // 作业A（mw-wpf）产物：类型判定 / Grid 布局产物 / 分组表可引用的条目清单 / 发射出的真控件 View.xaml。
+  // 条目清单也登记：它要带本次运行的身份与哈希，不能被上一次运行留下的同名旧件冒充。
+  "componentTypes", "wpfLayout", "layoutGroupCandidates", "wpfXaml"
 ];
 
 function fail(message) {

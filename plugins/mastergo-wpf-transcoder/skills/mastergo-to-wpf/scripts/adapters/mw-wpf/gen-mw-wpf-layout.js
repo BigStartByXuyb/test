@@ -14,6 +14,11 @@
 //   [--report]     推导报告（分区摘要 / 未归格节点 / 未归宿条目 / 分组表来源与指纹）
 //   [--groups]     分组表（意图输入，可选）：Generated/_inputs/<页面名>.layout-groups.json。
 //                  只写"哪些 ref 同属一组"，不写坐标尺寸；覆盖到的条目按表分组，没覆盖到的走机械判据
+//                  不参与分组的层级（区域根网格已由设计稿成层 / 本层条目不足 2 个 / 内容区没有条目）里
+//                  表里不许声明任何组：声明即 fail（这一层没有可表达的分组意图）
+//   [--group-candidates] 分组表可引用的条目清单（Generated/_inputs/<页面名>.layout-group-candidates.json）：
+//                  内容区根网格那一层的条目（declaredGroups 校验分组表的同一份 items）。
+//                  它只回答"表里能写哪些 ref"，不是输入——分组的结论仍由人/模型写进分组表。
 //
 // 输出（冻结；发射器与门禁按它读）
 //   { schemaVersion, adapter:"mw-wpf", pageTarget, design:{width,height},
@@ -53,7 +58,8 @@
 //     （同一起点的条目合并成一条带），尺寸与星号位置仍走口径 A；没有声明的层级、以及声明层级的交叉轴按 bbox 聚类。
 //   - 设计稿没打组的地方由代码补组：区域根网格里的散条目按**栏**收成合成容器——同一条列带（x 区间重叠）
 //     里 ≥2 个条目 → 一个列容器（栏内再按口径 A 成行）；容器条目同样参与。判据只看位置，不猜语义；
-//     收出来的容器（cell.synth，一层 Grid）与设计稿打的组同口径成带；已经成层的（owner 非空）不再补组。
+//     收出来的容器（cell.synth，一层 Grid）与设计稿打的组同口径成带；已经成层的（owner 非空）不再补组——
+//     这一层同样不参与分组表的声明：表里声明了组即 fail（判据见上面 --groups 那条）。
 //   - 层级照设计稿：成层容器各自发射一个内层 Grid（格子带 container:true），它的条目（直接子控件 /
 //     更内层的容器）进该层格子。成层容器 = 声明了 flex 主轴（flexDirection）的容器，或**带尺寸约束的容器**
 //     （约束是设计意图，展平会让它没有落到产物的位置）；没有 flex 声明、也没有尺寸约束的包裹层展平到最近一层；
@@ -84,6 +90,7 @@ function parseArgs(argv) {
     else if (token === "--page-target") args.pageTarget = argv[++i];
     else if (token === "--out") args.outPath = argv[++i];
     else if (token === "--report") args.reportPath = argv[++i];
+    else if (token === "--group-candidates") args.groupCandidatesPath = argv[++i];
     else fail("未知参数: " + token);
   }
   ["typesPath", "dslPath", "pageTarget", "outPath"].forEach(function (key) {
@@ -666,15 +673,31 @@ function buildRegionGrid(entries, containers, pending, dslTree, size, origin, gr
   const owner = flexOwnerOf(flex.owner);
   // 区域根网格是页面内容区那一层：页面常驻右栏（贴主轴末端的最末条目）在这一层固定。
   if (owner) owner.root = true;
+  // 设计稿已经打了组（这一层由某个容器提上来的，owner 非空）时，这一层不参与分组——分组表也不参与。
+  if (owner) requireNoDeclaredGroups(groupsDoc, "内容区根网格已由设计稿成层（这一层不参与分组）");
   // 设计稿已经打了组（这一层由某个容器提上来的，owner 非空）就不再补组；只有散落条目才补。
   const synth = owner ? { items: flex.items, unresolved: [] } : synthRegionGroups(flex.items, groupsDoc);
   return {
     grid: buildGridFrom(synth.items, { childrenOf: tree.childrenOf, dslTree: dslTree }, size, owner, origin),
-    unresolved: synth.unresolved
+    unresolved: synth.unresolved,
+    // 分组表只在这一层被消费（declaredGroups 校验的就是这一层的 items）：可引用的 ref 清单按它给。
+    // 清单在补组之前取（顺序要紧）：补出来的栏容器不是 DSL 节点，那个 ref 写进表也不认。
+    // 不参与分组的那一层清单按空给 —— 这一层唯一合法的表就是空数组，清单不能给出相反的答案。
+    // 不参与分组有两种：这一层已由设计稿成层（owner 非空），或这一层凑不出组（条目不足 2 个）。
+    groupCandidates: owner || flex.items.length < 2
+      ? []
+      : flex.items.map(function (item) { return { ref: item.ref, controlType: item.controlType }; })
   };
 }
 
 // 区域根网格的成栏：**分组表**（模型/人给的意图输入）优先，没覆盖到的散条目再走机械判据。
+// 不参与分组的层级（凑不出组 / 已由设计稿成层 / 内容区没有条目）唯一合法的表就是空数组：
+// 声明了组就停下报告，不静默忽略——声明的意图不会无声丢掉。判据只有这一处。
+function requireNoDeclaredGroups(groupsDoc, reason) {
+  if (!groupsDoc || !groupsDoc.groups.length) return;
+  fail("分组表声明了 " + groupsDoc.groups.length + " 个组，但" + reason + "：表里不声明任何组（groups 写成空数组，表本身仍是对象）");
+}
+
 // 分组表只写"哪些条目同属一组"，不写坐标与尺寸——事实一律来自 DSL 快照。
 // 机械判据只有一条——位置：同一条列带（x 区间重叠，条目在竖直方向排）里 ≥2 个条目 → 一个栏容器
 // （axis="y"，栏内再按口径 A 成行）。容器条目与叶子同等参与。
@@ -688,6 +711,8 @@ function buildRegionGrid(entries, containers, pending, dslTree, size, origin, gr
 // 就是按口径 A 成行的。分组表要行就显式写 kind="row"——那是人的判断，不由几何猜。
 
 const LAYOUT_GROUPS_SCHEMA = "mw-wpf-layout-groups/1";
+// 分组表「可引用的条目」那份清单的形状（--group-candidates 的落盘件，与分组表不是一回事）。
+const LAYOUT_GROUP_CANDIDATES_SCHEMA = "mw-wpf-layout-group-candidates/1";
 
 // 分组表形状（只写关系，不写事实）：
 //   { "schemaVersion": "mw-wpf-layout-groups/1", "pageTarget": "<页面名>",
@@ -776,7 +801,10 @@ function declaredGroups(items, groupsDoc) {
 // 区域根网格的成栏：分组表优先，没覆盖到的散条目再按机械判据补；
 // 两处都没落到的条目保持扁平，并登记进 unresolved（下次看图要看的清单）。
 function synthRegionGroups(items, groupsDoc) {
-  if (items.length < 2) return { items: items, unresolved: [] };
+  if (items.length < 2) {
+    requireNoDeclaredGroups(groupsDoc, "这一层只有 " + items.length + " 个条目（不足 2 个，凑不出组）");
+    return { items: items, unresolved: [] };
+  }
   const declared = groupsDoc ? declaredGroups(items, groupsDoc) : [];
   const taken = new Set();
   declared.forEach(function (group) {
@@ -879,15 +907,24 @@ function deriveLayout(options) {
     return "content";
   };
   const content = entries.filter(function (n) { return bandOfBox(n.y, n.h) === "content"; });
+  // 内容区一个条目都没有时压根没有成组的那一层：表里还声明着组就停下报告（判据同上）。
+  if (!content.length) requireNoDeclaredGroups(options.groups, "这一页的内容区里没有条目");
 
   const regions = [
     frameworkRegion("top-strip", "顶部栏", "framework-top", "MaxwellFramework_HeaderHeight", tokens.headerHeight, design, "y"),
     frameworkRegion("bottom-bar", "底部栏", "framework-bottom", "MaxwellFramework_BottomHeight", tokens.bottomHeight, design, "y")
   ];
+  let groupCandidates = [];
   if (content.length) {
     const work = buildRegionGrid(content, containers, pending, tree, {
       w: design.width, h: design.height - tokens.bottomHeight - tokens.headerHeight
     }, { x: 0, y: tokens.headerHeight }, options.groups || null);
+    // 清单里带上文案：写分组表的人/模型据此认得出这条 ref 是界面上的哪个东西（事实仍以 DSL 为准）。
+    groupCandidates = work.groupCandidates.map(function (entry) {
+      const node = options.types.byRef.get(entry.ref) || {};
+      // 容器类条目没有控件类型：字段留着给空串，形状不随条目变化（读的人少判一种情况）。
+      return { ref: entry.ref, controlType: String(entry.controlType || ""), text: String(node.sourceText || "") };
+    });
     regions.push({
       id: "work-area", name: "工作区", ref: null, role: "work-area", emit: true,
       x: 0, y: tokens.headerHeight, w: design.width,
@@ -938,7 +975,9 @@ function deriveLayout(options) {
     regions: regions,
     pending: pending,
     constraintExempt: constraintExempt,
-    layoutGroups: options.groupsSource || null
+    layoutGroups: options.groupsSource || null,
+    // 不是产物字段（main 落盘产物时剔掉，另落成 --group-candidates 那份清单）：分组表可引用的条目。
+    groupCandidates: groupCandidates
   };
 }
 
@@ -972,11 +1011,47 @@ function loadInputs(args) {
   };
 }
 
+function writeGroupCandidates(filePath, pageTarget, entries, source) {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, JSON.stringify({
+    schemaVersion: LAYOUT_GROUP_CANDIDATES_SCHEMA,
+    pageTarget: pageTarget,
+    // 本次运行的指纹：这份清单是从哪份 DSL 快照算出来的（快照换了，旧清单就不能再照着写表）。
+    source: source,
+    entries: entries
+  }, null, 2) + "\n", "utf8");
+}
+
 function main() {
   const args = parseArgs(process.argv.slice(2));
   const inputs = loadInputs(args);
   const tokens = Object.assign({ headerHeight: 85, bottomHeight: 180 }, inputs.tokens);
-  const layout = deriveLayout(Object.assign({}, inputs, { tokens: tokens }));
+  const options = Object.assign({}, inputs, { tokens: tokens });
+  const candidateSource = {
+    dslPath: args.dslPath,
+    dslSha256: crypto.createHash("sha256").update(fs.readFileSync(args.dslPath)).digest("hex")
+  };
+  let layout;
+  try {
+    // groupCandidates 不是产物字段（产物 schema 冻结）：它另落成 --group-candidates 那份清单。
+    const { groupCandidates, ...product } = deriveLayout(options);
+    layout = product;
+    if (args.groupCandidatesPath) writeGroupCandidates(args.groupCandidatesPath, layout.pageTarget, groupCandidates, candidateSource);
+  }
+  catch (error) {
+    // 推导失败（多半是分组表写错，例如引用了不在本层条目里的 ref）：按机械判据再推一遍，把清单落下来
+    // —— 出错的人拿到的正是「表里能写哪些 ref」，没有清单就没法照着改那张表。
+    if (args.groupCandidatesPath) {
+      try {
+        const { groupCandidates } = deriveLayout(Object.assign({}, options, { groups: null }));
+        writeGroupCandidates(args.groupCandidatesPath, inputs.pageTarget, groupCandidates, candidateSource);
+      }
+      catch {
+        // 清单落不下来不该盖住真正的错：下面照原样抛出去。
+      }
+    }
+    throw error;
+  }
   fs.mkdirSync(path.dirname(args.outPath), { recursive: true });
   fs.writeFileSync(args.outPath, JSON.stringify(layout, null, 2) + "\n", "utf8");
   if (args.reportPath) {
