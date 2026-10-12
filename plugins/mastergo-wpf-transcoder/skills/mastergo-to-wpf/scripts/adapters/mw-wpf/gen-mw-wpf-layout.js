@@ -670,6 +670,11 @@ function buildRegionGrid(entries, containers, pending, dslTree, size, origin, gr
   const owner = flexOwnerOf(flex.owner);
   // 区域根网格是页面内容区那一层：页面常驻右栏（贴主轴末端的最末条目）在这一层固定。
   if (owner) owner.root = true;
+  // 设计稿已经打了组（这一层由某个容器提上来的，owner 非空）时，这一层不参与分组——分组表也不参与。
+  // 表里还声明着组，说明写表的人看错了层级：停下报告，不静默忽略（否则声明的意图会无声丢掉）。
+  if (owner && groupsDoc && groupsDoc.groups.length) {
+    fail("分组表声明了 " + groupsDoc.groups.length + " 个组，但内容区根网格已由设计稿成层（这一层不参与分组）：改写成分组表为空数组（本页没有要声明的分组），或去掉设计稿里那一层容器");
+  }
   // 设计稿已经打了组（这一层由某个容器提上来的，owner 非空）就不再补组；只有散落条目才补。
   const synth = owner ? { items: flex.items, unresolved: [] } : synthRegionGroups(flex.items, groupsDoc);
   return {

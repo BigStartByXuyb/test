@@ -424,6 +424,18 @@ function sizes(bands) {
     });
   }, /pageTarget/, "分组表标的页面与本次页面不一致 → 失败（防套错页）");
 
+  // 区域根网格已由设计稿成层（这一层不参与分组）：表里还声明着组就停下报告，不静默忽略。
+  const layeredRoot = node("flexRoot", "FRAME", { width: 1280, height: 902, relativeX: 0, relativeY: 85 }, boxes, {
+    flexContainerInfo: { flexDirection: "column" }
+  });
+  assert.doesNotThrow(function () {
+    derive(snapshot([], [layeredRoot]), types, { groups: { groups: [] } }),
+      "成层的那一层：空表照常跑";
+  });
+  assert.throws(function () {
+    derive(snapshot([], [layeredRoot]), types, { groups: { groups: [{ id: "g", kind: "column", members: ["a", "b"] }] } });
+  }, /已由设计稿成层/, "成层的那一层还声明分组 → 失败（声明的意图不会无声丢掉）");
+
   // 文件形状：schema 版本、kind、成员数量都在读表时就失败。
   const tmp = path.join(os.tmpdir(), "layout-groups-" + process.pid + ".json");
   try {
