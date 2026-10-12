@@ -1011,11 +1011,13 @@ function loadInputs(args) {
   };
 }
 
-function writeGroupCandidates(filePath, pageTarget, entries) {
+function writeGroupCandidates(filePath, pageTarget, entries, source) {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   fs.writeFileSync(filePath, JSON.stringify({
     schemaVersion: LAYOUT_GROUP_CANDIDATES_SCHEMA,
     pageTarget: pageTarget,
+    // 本次运行的指纹：这份清单是从哪份 DSL 快照算出来的（快照换了，旧清单就不能再照着写表）。
+    source: source,
     entries: entries
   }, null, 2) + "\n", "utf8");
 }
@@ -1025,12 +1027,16 @@ function main() {
   const inputs = loadInputs(args);
   const tokens = Object.assign({ headerHeight: 85, bottomHeight: 180 }, inputs.tokens);
   const options = Object.assign({}, inputs, { tokens: tokens });
+  const candidateSource = {
+    dslPath: args.dslPath,
+    dslSha256: crypto.createHash("sha256").update(fs.readFileSync(args.dslPath)).digest("hex")
+  };
   let layout;
   try {
     // groupCandidates 不是产物字段（产物 schema 冻结）：它另落成 --group-candidates 那份清单。
     const { groupCandidates, ...product } = deriveLayout(options);
     layout = product;
-    if (args.groupCandidatesPath) writeGroupCandidates(args.groupCandidatesPath, layout.pageTarget, groupCandidates);
+    if (args.groupCandidatesPath) writeGroupCandidates(args.groupCandidatesPath, layout.pageTarget, groupCandidates, candidateSource);
   }
   catch (error) {
     // 推导失败（多半是分组表写错，例如引用了不在本层条目里的 ref）：按机械判据再推一遍，把清单落下来
@@ -1038,7 +1044,7 @@ function main() {
     if (args.groupCandidatesPath) {
       try {
         const { groupCandidates } = deriveLayout(Object.assign({}, options, { groups: null }));
-        writeGroupCandidates(args.groupCandidatesPath, inputs.pageTarget, groupCandidates);
+        writeGroupCandidates(args.groupCandidatesPath, inputs.pageTarget, groupCandidates, candidateSource);
       }
       catch {
         // 清单落不下来不该盖住真正的错：下面照原样抛出去。

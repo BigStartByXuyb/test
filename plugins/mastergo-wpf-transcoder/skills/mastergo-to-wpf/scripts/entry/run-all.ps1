@@ -370,7 +370,10 @@ function Register-StepArtifacts {
         'ledger'     { if (Test-Path -LiteralPath $LedgerJson) { $pairs += , @('iconMap', $LedgerJson) } }
         'layout'     {
             $pairs += , @('layoutManifest', $LayoutManifestJson)
-            if ($Mode -eq 'mw-wpf') { $pairs += , @('wpfLayout', $WpfLayoutJson) }
+            if ($Mode -eq 'mw-wpf') {
+                $pairs += , @('wpfLayout', $WpfLayoutJson)
+                $pairs += , @('layoutGroupCandidates', $GroupCandidateJson)
+            }
         }
         'bundle'     {
             if ($Mode -eq 'mw-wpf') { $pairs += , @('wpfXaml', $WpfViewXaml) }
@@ -774,32 +777,30 @@ foreach ($step in $Steps) {
                     # 表只写"哪些 ref 同属一组"，坐标尺寸仍以 DSL 为唯一真值（校验在推导入口 fail-closed）。
                     # 读图开关：有设计稿位图就必须先由图产出这张表（看图是模型那一步的产物）；
                     # 有图无表属于流程漏步——停下报告，不静默退化成纯机械推导。
-                    $GroupsArgs = @()
                     $groupsAuto = Join-Path $Inputs "$Target.layout-groups.json"
                     # 整条管道包在 @() 里：一张都没有时 Results 是 $null，而 Set-StrictMode 下 $null.Count 直接抛
                     # （与上面 $pages 同一写法）——没图是合法情形，不能变成 `layout` 必失败。
                     $designImages = @(@("$Target.design.png", "$Target.design.jpg", "$Target.design.jpeg") |
                         ForEach-Object { Join-Path $Inputs $_ } | Where-Object { Test-Path -LiteralPath $_ })
-                    if (Test-Path -LiteralPath $groupsAuto) { $GroupsArgs = @('--groups', $groupsAuto) }
-                    elseif ($designImages.Count) {
-                        # 有图无表：先按机械判据推一遍，把「表里能写哪些 ref」那份清单落下来（人/模型据此写表）。
-                        # 这一遍的布局产物只进 _work 下的临时件（本页产物路径不动，免得留下"没经声明"的布局）；
-                        # 条目清单按约定落 Generated/_inputs/<Target>.layout-group-candidates.json。
-                        Invoke-StepCommand -Label 'wpf layout candidates' -LogFile $log -File 'node' -Arguments @(
-                            (Get-AdapterScript 'wpfLayout'), '--types', $TypeAuditJson,
-                            '--dsl', $LayoutDslJson, '--visibility', $VisibilityJson,
-                            '--map', $TemplateMap, '--page-target', $Target,
-                            '--out', (Join-Path $Work "$Target.wpf-layout.candidates-probe.json"),
-                            '--report', (Join-Path $Work "$Target.wpf-layout.candidates-probe.report.json"),
-                            '--group-candidates', $GroupCandidateJson) | Out-Null
-                        throw "有设计稿位图但没有分组表：先看图产出 $groupsAuto（图: $($designImages -join ', ')；表里可引用的条目见 $GroupCandidateJson——那一份为空就说明这一层不参与分组，这时表里不声明任何组（groups 写成空数组）；口径见 mw-wpf-mode.md 第 2 节）"
-                    }
-                    Invoke-StepCommand -Label 'wpf layout' -LogFile $log -File 'node' -Arguments (@(
+                    # 推导调用的参数只有这一处：公共输入一份，看表/图各支只加自己那几项。
+                    $LayoutArgs = @(
                         (Get-AdapterScript 'wpfLayout'), '--types', $TypeAuditJson,
                         '--dsl', $LayoutDslJson, '--visibility', $VisibilityJson,
                         '--map', $TemplateMap, '--page-target', $Target,
-                        '--out', $WpfLayoutJson, '--report', $WpfLayoutReportJson,
-                        '--group-candidates', $GroupCandidateJson) + $GroupsArgs) | Out-Null
+                        '--group-candidates', $GroupCandidateJson)
+                    if ($designImages.Count -and -not (Test-Path -LiteralPath $groupsAuto)) {
+                        # 有图无表：先按机械判据推一遍，把「表里能写哪些 ref」那份清单落下来（人/模型据此写表）。
+                        # 这一遍的布局产物只进 _work 下的临时件（本页产物路径不动，免得留下"没经声明"的布局）；
+                        # 条目清单按约定落 Generated/_inputs/<Target>.layout-group-candidates.json。
+                        Invoke-StepCommand -Label 'wpf layout candidates' -LogFile $log -File 'node' -Arguments ($LayoutArgs + @(
+                            '--out', (Join-Path $Work "$Target.wpf-layout.candidates-probe.json"),
+                            '--report', (Join-Path $Work "$Target.wpf-layout.candidates-probe.report.json"))) | Out-Null
+                        throw "有设计稿位图但没有分组表：先看图产出 $groupsAuto（图: $($designImages -join ', ')；表里可引用的条目见 $GroupCandidateJson——那一份为空就说明这一层不参与分组，这时表里不声明任何组（groups 写成空数组）；口径见 mw-wpf-mode.md 第 2 节）"
+                    }
+                    # 本页正式推导：有表就带上（存在就消费），没表（也没图）就走纯机械判据。
+                    if (Test-Path -LiteralPath $groupsAuto) { $LayoutArgs += @('--groups', $groupsAuto) }
+                    Invoke-StepCommand -Label 'wpf layout' -LogFile $log -File 'node' -Arguments ($LayoutArgs + @(
+                        '--out', $WpfLayoutJson, '--report', $WpfLayoutReportJson)) | Out-Null
                     # 步骤 note 只读布局报告：报告是布局产物的摘要件，未归宿条目（= 既没进分组表、也没被机械
                     # 判据收成栏的散条目，报给人抽查）在那里已按分区拍平，本处不再自己遍历 regions。
                     # 框架固定区（顶部栏/底部栏）没有 unresolved 字段，直接遍历在 Set-StrictMode 下必抛。
