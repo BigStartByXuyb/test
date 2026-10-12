@@ -692,7 +692,7 @@ function buildRegionGrid(entries, containers, pending, dslTree, size, origin, gr
 // 声明了组就停下报告，不静默忽略——声明的意图不会无声丢掉。判据只有这一处。
 function requireNoDeclaredGroups(groupsDoc, reason) {
   if (!groupsDoc || !groupsDoc.groups.length) return;
-  fail("分组表声明了 " + groupsDoc.groups.length + " 个组，但" + reason + "：把分组表写成空数组");
+  fail("分组表声明了 " + groupsDoc.groups.length + " 个组，但" + reason + "：表里不声明任何组（groups 写成空数组，表本身仍是对象）");
 }
 
 // 分组表只写"哪些条目同属一组"，不写坐标与尺寸——事实一律来自 DSL 快照。
@@ -799,7 +799,7 @@ function declaredGroups(items, groupsDoc) {
 // 两处都没落到的条目保持扁平，并登记进 unresolved（下次看图要看的清单）。
 function synthRegionGroups(items, groupsDoc) {
   if (items.length < 2) {
-    requireNoDeclaredGroups(groupsDoc, "这一层只有 " + items.length + " 个条目（凑不出组）");
+    requireNoDeclaredGroups(groupsDoc, "这一层只有 " + items.length + " 个条目（不足 2 个，凑不出组）");
     return { items: items, unresolved: [] };
   }
   const declared = groupsDoc ? declaredGroups(items, groupsDoc) : [];
