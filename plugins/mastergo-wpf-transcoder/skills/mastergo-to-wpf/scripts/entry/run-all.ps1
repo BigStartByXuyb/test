@@ -152,8 +152,8 @@ $Steps = @(
         # layoutStatus 的合法终态有两个：complete 与 none。none 的触发条件是推导脚本的
         # 「menuItems + residentGroupItems === 0」（本页既没有菜单项、也没有右下角常驻分组）；
         # 此时 Layout.xml 仍以空 <Menu> 注册本页——Bundle 与 verify 都要求本页有 <Page> 注册。
-        Failures = @('layoutStatus 不属于 complete/none', 'layoutEvidence.unresolvedBottomBarItems≠0', '（作业A）有设计稿位图但没有分组表', '（作业A）分组表校验失败（pageTarget 与本次页面不一致 / 未知 ref / 一个 ref 进多个分组 / 组的地盘里夹着未归组条目）', '（作业A）分组表声明了组，但这一层不参与分组（内容区凑不出组，或区域根网格已由设计稿成层）')
-        Recovery = @('补齐底部栏变体命中后重跑：-Progress layout（校验失败表示清单不完整，不是拒绝生成页面）；本页确实没有菜单项与常驻分组时 none 是合法终态（此时 menuItems 与两个计数必须全为 0）', '（作业A）有图无表、或分组表里的 ref 不合格：跑一次 layout 会把可引用的条目清单落成 Generated/_inputs/<Target>.layout-group-candidates.json，照着它按 mw-wpf-mode.md 第 2 节看图产出／修正分组表后重跑：-Progress layout', '（作业A）这一层不参与分组（内容区凑不出组，或区域根网格已由设计稿成层）却还声明了组：清单在这种情况下是空的，把分组表写成空数组后重跑：-Progress layout')
+        Failures = @('layoutStatus 不属于 complete/none', 'layoutEvidence.unresolvedBottomBarItems≠0', '（作业A）有设计稿位图但没有分组表', '（作业A）分组表校验失败（pageTarget 与本次页面不一致 / 未知 ref / 一个 ref 进多个分组 / 组的地盘里夹着未归组条目）', '（作业A）分组表声明了组，但这一层不参与分组（这一层凑不出组 / 内容区没有条目 / 区域根网格已由设计稿成层）')
+        Recovery = @('补齐底部栏变体命中后重跑：-Progress layout（校验失败表示清单不完整，不是拒绝生成页面）；本页确实没有菜单项与常驻分组时 none 是合法终态（此时 menuItems 与两个计数必须全为 0）', '（作业A）有图无表、或分组表里的 ref 不合格：跑一次 layout 会把可引用的条目清单落成 Generated/_inputs/<Target>.layout-group-candidates.json，照着它按 mw-wpf-mode.md 第 2 节看图产出／修正分组表后重跑：-Progress layout', '（作业A）这一层不参与分组（这一层凑不出组 / 内容区没有条目 / 区域根网格已由设计稿成层）却还声明了组：清单在这种情况下是空的，把分组表写成空数组后重跑：-Progress layout')
     },
     [pscustomobject]@{
         Id = 9; Name = 'inputs'; Title = '校验译文并生成 Bundle 清单'
