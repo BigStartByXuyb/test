@@ -148,7 +148,7 @@ $Steps = @(
         Id = 8; Name = 'layout'; Title = 'Layout 清单机械推导（底部栏 MenuItem）'
         Inputs   = @('dsl.snapshot.json + 图标台账 + 正式映射表', '（作业A）分组表 Generated/_inputs/<Target>.layout-groups.json——可选，但有设计稿位图时必须先产出它')
         Outputs  = @('Layout 清单与推导报告 Generated/_inputs/<Target>.layout-manifest.json(.report.json)',
-                     '（作业A）分组表可引用的条目清单 Generated/_inputs/<Target>.layout-group-candidates.json——写表前先看它，表里写别的 ref 会被推导入口拒')
+                     '（作业A）分组表可引用的条目清单 Generated/_inputs/<Target>.layout-group-candidates.json——辅助件（写表用、不进运行登记表）：写表前先看它，表里写别的 ref 会被推导入口拒')
         # layoutStatus 的合法终态有两个：complete 与 none。none 的触发条件是推导脚本的
         # 「menuItems + residentGroupItems === 0」（本页既没有菜单项、也没有右下角常驻分组）；
         # 此时 Layout.xml 仍以空 <Menu> 注册本页——Bundle 与 verify 都要求本页有 <Page> 注册。
@@ -370,10 +370,7 @@ function Register-StepArtifacts {
         'ledger'     { if (Test-Path -LiteralPath $LedgerJson) { $pairs += , @('iconMap', $LedgerJson) } }
         'layout'     {
             $pairs += , @('layoutManifest', $LayoutManifestJson)
-            if ($Mode -eq 'mw-wpf') {
-                $pairs += , @('wpfLayout', $WpfLayoutJson)
-                $pairs += , @('layoutGroupCandidates', $GroupCandidateJson)
-            }
+            if ($Mode -eq 'mw-wpf') { $pairs += , @('wpfLayout', $WpfLayoutJson) }
         }
         'bundle'     {
             if ($Mode -eq 'mw-wpf') { $pairs += , @('wpfXaml', $WpfViewXaml) }
