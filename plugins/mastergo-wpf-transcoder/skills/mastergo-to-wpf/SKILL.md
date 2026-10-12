@@ -36,6 +36,7 @@ description: 将明确要求的 MasterGo 设计稿转换为 MTSLG IOContorl XML�
    结论必须落成**分组表**（`Generated/_inputs/<Target>.layout-groups.json`）再进 `layout`；**约定路径上有设计稿位图（`Generated/_inputs/<Target>.design.png`，`.jpg` / `.jpeg` 同口径，按设计稿原始尺寸导出）就必须先产出分组表**，
    否则 `layout` 停下。读图只补关系、不增删控件；读图结论**不得覆盖或否决** DSL 机械真值
    （外观、图标含义与朝向、坐标、尺寸一律以 DSL 为准）。
+   表里能写哪些 ref 由推导入口给出的条目清单（`Generated/_inputs/<Target>.layout-group-candidates.json`）说了算：清单外的 ref 会被拒。
    完整口径与分组表 schema 只在 `references/adapters/mw-wpf/mw-wpf-mode.md` 第 2 节。
 3. **不降级、不伪造**：没有正式映射的组件只进来源清单与待确认，不得改成 `Button`、`Border`、无类型容器或近似控件；存在未映射组件时不得宣称「完整可运行页面」。
    **纯布局包裹层不属于未映射组件**：未命中模板族、也未登记 `pending` 的 `FRAME`/`GROUP`/`LAYER` 按 `mtslg-mode.md` 第 9 节展平到最近有效父容器（容器本身不发射控件），内部控件与文本照常映射。进入待确认并隔离内部文本的有三类：未命中模板的**组件实例**（`INSTANCE`/`COMPONENT`）、命中模板族但结构部分命中（如表格表头可见文本不足）的节点，以及被 `manifest.excludeInstances` 清单隔离的组件。

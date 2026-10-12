@@ -146,6 +146,7 @@ pwsh -NoProfile -File <skill>\scripts\entry\run-all.ps1 -ProjectRoot <项目> -T
   - （作业A）分组表 Generated/_inputs/<Target>.layout-groups.json——可选，但有设计稿位图时必须先产出它
 - **产物**：
   - Layout 清单与推导报告 Generated/_inputs/<Target>.layout-manifest.json(.report.json)
+  - （作业A）分组表可引用的条目清单 Generated/_inputs/<Target>.layout-group-candidates.json——写表前先看它，表里写别的 ref 会被推导入口拒
 - **失败语义**：
   - layoutStatus 不属于 complete/none
   - layoutEvidence.unresolvedBottomBarItems≠0

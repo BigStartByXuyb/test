@@ -147,7 +147,8 @@ $Steps = @(
     [pscustomobject]@{
         Id = 8; Name = 'layout'; Title = 'Layout 清单机械推导（底部栏 MenuItem）'
         Inputs   = @('dsl.snapshot.json + 图标台账 + 正式映射表', '（作业A）分组表 Generated/_inputs/<Target>.layout-groups.json——可选，但有设计稿位图时必须先产出它')
-        Outputs  = @('Layout 清单与推导报告 Generated/_inputs/<Target>.layout-manifest.json(.report.json)')
+        Outputs  = @('Layout 清单与推导报告 Generated/_inputs/<Target>.layout-manifest.json(.report.json)',
+                     '（作业A）分组表可引用的条目清单 Generated/_inputs/<Target>.layout-group-candidates.json——写表前先看它，表里写别的 ref 会被推导入口拒')
         # layoutStatus 的合法终态有两个：complete 与 none。none 的触发条件是推导脚本的
         # 「menuItems + residentGroupItems === 0」（本页既没有菜单项、也没有右下角常驻分组）；
         # 此时 Layout.xml 仍以空 <Menu> 注册本页——Bundle 与 verify 都要求本页有 <Page> 注册。
@@ -490,6 +491,8 @@ $MappingAuditJson = Join-Path $Generated "$Target.mapping.json"
 $TypeAuditJson = Join-Path $Generated "$Target.component-types.json"
 $WpfLayoutJson = Join-Path $Generated "$Target.wpf-layout.json"
 $WpfLayoutReportJson = Join-Path $Inputs "$Target.wpf-layout.report.json"
+# （作业A）分组表可引用的条目清单：推导入口落盘，人/模型据此写分组表（表里写了别的 ref 会被拒）。
+$GroupCandidateJson = Join-Path $Inputs "$Target.layout-group-candidates.json"
 $WpfXamlReportJson = Join-Path $Inputs "$Target.wpf-xaml.report.json"
 # 尺寸约束：合并后的 DSL 快照是 `layout` 与 `gates` 的共同输入（无约束时就是原始快照）。
 $ConstrainedDslJson = Join-Path $Generated "$Target.dsl.constrained.json"
@@ -779,13 +782,23 @@ foreach ($step in $Steps) {
                         ForEach-Object { Join-Path $Inputs $_ } | Where-Object { Test-Path -LiteralPath $_ })
                     if (Test-Path -LiteralPath $groupsAuto) { $GroupsArgs = @('--groups', $groupsAuto) }
                     elseif ($designImages.Count) {
-                        throw "有设计稿位图但没有分组表：先看图产出 $groupsAuto（图: $($designImages -join ', ')；口径见 mw-wpf-mode.md 第 2 节）"
+                        # 有图无表：先按机械判据推一遍，把「表里能写哪些 ref」那份清单落下来（人/模型据此写表）。
+                        # 这一遍的产物只进 _work 下的临时件：本页产物路径不动，免得留下"没经声明"的布局。
+                        Invoke-StepCommand -Label 'wpf layout candidates' -LogFile $log -File 'node' -Arguments @(
+                            (Get-AdapterScript 'wpfLayout'), '--types', $TypeAuditJson,
+                            '--dsl', $LayoutDslJson, '--visibility', $VisibilityJson,
+                            '--map', $TemplateMap, '--page-target', $Target,
+                            '--out', (Join-Path $Work "$Target.wpf-layout.candidates-probe.json"),
+                            '--report', (Join-Path $Work "$Target.wpf-layout.candidates-probe.report.json"),
+                            '--group-candidates', $GroupCandidateJson) | Out-Null
+                        throw "有设计稿位图但没有分组表：先看图产出 $groupsAuto（图: $($designImages -join ', ')；表里可引用的条目见 $GroupCandidateJson；口径见 mw-wpf-mode.md 第 2 节）"
                     }
                     Invoke-StepCommand -Label 'wpf layout' -LogFile $log -File 'node' -Arguments (@(
                         (Get-AdapterScript 'wpfLayout'), '--types', $TypeAuditJson,
                         '--dsl', $LayoutDslJson, '--visibility', $VisibilityJson,
                         '--map', $TemplateMap, '--page-target', $Target,
-                        '--out', $WpfLayoutJson, '--report', $WpfLayoutReportJson) + $GroupsArgs) | Out-Null
+                        '--out', $WpfLayoutJson, '--report', $WpfLayoutReportJson,
+                        '--group-candidates', $GroupCandidateJson) + $GroupsArgs) | Out-Null
                     # 步骤 note 只读布局报告：报告是布局产物的摘要件，未归宿条目（= 既没进分组表、也没被机械
                     # 判据收成栏的散条目，报给人抽查）在那里已按分区拍平，本处不再自己遍历 regions。
                     # 框架固定区（顶部栏/底部栏）没有 unresolved 字段，直接遍历在 Set-StrictMode 下必抛。

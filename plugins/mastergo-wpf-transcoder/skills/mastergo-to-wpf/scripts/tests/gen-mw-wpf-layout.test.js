@@ -369,10 +369,17 @@ function sizes(bands) {
   const types = typesOf([typeOf("a", 100, 115), typeOf("b", 100, 215), typeOf("c", 400, 115), typeOf("d", 400, 215)]);
 
   // 没有分组表：机械判据只看位置 → 两条列带各补一个栏容器。
-  const mechanical = workArea(derive(snapshot([], boxes), types));
+  const mechanicalLayout = derive(snapshot([], boxes), types);
+  const mechanical = workArea(mechanicalLayout);
   assert.strictEqual(mechanical.grid.cells.filter(function (cell) { return cell.synth; }).length, 2,
     "没有分组表：机械判据按两条列带各补一个栏容器");
   assert.strictEqual(mechanical.unresolved.length, 0, "两条列带都收走了，没有未归宿条目");
+  // 写表前看的条目清单：就是校验分组表的同一份 items（补组之前），补出来的栏容器不在里面。
+  assert.deepStrictEqual(mechanicalLayout.groupCandidates.map(function (item) { return item.ref; }).sort(),
+    ["a", "b", "c", "d"], "条目清单＝内容区根网格那一层的条目（ref 照 DSL 给）");
+  assert.ok(mechanicalLayout.groupCandidates.every(function (item) {
+    return typeof item.controlType === "string" && typeof item.text === "string";
+  }), "清单每条带 controlType 与文案：写表的人/模型据此认得出这条 ref 是界面上的哪个东西");
 
   // 有分组表：四条并成一个声明的栏容器，顶层只剩这一个格子。
   const declared = workArea(derive(snapshot([], boxes), types, {

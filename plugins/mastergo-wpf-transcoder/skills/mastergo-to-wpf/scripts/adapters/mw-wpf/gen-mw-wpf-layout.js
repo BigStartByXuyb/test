@@ -14,6 +14,9 @@
 //   [--report]     推导报告（分区摘要 / 未归格节点 / 未归宿条目 / 分组表来源与指纹）
 //   [--groups]     分组表（意图输入，可选）：Generated/_inputs/<页面名>.layout-groups.json。
 //                  只写"哪些 ref 同属一组"，不写坐标尺寸；覆盖到的条目按表分组，没覆盖到的走机械判据
+//   [--group-candidates] 分组表可引用的条目清单（Generated/_inputs/<页面名>.layout-group-candidates.json）：
+//                  内容区根网格那一层的条目（declaredGroups 校验分组表的同一份 items）。
+//                  它只回答"表里能写哪些 ref"，不是输入——分组的结论仍由人/模型写进分组表。
 //
 // 输出（冻结；发射器与门禁按它读）
 //   { schemaVersion, adapter:"mw-wpf", pageTarget, design:{width,height},
@@ -84,6 +87,7 @@ function parseArgs(argv) {
     else if (token === "--page-target") args.pageTarget = argv[++i];
     else if (token === "--out") args.outPath = argv[++i];
     else if (token === "--report") args.reportPath = argv[++i];
+    else if (token === "--group-candidates") args.groupCandidatesPath = argv[++i];
     else fail("未知参数: " + token);
   }
   ["typesPath", "dslPath", "pageTarget", "outPath"].forEach(function (key) {
@@ -670,7 +674,10 @@ function buildRegionGrid(entries, containers, pending, dslTree, size, origin, gr
   const synth = owner ? { items: flex.items, unresolved: [] } : synthRegionGroups(flex.items, groupsDoc);
   return {
     grid: buildGridFrom(synth.items, { childrenOf: tree.childrenOf, dslTree: dslTree }, size, owner, origin),
-    unresolved: synth.unresolved
+    unresolved: synth.unresolved,
+    // 分组表只在这一层被消费（declaredGroups 校验的就是这一层的 items）：可引用的 ref 清单按它给。
+    // 清单在补组之前取（顺序要紧）：补出来的栏容器不是 DSL 节点，那个 ref 写进表也不认。
+    groupCandidates: flex.items.map(function (item) { return { ref: item.ref, controlType: item.controlType }; })
   };
 }
 
@@ -688,6 +695,8 @@ function buildRegionGrid(entries, containers, pending, dslTree, size, origin, gr
 // 就是按口径 A 成行的。分组表要行就显式写 kind="row"——那是人的判断，不由几何猜。
 
 const LAYOUT_GROUPS_SCHEMA = "mw-wpf-layout-groups/1";
+// 分组表「可引用的条目」那份清单的形状（--group-candidates 的落盘件，与分组表不是一回事）。
+const LAYOUT_GROUP_CANDIDATES_SCHEMA = "mw-wpf-layout-group-candidates/1";
 
 // 分组表形状（只写关系，不写事实）：
 //   { "schemaVersion": "mw-wpf-layout-groups/1", "pageTarget": "<页面名>",
@@ -884,10 +893,17 @@ function deriveLayout(options) {
     frameworkRegion("top-strip", "顶部栏", "framework-top", "MaxwellFramework_HeaderHeight", tokens.headerHeight, design, "y"),
     frameworkRegion("bottom-bar", "底部栏", "framework-bottom", "MaxwellFramework_BottomHeight", tokens.bottomHeight, design, "y")
   ];
+  let groupCandidates = [];
   if (content.length) {
     const work = buildRegionGrid(content, containers, pending, tree, {
       w: design.width, h: design.height - tokens.bottomHeight - tokens.headerHeight
     }, { x: 0, y: tokens.headerHeight }, options.groups || null);
+    // 清单里带上文案：写分组表的人/模型据此认得出这条 ref 是界面上的哪个东西（事实仍以 DSL 为准）。
+    groupCandidates = work.groupCandidates.map(function (entry) {
+      const node = options.types.byRef.get(entry.ref) || {};
+      // 容器类条目没有控件类型：字段留着给空串，形状不随条目变化（读的人少判一种情况）。
+      return { ref: entry.ref, controlType: String(entry.controlType || ""), text: String(node.sourceText || "") };
+    });
     regions.push({
       id: "work-area", name: "工作区", ref: null, role: "work-area", emit: true,
       x: 0, y: tokens.headerHeight, w: design.width,
@@ -938,7 +954,9 @@ function deriveLayout(options) {
     regions: regions,
     pending: pending,
     constraintExempt: constraintExempt,
-    layoutGroups: options.groupsSource || null
+    layoutGroups: options.groupsSource || null,
+    // 不是产物字段（main 落盘产物时剔掉，另落成 --group-candidates 那份清单）：分组表可引用的条目。
+    groupCandidates: groupCandidates
   };
 }
 
@@ -976,9 +994,18 @@ function main() {
   const args = parseArgs(process.argv.slice(2));
   const inputs = loadInputs(args);
   const tokens = Object.assign({ headerHeight: 85, bottomHeight: 180 }, inputs.tokens);
-  const layout = deriveLayout(Object.assign({}, inputs, { tokens: tokens }));
+  // groupCandidates 不是产物字段：产物 schema 冻结，它另落成 --group-candidates 那份清单。
+  const { groupCandidates, ...layout } = deriveLayout(Object.assign({}, inputs, { tokens: tokens }));
   fs.mkdirSync(path.dirname(args.outPath), { recursive: true });
   fs.writeFileSync(args.outPath, JSON.stringify(layout, null, 2) + "\n", "utf8");
+  if (args.groupCandidatesPath) {
+    fs.mkdirSync(path.dirname(args.groupCandidatesPath), { recursive: true });
+    fs.writeFileSync(args.groupCandidatesPath, JSON.stringify({
+      schemaVersion: LAYOUT_GROUP_CANDIDATES_SCHEMA,
+      pageTarget: layout.pageTarget,
+      entries: groupCandidates
+    }, null, 2) + "\n", "utf8");
+  }
   if (args.reportPath) {
     const summary = {
       pageTarget: layout.pageTarget,
