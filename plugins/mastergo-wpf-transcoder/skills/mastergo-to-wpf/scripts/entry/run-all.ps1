@@ -783,7 +783,8 @@ foreach ($step in $Steps) {
                     if (Test-Path -LiteralPath $groupsAuto) { $GroupsArgs = @('--groups', $groupsAuto) }
                     elseif ($designImages.Count) {
                         # 有图无表：先按机械判据推一遍，把「表里能写哪些 ref」那份清单落下来（人/模型据此写表）。
-                        # 这一遍的产物只进 _work 下的临时件：本页产物路径不动，免得留下"没经声明"的布局。
+                        # 这一遍的布局产物只进 _work 下的临时件（本页产物路径不动，免得留下"没经声明"的布局）；
+                        # 条目清单按约定落 Generated/_inputs/<Target>.layout-group-candidates.json。
                         Invoke-StepCommand -Label 'wpf layout candidates' -LogFile $log -File 'node' -Arguments @(
                             (Get-AdapterScript 'wpfLayout'), '--types', $TypeAuditJson,
                             '--dsl', $LayoutDslJson, '--visibility', $VisibilityJson,
