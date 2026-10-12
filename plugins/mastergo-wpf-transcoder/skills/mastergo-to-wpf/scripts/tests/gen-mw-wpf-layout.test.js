@@ -428,10 +428,9 @@ function sizes(bands) {
   const layeredRoot = node("flexRoot", "FRAME", { width: 1280, height: 902, relativeX: 0, relativeY: 85 }, boxes, {
     flexContainerInfo: { flexDirection: "column" }
   });
-  assert.doesNotThrow(function () {
-    derive(snapshot([], [layeredRoot]), types, { groups: { groups: [] } }),
-      "成层的那一层：空表照常跑";
-  });
+  const layeredEmpty = derive(snapshot([], [layeredRoot]), types, { groups: { groups: [] } });
+  assert.deepStrictEqual(layeredEmpty.groupCandidates, [],
+    "成层的那一层不参与分组：条目清单按空给（这一层唯一合法的表就是空数组）");
   assert.throws(function () {
     derive(snapshot([], [layeredRoot]), types, { groups: { groups: [{ id: "g", kind: "column", members: ["a", "b"] }] } });
   }, /已由设计稿成层/, "成层的那一层还声明分组 → 失败（声明的意图不会无声丢掉）");

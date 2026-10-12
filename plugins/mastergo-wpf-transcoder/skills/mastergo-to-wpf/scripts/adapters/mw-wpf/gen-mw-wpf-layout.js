@@ -682,7 +682,8 @@ function buildRegionGrid(entries, containers, pending, dslTree, size, origin, gr
     unresolved: synth.unresolved,
     // 分组表只在这一层被消费（declaredGroups 校验的就是这一层的 items）：可引用的 ref 清单按它给。
     // 清单在补组之前取（顺序要紧）：补出来的栏容器不是 DSL 节点，那个 ref 写进表也不认。
-    groupCandidates: flex.items.map(function (item) { return { ref: item.ref, controlType: item.controlType }; })
+    // 成层的那一层不参与分组 —— 清单按空给：这一层唯一合法的表就是空数组，清单不能给出相反的答案。
+    groupCandidates: owner ? [] : flex.items.map(function (item) { return { ref: item.ref, controlType: item.controlType }; })
   };
 }
 
@@ -995,22 +996,43 @@ function loadInputs(args) {
   };
 }
 
+function writeGroupCandidates(filePath, pageTarget, entries) {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, JSON.stringify({
+    schemaVersion: LAYOUT_GROUP_CANDIDATES_SCHEMA,
+    pageTarget: pageTarget,
+    entries: entries
+  }, null, 2) + "\n", "utf8");
+}
+
 function main() {
   const args = parseArgs(process.argv.slice(2));
   const inputs = loadInputs(args);
   const tokens = Object.assign({ headerHeight: 85, bottomHeight: 180 }, inputs.tokens);
-  // groupCandidates 不是产物字段：产物 schema 冻结，它另落成 --group-candidates 那份清单。
-  const { groupCandidates, ...layout } = deriveLayout(Object.assign({}, inputs, { tokens: tokens }));
+  const options = Object.assign({}, inputs, { tokens: tokens });
+  let layout;
+  try {
+    // groupCandidates 不是产物字段（产物 schema 冻结）：它另落成 --group-candidates 那份清单。
+    const { groupCandidates, ...product } = deriveLayout(options);
+    layout = product;
+    if (args.groupCandidatesPath) writeGroupCandidates(args.groupCandidatesPath, layout.pageTarget, groupCandidates);
+  }
+  catch (error) {
+    // 推导失败（多半是分组表写错，例如引用了不在本层条目里的 ref）：按机械判据再推一遍，把清单落下来
+    // —— 出错的人拿到的正是「表里能写哪些 ref」，没有清单就没法照着改那张表。
+    if (args.groupCandidatesPath) {
+      try {
+        const { groupCandidates } = deriveLayout(Object.assign({}, options, { groups: null }));
+        writeGroupCandidates(args.groupCandidatesPath, inputs.pageTarget, groupCandidates);
+      }
+      catch {
+        // 清单落不下来不该盖住真正的错：下面照原样抛出去。
+      }
+    }
+    throw error;
+  }
   fs.mkdirSync(path.dirname(args.outPath), { recursive: true });
   fs.writeFileSync(args.outPath, JSON.stringify(layout, null, 2) + "\n", "utf8");
-  if (args.groupCandidatesPath) {
-    fs.mkdirSync(path.dirname(args.groupCandidatesPath), { recursive: true });
-    fs.writeFileSync(args.groupCandidatesPath, JSON.stringify({
-      schemaVersion: LAYOUT_GROUP_CANDIDATES_SCHEMA,
-      pageTarget: layout.pageTarget,
-      entries: groupCandidates
-    }, null, 2) + "\n", "utf8");
-  }
   if (args.reportPath) {
     const summary = {
       pageTarget: layout.pageTarget,

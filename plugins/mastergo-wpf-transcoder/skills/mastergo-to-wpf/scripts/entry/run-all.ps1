@@ -370,7 +370,10 @@ function Register-StepArtifacts {
         'ledger'     { if (Test-Path -LiteralPath $LedgerJson) { $pairs += , @('iconMap', $LedgerJson) } }
         'layout'     {
             $pairs += , @('layoutManifest', $LayoutManifestJson)
-            if ($Mode -eq 'mw-wpf') { $pairs += , @('wpfLayout', $WpfLayoutJson) }
+            if ($Mode -eq 'mw-wpf') {
+                $pairs += , @('wpfLayout', $WpfLayoutJson)
+                $pairs += , @('layoutGroupCandidates', $GroupCandidateJson)
+            }
         }
         'bundle'     {
             if ($Mode -eq 'mw-wpf') { $pairs += , @('wpfXaml', $WpfViewXaml) }
