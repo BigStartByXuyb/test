@@ -440,6 +440,13 @@ function sizes(bands) {
     derive(snapshot([], [mk("only", 100, 115)]), typesOf([typeOf("only", 100, 115)]),
       { groups: { groups: [{ id: "g", kind: "column", members: ["only", "a"] }] } });
   }, /凑不出组/, "内容区不足 2 个条目却声明了组 → 失败");
+  // 判据用的是「这一层的 items」（展平之后），不是内容区条目总数：单个包裹容器里装两条照样能声明。
+  const wrapped = node("wrap", "GROUP", { width: 200, height: 200, relativeX: 100, relativeY: 115 }, [mk("w1", 0, 0), mk("w2", 0, 40)]);
+  const wrappedLayout = derive(snapshot([], [wrapped]), typesOf([typeOf("w1", 100, 200), typeOf("w2", 100, 240)]), {
+    groups: { groups: [{ id: "g", kind: "column", members: ["w1", "w2"] }] }
+  });
+  assert.deepStrictEqual(wrappedLayout.groupCandidates.map(function (item) { return item.ref; }).sort(), ["w1", "w2"],
+    "内容区只有一个包裹容器、里面两条：展平后这两条就是本层条目，清单与声明都按它算");
   assert.throws(function () {
     derive(snapshot([], [layeredRoot]), types, { groups: { groups: [{ id: "g", kind: "column", members: ["a", "b"] }] } });
   }, /已由设计稿成层/, "成层的那一层还声明分组 → 失败（声明的意图不会无声丢掉）");

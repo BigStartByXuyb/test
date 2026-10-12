@@ -671,10 +671,7 @@ function buildRegionGrid(entries, containers, pending, dslTree, size, origin, gr
   // 区域根网格是页面内容区那一层：页面常驻右栏（贴主轴末端的最末条目）在这一层固定。
   if (owner) owner.root = true;
   // 设计稿已经打了组（这一层由某个容器提上来的，owner 非空）时，这一层不参与分组——分组表也不参与。
-  // 表里还声明着组，说明写表的人看错了层级：停下报告，不静默忽略（否则声明的意图会无声丢掉）。
-  if (owner && groupsDoc && groupsDoc.groups.length) {
-    fail("分组表声明了 " + groupsDoc.groups.length + " 个组，但内容区根网格已由设计稿成层（这一层不参与分组）：改写成分组表为空数组（本页没有要声明的分组），或去掉设计稿里那一层容器");
-  }
+  if (owner) requireNoDeclaredGroups(groupsDoc, "内容区根网格已由设计稿成层（这一层不参与分组）");
   // 设计稿已经打了组（这一层由某个容器提上来的，owner 非空）就不再补组；只有散落条目才补。
   const synth = owner ? { items: flex.items, unresolved: [] } : synthRegionGroups(flex.items, groupsDoc);
   return {
@@ -684,13 +681,20 @@ function buildRegionGrid(entries, containers, pending, dslTree, size, origin, gr
     // 清单在补组之前取（顺序要紧）：补出来的栏容器不是 DSL 节点，那个 ref 写进表也不认。
     // 不参与分组的那一层清单按空给 —— 这一层唯一合法的表就是空数组，清单不能给出相反的答案。
     // 不参与分组有两种：这一层已由设计稿成层（owner 非空），或这一层凑不出组（条目不足 2 个）。
-    groupCandidates: owner || entries.length < 2
+    groupCandidates: owner || flex.items.length < 2
       ? []
       : flex.items.map(function (item) { return { ref: item.ref, controlType: item.controlType }; })
   };
 }
 
 // 区域根网格的成栏：**分组表**（模型/人给的意图输入）优先，没覆盖到的散条目再走机械判据。
+// 不参与分组的层级（凑不出组 / 已由设计稿成层 / 内容区没有条目）唯一合法的表就是空数组：
+// 声明了组就停下报告，不静默忽略——声明的意图不会无声丢掉。判据只有这一处。
+function requireNoDeclaredGroups(groupsDoc, reason) {
+  if (!groupsDoc || !groupsDoc.groups.length) return;
+  fail("分组表声明了 " + groupsDoc.groups.length + " 个组，但" + reason + "：把分组表写成空数组");
+}
+
 // 分组表只写"哪些条目同属一组"，不写坐标与尺寸——事实一律来自 DSL 快照。
 // 机械判据只有一条——位置：同一条列带（x 区间重叠，条目在竖直方向排）里 ≥2 个条目 → 一个栏容器
 // （axis="y"，栏内再按口径 A 成行）。容器条目与叶子同等参与。
@@ -794,7 +798,10 @@ function declaredGroups(items, groupsDoc) {
 // 区域根网格的成栏：分组表优先，没覆盖到的散条目再按机械判据补；
 // 两处都没落到的条目保持扁平，并登记进 unresolved（下次看图要看的清单）。
 function synthRegionGroups(items, groupsDoc) {
-  if (items.length < 2) return { items: items, unresolved: [] };
+  if (items.length < 2) {
+    requireNoDeclaredGroups(groupsDoc, "这一层只有 " + items.length + " 个条目（凑不出组）");
+    return { items: items, unresolved: [] };
+  }
   const declared = groupsDoc ? declaredGroups(items, groupsDoc) : [];
   const taken = new Set();
   declared.forEach(function (group) {
@@ -897,12 +904,8 @@ function deriveLayout(options) {
     return "content";
   };
   const content = entries.filter(function (n) { return bandOfBox(n.y, n.h) === "content"; });
-  // 这一页凑不出组（内容区不足 2 个条目）时这一层不参与分组：表里还声明着组就停下报告，不静默忽略。
-  // 判据与「成层的那一层」同一条：不参与分组的层级，唯一合法的表就是空数组。
-  if (content.length < 2 && options.groups && options.groups.groups.length) {
-    fail("分组表声明了 " + options.groups.groups.length + " 个组，但这一页的内容区只有 " + content.length +
-      " 个条目（凑不出组）：把分组表写成空数组");
-  }
+  // 内容区一个条目都没有时压根没有成组的那一层：表里还声明着组就停下报告（判据同上）。
+  if (!content.length) requireNoDeclaredGroups(options.groups, "这一页的内容区里没有条目");
 
   const regions = [
     frameworkRegion("top-strip", "顶部栏", "framework-top", "MaxwellFramework_HeaderHeight", tokens.headerHeight, design, "y"),
