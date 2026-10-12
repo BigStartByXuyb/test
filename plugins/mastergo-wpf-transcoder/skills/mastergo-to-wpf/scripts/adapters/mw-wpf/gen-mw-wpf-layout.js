@@ -894,6 +894,12 @@ function deriveLayout(options) {
     return "content";
   };
   const content = entries.filter(function (n) { return bandOfBox(n.y, n.h) === "content"; });
+  // 这一页凑不出组（内容区不足 2 个条目）时这一层不参与分组：表里还声明着组就停下报告，不静默忽略。
+  // 判据与「成层的那一层」同一条：不参与分组的层级，唯一合法的表就是空数组。
+  if (content.length < 2 && options.groups && options.groups.groups.length) {
+    fail("分组表声明了 " + options.groups.groups.length + " 个组，但这一页的内容区只有 " + content.length +
+      " 个条目（凑不出组）：把分组表写成空数组");
+  }
 
   const regions = [
     frameworkRegion("top-strip", "顶部栏", "framework-top", "MaxwellFramework_HeaderHeight", tokens.headerHeight, design, "y"),

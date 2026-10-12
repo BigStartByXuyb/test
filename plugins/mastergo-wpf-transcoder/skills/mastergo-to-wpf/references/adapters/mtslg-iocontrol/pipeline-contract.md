@@ -152,11 +152,11 @@ pwsh -NoProfile -File <skill>\scripts\entry\run-all.ps1 -ProjectRoot <项目> -T
   - layoutEvidence.unresolvedBottomBarItems≠0
   - （作业A）有设计稿位图但没有分组表
   - （作业A）分组表校验失败（pageTarget 与本次页面不一致 / 未知 ref / 一个 ref 进多个分组 / 组的地盘里夹着未归组条目）
-  - （作业A）内容区根网格已由设计稿成层，但分组表还声明了组
+  - （作业A）分组表声明了组，但这一层不参与分组（内容区凑不出组，或区域根网格已由设计稿成层）
 - **怎么修**：
   - 补齐底部栏变体命中后重跑：-Progress layout（校验失败表示清单不完整，不是拒绝生成页面）；本页确实没有菜单项与常驻分组时 none 是合法终态（此时 menuItems 与两个计数必须全为 0）
   - （作业A）有图无表、或分组表里的 ref 不合格：跑一次 layout 会把可引用的条目清单落成 Generated/_inputs/<Target>.layout-group-candidates.json，照着它按 mw-wpf-mode.md 第 2 节看图产出／修正分组表后重跑：-Progress layout
-  - （作业A）内容区根网格已由设计稿成层却还声明了组：这一层不参与分组、清单为空，把分组表写成空数组后重跑：-Progress layout
+  - （作业A）这一层不参与分组（内容区凑不出组，或区域根网格已由设计稿成层）却还声明了组：清单在这种情况下是空的，把分组表写成空数组后重跑：-Progress layout
 
 ### 9. `inputs` —— 校验译文并生成 Bundle 清单
 
