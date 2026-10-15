@@ -1,0 +1,16 @@
+{
+  "name": "inteplm-deliverable-docs",
+  "description": "在 IntePLM 新建交付物文档并上传文件：生成编号、命名、选位置、删模板、传文件。",
+  "version": "1.0.0",
+  "author": {
+    "name": "黄一真"
+  },
+  "keywords": [
+    "inteplm",
+    "plm",
+    "deliverable",
+    "upload",
+    "document"
+  ],
+  "license": "UNLICENSED"
+}
