@@ -1,0 +1,16 @@
+{
+  "name": "mastergo-wpf-transcoder",
+  "description": "MasterGo design to MW WPF and MTSLG IOContorl conversion rules, component mappings, strict mapping-document format, provenance checks, and coordinate validation.",
+  "version": "2.4.0",
+  "author": {
+    "name": "xuyb"
+  },
+  "keywords": [
+    "mastergo",
+    "wpf",
+    "mtslg",
+    "iocontrol",
+    "design-to-code"
+  ],
+  "license": "UNLICENSED"
+}

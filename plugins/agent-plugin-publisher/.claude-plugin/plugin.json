@@ -1,0 +1,16 @@
+{
+  "name": "agent-plugin-publisher",
+  "description": "将用户明确指定的本地目录按团队统一格式打包为插件。",
+  "version": "1.0.1",
+  "author": {
+    "name": "xuyb"
+  },
+  "keywords": [
+    "plugin",
+    "packaging",
+    "agent",
+    "skill",
+    "mcp"
+  ],
+  "license": "UNLICENSED"
+}

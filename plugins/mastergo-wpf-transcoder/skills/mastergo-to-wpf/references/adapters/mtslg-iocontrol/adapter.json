@@ -1,0 +1,26 @@
+{
+  "_meta": {
+    "mode": "mtslg-iocontrol",
+    "note": [
+      "作业B（MTSLG IOContorl）路线描述符：run-all.ps1 -Mode mtslg-iocontrol（缺省）按本文件派发。",
+      "templateMap 是本路线的写入规则表（IOContorl 属性怎么写），它以 extends 指向共享类型表 references/component-types.json。",
+      "Layout 清单推导与 Layout.xml 发射是两条路线共用的实现（Layout.xml 是项目级注册），因此两个描述符登记同一对脚本。"
+    ]
+  },
+  "mode": "mtslg-iocontrol",
+  "title": "作业B（MTSLG IOContorl 页面 XML）",
+  "templateMap": "references/adapters/mtslg-iocontrol/mtslg-iocontrol-map.json",
+  "typeMap": "references/component-types.json",
+  "scripts": {
+    "mapping": "adapters/mtslg-iocontrol/gen-mtslg-mapping-from-dsl.js",
+    "layoutManifest": "adapters/mtslg-iocontrol/gen-mtslg-layout-manifest.js",
+    "layout": "adapters/mtslg-iocontrol/gen-mtslg-layout.js",
+    "bundle": "entry/gen-mastergo-page-bundle.js",
+    "verify": "adapters/mtslg-iocontrol/run-verifications.ps1"
+  },
+  "artifacts": {
+    "mapping": "Generated/<Target>.mapping.json",
+    "layoutManifest": "Generated/_inputs/<Target>.layout-manifest.json",
+    "pageXml": "Resources/Pages/<Target>/<Target>Page.xml"
+  }
+}

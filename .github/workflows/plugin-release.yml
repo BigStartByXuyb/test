@@ -1,0 +1,57 @@
+name: Plugin Release
+
+# 插件有自己的版本线：打 tag 时把 plugins/mastergo-wpf-transcoder 打成发布件
+# （plugin-manifest.json + 按 sha256 命名的文件），发到这个仓库的 Release。
+# 客户端从 <这个仓库>/releases/latest/download/plugin-manifest.json 取（详见客户端仓库的
+# docs/plugin-release.md）—— 打包实现只有客户端那一份脚本，这里按 commit 钉住它来调，不另抄一套。
+#
+# 与 plugin-cicd.yml 的分工：那条在 PR / main 上跑市场审计；这条只在 tag 上发发布件。
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      # 插件仓库自己（要打的那个 tag）：打包脚本按 tag 摊出插件树，所以标签要取得到。
+      - name: Checkout this repo at the tag
+        uses: actions/checkout@v4
+        with:
+          path: plugin
+          fetch-depth: 0
+
+      # 打包实现（客户端仓库，按 commit 钉住）：清单形状与「什么算插件根」的判据都在那边一处。
+      - name: Checkout the client repo (packer)
+        uses: actions/checkout@v4
+        with:
+          repository: BigStartByXuyb/mastergo-transcoder-gui
+          # 钉住客户端仓库的 commit（打包实现只有那一份脚本：清单形状与「什么算插件根」的判据都在那边）。
+          # 要换实现就换这个 sha —— 用 commit 而不是分支，发布件才不会随别人改动漂移。
+          ref: 785010422e2d3ed469367f8a11b8d6e3b36c9974
+          path: client
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # 打包与上传都交给那一份脚本：逐文件算 sha256、先传文件最后传清单
+      # （清单先到而文件没到，客户端会下到 404）。cwd 在这个仓库里，所以 Release 发在本仓库。
+      # tag 与 plugins/mastergo-wpf-transcoder/.claude-plugin/plugin.json 里的版本对不上时，
+      # 脚本自己会失败 —— 不让「发布的版本」和「包里声明的版本」出现两说。
+      - name: Pack and publish
+        working-directory: plugin
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node ../client/scripts/pack-plugin.js \
+            --repo-dir . \
+            --tag "$GITHUB_REF_NAME" \
+            --dir plugins/mastergo-wpf-transcoder \
+            --out ../dist/plugin \
+            --upload "$GITHUB_REF_NAME" \
+            --notes "插件发布件 $GITHUB_REF_NAME"

@@ -1,0 +1,1136 @@
+#!/usr/bin/env node
+"use strict";
+
+// 按钮族固定字段口径的单一真值源回归：映射表 buttonFamily / controlTypeRequiredAttrs
+// 必须与两个脚本的内置默认、两份 Skill 的正文表述逐项一致。
+// 背景：同一规则曾在「映射表 + 生成器常量 + 校验器常量 + 文档」四处各写一遍，
+// 2026-09-10 的按钮族改动就是在这里漂移的（文档写「无图标不发射」，脚本发空字符串占位），
+// 之后十几轮 CI 语义审计因为只读抽查范围不同，一直没对上，最终以 BLOCK 形式爆出。
+
+const assert = require("assert");
+const fs = require("fs");
+const path = require("path");
+const { loadTemplateMap } = require(path.join(__dirname, "..", "lib", "load-template-map.js"));
+
+const MAP = path.join(__dirname, "..", "..", "references", "adapters", "mtslg-iocontrol", "mtslg-iocontrol-map.json");
+const DOC_FORMAT_SKILL = path.join(__dirname, "..", "..", "..", "mastergo-iocontrol-document-format", "SKILL.md");
+const MAIN_SKILL = path.join(__dirname, "..", "..", "SKILL.md");
+const GENERATOR = path.join(__dirname, "..", "adapters/mtslg-iocontrol", "gen-iocontrol-xml.js");
+const VALIDATOR = path.join(__dirname, "..", "adapters/mtslg-iocontrol", "validate-iocontrol-provenance.js");
+const FEISHU_MAPPING = path.join(__dirname, "..", "..", "references", "adapters", "mtslg-iocontrol", "feishu-component-library-mapping.md");
+const MODE_DOC = path.join(__dirname, "..", "..", "references", "adapters", "mtslg-iocontrol", "mtslg-mode.md");
+const PAGE_BUILD_RULES = path.join(__dirname, "..", "..", "references", "adapters", "mtslg-iocontrol", "page-build-rules.md");
+
+const map = loadTemplateMap(MAP);
+const docFormat = fs.readFileSync(DOC_FORMAT_SKILL, "utf8");
+const mainSkill = fs.readFileSync(MAIN_SKILL, "utf8");
+const generator = fs.readFileSync(GENERATOR, "utf8");
+const validator = fs.readFileSync(VALIDATOR, "utf8");
+const feishuMapping = fs.readFileSync(FEISHU_MAPPING, "utf8");
+const modeDoc = fs.readFileSync(MODE_DOC, "utf8");
+const pageBuildRules = fs.readFileSync(PAGE_BUILD_RULES, "utf8");
+
+const family = map.buttonFamily;
+const required = map.controlTypeRequiredAttrs;
+const skillLines = (text) => text.split(/\r?\n/);
+
+// ---------- 1. 映射表内部自洽 ----------
+assert.ok(family && Array.isArray(family.alwaysWrittenAttrs), "映射表必须登记 buttonFamily.alwaysWrittenAttrs");
+assert.ok(family.alwaysWrittenAttrs.includes("IOEnable"), "按钮族固定参数必须包含 IOEnable");
+assert.ok(required.IconButton.includes("Icon"), "IconButton 的必写字段必须包含 Icon");
+for (const attr of family.iconSizeAttrs) {
+  assert.ok(required.IconButton.includes(attr), `IconButton 的必写字段必须包含 ${attr}`);
+}
+for (const type of ["Button", "StatusButton"]) {
+  for (const attr of ["Icon", ...family.iconSizeAttrs]) {
+    assert.ok(!(required[type] || []).includes(attr), `${type} 不含图标字段，不得登记 ${attr}`);
+  }
+}
+// 图标三件套必须全有或全无：避免出现「登记了 IconWidth 却没登记 Icon」这类半套模板。
+for (const [type, attrs] of Object.entries(required)) {
+  if (type.startsWith("_") || !Array.isArray(attrs)) continue;
+  const flags = ["Icon", ...family.iconSizeAttrs].map((attr) => attrs.includes(attr));
+  assert.ok(flags.every(Boolean) || flags.every((hit) => !hit),
+    `${type} 的图标字段必须全有或全无: ${JSON.stringify(attrs)}`);
+}
+assert.ok(!JSON.stringify(map).includes("无图标槽位时不发射"),
+  "映射表描述不得保留「无图标槽位时不发射」——与 controlTypeRequiredAttrs 的空字符串占位口径相反");
+
+// 变体级必写字段收窄（omitRequiredAttrs）：映射表登记 + 两份 Skill + 两份人读参考 + 生成器/校验器同口径。
+// 背景：该字段先只落在飞书映射文档一处，CI 语义审计以 BLOCK 报「其余权威文档仍写恒写、LangName 是唯一例外」。
+const omitVariants = [map.rightSidebarTemplates.variants.enter, map.rightSidebarTemplates.variants.exit];
+for (const variant of omitVariants) {
+  assert.deepStrictEqual(variant.omitRequiredAttrs, ["IOVisible", "IOEnable", "IsShowStatus", "IsNeedRedMark"],
+    "右栏固定变体必须登记收窄掉的必写字段: " + variant.style);
+}
+for (const [label, text] of [
+  ["mtslg-mode.md", modeDoc],
+  ["feishu-component-library-mapping.md", feishuMapping],
+  ["mastergo-iocontrol-document-format/SKILL.md", docFormat],
+  ["gen-iocontrol-xml.js 头部注释", generator],
+]) {
+  assert.ok(text.includes("omitRequiredAttrs"),
+    label + " 必须写明按钮族必写字段可被变体登记 omitRequiredAttrs 收窄（不得只写「恒写 + LangName 是唯一例外」）");
+}
+assert.ok(!/`LangName` 是唯一例外/.test(mainSkill + modeDoc + feishuMapping),
+  "按钮族必写字段已有 omitRequiredAttrs 例外，正文不得再写「LangName 是唯一例外」");
+assert.ok(generator.includes("omittedAttrs(") && validator.includes("omittedAttrs("),
+ "生成器与校验器必须共用 scripts/lib/script-helpers.js 的 omittedAttrs() 判据");
+
+// ---------- 槽位级多语言豁免（langRefPolicy=none）：映射表登记点 + 四份人读文档同口径 ----------
+// 背景：该策略只在选择框的值槽位上生效，2026-09-20 的 CI 语义审计以 REVIEW 报出
+// 「文档把它写成通用机制，而实现只在四个族读 slots[0]」与「既有枚举未同步 valueLangExempt」。
+const langRefSlots = [];
+for (const [familyName, spec] of Object.entries(map)) {
+  if (!familyName.endsWith("Templates") || !spec || !spec.variants) continue;
+  for (const [variantName, entry] of Object.entries(spec.variants)) {
+    const slots = entry && Array.isArray(entry.slots) ? entry.slots : [];
+    slots.forEach((slotSpec, index) => {
+      if (!slotSpec || slotSpec.langRefPolicy === undefined) return;
+      langRefSlots.push(`${familyName}.${variantName}#slots[${index}].${slotSpec.slot}=${slotSpec.langRefPolicy}`);
+    });
+  }
+}
+assert.ok(langRefSlots.length > 0, "映射表必须登记选择框 Value 的槽位级多语言豁免");
+assert.ok(langRefSlots.every((item) => item.endsWith("=none")),
+  "langRefPolicy 只允许 none: " + langRefSlots.join(", "));
+assert.ok(langRefSlots.every((item) => item.includes("#slots[0]")),
+  "langRefPolicy 只允许登记在值槽位 slots[0]: " + langRefSlots.join(", "));
+// 按钮族不开放槽位豁免：登记的槽位控件类型不得属于 buttonFamily.controlTypes（否则按钮文案会静默不产键）。
+const buttonTypes = new Set((map.buttonFamily && map.buttonFamily.controlTypes) || []);
+for (const [familyName, spec] of Object.entries(map)) {
+  if (!familyName.endsWith("Templates") || !spec || !spec.variants) continue;
+  for (const [variantName, entry] of Object.entries(spec.variants)) {
+    for (const slotSpec of (entry && entry.slots) || []) {
+      if (!slotSpec || slotSpec.langRefPolicy === undefined) continue;
+      assert.ok(!buttonTypes.has(String(slotSpec.controlType || "")),
+        familyName + "." + variantName + " 的值槽位是按钮族（" + slotSpec.controlType +
+        "），不得登记 langRefPolicy —— 按钮文案一律产键挂 LangName");
+    }
+  }
+}
+assert.ok(langRefSlots.some((item) => item.startsWith("selectBoxTemplates.")),
+  "选择框四个变体的值槽位必须全部登记该策略: " + langRefSlots.join(", "));
+assert.strictEqual(langRefSlots.filter((item) => item.startsWith("selectBoxTemplates.")).length, 4,
+  "选择框-40/36/32/28 四个变体都要登记，缺一个就会又给 Value 产键");
+for (const [label, text] of [
+  ["映射表 selectBoxTemplates.langRefPolicyNote", String(map.selectBoxTemplates.langRefPolicyNote || "")],
+  ["mtslg-mode.md", modeDoc],
+  ["feishu-component-library-mapping.md", feishuMapping],
+]) {
+  assert.ok(text.includes("langRefPolicy"),
+    label + " 必须写明槽位级多语言豁免（登记在映射表的变体槽位上）");
+}
+// 交付侧的枚举必须包含槽位豁免清单，否则照旧文书写交付说明会漏列 valueLangExempt。
+assert.ok(mainSkill.includes("valueLangExempt"),
+  "SKILL.md 必须把 valueLangExempt 列入交付说明的枚举");
+// 全量多语言口径：五处权威来源必须同口径（每个设计文本 Value 都产键挂 LangName，
+// 唯一不产键的是槽位登记 langRefPolicy=none 的值），不得再出现"中英文一致就不产键"的旧说法。
+for (const [label, text] of [
+  ["mtslg-mode.md", modeDoc],
+  ["feishu-component-library-mapping.md", feishuMapping],
+  ["mtslg-iocontrol-map.json（controlTypeRequiredAttrs._note）", JSON.stringify(map)],
+  ["gen-mtslg-lang-keys-from-dsl.js 头注释", fs.readFileSync(path.join(__dirname, "..", "adapters/mtslg-iocontrol", "gen-mtslg-lang-keys-from-dsl.js"), "utf8")],
+]) {
+  assert.ok(text.includes("产键挂") || text.includes("都产键"),
+    label + " 必须写明全量多语言口径（每个设计文本 Value 都产键挂 LangName）");
+  assert.ok(!/中英文一致的文本不编造语言键|不需要语言键/.test(text),
+    label + " 不得再保留『中英文一致就不产键』的旧说法——全量口径下这类文本照样产键，只是 EN 值等于原文");
+}
+assert.ok(mainSkill.includes("identicalTextKeys"),
+  "SKILL.md 必须把 identicalTextKeys 列入交付说明的枚举");
+// 与实现相矛盾的 noLangRefs 表述不得出现在插件任何一处（「不含英文字母」会把功能键 F1 排除在外，
+// 与派生器 isDynamicText() 的实现相反）——全插件扫描，扫描范围就是注释声明的范围。
+const contradictingCriterion = "不含中文" + "且不含英文字母";
+const pluginRootDir = path.join(__dirname, "..", "..", "..", "..");
+assert.ok(fs.existsSync(path.join(pluginRootDir, ".claude-plugin", "plugin.json")),
+  "扫描根必须是插件根目录（含 .claude-plugin/plugin.json）: " + pluginRootDir);
+const sweep = (dir) => {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const target = path.join(dir, entry.name);
+    if (entry.isDirectory()) { if (entry.name !== "node_modules") sweep(target); continue; }
+    if (!/\.(md|json|js|mjs)$/.test(entry.name)) continue;
+    if (path.resolve(target) === path.resolve(__filename)) continue;
+    assert.ok(!fs.readFileSync(target, "utf8").includes(contradictingCriterion),
+      path.relative(pluginRootDir, target) + " 含有与派生器实现相矛盾的表述「" + contradictingCriterion + "」");
+  }
+};
+sweep(pluginRootDir);
+// 派生器头注释同样必须写全量口径（不再是「枚举只在 SKILL.md 维护」那套豁免口径）。
+assert.ok(/`languages\.keys\[\]` 显式提供的条目优先级最高[^\n]*唯一例外/.test(pageBuildRules),
+  "语言键真值源（page-build-rules.md）必须就地写明显式 keys[] 的「优先级最高」以槽位豁免为唯一例外");
+assert.ok(!/`LangName` 是唯一例外/.test(JSON.stringify(map)),
+  "映射表必须与两份正文同口径：不得再写「LangName 是唯一例外」");
+
+// ---------- TextBlock FontWeight：映射表是唯一真值源，正文只引用不另立枚举 ----------
+// 背景：该规则曾在「映射表 note + 两份正文（SKILL.md / mtslg-mode.md）+ 生成器内置默认」四处
+// 各写一份 normal 名单，2026-09-15 的 CI 语义审计连续两轮以 REVIEW 报出「正文枚举漏项 / 口径两读」。
+const fontWeightRule = map.textBlockFontWeight;
+assert.ok(fontWeightRule, "映射表必须登记 textBlockFontWeight 规则");
+assert.strictEqual(fontWeightRule.attr, "FontWeight", "textBlockFontWeight.attr 必须是 FontWeight");
+assert.deepStrictEqual(fontWeightRule.controlTypes, ["TextBlock"], "FontWeight 规则只作用于 TextBlock");
+assert.ok(Array.isArray(fontWeightRule.normalStyleNames) && fontWeightRule.normalStyleNames.length > 0,
+  "必须登记 normalStyleNames（设计稿字体样式名里的正常体写法）");
+assert.ok(Array.isArray(fontWeightRule.normalValues) && fontWeightRule.normalValues.length > 0,
+  "必须登记 normalValues（样式名缺失时回退判定用的 weight 值）");
+assert.ok(typeof fontWeightRule.fallbackValueSource === "string" && fontWeightRule.fallbackValueSource,
+  "必须登记 fallbackValueSource（样式名取不到时的回退来源）");
+// 允许集必须放开 FontWeight；但它是「命中才写」，不得进入恒写集合。
+assert.ok((map.controlTypes.TextBlock.attrs || []).includes("FontWeight"),
+  "controlTypes.TextBlock.attrs 必须允许 FontWeight");
+assert.ok(!(required.TextBlock || []).includes("FontWeight"),
+  "FontWeight 是命中才写的条件属性，不得进入 controlTypeRequiredAttrs 恒写集合");
+// 映射生成器必须从映射表读规则并实现「样式名优先 + weight 回退」；
+// 发射器只需把 FontWeight 纳入固定属性顺序（值由 mapping 携带）。
+const fontGenerator = fs.readFileSync(path.join(__dirname, "..", "adapters/mtslg-iocontrol", "gen-mtslg-mapping-from-dsl.js"), "utf8");
+assert.ok(fontGenerator.includes("textBlockFontWeight") && fontGenerator.includes("designFontStyleName"),
+  "映射生成器必须消费 textBlockFontWeight 并解析设计稿字体样式名（designFontStyleName）");
+assert.ok(/ATTR_ORDER[\s\S]{0,600}FontWeight/.test(generator),
+  "gen-iocontrol-xml.js 的 ATTR_ORDER 必须包含 FontWeight（属性顺序：FontSize → FontWeight → Width/Height）");
+// 三份人读文档必须写 FontWeight 并指向真值源，不得再抄一份 normal 名单（那是历史漂移点）。
+for (const [label, text] of [
+  ["mtslg-mode.md", modeDoc],
+  ["feishu-component-library-mapping.md", feishuMapping],
+]) {
+  assert.ok(text.includes("FontWeight"), label + " 必须登记 FontWeight 规则");
+  assert.ok(text.includes("normalStyleNames"), label + " 必须指向映射表的 normalStyleNames，不得另立 normal 名单枚举");
+  assert.ok(!text.includes("`Regular`/`Normal`/`Book`/`常规体`/`常规`"),
+    label + " 不得再硬编码已漂移过的 normal 名单枚举，改用 normalStyleNames 指真值源");
+}
+
+// ---------- 相机视口（cameraTemplates）：Camera 不写 Style、字段集固定 ----------
+const cameraFamily = map.cameraTemplates;
+assert.ok(cameraFamily && cameraFamily.variants, "映射表必须登记 cameraTemplates.variants");
+assert.strictEqual(cameraFamily.stylePolicy, "none", "相机族必须声明 stylePolicy=none（不发射 Style）");
+assert.strictEqual(cameraFamily.innerCandidatePolicy, "never",
+  "相机族只认实例自身名，禁止用内部实例子节点名当候选（否则页面根会被误判成 Camera）");
+assert.ok(Object.keys(cameraFamily.variants).length > 0, "相机族至少要登记一个组件集");
+for (const [name, spec] of Object.entries(cameraFamily.variants)) {
+  assert.strictEqual(spec.componentSet, name, "相机变体的 componentSet 必须等于组件集名: " + name);
+  assert.strictEqual(spec.controlType, "Camera", "相机变体必须发射 ControlType=Camera: " + name);
+  assert.strictEqual(spec.style, null, "相机变体不得登记 Style: " + name);
+}
+assert.ok(!(required.Camera || []).includes("Style"), "Camera 的恒写字段集不得包含 Style");
+for (const attr of ["DesignPanelID", "Value"]) {
+  assert.ok((required.Camera || []).includes(attr), "Camera 恒写字段必须包含 " + attr);
+}
+assert.ok((map.controlTypes.Camera.attrs || []).includes("DesignPanelID"), "controlTypes.Camera 必须允许 DesignPanelID");
+assert.ok(feishuMapping.includes("cameraTemplates"), "人读映射文档必须登记相机族（cameraTemplates）");
+// 相机视口内部文本的处置必须显式登记，且 omit 角色要在校验器里放行（否则内部文本会漏成根级 TextBlock）。
+assert.ok(cameraFamily.innerTextPolicy && cameraFamily.innerTextPolicy.role,
+  "相机族必须登记 innerTextPolicy.role（内部文本整体 omit 的角色）");
+assert.strictEqual(cameraFamily.innerTextPolicy.decision, "omit", "相机内部文本必须 decision=omit");
+assert.ok(validator.includes("'" + cameraFamily.innerTextPolicy.role + "'"),
+  "相机内部文本的 omit 角色必须登记进 validate-iocontrol-provenance.js 的 OMIT_ROLES: " + cameraFamily.innerTextPolicy.role);
+assert.ok(feishuMapping.includes(cameraFamily.innerTextPolicy.role),
+  "人读映射文档必须写明相机内部文本的 omit 角色（该角色登记在校验器 OMIT_ROLES）");
+assert.ok(fontGenerator.includes("innerTextPolicy"),
+  "映射生成器必须按 innerTextPolicy 消费/omit 相机内部文本");
+// innerTextPolicy 的每个字段都必须被生成器真正消费（禁止"登记了但没人读"）。
+for (const field of ["innerTextPolicy.decision", "innerTextPolicy.role"]) {
+  const token = field.split(".")[1];
+  assert.ok(fontGenerator.includes("innerPolicy." + token),
+    "映射生成器必须读取 " + field + "（登记字段必须是行为真值源）: " + token);
+}
+// omit 角色的真值源是校验器的 OMIT_ROLES 集合。要求两件事：
+//   ① 映射表里登记的族内文本角色必须都在 OMIT_ROLES 里（否则生成器 omit、校验器判"未登记角色"，两侧互斥）；
+//   ② 集合里每个角色都要有人读登记点（page-build-rules.md 的 omit 一节 / 飞书映射文档 / mtslg-mode.md）。
+const omitRolesMatch = /const OMIT_ROLES = \[([^\]]+)\]/.exec(validator);
+assert.ok(omitRolesMatch, "必须能在校验器里读到 OMIT_ROLES 定义");
+const omitRoles = omitRolesMatch[1].split(",").map((item) => item.trim().replace(/^'|'$/g, "")).filter(Boolean);
+for (const [familyLabel, family] of [["cameraTemplates", cameraFamily], ["tableTemplates", map.tableTemplates]]) {
+  const role = family && family.innerTextPolicy && family.innerTextPolicy.role;
+  assert.ok(role && omitRoles.includes(role),
+    "映射表 " + familyLabel + ".innerTextPolicy.role 必须登记进校验器 OMIT_ROLES: " + role);
+}
+for (const role of omitRoles) {
+  assert.ok(pageBuildRules.includes(role) || feishuMapping.includes(role) || modeDoc.includes(role),
+    "OMIT_ROLES 里的角色必须在人读文档有登记点（page-build-rules.md / 飞书映射文档 / mtslg-mode.md）: " + role);
+}
+// hidden 是第二条 omit 路径（OMIT_REASONS = ['hidden', ...OMIT_ROLES]），SKILL.md 必须同时写清，
+// 不能把 omit 说成只由 OMIT_ROLES 决定。
+assert.ok(/const OMIT_REASONS = \['hidden'\]\.concat\(OMIT_ROLES\)/.test(validator),
+  "校验器必须保持 OMIT_REASONS = ['hidden'].concat(OMIT_ROLES) 的定义");
+assert.ok(mainSkill.includes("OMIT_REASONS") && mainSkill.includes("hidden"),
+  "SKILL.md 的 omit 说明必须写明 hidden 这条路径（omitReason='hidden' 登记在 OMIT_REASONS）");
+
+// ---------- 2. 脚本内置默认 == 映射表（防止三处各写一份后漂移） ----------
+function objectLiteralOf(source, constName) {
+  const match = source.match(new RegExp("const " + constName + "\\s*=\\s*\\{([\\s\\S]*?)\\n\\};"));
+  assert.ok(match, `源码中必须存在 const ${constName} = { ... }`);
+  return match[1];
+}
+
+function splitList(text) {
+  return text.split(",").map((item) => item.trim().replace(/^['"]|['"]$/g, "")).filter(Boolean);
+}
+
+function arrayFields(chunk) {
+  const result = {};
+  const re = /([A-Za-z_][\w]*)\s*:\s*\[([^\]]*)\]/g;
+  let match;
+  while ((match = re.exec(chunk))) {
+    result[match[1]] = splitList(match[2]);
+  }
+  return result;
+}
+
+function arrayLiteralOf(source, constName) {
+  const match = source.match(new RegExp("const " + constName + "\\s*=\\s*\\[([^\\]]*)\\]"));
+  assert.ok(match, `源码中必须存在 const ${constName} = [ ... ]`);
+  return splitList(match[1]);
+}
+
+const sameList = (a, b) => JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
+
+for (const [file, source, constName] of [
+  ["gen-iocontrol-xml.js", generator, "DEFAULT_BUTTON_FAMILY"],
+  ["validate-iocontrol-provenance.js", validator, "DEFAULT_BUTTON_FAMILY_RULES"],
+]) {
+  const defaults = arrayFields(objectLiteralOf(source, constName));
+  for (const [key, value] of Object.entries(defaults)) {
+    assert.ok(sameList(value, family[key] || []),
+      `${file} 的 ${constName}.${key} 与映射表 buttonFamily.${key} 漂移: ${JSON.stringify(value)} vs ${JSON.stringify(family[key])}`);
+  }
+}
+
+for (const [type, attrs] of Object.entries(arrayFields(objectLiteralOf(generator, "DEFAULT_CONTROL_TYPE_REQUIRED_ATTRS")))) {
+  assert.ok(required[type] && sameList(attrs, required[type]),
+    `gen-iocontrol-xml.js 的 DEFAULT_CONTROL_TYPE_REQUIRED_ATTRS.${type} 与映射表 controlTypeRequiredAttrs.${type} 漂移`);
+}
+
+// 「哪些 ControlType 的模板含图标字段」在三处必须是同一个集合：映射表、生成器内置默认、
+// 校验器无模板信息时的内置口径。任一处漏改都会让两条门禁对同一映射给出相反结论。
+const iconTemplateTypes = Object.entries(required)
+  .filter(([type, attrs]) => !type.startsWith("_") && Array.isArray(attrs) && attrs.includes("Icon"))
+  .map(([type]) => type).sort();
+const generatorIconTemplateTypes = Object.entries(arrayFields(objectLiteralOf(generator, "DEFAULT_CONTROL_TYPE_REQUIRED_ATTRS")))
+  .filter(([, attrs]) => attrs.includes("Icon")).map(([type]) => type).sort();
+const validatorFallbackTypes = arrayLiteralOf(validator, "DEFAULT_ICON_TEMPLATE_CONTROL_TYPES");
+assert.deepStrictEqual(generatorIconTemplateTypes, iconTemplateTypes,
+  "生成器内置默认中「模板含图标字段」的 ControlType 集合必须与映射表一致");
+assert.deepStrictEqual(validatorFallbackTypes, iconTemplateTypes,
+  "校验器无模板信息时的内置图标口径必须与映射表「模板含图标字段」的集合一致");
+
+// ---------- 3. 文档格式 Skill 与映射表同口径 ----------
+const exceptionLine = skillLines(docFormat).find((line) => line.startsWith("例外：按钮族"));
+assert.ok(exceptionLine, "文档格式 Skill 必须保留按钮族例外段");
+for (const attr of [...family.alwaysWrittenAttrs, "Icon", ...family.iconSizeAttrs]) {
+  assert.ok(exceptionLine.includes("`" + attr + "`"),
+    `文档格式 Skill 的按钮族例外段必须逐项登记固定字段 ${attr}`);
+}
+assert.ok(exceptionLine.includes("写空字符串值"), "按钮族例外段必须写明取不到来源时写空字符串值");
+assert.ok(!docFormat.includes("没有图标槽位时不发射"),
+  "文档格式 Skill 不得保留「没有图标槽位时不发射」——与映射表/生成器的空字符串占位口径相反");
+
+const iconRuleLine = skillLines(docFormat)
+  .find((line) => line.startsWith("- ") && line.includes("IconWidth") && line.includes("无图标槽位时写空字符串值"));
+assert.ok(iconRuleLine, "文档格式 Skill 的特殊规则必须按映射表写明无图标槽位时写空字符串值");
+assert.ok(iconRuleLine.includes("IconHeight"), "特殊规则的图标字段规则必须同时覆盖 IconWidth / IconHeight");
+
+// ---------- 4. 主 Skill 与生成器注释不得留下相反表述 ----------
+assert.ok(!mainSkill.includes('不得写 `Icon=""`'), "SKILL.md 不得保留可两读的否定写法");
+// 图标字段口径的人读登记点是两份适配器参考（SKILL.md 只留一行指针，不再复述细节）。
+for (const [label, text] of [["mtslg-mode.md", modeDoc], ["feishu-component-library-mapping.md", feishuMapping]]) {
+  assert.ok(text.includes("模板不含图标字段"), label + " 必须写明模板不含图标字段时不写这三项");
+  assert.ok(text.includes("无图标槽位时"), label + " 必须写明模板含图标字段但无图标槽位时的空字符串占位");
+}
+assert.ok(!generator.includes("都不发射"), "生成器注释不得保留「无图标槽位时都不发射」的旧口径");
+
+// ---------- 5. 两份人读参考文档的口径不得与映射表相反 ----------
+for (const [file, source] of [
+  ["feishu-component-library-mapping.md", feishuMapping],
+  ["mtslg-mode.md", modeDoc],
+]) {
+  const contradicted = skillLines(source).filter((line) => line.includes("无图标槽位时不发射"));
+  assert.deepStrictEqual(contradicted, [], `${file} 不得保留「无图标槽位时不发射」的旧口径`);
+  const stated = skillLines(source).filter((line) => line.includes("无图标槽位时") && line.includes("空字符串"));
+  assert.ok(stated.length > 0, `${file} 必须写明「无图标槽位时…空字符串」`);
+}
+
+// ---------- 6. 已作废表述不得在文档里残留；关键文档必须写明新口径 ----------
+// 背景：口径迁移（例如「父节点语义不再作为匹配键」）要改 5~6 份文档，只改一处就会被 CI 判矛盾。
+// 这里把"已作废表述"和"必须出现的新口径"都变成字符串断言，本地跑一次就知道有没有漏改。
+// 覆盖范围：插件根目录下的全部 .md（不含仓库外的快照文档）。
+const PLUGIN_ROOT = path.join(__dirname, "..", "..", "..", "..");
+const RETIRED_PHRASES = [
+  "父节点语义 + 公开属性名",
+  "追加父节点语义",
+  "才使用“完整父节点语义",
+  "parentVariants",
+];
+const RETIRED_EXEMPT = /已作废|不作为匹配键|不是匹配键|不参与匹配|不得使用/;
+const mdFiles = fs.readdirSync(PLUGIN_ROOT, { recursive: true })
+  .filter((entry) => String(entry).endsWith(".md"))
+  .map((entry) => path.join(PLUGIN_ROOT, String(entry)));
+assert.ok(mdFiles.length > 0, "必须能在插件根下枚举到文档");
+for (const file of mdFiles) {
+  skillLines(fs.readFileSync(file, "utf8")).forEach((line, index) => {
+    for (const phrase of RETIRED_PHRASES) {
+      if (!line.includes(phrase)) continue;
+      assert.ok(RETIRED_EXEMPT.test(line),
+        `${path.relative(PLUGIN_ROOT, file)}:${index + 1} 出现已作废表述「${phrase}」，须改成新口径或显式标注已作废`);
+    }
+  });
+}
+
+const MUST_STATE_NO_PARENT_MATCH_KEY = [
+  "skills/mastergo-iocontrol-document-format/SKILL.md",
+  "skills/mastergo-to-wpf/references/mastergo-component-mapping-rules.md",
+  "skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/mtslg-mode.md",
+  "skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/feishu-component-library-mapping.md",
+];
+for (const rel of MUST_STATE_NO_PARENT_MATCH_KEY) {
+  const text = fs.readFileSync(path.join(PLUGIN_ROOT, rel), "utf8");
+  const stated = skillLines(text).some((line) =>
+    line.includes("父节点语义") && /不作为匹配键|不是匹配键|不参与匹配/.test(line));
+  assert.ok(stated,
+    `${rel} 必须有一句同时出现「父节点语义」与「不作为匹配键 / 不是匹配键 / 不参与匹配」`);
+}
+
+// ---------- 7. ViewModel 按钮处理方法名：人读文档口径 ↔ 宿主壳脚本实现必须同步 ----------
+// 规则真值源只有两处：page-shell-generator.md 的「按钮处理方法（一钮一方法）」+ gen-mw-wpf-page.js。
+// 背景：方法名曾在文档里只写「case 骨架」、脚本也只发内联 TODO；新增一钮一方法后若只改一处，
+// 就会出现「文档说调用方法、脚本还在发 TODO」的两读。
+const SHELL_DOC = path.join(__dirname, "..", "..", "references", "adapters", "mw-wpf", "page-shell-generator.md");
+const shellDoc = fs.readFileSync(SHELL_DOC, "utf8");
+const hostGenerator = fs.readFileSync(path.join(__dirname, "..", "host", "gen-mw-wpf-page.js"), "utf8");
+assert.ok(shellDoc.includes("按钮处理方法（一钮一方法）"), "页面壳文档必须登记「按钮处理方法（一钮一方法）」小节");
+for (const token of ["langName", "MenuItem", "MenuItemIndex"]) {
+  assert.ok(shellDoc.includes(token), "页面壳文档必须写明按钮方法名取值链里的 " + token);
+}
+// 清单里没有独立的方法名字段：方法名只从 langName（LanguageKey）派生。
+assert.ok(!shellDoc.includes("methodName"), "页面壳文档不得再出现清单字段 methodName（方法名只从 langName 派生）");
+assert.ok(!hostGenerator.includes("item.methodName"), "宿主壳生成器不得读取清单的 methodName 字段");
+assert.ok(hostGenerator.includes("resolveMethodNameFromLangName") && hostGenerator.includes("resolveButtonHandlers"),
+  "宿主壳生成器必须实现按钮方法名解析（resolveMethodNameFromLangName / resolveButtonHandlers）");
+assert.ok(hostGenerator.includes('const MENU_KEY_PREFIX = "MenuItem"'),
+  "方法名派生必须以菜单键前缀 MenuItem 为界（langName 去前缀 = 按钮英文语义名）");
+assert.ok(hostGenerator.includes("PROVISIONAL_MENU_KEY"),
+  "临时键 MenuItemIndex<n> 必须显式排除，不得当作按钮英文名");
+// 取名步骤只有「是否带 MenuItem 前缀」一条：带前缀去前缀、不带前缀取整键（scope 不参与）；
+// 临时键检查必须写在去前缀之前（否则 MenuItemIndex3 会派生出 Index3）。
+assert.ok(hostGenerator.includes("=== 0 ? key.slice(MENU_KEY_PREFIX.length) : key"),
+  "带 MenuItem 前缀时去前缀，不带前缀时取整键");
+assert.ok(!shellDoc.includes("共享键直接取整键"),
+  "文档不得把 scope=shared 写成独立分支（共享键通常也带 MenuItem 前缀）");
+assert.ok(shellDoc.includes("这一检查发生在取名之前"),
+  "文档必须写明临时键检查发生在取名（去前缀）之前");
+assert.ok(shellDoc.includes("一共四类"),
+  "文档必须写明退回内联 TODO 一共四类（与 reason 一一对应）");
+for (const item of ["没有 `langName`", "MenuItemIndex<n>", "不是合法 C# 标识符", "命中 C# 关键字"]) {
+  assert.ok(shellDoc.includes(item), "退回内联 TODO 的清单必须写明: " + item);
+}
+// 文档声称四条「与审计 reason 一一对应」：脚本必须真的给出四条不同 reason 文案。
+for (const reason of ["该菜单项没有 LangName", "是临时键 MenuItemIndex<n>", "不是合法 C# 标识符", "派生出的是 C# 关键字"]) {
+  assert.ok(hostGenerator.includes(reason), "脚本必须为退回情形写出对应 reason: " + reason);
+}
+assert.ok(hostGenerator.includes('"        private void " + item.method + "()"'),
+  "宿主壳生成器必须发射 private void <方法名>() 处理方法骨架");
+assert.ok(hostGenerator.includes("inlineTodoCases"),
+  "解析不出方法名的按钮必须退回内联 TODO，并登记进审计 inlineTodoCases");
+// 固定成员清单在文档与脚本两侧必须逐项一致（CI 语义审计 REVIEW-001：只查字符串存在不足以防漂移）。
+const reservedFromDoc = (function () {
+  const marker = "与 ViewModel 固定成员同名（";
+  const start = shellDoc.indexOf(marker);
+  assert.ok(start >= 0, "文档必须写明「与 ViewModel 固定成员同名」的撞名口径");
+  const end = shellDoc.indexOf("）", start + marker.length);
+  return shellDoc.slice(start + marker.length, end).split("/")
+    .map(function (item) { return item.trim().replace(/`/g, ""); })
+    .filter(Boolean);
+})();
+const reservedFromScript = arrayLiteralOf(hostGenerator, "RESERVED_VIEWMODEL_MEMBERS");
+assert.ok(sameList(reservedFromDoc, reservedFromScript),
+  "文档列出的 ViewModel 固定成员必须与 RESERVED_VIEWMODEL_MEMBERS 逐项一致: " +
+  JSON.stringify(reservedFromDoc) + " vs " + JSON.stringify(reservedFromScript));
+assert.ok(shellDoc.includes("ViewModel 类名"), "文档必须写明与 ViewModel 类名同名的口径");
+assert.ok(hostGenerator.includes("method === viewModelName"),
+  "宿主壳生成器必须把 ViewModel 类名一并当保留名处理");
+// 撞名提示里的 langName 来源清单必须与文档一致（图标资源名 / 术语表 / 英文译文）。
+for (const source of ["图标资源名", "术语表 langGlossary", "该文案的英文译文"]) {
+  assert.ok(hostGenerator.includes(source), "撞名提示必须列出 langName 来源: " + source);
+  assert.ok(shellDoc.includes(source.replace(" langGlossary", "")), "文档必须写明 langName 来源: " + source);
+}
+// 一钮一方法的记法必须在文档里写明（避免把 ViewModel 侧又改回静态 TODO 骨架或加多余门禁）。
+assert.ok(shellDoc.includes("一个按钮 = 一个 `case` = 一个处理方法"),
+  "文档必须写明「一个按钮 = 一个 case = 一个处理方法」");
+// 撞名口径：文档写「直接失败」，脚本就必须真失败（不能只写文档、也不能静默改名/静默退回）。
+assert.ok(shellDoc.includes("撞名是输入错误，直接失败"),
+  "文档必须写明方法名撞名（固定成员/类名/同页按钮）是输入错误、直接失败");
+assert.ok(hostGenerator.includes("RESERVED_VIEWMODEL_MEMBERS"),
+  "宿主壳生成器必须登记 ViewModel 固定成员集合（撞名直接失败）");
+assert.ok(hostGenerator.includes("与 ViewModel 成员同名") && hostGenerator.includes("两个按钮算出同一个处理方法名"),
+  "宿主壳生成器必须对固定成员撞名与同页按钮撞名两条都直接失败");
+
+console.log("PASS 按钮族固定字段单一真值源（映射表 ↔ 脚本默认 ↔ 格式 Skill ↔ 适配器人读参考）一致性回归测试");
+console.log("PASS ViewModel 按钮处理方法名口径（page-shell-generator.md ↔ gen-mw-wpf-page.js）");
+console.log("PASS 已作废表述（父节点语义匹配键 / parentVariants）插件根 .md 扫描");
+
+// ---------- 8. 表格族（tableTemplates）：结构签名命中 + 列定义模板 + 行数据 omit ----------
+// 单一真值源是映射表 tableTemplates；生成器 / 发射器 / 校验器 / 编排器 / 四份文档必须同口径。
+// 背景：表格在组件库里没有组件集（设计稿里只是 GROUP），命中口径、列几何与行数据处置
+// 一处分叉就会出现「文档说发射控件、脚本说行是数据」这类两读，因此在这里逐项钉死。
+const mappingGenerator = fs.readFileSync(path.join(__dirname, "..", "adapters/mtslg-iocontrol", "gen-mtslg-mapping-from-dsl.js"), "utf8");
+const bundleGenerator = fs.readFileSync(path.join(__dirname, "..", "entry", "gen-mastergo-page-bundle.js"), "utf8");
+const coordNodesLib = fs.readFileSync(path.join(__dirname, "..", "lib", "coord-nodes.js"), "utf8");
+const mapRules = fs.readFileSync(path.join(__dirname, "..", "adapters", "mtslg-iocontrol", "lib", "iocontrol-map-rules.js"), "utf8");
+
+const tableFamily = map.tableTemplates;
+assert.ok(tableFamily, "映射表必须登记 tableTemplates");
+const tableStructural = tableFamily.match && tableFamily.match.structural;
+assert.ok(tableStructural, "映射表必须登记 tableTemplates.match.structural（表格没有组件集，按结构签名命中）");
+assert.deepStrictEqual(tableStructural.nodeTypes, ["GROUP"],
+  "表格结构签名只作用于 GROUP（表格在设计稿里就是一个组）");
+assert.ok(!Object.prototype.hasOwnProperty.call(tableStructural, "nameSuffix"),
+  "表格命中不得登记图层名后缀——图层名不参与匹配（与设计侧约定的结构身份口径）");
+assert.strictEqual(tableStructural.variant, "Table", "结构签名必须指向已登记的变体名");
+assert.ok(tableFamily.variants[tableStructural.variant], "结构签名指向的变体必须在 variants 里登记");
+assert.strictEqual(tableFamily.variants[tableStructural.variant].controlType, "DataGrid", "表格族必须发射 DataGrid");
+assert.ok(Array.isArray(tableStructural.signature.headerGroupNames) && tableStructural.signature.headerGroupNames.length,
+  "结构签名必须登记表头群组名");
+assert.ok(Array.isArray(tableStructural.signature.rowGroupNames) && tableStructural.signature.rowGroupNames.length,
+  "结构签名必须登记行群组名");
+assert.ok(Number(tableStructural.signature.minRows) >= 1, "结构签名必须登记最小行数");
+assert.ok(typeof tableFamily.structuralPolicy === "string" && tableFamily.structuralPolicy,
+  "必须登记 structuralPolicy（为什么表格可以按结构身份命中、图层名为何不参与匹配）");
+
+const columnTemplate = tableFamily.columnTemplate;
+assert.ok(columnTemplate && columnTemplate.geometry, "必须登记 columnTemplate.geometry（列定义固定几何）");
+assert.strictEqual(columnTemplate.geometry.left, 0);
+assert.strictEqual(columnTemplate.geometry.top, 0);
+assert.strictEqual(columnTemplate.geometry.height, 45);
+assert.strictEqual(columnTemplate.omitWidth, true, "DataGrid 列定义不写 Width");
+assert.ok((columnTemplate.alwaysWrittenAttrs || []).includes("IOName"), "列定义必须恒写 IOName 空占位");
+assert.strictEqual(columnTemplate.requiredAttrsPolicy, "column-template",
+  "列定义必须明确「不套 controlTypeRequiredAttrs」");
+assert.strictEqual(tableFamily.columnControlTypePolicy, "strict-majority-else-TextBlock",
+  "列 ControlType 判定口径必须是严格多数、否则退化 TextBlock");
+assert.ok(typeof tableFamily.columnControlTypePolicyNote === "string" && tableFamily.columnControlTypePolicyNote,
+  "列 ControlType 判定必须写明依据");
+assert.strictEqual(tableFamily.rowPolicy, "row-data-not-emitted", "行是数据、不发射控件");
+assert.ok(typeof tableFamily.rowPolicyNote === "string" && tableFamily.rowPolicyNote, "行处置必须写明原因");
+assert.ok(tableFamily.innerTextPolicy && tableFamily.innerTextPolicy.role, "必须登记表格内文本的 omit 角色");
+assert.strictEqual(tableFamily.innerTextPolicy.decision, "omit", "表格行内文本必须 decision=omit");
+assert.ok(tableFamily.valuePolicy && tableFamily.valuePolicy.attr === "Value", "必须登记 DataGrid 根节点的 Value 策略");
+assert.strictEqual(tableFamily.valuePolicy.allowEmpty, true, "当前阶段允许（并要求）空串占位 + valuePending 待绑定提示");
+
+// 规则块必须由共享解析器读取（禁止各脚本再抄一份默认值）。
+  assert.ok(mapRules.includes("parseTableTemplate"), "adapters/mtslg-iocontrol/lib/iocontrol-map-rules.js 必须提供 parseTableTemplate 共享解析");
+assert.ok(mappingGenerator.includes("parseTableTemplate") && mappingGenerator.includes("structuralTableMatches"),
+  "映射生成器必须按映射表结构签名命中表格");
+for (const token of ["columnTemplate", "innerTextPolicy", "tableAudits", "nearestColumnIndex"]) {
+  assert.ok(mappingGenerator.includes(token), "映射生成器必须消费 " + token);
+}
+assert.ok(mappingGenerator.includes("tableStructuralStatus"),
+  "表头结构身份成立但没有可见文本时必须登记 pending（tableStructuralStatus）");
+assert.ok(generator.includes("table-column") && generator.includes("isTableColumnNode") &&
+  generator.includes("applyNodeGeometry") && generator.includes("applyTemplateAttrs"),
+  "发射器必须按 nodeKind=table-column 走列定义模板几何与字段集");
+assert.ok(validator.includes("'" + tableFamily.innerTextPolicy.role + "'"),
+  "表格行数据的 omit 角色必须登记进校验器 OMIT_ROLES: " + tableFamily.innerTextPolicy.role);
+assert.ok(validator.includes("table-column") && validator.includes("columnTemplate"),
+  "校验器必须按 columnTemplate 单独校验列定义");
+// 坐标核对输入的唯一实现在 lib/coord-nodes.js（含 nodeKind=table-column 的固定几何处理），
+// 编排器与 check-coords.mjs 都调用它。
+assert.ok(coordNodesLib.includes("table-column"),
+  "坐标核对输入的实现必须为列定义单独给几何（nodeKind=table-column）");
+assert.ok(bundleGenerator.includes("tableAudits"), "编排器审计必须输出表格摘要");
+
+// 四份人读文档必须写明同一条口径。
+for (const [label, text] of [
+  ["mastergo-iocontrol-document-format/SKILL.md", docFormat],
+  ["mtslg-mode.md", modeDoc],
+  ["feishu-component-library-mapping.md", feishuMapping],
+]) {
+  assert.ok(text.includes("tableTemplates"), label + " 必须登记表格族（tableTemplates）");
+  assert.ok(text.includes("结构签名"), label + " 必须写明表格按结构签名命中");
+  assert.ok(text.includes("DataGrid"), label + " 必须写明表格发射 DataGrid");
+  assert.ok(text.includes("columnTemplate"), label + " 必须写明列定义几何来自 columnTemplate");
+  assert.ok(text.includes("table-data-cell"), label + " 必须写明行数据文本的 omit 角色");
+}
+assert.ok(feishuMapping.includes("组件集=Table"),
+  "人读映射文档必须保留「组件集=Table」的固定模板标题（文档格式约定）");
+
+// ---- 8.1 表格口径的 7 条 CI REVIEW 对应的防回归断言 ----
+// 这些断言来自 2026-09-16 的语义审计：条件条数、Value 现阶段口径、图层名例外清单、命中路径唯一性、
+// 隐藏列与列 Value 的旧表述、structuralPolicy 的 pending 范围——只写「出现某 token」挡不住这些，
+// 必须把「不允许再出现的旧表述」也钉住。
+// 命中路径唯一：property 与 componentSet 都不得登记（两者都会让实例走「需要结构签名」的渲染分支）。
+// 历史备注：1.0.139 曾把同一条判据写了两遍，其中一条落在 match.structural 上（对删除结果没有守护力），
+// 现在只保留判据落在 match 上的这两条，并把 componentSet 一并纳入。
+for (const key of ["property", "componentSet"]) {
+  assert.ok(!Object.prototype.hasOwnProperty.call(tableFamily.match, key),
+    "tableTemplates.match 不得登记 " + key + "（该键一旦命中就会走到需要结构签名的渲染分支）；命中路径只有 structural 一条");
+}
+const tableVariant = tableFamily.variants[tableStructural.variant] || {};
+assert.ok(Array.isArray(tableVariant.slots) && tableVariant.slots.length > 0,
+  "Table 变体必须登记 table 槽位（否则下面那条「槽位不得带 valueSource」会空通过）");
+const tableSlot = tableVariant.slots[0];
+assert.strictEqual(tableSlot.slot, "table", "Table 变体的首个槽位必须是 table");
+assert.ok(!Object.prototype.hasOwnProperty.call(tableSlot, "valueSource"),
+  "Table 变体的 table 槽位不得登记 valueSource（来源与占位口径只以 tableTemplates.valuePolicy 为准：现阶段固定空串 + valuePending 待绑定提示）");
+
+// 真值源（映射表）本身也不得再出现被退役的绝对表述与旧列口径——上一轮只守住了人读文档。
+const dataGridSpec = map.controlTypes.DataGrid;
+assert.ok(dataGridSpec && typeof dataGridSpec.description === "string", "映射表必须登记 controlTypes.DataGrid.description");
+for (const banned of ["最终配置必须非空", "空字符串仅可用于诊断中间态", "IODataGrid.LoadDataSource", "列=子 TextBlock/ComboBox"]) {
+  assert.ok(!dataGridSpec.description.includes(banned),
+    "映射表 controlTypes.DataGrid.description 不得保留已退役表述: " + banned);
+  assert.ok(!JSON.stringify(map).includes(banned),
+    "映射表任意位置都不得保留已退役表述: " + banned);
+}
+assert.ok(!Object.prototype.hasOwnProperty.call(dataGridSpec, "requiredNonEmptyAttrs"),
+  "映射表不得再登记 requiredNonEmptyAttrs（没有消费者，且与 tableTemplates.valuePolicy 的现阶段口径相反（固定空串 + 待绑定提示））");
+assert.ok(dataGridSpec.description.includes("tableTemplates.valuePolicy"),
+  "映射表 DataGrid 描述必须把 Value 的来源与占位口径指向 tableTemplates.valuePolicy");
+assert.ok(tableFamily.structuralPolicy.includes("四项同时成立"),
+  "structuralPolicy 必须写「四项同时成立」（条件条数要与 signature 一一对应：nodeTypes + 表头群组 + 行群组 + 表头可见文本）");
+assert.ok(tableFamily.structuralPolicy.includes("部分命中"),
+  "structuralPolicy 必须写清 pending 的范围是「部分命中」（REVIEW-007）");
+assert.ok(tableFamily.structuralPolicy.includes("图层名不参与匹配"),
+  "structuralPolicy 必须写明图层名不参与表格命中");
+// 当前阶段口径：DataGrid 根 Value 固定空串 + valuePending 作为待绑定提示（提示性，不是交付门禁）。
+assert.strictEqual(tableFamily.valuePolicy.decision, "fixed-empty",
+  "valuePolicy.decision 必须是当前阶段口径 fixed-empty（Value 固定空串）");
+assert.ok(tableFamily.valuePolicy.pendingRule && tableFamily.valuePolicy.pendingRule.includes("待绑定提示") &&
+  tableFamily.valuePolicy.pendingRule.includes("提示性审计字段"),
+  "valuePolicy.pendingRule 必须写明 valuePending 是待绑定提示、属提示性审计字段而不是交付门禁");
+assert.ok(!(columnTemplate.alwaysWrittenAttrs || []).includes("IOVisible"),
+  "列定义不得登记 IOVisible（表头文本没有「是否主键」信息，没有可靠来源；REVIEW-005）");
+
+for (const [label, text] of [
+  ["mastergo-iocontrol-document-format/SKILL.md", docFormat],
+  ["mtslg-mode.md", modeDoc],
+  ["feishu-component-library-mapping.md", feishuMapping],
+]) {
+  assert.ok(text.includes("四项同时成立"),
+    label + " 必须与映射表同口径写「四项同时成立」（图层名不再是命中条件）");
+  assert.ok(!text.includes("五项同时成立"),
+    label + " 不得保留「五项同时成立」（图层名后缀已不参与匹配）");
+  assert.ok(text.includes("固定写空串"),
+    label + " 必须写明 DataGrid 根 Value 当前阶段固定写空串（数据源由工程师后续绑定）");
+}
+// 图层名例外清单：表格族按结构身份命中、与图层名无关，因此只剩「底部栏」一条例外。
+for (const [label, text] of [["mtslg-mode.md", modeDoc]]) {
+  assert.ok(text.includes("例外只有一条"),
+    label + " 的图层名例外清单只能登记一条例外（底部栏按组件名匹配）");
+  assert.ok(!text.includes("例外只有两条"),
+    label + " 不得再登记两条例外（表格族不再依赖图层名后缀）");
+  assert.ok(text.includes("tableTemplates.match.structural") || text.includes("match.structural"),
+    label + " 必须点名表格族的结构签名登记位置");
+  assert.ok(text.includes("图层名不参与匹配") || text.includes("与图层名无关"),
+    label + " 必须写明表格族命中与图层名无关");
+}
+// 旧表述不得残留。
+assert.ok(!feishuMapping.includes("其 `Value` 属性必填且最终值必须非空"),
+  "feishu 映射文档不得保留「DataGrid 根 Value 必填且最终值必须非空」的绝对表述（REVIEW-002）");
+assert.ok(!feishuMapping.includes("隐藏主键列使用"),
+  "feishu 映射文档不得保留「隐藏主键列使用 IOVisible=false」（列集合里没有这条实现路径；REVIEW-005）");
+assert.ok(!feishuMapping.includes("列子节点 Value 是否填写取决于"),
+  "feishu 映射文档不得保留「列 Value 是否填写取决于…」（列 Value 一律等于表头文本；REVIEW-006）");
+assert.ok(!modeDoc.includes("列=子 TextBlock/ComboBox"),
+  "mtslg-mode.md 不得保留「列=子 TextBlock/ComboBox」的旧摘要（列是列定义，不是页面控件；REVIEW-006）");
+
+console.log("PASS 表格族（tableTemplates 结构签名 + DataGrid 列定义）一致性回归测试");
+
+// ---------- 文本换行口径：实现真值源 = lib/script-helpers.js，映射表 textNewlinePolicy 只登记 ----------
+// 背景：设计换行（U+2028）原先被原样写进 XML 属性、却被语言字典压成空格，
+// 同一份文案因此有两个版本，运行时按 LangName 取字典时两行文案退化成一行。
+const HELPERS = path.join(__dirname, "..", "lib", "script-helpers.js");
+const PAGE_LANG = path.join(__dirname, "..", "adapters/mtslg-iocontrol", "gen-mtslg-page-lang.js");
+const LANG_KEYS_SCRIPT = path.join(__dirname, "..", "adapters/mtslg-iocontrol", "gen-mtslg-lang-keys-from-dsl.js");
+const helpers = fs.readFileSync(HELPERS, "utf8");
+const pageLang = fs.readFileSync(PAGE_LANG, "utf8");
+
+const newlineRule = map.textNewlinePolicy;
+assert.ok(newlineRule, "映射表必须登记 textNewlinePolicy 规则");
+assert.strictEqual(newlineRule.normalizedValue, "LF (U+000A)", "textNewlinePolicy.normalizedValue 必须是 LF (U+000A)");
+assert.deepStrictEqual(newlineRule.designNewlineCodepoints, ["U+2028", "U+2029", "U+000D", "U+000A"],
+  "textNewlinePolicy 必须登记四种设计换行码点");
+assert.strictEqual(newlineRule.xmlAttrEscaping, "&#x0a;", "XML 属性换行写法必须是 &#x0a;");
+assert.strictEqual(newlineRule.langDictionaryEscaping, "&#x0a;", "语言字典换行写法必须是 &#x0a;");
+assert.ok(/script-helpers\.js/.test(newlineRule.implementationSource || ""),
+  "映射表必须登记实现真值源（scripts/lib/script-helpers.js），而不是自称运行期真值源");
+assert.ok(typeof newlineRule.langDictionaryValueTransform === "string" && newlineRule.langDictionaryValueTransform,
+  "映射表必须登记字典值的空白处理口径（与页面 XML 属性不同）");
+
+// 实现只允许有一份：共享库提供五个函数，生成器/校验器/字典发射器都引用它。
+for (const fn of ["normalizeNewlines", "langValueText", "decodeXmlEntities", "normalizeForCompare", "xmlElementText"]) {
+  assert.ok(new RegExp("function " + fn + "\\b").test(helpers), "script-helpers.js 必须提供 " + fn);
+}
+assert.ok((newlineRule.implementationSource || "").includes("langValueText"),
+  "textNewlinePolicy.implementationSource 必须登记字典值变换 langValueText 的实现位置");
+assert.ok((newlineRule.langDictionaryValueTransform || "").includes("langValueText"),
+  "langDictionaryValueTransform 必须点名实现函数 langValueText");
+assert.ok(!/function langValueText/.test(fs.readFileSync(LANG_KEYS_SCRIPT, "utf8")),
+  "gen-mtslg-lang-keys-from-dsl.js 不得自带 langValueText 实现（必须用共享库）");
+assert.ok(/normalizeNewlines\(value\)[\s\S]{0,80}&#x0a;/.test(helpers) || /normalizeNewlines\(value\)/.test(helpers),
+  "xmlAttr 必须先归一换行再发射");
+assert.ok(helpers.includes('.replace(/\\n/g, "&#x0a;")'), "xmlAttr / xmlElementText 必须把 LF 写成 &#x0a;");
+assert.ok(!/function escAttr/.test(generator),
+  "gen-iocontrol-xml.js 不得再自带属性转义实现（必须用共享 xmlAttr；否则换行口径会漏一处）");
+assert.ok(/\bnormalizeForCompare\b/.test(validator), "provenance 校验器必须用共享比对口径 normalizeForCompare");
+assert.ok(/\bxmlElementText\b/.test(pageLang), "语言字典发射器必须用共享元素内容转义（换行写 &#x0a;）");
+
+// 三份人读文档都必须写明换行口径（写 &#x0a; + 设计换行码点），否则文档与实现又会漂移。
+for (const [label, text] of [
+  ["mtslg-mode.md", modeDoc],
+  ["feishu-component-library-mapping.md", feishuMapping],
+]) {
+  assert.ok(text.includes("&#x0a;"), label + " 必须写明换行写成字符引用 &#x0a;");
+  assert.ok(text.includes("U+2028"), label + " 必须写明设计换行码点 U+2028");
+  assert.ok(text.includes("实现真值源"), label + " 必须写明实现真值源（script-helpers.js），不得把映射表写成运行期唯一真值源");
+  assert.ok(text.includes("三条用途"), label + " 空白口径必须写成「三条用途」，与映射表 note 一致");
+  assert.ok(!text.includes("空白处理的两条口径"), label + " 不得保留「空白处理的两条口径」的口径基数");
+}
+assert.ok(/三条用途/.test(newlineRule.note || ""), "映射表 note 必须写明空白处理分三条用途");
+
+// Layout 映射文档也要写明「MenuItem 文案含换行同样写 &#x0a;」（四份人读文档同口径）。
+const LAYOUT_DOC = fs.readFileSync(
+  path.join(__dirname, "..", "..", "references", "adapters", "mtslg-iocontrol", "feishu-layout-mapping.md"), "utf8");
+assert.ok(LAYOUT_DOC.includes("&#x0a;"), "feishu-layout-mapping.md 必须写明 MenuItem 文案换行写 &#x0a;");
+assert.ok(LAYOUT_DOC.includes("U+2028"), "feishu-layout-mapping.md 必须写明设计换行码点 U+2028");
+// 位置校验：换行口径必须挂在「### MenuItem 参数」小节内（标题之后、下一个标题之前），
+// 否则整段被搬走时前面的 contains 断言仍会通过，守护就形同虚设。
+{
+  const layoutLines = LAYOUT_DOC.split(/\r?\n/);
+  const sectionStart = layoutLines.findIndex((line) => line.startsWith("### MenuItem 参数"));
+  assert.ok(sectionStart >= 0, "feishu-layout-mapping.md 必须保留「### MenuItem 参数」小节");
+  let sectionEnd = layoutLines.length;
+  for (let i = sectionStart + 1; i < layoutLines.length; i += 1) {
+    if (/^#{2,3} /.test(layoutLines[i])) { sectionEnd = i; break; }
+  }
+  const section = layoutLines.slice(sectionStart, sectionEnd).join("\n");
+  assert.ok(section.includes("&#x0a;"),
+    "换行口径必须写在「### MenuItem 参数」小节内（当前挂在第 " + (sectionStart + 1) + " 行的小节之后未命中）");
+  assert.ok(section.includes("U+2028"), "MenuItem 小节内的换行口径必须写明设计换行码点 U+2028");
+}
+assert.ok(modeDoc.includes("压成空格会让两行文案退化成一行"),
+  "mtslg-mode.md 必须写明字典压成空格的后果");
+
+// 换行口径的同步范围：映射表 mapRole 与组件库映射文档必须给出同一份「三文档」清单
+// （BLOCK-001：两处基数/集合不一致会让维护者按其中一处执行时漏同步）。
+// 换行细则是适配器参考层的事实：SKILL.md 不再承载该口径，因此不在同步清单里。
+{
+  const docList = [
+    "skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/mtslg-mode.md",
+    "skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/feishu-component-library-mapping.md",
+    "skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/feishu-layout-mapping.md",
+  ];
+  for (const docPath of docList) {
+    assert.ok((newlineRule.mapRole || "").includes(docPath),
+      "映射表 textNewlinePolicy.mapRole 必须以插件根相对路径登记同步对象: " + docPath);
+    assert.ok(feishuMapping.includes(docPath),
+      "组件库映射文档的换行同步清单必须登记同一路径: " + docPath);
+  }
+  assert.ok(!/SKILL\.md/.test(newlineRule.mapRole || "") && !feishuMapping.includes("SKILL.md"),
+    "换行同步清单不得把 SKILL.md 当同步对象（换行口径在适配器参考层，不在 SKILL.md）");
+  assert.ok(feishuMapping.includes("三份人读文档"), "组件库映射文档必须写明同步范围是「三份人读文档」");
+  assert.ok(!feishuMapping.includes("四份人读文档"), "组件库映射文档不得再写「四份人读文档」");
+  assert.ok(/三份人读文档/.test(newlineRule.mapRole || ""), "映射表 mapRole 必须写明同步范围是「三份人读文档」");
+  assert.ok(!/四份人读文档/.test(newlineRule.mapRole || ""), "映射表 mapRole 不得再写「四份人读文档」");
+}
+
+// ---------- mapping 生成者口径（防回归） ----------
+// 背景：README 与 SKILL.md 曾长期把 mapping 描述成「AI 逐条生成/改写」的中间稿，
+// 而 2026-09-10（f2286ed）起 gen-mtslg-mapping-from-dsl.js 已是唯一 mapping 生成者：
+// Bundle 在清单提供 dslPath 时重算并覆盖 mappingPath，手写 mapping 不进入链路。
+// 这段断言防止文档再写回旧链路（旧链路的手写生成器痕迹止于 Generated/F2/build-mapping.js）。
+{
+  const readme = fs.readFileSync(path.join(__dirname, "..", "..", "..", "..", "README.md"), "utf8");
+  const mappingGenerator = fs.readFileSync(path.join(__dirname, "..", "adapters/mtslg-iocontrol", "gen-mtslg-mapping-from-dsl.js"), "utf8");
+  const bundle = fs.readFileSync(path.join(__dirname, "..", "entry", "gen-mastergo-page-bundle.js"), "utf8");
+
+  // 脚本侧事实：生成器发射算法 Tag；Bundle 以生成的 mapping 覆盖 mappingPath。
+  assert.ok(mappingGenerator.includes("新页面完整DSL映射"),
+    "映射生成器必须发射 mappingTag=新页面完整DSL映射");
+  assert.ok(bundle.includes('"--out", mappingPath'),
+    "Bundle 必须在提供 dslPath 时重算并覆盖 mappingPath");
+
+  for (const [name, text] of [["README.md", readme], ["SKILL.md", mainSkill]]) {
+    assert.ok(!/AI 仍需[^\n]*生成 mapping/.test(text),
+      name + " 不得再写「AI 仍需…生成 mapping」（mapping 由脚本机械生成）");
+    assert.ok(!/供 AI 生成 mapping/.test(text),
+      name + " 不得再写「供 AI 生成 mapping」");
+    assert.ok(!/也不替代 AI mapping/.test(text),
+      name + " 不得再写「也不替代 AI mapping」");
+    assert.ok(/gen-mtslg-mapping-from-dsl\.js/.test(text),
+      name + " 必须写明 mapping 由 gen-mtslg-mapping-from-dsl.js 机械生成");
+  }
+
+  // README「N 项强制工具」的标题基数必须与紧随其后的条目数一致。
+  // 背景：CI 语义审计（v1.0.154 的 REVIEW-001）报过「标题写三项、实际列四项」——
+  // 这类计数漂移当时的门禁完全没覆盖，所以补在这里。
+  const forcedHeading = /完整页面转换包含([一二两三四五六七八九十])项强制工具：/.exec(readme);
+  if (forcedHeading) {
+    const zhNum = { 一: 1, 二: 2, 两: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9, 十: 10 };
+    const declared = zhNum[forcedHeading[1]];
+    const tail = readme.slice(forcedHeading.index).replace(/\r\n/g, "\n");
+    const listBlock = tail.slice(tail.indexOf("\n- ") + 1).split("\n\n")[0];
+    const actual = (listBlock.match(/^- /gm) || []).length;
+    assert.strictEqual(actual, declared,
+      "README 的「" + declared + " 项强制工具」标题基数必须与清单条目数一致（实际 " + actual + " 条）");
+  } else {
+    assert.ok(false, "README 必须保留「完整页面转换包含 N 项强制工具：」小节标题");
+  }
+}
+
+// ---------- 容器族（infoGroupTemplates）GroupBox 的 Style 口径 ----------
+// 背景：CI 语义审计 v1.0.191 的 BLOCK-001 报过「两份权威文档对同一字段互斥」——
+// mtslg-mode.md 仍要求显式非空 Style、飞书文档与映射表已改成恒空串 + contentInsetStyle。
+// 这类漂移当时的门禁完全没覆盖，所以补在这里：映射表 / 生成器 / 三份正文必须同口径。
+{
+  const infoGroup = map.infoGroupTemplates;
+  const insets = infoGroup.styleInsets || {};
+  const variants = Object.entries(infoGroup.variants || {});
+  assert.ok(variants.length > 0, "infoGroupTemplates 必须登记容器变体");
+  for (const [name, spec] of variants) {
+    assert.strictEqual(spec.style, "", name + " 的 style 必须是空串（GroupBox 的 Style 恒空）");
+    assert.strictEqual(typeof spec.contentInsetStyle, "string",
+      name + " 必须登记 contentInsetStyle（仅用于查 styleInsets 的内部键）");
+    assert.ok(Object.prototype.hasOwnProperty.call(insets, spec.contentInsetStyle),
+      name + " 的 contentInsetStyle 必须能在 infoGroupTemplates.styleInsets 查到原点");
+  }
+  // styleInsets 的表头注释必须区分"发射值"与"查表键"。
+  assert.ok(/contentInsetStyle/.test(infoGroup.styleInsetsNote || ""),
+    "styleInsetsNote 必须说明 contentInsetStyle 是原点查表键");
+  // 「空 Style 时原点 = {1,35}」是项目框架侧的确定口径，不是待确认项。
+  // 本块只断言下面这几处已知承载点不得再出现 TD-065（不是全仓穷举）。
+  assert.ok(!/TD-065/.test(infoGroup.styleInsetsNote || ""),
+    "styleInsetsNote 不得把确定口径挂成待确认项（不得出现 TD-065）");
+  assert.ok(/确定口径/.test(infoGroup.styleInsetsNote || ""),
+    "styleInsetsNote 必须写明这是项目框架侧的确定口径");
+  // _meta 级的泛化句必须带容器内容区原点的例外，否则读者会按"父容器左上角"直接相减。
+  const metaNotes = (map._meta && Array.isArray(map._meta.note) ? map._meta.note : []).join("\n");
+  assert.ok(/内容区原点|contentInsetStyle|styleInsets/.test(metaNotes),
+    "map._meta.note 的容器坐标说明必须带容器内容区原点例外（不能只说「相对父容器左上角」）");
+  // 飞书文档的守门要**按小节断言**：整份文件里本来就有 contentInsetStyle（信息分组固定模板小节），
+  // 对全文匹配等于空转，防不住「父子相对坐标」小节被改回去。这里先切小节再匹配。
+  const feishuSection = (() => {
+    const start = feishuMapping.indexOf("## 组件父子相对坐标");
+    if (start < 0) return "";
+    const rest = feishuMapping.slice(start);
+    const next = rest.indexOf("\n## ", 1);
+    return next < 0 ? rest : rest.slice(0, next);
+  })();
+  assert.ok(feishuSection.length > 0, "feishu 组件库文档必须保留「组件父子相对坐标」小节");
+  assert.ok(/内容区原点/.test(feishuSection) && /contentInsetStyle/.test(feishuSection),
+    "「组件父子相对坐标」小节必须带容器内容区原点例外（且写明 contentInsetStyle 查表键）");
+  // 作业 A 的框架手册只需两句：本文是作业 A 参考；作业 B 的 GroupBox 是空 Style（+ 指向第 3 节）。
+  for (const manual of ["io/io-group-box.md", "native/group-box.md"]) {
+    const text = fs.readFileSync(path.join(__dirname, "..", "..", "references", "adapters", "mw-wpf", "framework-manual", "02-controls", manual), "utf8");
+    assert.ok(/作业 B（MTSLG IOContorl 页面 XML）的 GroupBox \*\*`Style` 是空串\*\*/.test(text),
+      "framework-manual/02-controls/" + manual + " 的适用范围横幅必须直说作业 B 的 GroupBox Style 是空串");
+    assert.ok(/第 3 节（坐标规则）/.test(text),
+      "framework-manual/02-controls/" + manual + " 必须指向 mtslg-mode.md 第 3 节（坐标规则）");
+    assert.ok(!/TD-065/.test(text),
+      "framework-manual/02-controls/" + manual + " 不得把该确定口径挂成待确认项");
+    assert.ok(!/作业 B 优先级|注意适用范围/.test(text),
+      "framework-manual/02-controls/" + manual + " 不得再引入「优先级/适用范围」之类的包装说法");
+  }
+  // map._meta.note 的交叉引用同样必须指到第 3 节。
+  assert.ok(/第 3 节（坐标规则）/.test(metaNotes), "map._meta.note 的交叉引用必须指向 mtslg-mode.md 第 3 节");
+  // mtslg-mode 第 3 节必须写明这是项目框架侧的确定口径，不是待确认项。
+  assert.ok(/确定口径/.test(modeDoc), "mtslg-mode.md 必须写明该口径是项目框架侧的确定口径");
+  assert.ok(!/TD-065/.test(modeDoc), "mtslg-mode.md 不得把该确定口径挂成待确认项");
+  // 台账与 guide 都不得出现 TD-065：它描述的是既定事实，不属于"待框架确认"那一类。
+  const manualDir = path.join(__dirname, "..", "..", "references", "adapters", "mw-wpf", "framework-manual", "05-best-practices");
+  const ledger = fs.readFileSync(path.join(manualDir, "pending-confirmations.md"), "utf8");
+  const guide = fs.readFileSync(path.join(manualDir, "pending-confirmations-guide.md"), "utf8");
+  assert.ok(!/TD-065/.test(ledger), "pending-confirmations.md 不得登记 TD-065（该口径是确定事实）");
+  assert.ok(!/TD-065/.test(guide), "pending-confirmations-guide.md 不得登记 TD-065（该口径是确定事实）");
+  assert.ok(/TD-047~064/.test(guide), "guide 第六节的编号区间必须回到 TD-047~064");
+  // 生成器只认 contentInsetStyle：不得保留"用非空 style 当查表键"的回退。
+  const mappingGenerator = fs.readFileSync(
+    path.join(__dirname, "..", "adapters/mtslg-iocontrol", "gen-mtslg-mapping-from-dsl.js"), "utf8");
+  assert.ok(!/contentInsetStyle\s*\|\|\s*spec\.style/.test(mappingGenerator),
+    "映射生成器不得保留 contentInsetStyle || style 的回退路径（会让旧口径静默通过）");
+  assert.ok(/attrs\.Style = spec\.style === undefined \|\| spec\.style === null \? "" : spec\.style/.test(mappingGenerator),
+    "映射生成器必须把变体 style 原样发射（GroupBox 的 Style 是必写字段）");
+  // 三份正文必须同口径：恒空 Style + contentInsetStyle 查原点。
+  for (const [label, text] of [["feishu-component-library-mapping.md", feishuMapping], ["mtslg-mode.md", modeDoc], ["SKILL.md", mainSkill]]) {
+    assert.ok(/contentInsetStyle/.test(text), label + " 必须写明原点查表键是 contentInsetStyle");
+    assert.ok(!/禁止空 Style|禁止容器变体把 Style 写成空/.test(text),
+      label + " 不得再保留「禁止空 Style」的旧口径");
+  }
+  // 飞书文档的两处固定模板必须发射空串 Style。
+  const styledTemplates = feishuMapping.match(/ControlType="GroupBox" Style="[^"]*"/g) || [];
+  assert.ok(styledTemplates.length >= 2, "飞书文档必须给出两处 GroupBox 固定模板");
+  styledTemplates.forEach((tag) => {
+    assert.strictEqual(tag, 'ControlType="GroupBox" Style=""',
+      "GroupBox 固定模板必须以 Style=\"\" 发射，实际：" + tag);
+  });
+}
+
+console.log("PASS 文本换行口径（textNewlinePolicy）一致性回归测试");
+
+// ---------- 页面节点 ID 口径（派生 + 页内唯一 + 跨版本稳定） ----------
+// 背景：ID 是 WPF 控件的 .Name 与框架 GetValueByID/GetControlByID 的句柄，也是 merge 对齐
+// 「同一个控件」的唯一钥匙。用遍历序号当身份会随兄弟增删整体位移，随机 GUID 则每次重跑都变，
+// 两者都会让 merge 静默配错、让工程师代码引用失效。真值源是生成器的 allocateId。
+{
+  const idGen = fs.readFileSync(path.join(__dirname, "..", "adapters/mtslg-iocontrol", "gen-mtslg-mapping-from-dsl.js"), "utf8");
+  assert.ok(idGen.includes("allocateId") && idGen.includes("ID_PAGE_KEY"),
+    "映射生成器必须用 allocateId + 页面键派生页面节点 ID");
+  assert.ok(!/`MG_\$\{String\(outputNodes\.length/.test(idGen) && !/`MGText_\$\{String\(textAudit\.length/.test(idGen),
+    "映射生成器不得再用遍历序号（MG_/MGText_）当节点身份");
+  for (const [label, text] of [["SKILL.md", mainSkill], ["mtslg-mode.md", modeDoc]]) {
+    assert.ok(text.includes("MX_"), label + " 必须写明页面节点 ID 前缀 MX_");
+    assert.ok(text.includes("sha256"), label + " 必须写明 ID 由设计稿节点 ref 派生（sha256）");
+    assert.ok(/禁止.*遍历序号|遍历序号.*禁止/.test(text), label + " 必须写明禁止用遍历序号当节点身份");
+    assert.ok(text.includes("人工维护约定"), label + " 必须写明人工维护约定");
+  }
+  assert.ok(modeDoc.includes("--allow-external-nodes"),
+    "mtslg-mode.md 必须写明人工/外部节点的校验放行开关");
+  assert.ok(modeDoc.includes("唯一性硬门"), "mtslg-mode.md 必须写明 merge 的 ID 唯一性硬门");
+  assert.ok(/`LangName`\s*跟随设计稿|LangName 跟随设计稿/.test(modeDoc),
+    "mtslg-mode.md 必须写明 LangName 跟随设计稿覆盖");
+}
+console.log("PASS 页面节点 ID 口径（派生 + 唯一 + 稳定）一致性回归测试");
+
+// 文档不得自行枚举真值源里的清单——枚举必然与 map / 脚本漂移。
+// 背景：2026-09-22 那几轮语义审计反复抓到的都是这一类（判定表把 iconPolicy 的取值抄了一份、
+// 抄了一份底部栏变体名、把 residentGroupPattern 的模式值写死、重复列了 omit 角色清单），
+// 而同仓库早有同名原则（fontWeight 的 normal 名单、ID 前缀），只是没有覆盖到判定表那一节。
+// 正确写法是"给结论 + 指向真值源"，所以这里把这几类字面量机械挡住。
+{
+  const rulesText = fs.readFileSync(PAGE_BUILD_RULES, "utf8");
+  const forbidden = [
+    ["single-path", "iconPolicy 的取值", "mtslg-iocontrol-map.json 各变体的 iconPolicy"],
+    ["pair-per-button", "iconPolicy 的取值", "mtslg-iocontrol-map.json 各变体的 iconPolicy"],
+    ["常驻(button", "residentGroupPattern 的模式值", "mtslg-iocontrol-map.json 的 layoutRules.bottomBar.residentGroupPattern"],
+    ["常驻(按钮", "residentGroupPattern 的模式值", "mtslg-iocontrol-map.json 的 layoutRules.bottomBar.residentGroupPattern"],
+    ["DI 显示-", "底部栏变体名", "mtslg-iocontrol-map.json 的 layoutRules.bottomBar.variants"],
+    ["DO 显示-", "底部栏变体名", "mtslg-iocontrol-map.json 的 layoutRules.bottomBar.variants"],
+    ["非首页-", "底部栏变体名", "mtslg-iocontrol-map.json 的 layoutRules.bottomBar.variants"],
+    ['"顶部栏", "底部"', "宿主壳标记词清单", "scripts/lib/mastergo-rules.js 的 HOST_SHELL_NAME_MARKERS"],
+  ];
+  for (const [needle, what, source] of forbidden) {
+    assert.ok(!rulesText.includes(needle),
+      "page-build-rules.md 不得自行枚举" + what + "（会与真值源漂移）：删掉 " + JSON.stringify(needle) +
+      "，改为指向 " + source);
+  }
+  // 反向：判定表必须把两族的判据都指向 map，而不是只描述一族。
+  assert.ok(rulesText.includes("layoutRules.bottomBar"),
+    "page-build-rules.md 的图标判定表必须点名布局族 layoutRules.bottomBar");
+  assert.ok(/判定时照\s*`mtslg-iocontrol-map\.json`/.test(rulesText),
+    "page-build-rules.md 必须写明各族匹配键以 mtslg-iocontrol-map.json 的 match 为准");
+  assert.ok(rulesText.includes("iconEntryOf"),
+    "page-build-rules.md 必须写明 MenuItem 的 Icon 来自台账（layout 脚本的 iconEntryOf）");
+  // 分族边界必须按**位置**界定：`layoutRules.bottomBar` 也有 `match` 块，
+  // 用"带 match 的各族"当组件模板族的定义会把布局族并进来（2026-09-22 审计抓到过），所以禁止这种概括。
+  assert.ok(!/带\s*`?match`?\s*的各族/.test(rulesText),
+    "不得用「带 match 的各族」定义组件模板族——layoutRules.bottomBar 也带 match，会把布局族并进来；" +
+    "应按位置区分：登记在 map 顶层的各族 vs 登记在 layoutRules 下的族");
+  assert.ok(rulesText.includes("顶层") && rulesText.includes("`layoutRules` 下"),
+    "page-build-rules.md 必须按位置写清组件模板族（map 顶层）与布局族（layoutRules 下）的边界");
+  // 两种"不登记"的语义必须分开写，且 runtimeIcons 只能挂在"由目标项目提供"那一类上。
+  assert.ok(rulesText.includes("没有图标") && rulesText.includes("由目标项目提供") && rulesText.includes("runtimeIcons"),
+    "page-build-rules.md 必须把「该槽位没有图标」与「图标由目标项目提供（记进 runtimeIcons）」分开表述");
+}
+console.log("PASS 判定表不得自行枚举真值源（iconPolicy / 变体名 / 模式值 / 标记词）一致性回归测试");
+
+// 底部栏变体清单：feishu-layout-mapping.md 是**唯一**逐一描述各变体槽位结构的文档
+// （映射表 `layoutRules.bottomBar.variants` 只登记 topLeftContent），所以这里不禁枚举，
+// 而是要求"枚举与映射表一一对应"——总数要对、每个变体名要逐字出现、每个小节都要是真实变体。
+// 简写（`DI 显示-0/1000/…`）会让映射表新增变体时无人发现，因此也在禁止之列。
+{
+const mapData = loadTemplateMap(MAP);
+  const layoutDoc = fs.readFileSync(
+    path.join(__dirname, "..", "..", "references", "adapters", "mtslg-iocontrol", "feishu-layout-mapping.md"), "utf8");
+  const variants = Object.keys(mapData.layoutRules.bottomBar.variants);
+  assert.ok(variants.length > 0, "映射表必须登记 layoutRules.bottomBar.variants");
+
+  const countMatch = /`layoutRules\.bottomBar\.variants`\s*共\s*(\d+)\s*个/.exec(layoutDoc);
+  assert.ok(countMatch, "feishu-layout-mapping.md 必须写明 layoutRules.bottomBar.variants 的总数（门禁据此核对）");
+  assert.strictEqual(Number(countMatch[1]), variants.length,
+    "底部栏变体总数与映射表不一致：文档写 " + countMatch[1] + "，映射表是 " + variants.length);
+
+  for (const name of variants) {
+    assert.ok(layoutDoc.includes(name),
+      "feishu-layout-mapping.md 必须逐字列出映射表里的底部栏变体（不得用 DI 显示-0/1000/… 这类简写）: " + name);
+  }
+  const sections = [...layoutDoc.matchAll(/^### 变体：(.+)$/gm)].map((m) => m[1].trim());
+  assert.ok(sections.length > 0, "feishu-layout-mapping.md 必须保留「### 变体：X」小节");
+  for (const name of sections) {
+    assert.ok(variants.includes(name),
+      "feishu-layout-mapping.md 描述了映射表里不存在的底部栏变体（改名或删除后未同步）: " + name);
+  }
+}
+console.log("PASS 底部栏变体清单（feishu-layout-mapping.md ↔ map.layoutRules.bottomBar.variants）一致性回归测试");
+
+// ---------- 9. 契约机器可读入口只有一种写法：-List -Format json -OutFile <文件> ----------
+// 背景：步骤契约的读取从 stdout 改成 -OutFile 文件通道（stdout 会被控制台代码页把中文替换成
+// U+FFFD，而 JSON.parse 照样成功）时，实现改了、几处入口文档没改，CI 语义审计以 REVIEW 报出。
+// "改了实现、漏改入口描述"不该留给下一轮审计发现，所以固化成断言：入口文档里凡出现契约命令，
+// 必须同处给出 -OutFile；确属"只讲人读 / 说明 stdout 会损坏"的行要显式标注。
+{
+  const entryDocs = [
+    path.join(PLUGIN_ROOT, "skills", "mastergo-to-wpf", "SKILL.md"),
+    path.join(PLUGIN_ROOT, "skills", "mastergo-to-wpf", "references", "adapters", "mtslg-iocontrol", "pipeline-contract.md"),
+  ];
+  let checked = 0;
+  for (const file of entryDocs) {
+    skillLines(fs.readFileSync(file, "utf8")).forEach((line, index) => {
+      if (!line.includes("-List -Format json")) return;
+      checked += 1;
+      assert.ok(/人读|损坏/.test(line) || line.includes("-OutFile"),
+        path.relative(PLUGIN_ROOT, file) + ":" + (index + 1) +
+        " 的契约入口必须写成 -List -Format json -OutFile <文件>；只讲人读或说明 stdout 会损坏的行要显式标注「人读」/「损坏」");
+    });
+  }
+  assert.ok(checked > 0, "入口文档必须至少给出一处契约命令示例（本门禁据此核对）");
+  // 实现侧同样钉住：参数、落盘编码、唯一读取实现三件套缺一不可。
+  const runAll = fs.readFileSync(path.join(__dirname, "..", "entry", "run-all.ps1"), "utf8");
+  assert.ok(runAll.includes("[string] $OutFile"), "run-all.ps1 必须提供 -OutFile 参数");
+  assert.ok(runAll.includes("Set-Content -LiteralPath $OutFile -Value $json -Encoding UTF8"),
+    "run-all.ps1 的 -OutFile 必须用 Set-Content -Encoding UTF8 落盘（PS7 下无 BOM）");
+  const stepsLib = fs.readFileSync(path.join(__dirname, "..", "lib", "pipeline-steps.js"), "utf8");
+  for (const token of ["-OutFile", "\\uFFFD"]) {
+    assert.ok(stepsLib.includes(token),
+      "lib/pipeline-steps.js 必须保留 " + token + "（文件通道 + 编码损坏 fail-closed）");
+  }
+}
+console.log("PASS 契约机器可读入口（入口文档 ↔ run-all.ps1 -OutFile ↔ lib/pipeline-steps.js）一致性回归测试");
+
+// ---------- 10. 匹配键口径只有一种读法，且同一条规则只写一处 ----------
+// 背景：同一轮里规范一边声明"不枚举属性名"、一边给出取值例示，又在同步清单里要求"列举处须同步"，
+// 读法分叉；"覆盖审计看不到生成器"这条规则也在同一份 Skill 里写了两遍。CI 语义审计以 REVIEW 报出。
+// 这里把它们变成断言：改口径时必须同一批把这几处一起改。
+{
+  for (const phrase of ["不另行维护属性名清单", "不维护键种类清单", "不枚举属性名"]) {
+    assert.ok(!docFormat.includes(phrase),
+      "规范不得再写绝对化的「" + phrase + "」——键种类只以映射表为准、文中取值仅为例示，两者并存");
+  }
+  assert.ok(docFormat.includes("一律以共享类型表各族的 `match` 为准"),
+    "规范必须写明「键的种类/属性名一律以共享类型表各族的 match 为准」");
+  assert.ok(docFormat.includes("只为例示"),
+    "规范必须写明文中出现的键取值只为例示、须与映射表同步");
+  const generatorBlind = skillLines(docFormat).filter((line) => line.includes("看不到生成器"));
+  assert.strictEqual(generatorBlind.length, 1,
+    "「覆盖审计看不到生成器」只允许在同步清单第 1 项写完整一处、其余位置改成引用（当前 " +
+    generatorBlind.length + " 处）——同一条规则写两遍会被语义审计当冗余报出");
+  // 自指门禁：小节内不得用「本节与『匹配键』一节」这类写法指代自己所处的小节——那样"只为例示"
+  // 的作用范围会出现两读（既可能被读成本段，也可能被读成整个小节，把正式登记口径一起降格）。
+  const lines = skillLines(docFormat);
+  const sectionOf = (heading) => {
+    const start = lines.findIndex((line) => line.trim() === heading);
+    if (start < 0) return null;
+    const end = lines.findIndex((line, index) => index > start && line.startsWith("## "));
+    return lines.slice(start + 1, end < 0 ? lines.length : end);
+  };
+  const matchKeySection = sectionOf("## 匹配键");
+  assert.ok(matchKeySection, "规范必须保留「## 匹配键」小节");
+  assert.ok(!matchKeySection.some((line) => line.includes("「匹配键」一节")),
+    "「匹配键」小节内不得再用「「匹配键」一节」指代自己（自指会让该句的作用范围出现两读）");
+}
+console.log("PASS 匹配键口径单读法 + 同一条规则单处陈述（mastergo-iocontrol-document-format/SKILL.md）");
+
+// ---------- 11. TextBlock Align 口径：映射表 ↔ 生成器 ↔ 人读文档 ----------
+// 背景：新增属性最典型的两处漂移是「映射表登记了、生成器没读」和「实现改了、文档没写」。
+// 这里把三个面钉在一起：登记点（textBlockAlign + controlTypeRequiredAttrs）、实现（生成器读
+// 设计稿 textAlign 并按 rightMatch / rightValue / defaultValue 取值）、人读（mtslg-mode /
+// 组件库映射文档 + 硬门禁索引）。
+{
+const mapData = loadTemplateMap(MAP);
+  const align = mapData.textBlockAlign;
+  assert.ok(align, "映射表必须登记 textBlockAlign（TextBlock 的 Align 口径）");
+  assert.strictEqual(align.attr, "Align", "textBlockAlign.attr 必须是 Align");
+  assert.strictEqual(align.policy, "always", "Align 是恒写属性：textBlockAlign.policy 必须是 always");
+  assert.ok((align.rightMatch || []).map((item) => String(item).toLowerCase()).includes("right"),
+    "textBlockAlign.rightMatch 必须包含 right（右对齐是唯一被识别的显式取值）");
+  assert.strictEqual(align.rightValue, "Right", "textBlockAlign.rightValue 必须是 Right");
+  assert.strictEqual(align.defaultValue, "Left",
+    "设计稿没有给出右对齐时按默认左对齐：textBlockAlign.defaultValue 必须是 Left");
+  assert.ok((align.controlTypes || []).length === 1 && align.controlTypes[0] === "TextBlock",
+    "Align 只有 TextBlock 有：textBlockAlign.controlTypes 必须恰好是 [TextBlock]");
+  const requiredAttrs = mapData.controlTypeRequiredAttrs || {};
+  assert.ok((requiredAttrs.TextBlock || []).includes(align.attr),
+    "Align 恒写 → 必须登记在 controlTypeRequiredAttrs.TextBlock 里（否则校验器不会要求它）");
+  for (const [type, attrs] of Object.entries(requiredAttrs)) {
+    if (type.startsWith("_") || type === "TextBlock" || !Array.isArray(attrs)) continue;
+    assert.ok(!attrs.includes(align.attr),
+      "Align 只有 TextBlock 有，其它 ControlType 的必写字段集不得登记它: " + type);
+  }
+  for (const [type, spec] of Object.entries(mapData.controlTypes || {})) {
+    if (!spec || typeof spec !== "object" || !Array.isArray(spec.attrs)) continue;
+    if (type === "TextBlock") continue;
+    assert.ok(!spec.attrs.includes(align.attr),
+      "Align 只有 TextBlock 有，其它 ControlType 的属性表不得登记它: " + type);
+  }
+  // 同一属性在「全局透传清单」与「按类型允许集」两处都要在，否则把 businessAttrs 当注册表的读者会漏掉它。
+  assert.ok((mapData.businessAttrs || []).includes(align.attr),
+    "Align 必须与同类显示属性（Foreground / FontSize / FontWeight）一起登记进 businessAttrs");
+  // 渲染层与校验层都必须把「只认 Left / Right」变成可验证的不变量：不允许落到通用空串占位。
+  const xmlGenerator = fs.readFileSync(path.join(__dirname, "..", "adapters/mtslg-iocontrol", "gen-iocontrol-xml.js"), "utf8");
+  assert.ok(xmlGenerator.includes("的 Align 必须是 \"Left\" / \"Right\""),
+    "gen-iocontrol-xml.js 必须对 TextBlock 的 Align 取值 fail-closed（不许空占位 / 第三种值）");
+  assert.ok(validator.includes("TextBlock 的 Align 必须是 \"Left\" / \"Right\""),
+    "validate-iocontrol-provenance.js 必须把 Align 取值作为错误拦下");
+  assert.ok(validator.includes("Align 只有 TextBlock 有"),
+    "validate-iocontrol-provenance.js 必须拦下非 TextBlock 节点携带 Align 的产物（只 TextBlock 有该参数）");
+  const mappingGenerator = fs.readFileSync(path.join(__dirname, "..", "adapters/mtslg-iocontrol", "gen-mtslg-mapping-from-dsl.js"), "utf8");
+  for (const token of ["textBlockAlign", "textAlignByRef", "attrs[alignAttr]"]) {
+    assert.ok(mappingGenerator.includes(token),
+      "gen-mtslg-mapping-from-dsl.js 必须保留 Align 发射实现: " + token);
+  }
+  for (const [file, text] of [["mtslg-mode.md", modeDoc], ["feishu-component-library-mapping.md", feishuMapping]]) {
+    assert.ok(text.includes("Align"), file + " 必须写明 TextBlock 的 Align 口径");
+    assert.ok(text.includes("Left") && text.includes("Right"),
+      file + " 必须写明 Align 的两种取值 Left / Right");
+    assert.ok(text.includes("textAlign"), file + " 必须写明 Align 的真值源是设计稿 textAlign");
+    assert.ok(text.includes("默认左对齐"), file + " 必须写明设计稿没有给出右对齐时按默认左对齐");
+  }
+  assert.ok(mainSkill.includes("Align"),
+    "mastergo-to-wpf/SKILL.md 的硬门禁索引必须点名 Align（否则执行者不知道它有条确定口径）");
+  // Left 口径（Align=Right 时"到右边缘"）：登记字段 + 唯一实现 + 全部消费方都必须指向同一处。
+  for (const field of ["distanceAttr", "distanceLeftBasis", "distanceRightBasis", "distanceCenterPolicy",
+    "distanceWidthSource", "distanceParentRightEdge", "distanceImplementation"]) {
+    assert.ok(typeof align[field] === "string" && align[field].trim(),
+      "textBlockAlign 必须登记 " + field + "（Align=Right 时 Left 的口径）");
+  }
+  assert.strictEqual(align.distanceAttr, "Left",
+    "距离参数名固定为 Left（与 Align 同一组属性，不新增第三个属性名）");
+  const helpers = fs.readFileSync(path.join(__dirname, "..", "lib", "script-helpers.js"), "utf8");
+  for (const token of ["function parentOuterRightEdge", "function textBlockLeftValue", "function isRightAlignedTextBlock"]) {
+    assert.ok(helpers.includes(token),
+      "lib/script-helpers.js 必须保留 " + token + "（Left 口径的判据与计算的唯一实现）");
+  }
+  // 分支判据只允许用共用函数（不得各写一份 Align 比较）。
+  for (const rel of ["adapters/mtslg-iocontrol/apply-container-containment.js", "adapters/mtslg-iocontrol/gen-iocontrol-xml.js",
+    "adapters/mtslg-iocontrol/validate-iocontrol-provenance.js", "lib/coord-nodes.js"]) {
+    const consumer = fs.readFileSync(path.join(__dirname, "..", rel), "utf8");
+    assert.ok(consumer.includes("isRightAlignedTextBlock"),
+      rel + " 必须用共享的 isRightAlignedTextBlock 判分支（不得自己拼 Align 比较）");
+  }
+  // 坐标核对输入只有一份实现：Bundle 与 check-coords.mjs 都调 lib/coord-nodes.js。
+  for (const rel of ["entry/gen-mastergo-page-bundle.js", "adapters/mtslg-iocontrol/check-coords.mjs"]) {
+    const consumer = fs.readFileSync(path.join(__dirname, "..", rel), "utf8");
+    assert.ok(consumer.includes("buildCoordNodes"),
+      rel + " 必须调用 lib/coord-nodes.js 的 buildCoordNodes（坐标核对输入不得内联一份）");
+  }
+  // 旧的附加标记（leftBasis / TEXT_BLOCK_RIGHT_LEFT_BASIS）不得残留：判据只认节点 Align 属性。
+  for (const rel of ["lib/script-helpers.js", "lib/coord-nodes.js", "adapters/mtslg-iocontrol/gen-mtslg-mapping-from-dsl.js",
+    "adapters/mtslg-iocontrol/apply-container-containment.js", "adapters/mtslg-iocontrol/gen-iocontrol-xml.js", "adapters/mtslg-iocontrol/validate-iocontrol-provenance.js",
+    "adapters/mtslg-iocontrol/check-coords.mjs", "entry/gen-mastergo-page-bundle.js"]) {
+    const source = fs.readFileSync(path.join(__dirname, "..", rel), "utf8");
+    assert.ok(!source.includes("leftBasis") && !source.includes("TEXT_BLOCK_RIGHT_LEFT_BASIS"),
+      rel + " 不得残留 leftBasis / TEXT_BLOCK_RIGHT_LEFT_BASIS（已改用节点 Align 判据）");
+  }
+  // 左对齐口径也必须真的走那个共用实现（否则"唯一实现"只是注释）：生产者与 provenance 校验器
+  // 共四处调用点都要传 align: "Left"。
+  for (const rel of ["adapters/mtslg-iocontrol/gen-mtslg-mapping-from-dsl.js", "adapters/mtslg-iocontrol/apply-container-containment.js", "adapters/mtslg-iocontrol/gen-iocontrol-xml.js",
+    "adapters/mtslg-iocontrol/validate-iocontrol-provenance.js"]) {
+    const consumer = fs.readFileSync(path.join(__dirname, "..", rel), "utf8");
+    assert.ok(consumer.includes('align: "Left"') || consumer.includes("align: 'Left'"),
+      rel + " 的左对齐 Left 必须调用共用的 textBlockLeftValue（align: Left），不得各写一份公式");
+  }
+  // 映射表的 distance* 字段是登记 + 回归断言，不是运行期输入 —— 措辞必须点明，避免被读成脚本会读它。
+  assert.ok(/不是脚本的运行期输入/.test(align.note || ""),
+    "textBlockAlign.note 必须写明 distance* 是登记/回归断言口径、不是脚本的运行期输入");
+  for (const [file, text] of [["mtslg-mode.md", modeDoc], ["feishu-component-library-mapping.md", feishuMapping],
+    ["mastergo-to-wpf/SKILL.md", mainSkill]]) {
+    assert.ok(text.includes("右边缘"), file + " 必须写明 Align=Right 时 Left 是到右边缘的距离");
+  }
+}
+console.log("PASS TextBlock Align 口径（映射表 textBlockAlign ↔ 生成器发射 ↔ 人读文档）一致性回归测试");

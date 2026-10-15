@@ -1,0 +1,725 @@
+{
+  "_meta": {
+    "source": "{source_root}/docs/Windows_setting/MT3.0 界面设计器.xml（目标项目提供的权威文档）",
+    "note": [
+      "官方标签拼写为 IOContorl（无字母 e），全部控件统一用该标签，由 ControlType 属性区分。",
+      "通用属性对所有控件有效：ID / ControlType / IOEnable / IOVisible / Height / Width / Margin / Left / Top / Style。",
+      "LangName 几乎所有控件可用（多语言键，CN/EN 成对，须命中键白名单）。",
+      "geometryAttrs 由生成器按 DSL bbox 计算直传，禁止从映射输入覆盖；businessAttrs 从映射 JSON 逐节点透传，生成器不校验内容（键校验交给 mtslg-keys.json 白名单）。",
+      "容器类控件（nested=true）可包含子 IOContorl。子控件坐标一般相对父容器左上角；**例外**：`ControlType=\"GroupBox\"` 等两段式容器不是——原点 = 父容器左上角 + 内容区边框 + 标题条高度（即 `infoGroupTemplates.styleInsets`，按容器变体的 `contentInsetStyle` 查表），详见 infoGroupTemplates.styleInsetsNote 与 mtslg-mode.md 第 3 节（坐标规则）。"
+    ]
+  },
+  "commonAttrs": [
+    "ID",
+    "ControlType",
+    "IOEnable",
+    "IOVisible",
+    "Height",
+    "Width",
+    "Margin",
+    "Left",
+    "Top",
+    "Style"
+  ],
+  "buttonFamily": {
+    "controlTypes": [
+      "IconButton",
+      "Button",
+      "StatusButton"
+    ],
+    "alwaysWrittenAttrs": [
+      "PageName",
+      "IOVisible",
+      "IOCommand",
+      "IOEnable"
+    ],
+    "iconSizeAttrs": [
+      "IconWidth",
+      "IconHeight"
+    ],
+    "iconSizeRule": "IconWidth/IconHeight 取台账命中条目节点 bbox（该条目 sourceRef 指向的节点，缺失回退 sourceId；映射字段 iconSize，四舍五入取整）；台账条目必须登记在只包住该图标图形的节点上，登记在按钮级容器上会取到按钮尺寸；**例外：变体登记 iconPolicy=runtime 时图标由目标项目提供、本页台账没有也不该有该条目，尺寸改取该实例子树里唯一 PATH 的 bbox（多个 PATH 直接失败，要求设计侧消歧；登记台账对该变体无效，禁止猜尺寸）**；模板含图标字段的 IconButton 的 Icon/IconWidth/IconHeight 属于 controlTypeRequiredAttrs 的恒写字段，无图标槽位时写空字符串；Button/StatusButton 的模板不含图标字段，不发射这三项；iconSize 只在模板含图标字段且节点带 Icon 时被消费，带 Icon 却没有 iconSize 视为映射不完整，生成器直接失败"
+  },
+  "textNewlinePolicy": {
+    "attrScope": "所有 XML 属性里的文案（页面 XML 的 Value / Header，Layout 的 MenuItem Name / TopLeftContent 等）与页面语言字典的字符串值",
+    "designNewlineCodepoints": [
+      "U+2028",
+      "U+2029",
+      "U+000D",
+      "U+000A"
+    ],
+    "normalizedValue": "LF (U+000A)",
+    "xmlAttrEscaping": "&#x0a;",
+    "langDictionaryEscaping": "&#x0a;",
+    "valueComparison": "normalizeForCompare：先解码字符引用（&#x0a; 等）、再把换行码点归一成 LF，然后逐字比较",
+    "implementationSource": "scripts/lib/script-helpers.js 的 normalizeNewlines / langValueText / xmlAttr / xmlElementText / normalizeForCompare（**实现真值源**；生成器、校验器、Bundle、字典发射器共用同一份，不允许别处再写一份换行/字典值处理）",
+    "mapRole": "本块**登记**同一口径供人读与回归断言比对（不是脚本的运行期输入）：换行码点、归一目标与两种发射写法必须与实现真值源一致；改口径时先改实现，再同步本块与三份人读文档（路径以插件根为基准）：skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/mtslg-mode.md、skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/feishu-component-library-mapping.md、skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/feishu-layout-mapping.md。",
+    "langDictionaryValueTransform": "字典值 = 归一换行 → 行内空白（空格/制表符）折叠成单个空格 → 换行两侧空白一并去掉 → 行首行尾空白去掉（trim）。示例：`A␠␠\\n␠␠B` → `A\\nB`；`␠␠␠␠对位模式␠␠␠␠` → `对位模式`。实现位置 = scripts/lib/script-helpers.js 的 `langValueText`（唯一实现；gen-mtslg-lang-keys-from-dsl.js 只调用它，不自带一份）。",
+    "note": "设计稿一个文本 run 内部的换行以 U+2028（行分隔符）/U+2029（段分隔符）编码（另有 CR/CRLF/LF），必须归一成 LF 后按框架写法发射：**XML 属性里不能出现字面换行**（解析器会把它归一成空格），所以一律写成字符引用 &#x0a;。同一行内不同字体的多个 text run 是 text 数组多项，按空串拼接，**不是**换行。语言字典是运行时按 LangName 取文案的载体，必须与设计稿换行一致（写成 &#x0a;），否则两行文案在运行时退化成一行。空白处理分**三条用途**：① 页面 XML 属性文案只归一换行、其余空白原样保留；② 字典值额外折叠行内空白、去掉换行两侧空白并 trim（逐字规则见 langDictionaryValueTransform）；③ 键派生 / 译文查找 / 术语表匹配用全量压平值（normalizeText）。三者用途不同，不是同一份字符串。"
+  },
+  "textBlockFontWeight": {
+    "attr": "FontWeight",
+    "controlTypes": [
+      "TextBlock"
+    ],
+    "policy": "emit-when-not-normal",
+    "normalValues": [
+      "",
+      "normal",
+      "400",
+      "regular"
+    ],
+    "normalStyleNames": [
+      "regular",
+      "normal",
+      "book",
+      "标准体",
+      "常规体",
+      "常规"
+    ],
+    "valueSource": "dsl.styles[<text[0].font>].value.style → fontStyle（设计稿自己的字体样式名，如 Bold / SemiBold / 常规体）",
+    "valueFormat": "design-style-name",
+    "fallbackValueSource": "dsl.styles[<text[0].font>].value.weight（样式名缺失时才回退到数值）",
+    "note": "TextBlock 的 FontWeight 只在设计稿字重不是 normal 时发射：命中才写、不写空串、不参与恒写集合。判定顺序固定为「样式名优先」：先取设计稿自己的字体样式名（styles[...].value.style 里的 fontStyle，例如 \"Bold\"；带字体族档位数字的前缀去掉，\"75 SemiBold\" → \"SemiBold\"、\"55 Regular\" → Regular），样式名命中 normalStyleNames 即为 normal、不写该属性；只有**样式名取不到**（style 缺失/非法 JSON/没有 fontStyle 字段）时，才用 weight 数值按 normalValues 判定，非 normal 时回退写数值。FontSize 仍按 controlTypeRequiredAttrs 恒写。"
+  },
+  "textBlockAlign": {
+    "attr": "Align",
+    "controlTypes": [
+      "TextBlock"
+    ],
+    "policy": "always",
+    "valueSource": "dsl.nodes[...].textAlign（TEXT 节点级字段；设计稿实测取值 left / right / center）",
+    "rightMatch": [
+      "right"
+    ],
+    "rightValue": "Right",
+    "defaultValue": "Left",
+    "distanceAttr": "Left",
+    "distanceLeftBasis": "Left = 控件**左边缘**到输出父容器**内容区左边缘**的距离 = pageAbsX − 内容区原点X（与既有的 Left 完全一致）",
+    "distanceRightBasis": "Left = 以控件**右上角**为原点，量到输出父容器**外框右边缘**的距离 = 父外框右边缘 − (pageAbsX + 设计稿 bbox 宽度)",
+    "distanceCenterPolicy": "center 与左对齐同口径（center 归 defaultValue 那一侧）",
+    "distanceWidthSource": "设计稿 bbox 宽度（mapping nodes[].dslWidth / sourceNodes[].width）；产物 XML 的 Width 仍是 NaN（自适应），宽度只参与这里的 Left 计算",
+    "distanceParentRightEdge": "页面根 = 根节点宽度（页面宽度）；容器 = 容器 pageAbsX + 容器宽度（**外框**右边缘，不是内容区右边缘）",
+    "distanceImplementation": "scripts/lib/script-helpers.js 的 isRightAlignedTextBlock（分支判据）/ parentOuterRightEdge / textBlockLeftValue（唯一实现）；坐标核对输入的唯一实现是 scripts/lib/coord-nodes.js",
+    "note": "TextBlock 的 Align 恒写、必写（进 controlTypeRequiredAttrs，且只有 TextBlock 有这个属性）：textAlign 归一成小写后命中 rightMatch 就发射 rightValue，其余（left / center / 字段缺失 / 其它取值）一律发射 defaultValue——**默认左对齐**。目标框架只认 Left / Right 两种取值，因此 Align **不适用必写字段的「取不到来源写空字符串」通用口径**：映射缺失 / 空串 / 第三种值由渲染层与校验层直接判失败（fail-closed）。**Align=Right 会同时改变 Left 的口径**（不再是\"到左边缘\"，而是按 distanceRightBasis 算出的\"到右边缘\"距离）。分支判据与计算都只有一处实现：`scripts/lib/script-helpers.js` 的 `isRightAlignedTextBlock`（判据）/ `textBlockLeftValue`（两条口径），映射生成器 / 容器重挂 / XML 渲染 / provenance 校验直接调用；坐标核对输入的唯一实现是 `scripts/lib/coord-nodes.js`（Bundle 与 check-coords.mjs 共用，右对齐节点在那里算出 `expectedLeft`）。本块的 distance* 字段是**登记点（人读 + 回归断言比对真值），不是脚本的运行期输入**（角色与 textNewlinePolicy.mapRole 相同）。"
+  },
+  "controlTypeRequiredAttrs": {
+    "_note": "每个 ControlType 的固定必写字段集（属性恒写，取不到来源时写空字符串）。ID/ControlType 恒由节点身份发射，Left/Top/Width/Height 恒由 DSL bbox 发射（TextBlock 为 Width=NaN、Height=40），因此不重复登记在这里。LangName 是另一个例外：只在多语言绑定层给出真实 key 时发射——全量多语言下每个设计文本 Value 都产键挂 LangName，只有槽位登记 langRefPolicy=none 的值（当前只有选择框 Value，运行时由数据决定）与空文本节点（Value=\"\"，没有可翻译的文案）不产键、不写空占位。TextBlock 的 Align 是第二个例外：目标框架只认 Left / Right，映射缺失/空串/第三种值一律 fail-closed（见 textBlockAlign.note），不写空占位。真值来源：设计方给定的 IOContorl 字段模板。",
+    "GroupBox": [
+      "Style",
+      "Header",
+      "LangName",
+      "IOName",
+      "IOEnable",
+      "IOVisible",
+      "MinValue",
+      "MaxValue"
+    ],
+    "Border": [
+      "Style",
+      "Value",
+      "IOEnable",
+      "IOVisible"
+    ],
+    "TextBlock": [
+      "Style",
+      "Value",
+      "LangName",
+      "IOName",
+      "IOEnable",
+      "IOVisible",
+      "IsAutoRead",
+      "Foreground",
+      "FontSize",
+      "Align"
+    ],
+    "Button": [
+      "Style",
+      "Value",
+      "LangName",
+      "PageName",
+      "IOCommand",
+      "IOEnable",
+      "IOVisible"
+    ],
+    "StatusButton": [
+      "Style",
+      "Value",
+      "LangName",
+      "PageName",
+      "IOCommand",
+      "IOEnable",
+      "IOVisible"
+    ],
+    "IconButton": [
+      "Style",
+      "Value",
+      "LangName",
+      "PageName",
+      "Icon",
+      "TopLeftContent",
+      "IsShowStatus",
+      "IsNeedRedMark",
+      "IOCommand",
+      "IOEnable",
+      "IOVisible",
+      "IconHeight",
+      "IconWidth"
+    ],
+    "Togglebutton": [
+      "Style",
+      "Value",
+      "IOName",
+      "IOState",
+      "IsAutoRefresh",
+      "IOEnable",
+      "IOVisible"
+    ],
+    "RadioButton": [
+      "Style",
+      "Value",
+      "IOName",
+      "IOState",
+      "IsAutoRefresh",
+      "IOEnable",
+      "IOVisible"
+    ],
+    "ComboBox": [
+      "Style",
+      "Value",
+      "IOName",
+      "ItemsSourceFile",
+      "DisplayMemberPath",
+      "SelectedValuePath",
+      "IsAutoRead",
+      "IsAutoWrite",
+      "IsWriteIO",
+      "IOCommand",
+      "IOEnable",
+      "IOVisible"
+    ],
+    "CheckBox": [
+      "Value",
+      "IOName",
+      "DefaultValue",
+      "IsWriteIO",
+      "IOEnable",
+      "IOVisible"
+    ],
+    "TextBox": [
+      "Value",
+      "DefaultValue",
+      "IsWriteIO",
+      "Keypad",
+      "IOEnable",
+      "IOVisible"
+    ],
+    "NumberBox": [
+      "Value",
+      "MinValue",
+      "MaxValue",
+      "DefaultValue",
+      "DecimalPlaces",
+      "IsWriteIO",
+      "Keypad",
+      "IsAutoRead",
+      "IOEnable",
+      "IOVisible"
+    ],
+    "IntNumberBox": [
+      "Value",
+      "MinValue",
+      "MaxValue",
+      "DefaultValue",
+      "DecimalPlaces",
+      "IsWriteIO",
+      "Keypad",
+      "IsAutoRead",
+      "IOEnable",
+      "IOVisible"
+    ],
+    "DataGrid": [
+      "Value",
+      "IOName",
+      "IOEnable",
+      "IOVisible"
+    ],
+    "Camera": [
+      "DesignPanelID",
+      "Value",
+      "IOName"
+    ]
+  },
+  "controlTypeAttrDefaults": {
+    "_note": "必写字段在映射没有来源时使用的默认值；未在此登记的字段一律写空字符串（例外：TextBlock 的 Align 不适用空字符串口径，取值只能是 Left / Right，缺失即失败，见 textBlockAlign.note）。Border 的 Value 是线宽，设计侧模板约定默认 1。",
+    "Border": {
+      "Value": "1"
+    }
+  },
+  "geometryAttrs": [
+    "Left",
+    "Top",
+    "Width",
+    "Height"
+  ],
+  "businessAttrs": [
+    "IOName",
+    "IOCommand",
+    "IOParam",
+    "IOState",
+    "IOStyle",
+    "IOGroup",
+    "PageName",
+    "ParameterName",
+    "Value",
+    "Header",
+    "LangName",
+    "IsAutoRead",
+    "IsAutoWrite",
+    "IsAutoRefresh",
+    "IsWriteIO",
+    "IsSave",
+    "IsShowDialog",
+    "DialogMessage",
+    "IsShowStatus",
+    "IsNeedRedMark",
+    "Icon",
+    "IconHeight",
+    "IconWidth",
+    "IconColor",
+    "IconText",
+    "TopLeftContent",
+    "StatusBrush",
+    "Foreground",
+    "FontSize",
+    "FontWeight",
+    "Align",
+    "Orientation",
+    "ItemsSourceFile",
+    "DisplayMemberPath",
+    "SelectedValuePath",
+    "Filter",
+    "DefaultValue",
+    "MinValue",
+    "MaxValue",
+    "MinRange",
+    "MaxRange",
+    "DecimalPlaces",
+    "Keypad",
+    "MaxLength",
+    "DisableRow",
+    "DesignPanelID",
+    "IOSetExposure",
+    "IsImagePix",
+    "IsExpendPanel",
+    "IsCrossingLineSolid",
+    "IsCrossingLineHorizontal",
+    "IsCrossingLineVertical",
+    "IsCrossingMove",
+    "ScalingType",
+    "IsRightMenu",
+    "IsMoveZToFocus",
+    "IsLiveImage",
+    "IsCenterRec",
+    "CenterRecWidth",
+    "CenterRecHeight",
+    "IsBaseLine",
+    "IsHorizontal",
+    "IsVertical",
+    "IsBaseLineHeight",
+    "IsAutoFocus",
+    "IsSwicthMode",
+    "IsLightControl",
+    "IsChangeMode",
+    "YReverse",
+    "LeftCameraName",
+    "RightCameraName",
+    "LeftUpVisibility",
+    "RightUpVisibility",
+    "RightDownVisibility",
+    "IOAxisName",
+    "AxisType",
+    "AxisMin",
+    "AxisMax",
+    "ImageMin",
+    "ImageMax",
+    "RotatePointX",
+    "RotatePointY",
+    "Index"
+  ],
+  "controlTypes": {
+    "View": {
+      "description": "纯容器/页签（Value=标题），可含 Index/Icon/LangName 作为页签属性",
+      "nested": true,
+      "attrs": [
+        "Value",
+        "Index",
+        "Icon",
+        "LangName"
+      ]
+    },
+    "GroupBox": {
+      "description": "分组框，Header 为标题，可嵌套子控件（子坐标相对其左上角）",
+      "nested": true,
+      "attrs": [
+        "Header",
+        "LangName"
+      ]
+    },
+    "Border": {
+      "description": "边框线，Value(int)=线宽，例 Value=\"1\" Margin=\"5\"",
+      "nested": true,
+      "attrs": [
+        "Value"
+      ]
+    },
+    "ButtonGroup": {
+      "description": "单选按钮组容器，内部放多个 RadioButton 共用同一 IOName",
+      "nested": true,
+      "attrs": [
+        "Value",
+        "Orientation"
+      ]
+    },
+    "TextBlock": {
+      "description": "文本标签；Value=标签文本，IOName=从 IO 读标签名，IOState=状态文本驱动颜色，IsAutoRead 默认 false；Height 固定 40、Width 固定 NaN（宽度自适应，不用文本 bbox 宽度）；FontWeight 是「命中才写」的条件属性（设计稿字重非 normal 时发射，值取 `styles[...].value.style` 的 `fontStyle`，见本文件 textBlockFontWeight），不属于 controlTypeRequiredAttrs 恒写集合；Align 是恒写、必写属性，**只有 TextBlock 有**（设计稿 TEXT 节点 textAlign=right → \"Right\"，其余含缺失 → \"Left\" 默认左对齐，见本文件 textBlockAlign）",
+      "nested": false,
+      "attrs": [
+        "Value",
+        "IOName",
+        "Align",
+        "IOState",
+        "IsAutoRead",
+        "IOGroup",
+        "Foreground",
+        "FontSize",
+        "FontWeight",
+        "LangName"
+      ]
+    },
+    "Button": {
+      "description": "按钮；IOName 绑 IO 变量（Function/Event 消息），IOStyle=Write|Event（默认 Function），PageName=\"Jump:X\" 跳转",
+      "nested": false,
+      "attrs": [
+        "Value",
+        "IOName",
+        "IOStyle",
+        "IOParam",
+        "IsShowDialog",
+        "DialogMessage",
+        "PageName",
+        "ParameterName",
+        "IOGroup",
+        "IsSave",
+        "LangName",
+        "IOVisible",
+        "IOCommand"
+      ]
+    },
+    "IconButton": {
+      "description": "图标按钮（继承 Button）；Icon=Geometry 键，TopLeftContent=F1..F12，IOState 状态色。按钮族固定参数：所有 IconButton 无差别发射 PageName/IOVisible/IOCommand/IOEnable（无可靠来源时为空字符串占位）；Icon/IconWidth/IconHeight 属 controlTypeRequiredAttrs 的恒写字段：有图标槽位时 IconWidth/IconHeight 取台账命中条目节点 bbox（映射字段 iconSize，四舍五入取整），无图标槽位时三项写空字符串",
+      "nested": false,
+      "attrs": [
+        "Icon",
+        "IconHeight",
+        "IconWidth",
+        "TopLeftContent",
+        "PageName",
+        "IOCommand",
+        "IOVisible",
+        "IsShowStatus",
+        "IsNeedRedMark",
+        "StatusBrush",
+        "IOState",
+        "IconColor",
+        "IconText",
+        "LangName"
+      ]
+    },
+    "StatusButton": {
+      "description": "状态按钮（继承 Button）；IOState 条件表达式更新左侧状态色",
+      "nested": false,
+      "attrs": [
+        "IOState",
+        "LangName",
+        "IOName",
+        "IOCommand",
+        "PageName",
+        "IOVisible"
+      ]
+    },
+    "Togglebutton": {
+      "description": "切换按钮；IOState 控制选中态",
+      "nested": false,
+      "attrs": [
+        "Value",
+        "IOName",
+        "IOState",
+        "IsAutoRefresh"
+      ]
+    },
+    "RadioButton": {
+      "description": "单选按钮（配 ButtonGroup）；IOGroup 与按钮同组，点击先写 IO 再执行逻辑",
+      "nested": false,
+      "attrs": [
+        "Value",
+        "IOName",
+        "IOState",
+        "IOGroup",
+        "IsAutoRefresh"
+      ]
+    },
+    "ComboBox": {
+      "description": "下拉框；选项用子 TextBlock 表示；ItemsSourceFile 绑定数据文件",
+      "nested": true,
+      "attrs": [
+        "Value",
+        "IOName",
+        "ItemsSourceFile",
+        "DisplayMemberPath",
+        "SelectedValuePath",
+        "IsAutoRead",
+        "IsAutoWrite",
+        "Filter",
+        "IOCommand",
+        "LangName",
+        "IsWriteIO"
+      ]
+    },
+    "CheckBox": {
+      "description": "勾选框；Value(bool) 是否选中，IOName 回显",
+      "nested": false,
+      "attrs": [
+        "Value",
+        "IOName",
+        "DefaultValue",
+        "IsWriteIO"
+      ]
+    },
+    "TextBox": {
+      "description": "文本输入框；Keypad(bool) 数字键盘",
+      "nested": false,
+      "attrs": [
+        "DefaultValue",
+        "Keypad",
+        "IsWriteIO"
+      ]
+    },
+    "NumberBox": {
+      "description": "数字输入；DecimalPlaces 默认 3 位，MaxLength 默认 8",
+      "nested": false,
+      "attrs": [
+        "IOName",
+        "MinValue",
+        "MaxValue",
+        "DefaultValue",
+        "DecimalPlaces",
+        "Keypad",
+        "MaxLength",
+        "IsAutoRead",
+        "IsWriteIO"
+      ]
+    },
+    "IntNumberBox": {
+      "description": "整数输入，同 NumberBox",
+      "nested": false,
+      "attrs": [
+        "IOName",
+        "MinValue",
+        "MaxValue",
+        "DefaultValue",
+        "DecimalPlaces",
+        "Keypad",
+        "MaxLength",
+        "IsAutoRead",
+        "IsWriteIO"
+      ]
+    },
+    "DataGrid": {
+      "description": "数据表格。**本插件可自证的两条**：① `Value` 属固定必写字段、恒写且不省略——必写字段集的唯一登记点是本文件顶层的 controlTypeRequiredAttrs.DataGrid（`Value` / `IOName` / `IOEnable` / `IOVisible`），生成器与校验器都只读那一处；② 列子节点是**列定义**不是页面控件，几何与字段集按 tableTemplates.columnTemplate、列 ControlType 按 columnControlTypePolicy 判定。**其余一律不是本插件的规则**：`Value` 当前阶段的占位口径（固定空串 + 待绑定审计标记）以 tableTemplates.valuePolicy 为唯一真值源；`Value` 在运行时指向哪个文件、子列结构与数据源字段、以及省略属性或空值指向不存在文件时如何表现，全部归目标项目 DataGrid 控件契约，须由契约/源码/实测确认后才能落笔。",
+      "nested": true,
+      "attrs": [
+        "IOName",
+        "IsAutoRefresh",
+        "Value",
+        "DisableRow",
+        "IOCommand"
+      ]
+    },
+    "TabControl": {
+      "description": "页签容器；子节点 TabItem（Value=页签名，Height=35）",
+      "nested": true,
+      "attrs": [
+        "IOName",
+        "IOEnable",
+        "IOCommand"
+      ]
+    },
+    "TabItem": {
+      "description": "TabControl 的页签项（仅作为 TabControl 子节点）",
+      "nested": false,
+      "attrs": [
+        "Value",
+        "Height",
+        "LangName"
+      ]
+    },
+    "ProgressBar": {
+      "description": "进度条；MinValue/MaxValue/Value",
+      "nested": false,
+      "attrs": [
+        "MinValue",
+        "MaxValue",
+        "Value",
+        "IOName"
+      ]
+    },
+    "RangeProgressBar": {
+      "description": "区间进度条；额外 MinRange/MaxRange",
+      "nested": false,
+      "attrs": [
+        "MinValue",
+        "MaxValue",
+        "Value",
+        "IOName",
+        "MinRange",
+        "MaxRange"
+      ]
+    },
+    "PowerControl": {
+      "description": "实时功率曲线控件；IOName 读值回显",
+      "nested": false,
+      "attrs": [
+        "IOName"
+      ]
+    },
+    "Camera": {
+      "description": "相机控件（相机视口）；DesignPanelID=相机编号、Value=相机名（设计稿无来源时空串占位），尺寸取实例 bbox（实测 600×600 / 600×510）。**不发射 Style**（cameraTemplates.stylePolicy=none，用运行时默认控件外观）；恒写字段为 DesignPanelID / Value / IOName。",
+      "nested": false,
+      "attrs": [
+        "DesignPanelID",
+        "IOName",
+        "Value",
+        "IOSetExposure",
+        "IsImagePix",
+        "IsExpendPanel",
+        "IsCrossingLineSolid",
+        "IsCrossingLineHorizontal",
+        "IsCrossingLineVertical",
+        "IsCrossingMove",
+        "ScalingType",
+        "IsRightMenu",
+        "IsMoveZToFocus",
+        "IsLiveImage",
+        "IsCenterRec",
+        "CenterRecWidth",
+        "CenterRecHeight",
+        "IsBaseLine",
+        "IsHorizontal",
+        "IsVertical",
+        "IsBaseLineHeight",
+        "IsAutoFocus",
+        "IsSwicthMode",
+        "IsLightControl",
+        "IsChangeMode",
+        "YReverse"
+      ]
+    },
+    "AutoCutCamera": {
+      "description": "自动切割相机；LeftUp/RightUp/RightDownVisibility 控制子窗口显隐",
+      "nested": false,
+      "attrs": [
+        "DesignPanelID",
+        "Value",
+        "IsLiveImage",
+        "LeftUpVisibility",
+        "RightUpVisibility",
+        "RightDownVisibility"
+      ]
+    },
+    "HighAngleCamera": {
+      "description": "高角度相机",
+      "nested": false,
+      "attrs": [
+        "DesignPanelID",
+        "Value",
+        "IsLiveImage"
+      ]
+    },
+    "LowAngleCamera": {
+      "description": "低角度相机",
+      "nested": false,
+      "attrs": [
+        "DesignPanelID",
+        "Value",
+        "IsLiveImage"
+      ]
+    },
+    "EMTCamera": {
+      "description": "EMT 相机；LeftCameraName/RightCameraName 为左右下相机名",
+      "nested": false,
+      "attrs": [
+        "DesignPanelID",
+        "LeftCameraName",
+        "RightCameraName",
+        "IsLiveImage"
+      ]
+    },
+    "Image": {
+      "description": "图片；Value=图片绝对路径（如 Z:\\Gui\\Animation\\研磨.png）；带轴属性用于轴位图",
+      "nested": false,
+      "attrs": [
+        "Value",
+        "IOAxisName",
+        "AxisType",
+        "AxisMin",
+        "AxisMax",
+        "ImageMin",
+        "ImageMax",
+        "RotatePointX",
+        "RotatePointY"
+      ]
+    }
+  },
+  "_nested": {
+    "description": "布局分组（无控件语义）：保持层级时用无 ControlType 的子 IOContorl 标签（与根节点同形）；框架是否支持需运行时验证，不支持则展平并把子坐标重基于最近有效父容器"
+  },
+  "extends": "../../component-types.json",
+  "familyOverlays": {
+    "infoGroupTemplates": {
+      "styleInsets": {
+        "IOGroupBoxBaseStyle": {
+          "left": 2,
+          "top": 40
+        },
+        "IOGroupBoxSecondary": {
+          "left": 1,
+          "top": 35
+        },
+        "IOGroupBoxThirdly": {
+          "left": 1,
+          "top": 25
+        },
+        "IOGroupBoxFour": {
+          "left": 1,
+          "top": 35
+        }
+      },
+      "styleInsetsNote": "容器内容区原点（相对容器左上角）= 内容区边框厚度 + 标题条高度。本表这四个原点是**项目框架侧的确定口径**（历史上抄录自框架模板 SDC/Style/IOGroupBox.xaml 的内容区边框 2 0 2 2 / 1 0 1 1 与 SDC/Sizes.xaml 的 GroupBoxBaseHeader=40 / GroupBoxSecondaryHeader=35 / GroupBoxThirdlyHeader=25，作为数值由来说明）。重挂进容器的子控件坐标必须按此原点换算：expectedLeft = 子绝对X − 容器绝对X − inset.left，expectedTop = 子绝对Y − 容器绝对Y − inset.top；不换算会让容器内所有子控件整体下移一个标题条高度。容器变体上，`style` 是发射到 XML 的 Style 值、`contentInsetStyle` 是仅用于查本表 styleInsets 的内部键，两者分开登记：项目框架口径下 GroupBox 的 `style` 恒为空串（`Style=\"\"`），而其内容区原点就是 `contentInsetStyle` 指向的本表取值（本族 `IOGroupBoxSecondary` = {left:1, top:35}）——这是既定事实，直接换算，不设待确认项；`contentInsetStyle` 仍必须显式登记（禁止 null），否则子控件相对坐标无法机械换算，生成器 fail-closed。"
+    },
+    "tableTemplates": {
+      "columnTemplate": {
+        "geometry": {
+          "left": 0,
+          "top": 0,
+          "height": 45
+        },
+        "omitWidth": true,
+        "alwaysWrittenAttrs": [
+          "IOName"
+        ],
+        "requiredAttrsPolicy": "column-template",
+        "note": "DataGrid 的列子节点是**列定义**，不是页面控件：按设计器模板发射固定几何（Left=0 / Top=0 / Height=45，不写 Width），属性只发射 Value（列标题，来自表头文本）加恒写 IOName 空占位，不套用 controlTypeRequiredAttrs（那是页面控件的字段集）。列顺序 = 表头文本从左到右；列数 = 表头可见文本数（没有「隐藏主键列」这类额外列——本族不为列发射 IOVisible，除非将来为它在 columnTemplate 登记来源判据与发射口径）。"
+      }
+    }
+  }
+}
