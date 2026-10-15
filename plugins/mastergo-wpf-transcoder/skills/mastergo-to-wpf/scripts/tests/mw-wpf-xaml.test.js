@@ -1,0 +1,300 @@
+#!/usr/bin/env node
+"use strict";
+
+// 作业A（mw-wpf）页面 XAML 发射器回归：
+//   1) 发射形态对齐真实页面（UserControl 头 / Resources 合并本页 Icon 字典 / Grid 行列 / Grid.Row / 语言键 / 形状资源）；
+//   2) 框架固定区（顶部栏 / 底部栏）不发射；
+//   3) 未登记类型（写法表 status=pending）与取不到样式族的变体一律 fail-closed；
+//   4) 没有语言键的文本不写字面量，进 textPending；
+//   5) 目标已存在且未加 --overwrite 时拒绝覆盖。
+
+const assert = require("assert");
+const fs = require("fs");
+const path = require("path");
+const { tmpDir } = require(path.join(__dirname, "helpers", "tmp-dir.js"));
+const { spawnSync } = require("child_process");
+
+const SCRIPT_DIR = path.join(__dirname, "..");
+const XAML_SCRIPT = path.join(SCRIPT_DIR, "adapters", "mw-wpf", "gen-mw-wpf-xaml.js");
+const ROUTE_MAP = path.join(SCRIPT_DIR, "..", "references", "adapters", "mw-wpf", "mw-wpf-map.json");
+
+const tmpRoot = tmpDir("mw-wpf-xaml-");
+let caseIndex = 0;
+
+function writeJson(name, value) {
+  const file = path.join(tmpRoot, name);
+  fs.writeFileSync(file, JSON.stringify(value, null, 2), "utf8");
+  return file;
+}
+
+function baseLayout(overrides = {}) {
+  return Object.assign({
+    schemaVersion: 1,
+    adapter: "mw-wpf",
+    pageTarget: "SamplePage",
+    design: { width: 1280, height: 1024 },
+    regions: [
+      {
+        id: "top-strip", name: "顶部栏", ref: "root/top", role: "framework-top", emit: false,
+        x: 0, y: 0, w: 1280, h: 90,
+        grid: {
+          rows: [{ size: "Pixel", value: 90, source: "framework:MaxwellFramework_HeaderHeight" }],
+          columns: [{ size: "Star", source: "design" }],
+          cells: [cell("root/top/btn", "IconButton", 0, 0, designBox(1280, 90, 100, 60))]
+        }
+      },
+      {
+        id: "work-area", name: "工作区", ref: "root/work", role: "work-area", emit: true,
+        x: 0, y: 90, w: 1280, h: 682,
+        grid: {
+          rows: [{ size: "Pixel", value: 160, source: "design" }, { size: "Star", source: "design" }],
+          columns: [{ size: "Pixel", value: 600, source: "design" }, { size: "Star", source: "design" }],
+          cells: [
+            cell("work/group", "GroupBox", 0, 0, designBox(600, 160, 200, 160)),
+            cell("work/enter", "IconButton", 0, 1, designBox(680, 160, 170, 80)),
+            cell("work/label", "TextBlock", 1, 0, designBox(600, 522, 120, 30))
+          ]
+        }
+      }
+    ],
+    pending: []
+  }, overrides);
+}
+
+function baseTypes(nodes) {
+  return { schemaVersion: 1, nodes: nodes, pending: [], unmappedComponents: [] };
+}
+
+// 格子契约（布局产物）：格子尺寸 = 设计稿那条带；承载物设计尺寸 = 控件/容器自身 bbox；
+// 偏移 = 承载物在格内的起点偏移。来源与算法见 gen-mw-wpf-layout.js（bandExtents / contentSizeOf）。
+function designBox(width, height, nodeWidth, nodeHeight, offsetX = 0, offsetY = 0) {
+  return {
+    width: width, height: height,
+    nodeWidth: nodeWidth, nodeHeight: nodeHeight,
+    offsetX: offsetX, offsetY: offsetY
+  };
+}
+
+function cell(ref, controlType, row, column, box) {
+  return Object.assign({ ref: ref, controlType: controlType, row: row, column: column, rowSpan: 1, columnSpan: 1 }, box);
+}
+
+const NODES = [
+  {
+    ref: "work/group", sourceRef: "work/group", controlType: "GroupBox", variant: "信息分组-模块化",
+    sourceText: "设定XY轴位置", absX: 658, absY: 514, w: 200, h: 160, langName: "SamplePageSetXYAxisPosition"
+  },
+  {
+    ref: "work/enter", sourceRef: "work/enter", controlType: "IconButton", variant: "enter",
+    sourceText: "ENTER", absX: 1090, absY: 606, w: 170, h: 80, langName: "SamplePageEnter", icon: "EnterGeometry"
+  },
+  {
+    ref: "work/label", sourceRef: "work/label", controlType: "TextBlock",
+    sourceText: "工件厚度", absX: 16, absY: 106, w: 120, h: 30, langName: "SamplePageWorkpieceThickness"
+  },
+  {
+    ref: "root/top/btn", sourceRef: "root/top/btn", controlType: "IconButton",
+    sourceText: "顶部按钮", absX: 10, absY: 10, w: 100, h: 60, langName: "SamplePageTopButton"
+  }
+];
+
+function run(args, expectFailure) {
+  const result = spawnSync(process.execPath, [XAML_SCRIPT].concat(args), { encoding: "utf8" });
+  if (expectFailure) {
+    assert.notStrictEqual(result.status, 0, "应当失败却成功了: " + result.stdout);
+    return result.stderr + result.stdout;
+  }
+  assert.strictEqual(result.status, 0, result.stderr);
+  return result.stdout;
+}
+
+function emitArgs(layoutPath, typesPath, outPath, extra = []) {
+  caseIndex += 1;
+  return [
+    "--layout", layoutPath, "--types", typesPath, "--map", ROUTE_MAP,
+    "--page", "SamplePage", "--x-class", "MaxWell.SLGPages.F2.View.SamplePageView",
+    "--assembly", "MaxWell.SLGPages",
+    "--icon-page", "Resources/Pages/SamplePage/SamplePageIcons.xaml",
+    "--out", outPath
+  ].concat(extra);
+}
+
+// 1) 正常发射：形态与真实页面一致。
+{
+  const layoutPath = writeJson("layout.ok.json", baseLayout());
+  const typesPath = writeJson("types.ok.json", baseTypes(NODES));
+  const outPath = path.join(tmpRoot, "ok", "SamplePageView.xaml");
+  const reportPath = path.join(tmpRoot, "ok", "report.json");
+  run(emitArgs(layoutPath, typesPath, outPath, ["--report", reportPath, "--overwrite"]));
+  const xaml = fs.readFileSync(outPath, "utf8");
+  const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
+
+  assert.match(xaml, /^<UserControl x:Class="MaxWell\.SLGPages\.F2\.View\.SamplePageView"/,
+    "UserControl 头必须带清单给出的 x:Class");
+  assert.match(xaml, /xmlns:s="http:\/\/www\.maxwell-gp\.com\/"/, "必须声明框架命名空间 s");
+  assert.match(xaml, /FocusVisualStyle="\{x:Null\}"/, "焦点视觉必须关闭（与真实页面一致）");
+  assert.match(xaml, /d:DesignHeight="1024" d:DesignWidth="1280"/, "设计尺寸取布局产物的 design");
+  assert.match(xaml,
+    /<ResourceDictionary Source="\/MaxWell\.SLGPages;component\/Resources\/Pages\/SamplePage\/SamplePageIcons\.xaml" \/>/,
+    "必须合并本页 Icon 字典（作业A 用 StaticResource 引用图形，缺合并点会在加载期抛异常）");
+  assert.match(xaml, /<Style TargetType="\{x:Type TextBlock\}" BasedOn="\{StaticResource TextBlockStyle\}" \/>/,
+    "TextBlock 走页级 BasedOn");
+  assert.match(xaml, /<Grid\.RowDefinitions>/, "多行必须写行定义");
+  assert.match(xaml, /<RowDefinition Height="160" \/>/, "行尺寸照设计稿像素");
+  assert.match(xaml, /<RowDefinition \/>/, "星号尺寸写成裸 RowDefinition");
+  assert.match(xaml, /<s:IconButton\n\s+Grid\.Row="0"\n\s+Grid\.Column="1"/, "控件落格必须写 Grid.Row/Grid.Column");
+  assert.match(xaml, /Icon="\{StaticResource EnterGeometry\}"/, "图形走 StaticResource");
+  // RightButtonStyle 是「图标上 + 文字下」，文本挂 IconText（见写法表 textBinding.byStyle）。
+  assert.match(xaml, /IconText="\{DynamicResource SamplePageEnter\}"/, "文本走 DynamicResource 语言键，并挂到样式族对应的属性");
+  assert.match(xaml, /Style="\{StaticResource RightButtonStyle\}"/, "enter 变体走 RightButtonStyle");
+  assert.match(xaml, /Header="\{DynamicResource SamplePageSetXYAxisPosition\}"/, "GroupBox 文本挂 Header");
+  assert.match(xaml, /Style="\{StaticResource IOGroupBoxSecondary\}"/, "信息分组-模块化 走 IOGroupBoxSecondary");
+  assert.ok(!xaml.includes("顶部按钮"), "框架固定区里的控件不得发射");
+  assert.ok(!xaml.includes("SamplePageTopButton"), "框架固定区里的文本不得发射");
+  assert.strictEqual(report.skippedRegions.length, 1, "跳过的框架固定区要进报告");
+  assert.strictEqual(report.skippedRegions[0].role, "framework-top");
+  assert.strictEqual(report.textPending.length, 0);
+}
+
+// 2) 未登记/待确认类型（写法表 status=pending，当前是 Border）→ 挂待确认、不发射（与作业B 的 pending 处置一致）。
+{
+  const layout = baseLayout();
+  layout.regions[1].grid.cells = [cell("work/border", "Border", 0, 0, designBox(600, 160, 10, 10))];
+  const layoutPath = writeJson("layout.pendingtype.json", layout);
+  const typesPath = writeJson("types.pendingtype.json", baseTypes([
+    { ref: "work/border", sourceRef: "work/border", controlType: "Border", absX: 0, absY: 0, w: 10, h: 10 }
+  ]));
+  const outPath = path.join(tmpRoot, "pendingtype", "View.xaml");
+  const reportPath = path.join(tmpRoot, "pendingtype", "report.json");
+  run(emitArgs(layoutPath, typesPath, outPath, ["--report", reportPath, "--overwrite"]));
+  const xaml = fs.readFileSync(outPath, "utf8");
+  const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
+  assert.ok(!xaml.includes("s:Border") && !xaml.includes("<Border"), "待确认类型不得发射成任何控件");
+  assert.strictEqual(report.pending.length, 1);
+  assert.match(report.pending[0].reason, /待确认/);
+}
+
+// 3) 变体取不到样式族（GroupBox 未登记变体）→ fail-closed，并指出是哪个变体。
+{
+  const layout = baseLayout();
+  layout.regions[1].grid.cells = [cell("work/group", "GroupBox", 0, 0, designBox(600, 160, 200, 160))];
+  const layoutPath = writeJson("layout.novariant.json", layout);
+  const typesPath = writeJson("types.novariant.json", baseTypes([
+    { ref: "work/group", sourceRef: "work/group", controlType: "GroupBox", sourceText: "分组", absX: 0, absY: 0, w: 200, h: 160, langName: "SamplePageGroup" }
+  ]));
+  const out = run(emitArgs(layoutPath, typesPath, path.join(tmpRoot, "novariant", "View.xaml")), true);
+  assert.match(out, /样式族/, "必须指出取不到样式族");
+  assert.match(out, /\(缺\)/, "变体缺省要显式写出");
+}
+
+// 4) 有文本但无语言键 → 不写字面量，进 textPending。
+{
+  const layout = baseLayout();
+  layout.regions[1].grid.cells = [cell("work/label", "TextBlock", 1, 0, designBox(600, 522, 120, 30))];
+  const layoutPath = writeJson("layout.nolang.json", layout);
+  const typesPath = writeJson("types.nolang.json", baseTypes([
+    { ref: "work/label", sourceRef: "work/label", controlType: "TextBlock", sourceText: "工件厚度", absX: 16, absY: 106, w: 120, h: 30 }
+  ]));
+  const outPath = path.join(tmpRoot, "nolang", "View.xaml");
+  const reportPath = path.join(tmpRoot, "nolang", "report.json");
+  run(emitArgs(layoutPath, typesPath, outPath, ["--report", reportPath, "--overwrite"]));
+  const xaml = fs.readFileSync(outPath, "utf8");
+  const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
+  assert.ok(!xaml.includes("工件厚度"), "没有语言键的文本不得写成字面量");
+  assert.strictEqual(report.textPending.length, 1);
+  assert.strictEqual(report.textPending[0].text, "工件厚度");
+}
+
+// 4b) 值槽位登记 langRefPolicy=none（选择框的 Value，如 "Auto"）：不写字面量、不算待办文本，
+//     单列进 valueLangExempt —— 与 Bundle 审计同名同义，A 门禁 R7 也按这条登记放行。
+{
+  const layout = baseLayout();
+  layout.regions[1].grid.cells = [cell("work/select", "ComboBox", 1, 0, designBox(600, 522, 170, 40))];
+  const layoutPath = writeJson("layout.valueexempt.json", layout);
+  const typesPath = writeJson("types.valueexempt.json", baseTypes([
+    {
+      ref: "work/select", sourceRef: "work/select", controlType: "ComboBox", variant: "选择框-40",
+      sourceText: "Auto", valueSource: "dsl.text", langRefPolicy: "none", absX: 16, absY: 106, w: 170, h: 40
+    }
+  ]));
+  const outPath = path.join(tmpRoot, "valueexempt", "View.xaml");
+  const reportPath = path.join(tmpRoot, "valueexempt", "report.json");
+  run(emitArgs(layoutPath, typesPath, outPath, ["--report", reportPath, "--overwrite"]));
+  const xaml = fs.readFileSync(outPath, "utf8");
+  const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
+  assert.ok(!xaml.includes("Auto"), "豁免值不得写成字面量");
+  assert.strictEqual(report.textPending.length, 0, "值槽位豁免不算待办文本");
+  assert.strictEqual(report.valueLangExempt.length, 1);
+  assert.strictEqual(report.valueLangExempt[0].text, "Auto");
+}
+
+// 5) 目标已存在且未加 --overwrite → 拒绝覆盖。
+{
+  const layoutPath = writeJson("layout.exists.json", baseLayout());
+  const typesPath = writeJson("types.exists.json", baseTypes(NODES));
+  const outPath = path.join(tmpRoot, "exists", "View.xaml");
+  fs.mkdirSync(path.dirname(outPath), { recursive: true });
+  fs.writeFileSync(outPath, "<!-- 既有产物 -->\n", "utf8");
+  const out = run(emitArgs(layoutPath, typesPath, outPath), true);
+  assert.match(out, /已存在/);
+  assert.strictEqual(fs.readFileSync(outPath, "utf8"), "<!-- 既有产物 -->\n", "拒绝覆盖时原文件必须逐字节不变");
+}
+
+// 6) 隐式默认样式（pageDefault="implicit"，如 Camera）：不写 Style、也不许进页级 Resources
+//    ——曾经错写成 BasedOn="{StaticResource null}"，被资源键门禁 R6 拦下。
+{
+  const layout = baseLayout();
+  layout.regions[1].grid.cells = [cell("work/camera", "Camera", 0, 0, designBox(600, 160, 200, 150))];
+  const layoutPath = writeJson("layout.implicit.json", layout);
+  const typesPath = writeJson("types.implicit.json", baseTypes([
+    { ref: "work/camera", sourceRef: "work/camera", controlType: "Camera", absX: 0, absY: 0, w: 200, h: 150 }
+  ]));
+  const outPath = path.join(tmpRoot, "implicit", "View.xaml");
+  run(emitArgs(layoutPath, typesPath, outPath, ["--overwrite"]));
+  const xaml = fs.readFileSync(outPath, "utf8");
+  assert.match(xaml, /<s:Camera/, "Camera 按写法表发射成 s:Camera");
+  assert.ok(!xaml.includes("StaticResource null"), "隐式默认样式不得写成 BasedOn=\"{StaticResource null}\"");
+  assert.ok(!/BasedOn="\{StaticResource [^}]*\}" \/>\s*$/m.test(xaml.split("<s:Camera")[0].split("<UserControl.Resources>")[1] || ""),
+    "隐式默认样式不得进页级 Resources");
+}
+
+// 7) 容器格子（成层容器：flex 容器或带尺寸约束的容器）：没有控件类型，自己就是一层 <Grid>，
+//    定位属性写在它身上，内部控件落它自己的内层格子。
+{
+  const layout = baseLayout();
+  layout.regions[1].grid.cells = [
+    cell("work/camera", "Camera", 0, 0, designBox(600, 160, 200, 150)),
+    {
+      ref: "work/flex", container: true, row: 0, column: 1, rowSpan: 1, columnSpan: 1,
+      // 容器格子：格子 680×160（比容器本身大 → 多出来的部分是间距），容器自身 200×150，贴格起点。
+      width: 680, height: 160, nodeWidth: 200, nodeHeight: 150, offsetX: 0, offsetY: 0,
+      children: {
+        rows: [{ size: "Pixel", value: 40, source: "design" }, { size: "Star", source: "design" }],
+        columns: [{ size: "Pixel", value: 120, source: "design" }, { size: "Star", source: "design" }],
+        cells: [
+          // 内层网格可用尺寸＝容器设计尺寸 200×150（不是整个格子）：列 120 + 星号 80，行 40 + 星号 110。
+          cell("work/label", "TextBlock", 0, 0, designBox(120, 40, 120, 30))
+        ]
+      }
+    }
+  ];
+  const layoutPath = writeJson("layout.container.json", layout);
+  const typesPath = writeJson("types.container.json", baseTypes([
+    { ref: "work/camera", sourceRef: "work/camera", controlType: "Camera", absX: 0, absY: 0, w: 200, h: 150 },
+    {
+      ref: "work/label", sourceRef: "work/label", controlType: "TextBlock",
+      sourceText: "工件厚度", absX: 16, absY: 106, w: 120, h: 30, langName: "SamplePageWorkpieceThickness"
+    }
+  ]));
+  const outPath = path.join(tmpRoot, "container", "View.xaml");
+  run(emitArgs(layoutPath, typesPath, outPath, ["--overwrite"]));
+  const xaml = fs.readFileSync(outPath, "utf8");
+  assert.match(xaml, /<Grid Grid\.Row="0" Grid\.Column="1" Width="200" Height="150" HorizontalAlignment="Left" VerticalAlignment="Top">/,
+    "容器格子必须发射成一层带定位属性、并按设计稿写尺寸与对齐的 <Grid>");
+  const container = xaml.slice(xaml.indexOf('<Grid Grid.Row="0" Grid.Column="1"'));
+  const inner = container.slice(0, container.indexOf("</Grid>"));
+  assert.match(inner, /<Grid\.RowDefinitions>/, "容器 Grid 必须有内层行列定义");
+  assert.match(inner, /<TextBlock[\s\S]*Grid\.Row="0"[\s\S]*Grid\.Column="0"/, "子控件必须落在容器 Grid 的内层格子里");
+}
+
+console.log("PASS 作业A 页面 XAML 发射（形态 / 固定区 / fail-closed / 语言键 / 覆盖保护 / 容器层）回归测试");

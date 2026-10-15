@@ -1,0 +1,27 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "bigstart-plugins",
+  "owner": {
+    "name": "BigStartByXuyb"
+  },
+  "metadata": {
+    "description": "BigStart team plugins for Claude Code and Codex."
+  },
+  "plugins": [
+    {
+      "name": "mastergo-wpf-transcoder",
+      "source": "./plugins/mastergo-wpf-transcoder",
+      "description": "MasterGo design to MW WPF and MTSLG IOContorl conversion rules, component mappings, provenance checks, and coordinate validation."
+    },
+    {
+      "name": "agent-plugin-publisher",
+      "source": "./plugins/agent-plugin-publisher",
+      "description": "将用户明确指定的本地目录按团队统一格式打包为插件。"
+    },
+    {
+      "name": "feishu-codex-bridge",
+      "source": "./plugins/feishu-codex-bridge",
+      "description": "把本机 Codex 接到飞书：飞书消息驱动 Codex 执行并把结果回贴原消息。"
+    }
+  ]
+}
