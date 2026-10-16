@@ -39,7 +39,16 @@ codex plugin add agent-plugin-publisher@mw-plugins
 
 如果其他已登记市场里也有同名插件，先用 `codex plugin list` 查看来源，再按客户端支持的 `插件 ID@市场 ID` 形式指定来源。安装后用 `codex plugin list` 确认状态。
 
-已有旧市场登记时，先用客户端的 marketplace list 命令查看登记项；按客户端命令移除旧登记，再添加上面的 GitLab 源。新市场 ID 为 mw-plugins。
+已有旧市场登记时，先查看登记名，移除旧登记，再添加上面的 GitLab 源：
+
+```sh
+claude plugin marketplace list
+claude plugin marketplace remove <旧市场 ID>
+codex plugin marketplace list
+codex plugin marketplace remove <旧市场 ID>
+```
+
+新市场 ID 为 `mw-plugins`。重新登记后再安装 `agent-plugin-publisher@mw-plugins`。
 
 ### 其他兼容 Agent
 
@@ -89,7 +98,15 @@ git diff --check
 
 ## 提交与发版
 
-所有日常更新提交到 GitLab 的 `plugin-migration` 分支，检查通过后通过 Merge Request 合入受保护的 `main`。首次创建共享分支的步骤见上文；后续更新按以下流程执行：
+所有日常更新提交到 GitLab 的 `plugin-migration` 分支，检查通过后通过 Merge Request 合入受保护的 `main`。首次 checkout 该分支：
+
+```sh
+git clone http://14.29.174.209:20001/data_ai/plugins.git
+cd plugins
+git switch --track origin/plugin-migration
+```
+
+后续更新流程：
 
 ```sh
 git switch plugin-migration
@@ -99,8 +116,6 @@ git commit -m "更新 <plugin-id> 插件内容"
 git push origin plugin-migration
 ```
 
-向 `main` 提交 Merge Request，并等待流水线完成后合并。MR 流水线使用 `data_ai/cicd` 中固定版本的模板，运行需要 Linux Docker Runner。`data_ai/cicd` 的 Job Token allowlist 必须允许 `data_ai/plugins` 读取共享模板。
-
-在本项目 Settings → CI/CD → Variables 中配置 `plugin-cicd` 作用域的 masked 变量：`ANTHROPIC_API_KEY`、`FEISHU_APP_ID`、`FEISHU_APP_SECRET`、`FEISHU_DEFAULT_CHAT_ID`、`FEISHU_RECIPIENT_MAP_JSON` 和 `GITLAB_API_TOKEN`。密钥值不提交到仓库。
+向 `main` 提交 Merge Request，并等待流水线完成后合并。MR 流水线使用 `data_ai/cicd` 中固定版本的模板；Runner、Job Token allowlist 和项目 CI/CD 变量由 Maintainer 配置。
 
 插件版本记录在各自的 `.claude-plugin/plugin.json`。发版时按 [`docs/plugin-release.md`](docs/plugin-release.md) 更新版本并推送 `v<version>` tag。提交前确认没有密钥、临时文件或本机绝对路径。
