@@ -85,11 +85,13 @@ git diff --check
 ```sh
 git switch plugin-migration
 git pull --rebase origin plugin-migration
-git add README.md docs/PLUGINS.md PLUGIN_MAINTAINER_GUIDE.md plugins/
+git add README.md docs/PLUGINS.md PLUGIN_MAINTAINER_GUIDE.md .claude-plugin/marketplace.json plugins/
 git commit -m "更新 <plugin-id> 插件内容"
 git push origin plugin-migration
 ```
 
-向 `main` 提交 Merge Request，并等待流水线完成后合并。MR 流水线使用 `data_ai/cicd` 中固定版本的模板；Runner、Job Token allowlist 和项目 CI/CD 变量由 Maintainer 配置。
+向 `main` 提交 Merge Request，并等待流水线完成后合并。MR 流水线使用 `data_ai/cicd` 中固定版本的模板，运行需要 Linux Docker Runner。`data_ai/cicd` 的 Job Token allowlist 必须允许 `data_ai/plugins` 读取共享模板。
+
+在本项目 Settings → CI/CD → Variables 中配置 `plugin-cicd` 作用域的 masked 变量：`ANTHROPIC_API_KEY`、`FEISHU_APP_ID`、`FEISHU_APP_SECRET`、`FEISHU_DEFAULT_CHAT_ID`、`FEISHU_RECIPIENT_MAP_JSON` 和 `GITLAB_API_TOKEN`。密钥值不提交到仓库。
 
 插件版本记录在各自的 `.claude-plugin/plugin.json`。发版时按 [`docs/plugin-release.md`](docs/plugin-release.md) 更新版本并推送 `v<version>` tag。提交前确认没有密钥、临时文件或本机绝对路径。
