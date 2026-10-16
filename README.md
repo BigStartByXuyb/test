@@ -1,6 +1,6 @@
-# BigStart Plugins
+# MW 插件系统插件市场
 
-团队插件市场。各插件位于 `plugins/`，根目录 `.claude-plugin/marketplace.json` 是唯一的市场目录。
+MW 插件系统的团队插件市场。各插件位于 `plugins/`，根目录 `.claude-plugin/marketplace.json` 是唯一的市场目录。
 
 ## 插件
 
@@ -10,4 +10,4 @@
 
 ## 发版
 
-版本号在插件自己的 `.claude-plugin/plugin.json`，tag 名 = `v` + 该版本号；什么时候发、版本位怎么选见 `docs/plugin-release.md`。
+版本号在插件自己的 `.claude-plugin/plugin.json`，tag 名 = `v` + 该版本号；发版流程见 `docs/plugin-release.md`。
