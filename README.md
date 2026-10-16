@@ -20,17 +20,26 @@ GitLab 市场源：
 
 ```sh
 claude plugin marketplace add http://14.29.174.209:20001/data_ai/plugins.git
-claude plugin install agent-plugin-publisher --marketplace http://14.29.174.209:20001/data_ai/plugins.git
+claude plugin install agent-plugin-publisher@mw-plugins
+```
+
+在 Claude Code 会话中也可以执行：
+
+```text
+/plugin marketplace add http://14.29.174.209:20001/data_ai/plugins.git
+/plugin install agent-plugin-publisher@mw-plugins
 ```
 
 ### Codex
 
 ```sh
 codex plugin marketplace add http://14.29.174.209:20001/data_ai/plugins.git
-codex plugin add agent-plugin-publisher
+codex plugin add agent-plugin-publisher@mw-plugins
 ```
 
 如果其他已登记市场里也有同名插件，先用 `codex plugin list` 查看来源，再按客户端支持的 `插件 ID@市场 ID` 形式指定来源。安装后用 `codex plugin list` 确认状态。
+
+已有旧市场登记时，先用客户端的 marketplace list 命令查看登记项；按客户端命令移除旧登记，再添加上面的 GitLab 源。新市场 ID 为 mw-plugins。
 
 ### 其他兼容 Agent
 
