@@ -4,11 +4,11 @@
 # 密钥不写在这里：CI/CD 变量在本仓库的 Settings → CI/CD → Variables（作用域 plugin-cicd）。
 include:
   - project: data_ai/cicd
-    ref: e86c8c538c51ed6be0e7a7d0f033627a7497f52a
+    ref: 69b10112bb7af1fe44167ab9c38a79c182a6dc76
     file: /templates/common.yml
   - project: data_ai/cicd
-    ref: e86c8c538c51ed6be0e7a7d0f033627a7497f52a
+    ref: 69b10112bb7af1fe44167ab9c38a79c182a6dc76
     file: /templates/plugin-marketplace.yml
 
 variables:
-  CI_IMPL_REF: e86c8c538c51ed6be0e7a7d0f033627a7497f52a
+  CI_IMPL_REF: 69b10112bb7af1fe44167ab9c38a79c182a6dc76
