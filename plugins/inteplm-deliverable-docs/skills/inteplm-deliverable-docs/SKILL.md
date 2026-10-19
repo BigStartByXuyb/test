@@ -74,10 +74,10 @@ node --test "<skill-dir>/scripts/tests/page-selection.test.js" "<skill-dir>/scri
 4. `setName --frame=documentLayout/create <按对照表生成的名称>`。
 5. `setLocation --frame=documentLayout/create <位置节点名>`。
 6. 电子文件自带一行模板 → `previewRows --frame=documentLayout/create 0`；检查预览仅包含模板行并取得用户确认后，运行 `removeRows --frame=documentLayout/create --confirm 0`。
-7. `upload --frame=documentLayout/create <本地文件路径>`,一次一个。
+7. `upload --frame=documentLayout/create <本地文件路径>`:一次一个**本地文件**(不是一份交付件)。同一份交付件含多个文件时,重复本步逐个上传,直到全部上传完。
 8. 用户确认后 `submit`。
 
-批量:每份交付件重复 1-8。
+批量:按**交付件**重复 1-8;一份交付件内的多个文件在第 7 步内部循环。
 
 ## 规则
 

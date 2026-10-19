@@ -73,6 +73,15 @@ const main = async () => {
   if (cmd === "frames") return out(page.frames().map((f) => ({ name: f.name(), url: f.url() })));
 
   const t = frameKey ? page.frames().filter((f) => f.url().includes(frameKey)).pop() : page;
+  if (!t) {
+    const urls = page.frames().map((f) => f.url()).filter(Boolean);
+    throw new Error(
+      [
+        `未找到 URL 含 "${frameKey}" 的 frame。先运行 frames 查看当前可用的 frame。`,
+        urls.length ? "当前 frame:\n" + urls.map((u) => "  - " + u).join("\n") : "当前没有可用的 frame。",
+      ].join("\n"),
+    );
+  }
 
   if (cmd === "snap") {
     const info = {
@@ -89,7 +98,11 @@ const main = async () => {
   }
 
   if (cmd === "jsClick") {
-    await t.evaluate((sel) => document.querySelector(sel).click(), args[0]);
+    await t.evaluate((sel) => {
+      const el = document.querySelector(sel);
+      if (!el) throw new Error(`未找到元素: ${sel}`);
+      el.click();
+    }, args[0]);
     await page.waitForTimeout(1500);
     return out({ clicked: args[0] });
   }
@@ -153,21 +166,27 @@ const main = async () => {
 
   if (cmd === "setLocation") {
     await t.evaluate(() => {
-      Array.from(document.querySelectorAll("input.el-input__inner"))
-        .find((i) => i.placeholder === "请选择存储位置")
-        .click();
+      const input = Array.from(document.querySelectorAll("input.el-input__inner")).find(
+        (i) => i.placeholder === "请选择存储位置",
+      );
+      if (!input) throw new Error("未找到「请选择存储位置」输入框");
+      input.click();
     });
     await page.waitForTimeout(1600);
     await t.evaluate((name) => {
-      Array.from(document.querySelectorAll(".ty-quick-choose-multiple__popper .el-tree-node__content"))
-        .find((n) => String(n.innerText || "").trim() === name)
-        .click();
+      const node = Array.from(document.querySelectorAll(".ty-quick-choose-multiple__popper .el-tree-node__content")).find(
+        (n) => String(n.innerText || "").trim() === name,
+      );
+      if (!node) throw new Error(`存储位置「${name}」未找到`);
+      node.click();
     }, args[0]);
     await page.waitForTimeout(1000);
     await t.evaluate(() => {
-      Array.from(document.querySelectorAll(".ty-quick-choose-multiple__popper button"))
-        .find((b) => String(b.innerText || "").trim() === "确定")
-        .click();
+      const button = Array.from(document.querySelectorAll(".ty-quick-choose-multiple__popper button")).find(
+        (b) => String(b.innerText || "").trim() === "确定",
+      );
+      if (!button) throw new Error("存储位置确认按钮未找到");
+      button.click();
     });
     await page.waitForTimeout(1800);
     return out({ inputs: await inputs(t) });
@@ -196,7 +215,9 @@ const main = async () => {
     const indexes = parseRowIndexes(args.slice(1), rows.length);
     const selectedRows = indexes.map((index) => ({ index, cells: rows[index] }));
     await t.evaluate((idxs) => {
-      const rows = Array.from(document.querySelectorAll("table.vxe-table--body")[0].querySelectorAll("tr"));
+      const table = document.querySelectorAll("table.vxe-table--body")[0];
+      if (!table) throw new Error("文件表格未找到,确认已打开交付物新建文档表单");
+      const rows = Array.from(table.querySelectorAll("tr"));
       const checkboxes = idxs.map((index) => rows[index]?.querySelector(".vxe-cell--checkbox"));
       if (checkboxes.some((checkbox) => !checkbox)) throw new Error("待移除行未找到文件勾选框");
       checkboxes.forEach((checkbox) => checkbox.click());
