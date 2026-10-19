@@ -1,6 +1,6 @@
 # 插件发版规范
 
-当前 `.github/workflows/plugin-release.yml` 只为 `mastergo-wpf-transcoder` 生成 GitHub Release 发布件。其他 marketplace 插件通过市场源分发，不使用该工作流的版本 tag。扩展其他插件的 Release 发布时，必须同步扩展工作流并更新本文。
+当前 `.github/workflows/plugin-release.yml` 只为 `mastergo-wpf-transcoder` 生成 GitHub Release 发布件。GitLab MR 是合并门禁；合并后先把对应提交同步到 GitHub，再将发布 tag 推送到 GitHub。GitLab tag 不触发发布作业。其他 marketplace 插件通过市场源分发，不使用该工作流的版本 tag。扩展其他插件的 Release 发布时，必须同步扩展工作流并更新本文。
 
 ## 版本号与 tag
 

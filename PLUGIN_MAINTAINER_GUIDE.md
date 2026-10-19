@@ -50,7 +50,7 @@ MasterGo 页面坐标与来源校验是页面级检查，不是无参数的市�
 
 `plugin-migration` 是日常维护分支。首次由 Maintainer 从 GitLab `main` 创建并推送该分支；维护者 checkout 后，提交前执行 `git pull --rebase origin plugin-migration`。完成本地校验后推送，并创建目标为 `main` 的 Merge Request。不要直接推送受保护的 `main`。
 
-GitLab CI 调用 `data_ai/cicd` 的长期维护 `main` 分支作为共享模板源。调用项目的 Job Token allowlist、Linux Docker Runner 和 masked CI/CD 变量由 Maintainer 配置；密钥不保存在仓库中。
+GitLab MR 的 `data_ai/cicd` `main` 流水线是本仓库唯一权威合并门禁；GitHub Actions 的 `BigStartByXuyb/cicd` 固定版本只为 GitHub 上的 PR 或推送提供辅助结果，不替代 GitLab MR 结果。GitLab `main` 是合并目标，GitHub 不作为本仓库的第二个合并入口。调用项目的 Job Token allowlist、Linux Docker Runner 和 masked CI/CD 变量由 Maintainer 配置；密钥不保存在仓库中。
 
 对映射文档、映射表或变体规则的改动，还必须按页面规则执行映射覆盖审计。先进入插件目录，再运行：
 
@@ -62,4 +62,4 @@ node skills/mastergo-to-wpf/scripts/adapters/mtslg-iocontrol/audit-mtslg-feishu-
 
 ## 发版
 
-版本写入插件自身的 `.claude-plugin/plugin.json`。当前 GitHub Release 工作流仅为 `mastergo-wpf-transcoder` 生成发布件；按 [`docs/plugin-release.md`](docs/plugin-release.md) 选择版本位，并为包含该版本的提交推送 `v<version>` tag。其他插件通过 marketplace 源分发，不使用该 tag 工作流。已推送 tag 不移动或覆盖。
+版本写入插件自身的 `.claude-plugin/plugin.json`。当前 GitHub Release 工作流仅为 `mastergo-wpf-transcoder` 生成发布件；GitLab MR 合并且 GitHub 主线同步到同一提交后，按 [`docs/plugin-release.md`](docs/plugin-release.md) 推送 `v<version>` tag 到 GitHub。GitLab tag 不触发该发布工作流。其他插件通过 marketplace 源分发，不使用该 tag 工作流。已推送 tag 不移动或覆盖。

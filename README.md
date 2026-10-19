@@ -71,7 +71,7 @@ plugins/
     └── agents/          # 可选
 ```
 
-`commands/`、`hooks/`、`references/`、`scripts/`、`output-styles/`、`themes/`、`monitors/`、`bin/`、`.lsp.json` 和 `settings.json` 也是支持的插件组件。完整组件归属与目录规则见 `agent-plugin-publisher` Skill。
+插件还可包含 `commands/`、`agents/`、`hooks/`、`.mcp.json`、`.lsp.json`、`output-styles/`、`themes/`、`monitors/`、`bin/` 和 `settings.json` 等公开组件；`references/`、`scripts/`、`assets/` 和 `examples/` 是组件使用的支撑资源。完整目录规则见 `agent-plugin-publisher` Skill。
 
 新增技能放在 `plugins/<plugin-id>/skills/<skill-id>/`，并提供 `SKILL.md`。Marketplace 条目、插件元数据和源目录必须使用一致的 ID 与路径。用户可见的插件用途、技能入口和安装条件维护在 `docs/PLUGINS.md`。
 

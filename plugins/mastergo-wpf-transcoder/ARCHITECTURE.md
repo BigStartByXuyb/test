@@ -185,7 +185,7 @@ DSL/mapping 文案 ──► 英文等译文由 AI 产出 translations 清单并
 - Node.js 运行全部 JS 脚本；MasterGo MCP 通过 `call-mastergo-mcp.js` 调用（token 不落盘）。
 - **文档同步工具（可选，非交付链路依赖）**：把本地规则文档同步到团队在线文档时，使用本机已授权的飞书文档 CLI（可检索/读写云文档）按标题定位并比对；它不是生成或校验流程的运行依赖，环境没有该工具时跳过同步步骤，并在交付说明里标注"在线文档未同步"，不得因此阻塞页面交付。
 - 本地回归：`node --test "skills/mastergo-to-wpf/scripts/tests/*.test.js"`（跑满 `scripts/tests/` 下全部用例，含脚本复用门禁 `script-duplication.test.js`、文本换行口径 `text-newline.test.js`、文档预算 `doc-budget.test.js`、流水线契约 `pipeline-contract.test.js`、临时目录卫生 `tmp-hygiene.test.js`）、`Get-ChildItem "skills/mastergo-to-wpf/scripts/tests/*.tests.ps1" | ForEach-Object { pwsh -NoProfile -File $_.FullName }`（`mastergo-dsl-pipeline.tests.ps1` + `run-all-resume-identity.tests.ps1`）、`node skills/mastergo-to-wpf/scripts/adapters/mtslg-iocontrol/audit-mtslg-feishu-map.js <doc> <map>`。
-- CI 使用 `data_ai/cicd` 共享流水线，执行确定性校验、插件 JavaScript 与 PowerShell 用例和语义审计。需要页面级 XML、DSL 或映射输入的坐标与来源校验由提交者在本地执行。
+- GitLab MR 以 `data_ai/cicd` `main` 共享流水线作为唯一合并门禁，执行确定性校验、插件 JavaScript 与 PowerShell 用例和语义审计；GitHub Actions 的固定版本仅为 GitHub 入口提供辅助结果，不替代 GitLab MR 结论。需要页面级 XML、DSL 或映射输入的坐标与来源校验由提交者在本地执行。
 
 ## 11. 维护约定
 
