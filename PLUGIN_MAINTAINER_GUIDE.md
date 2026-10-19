@@ -10,20 +10,17 @@
 
 ## 新增或更新插件
 
-1. 首次由 Maintainer 从 GitLab `main` 创建并推送共享的 `plugin-migration` 分支。
-2. 每位维护者 checkout `plugin-migration`，提交前执行 `git pull --rebase origin plugin-migration`。
-3. 新插件放在 `plugins/<plugin-id>/`，并建立 `.claude-plugin/plugin.json`。
-4. 每项技能放在 `skills/<skill-id>/SKILL.md`；MCP 配置和 Subagent 按需要放入插件目录。
-5. 在根 `.claude-plugin/marketplace.json` 中新增或更新该插件对应的一条 `source` 条目，并保留其他插件条目；每个插件恰好一条。
-6. 在 `docs/PLUGINS.md` 中同步维护用途、技能入口和安装要求。
-7. ID、目录和清单路径保持一致，不能新增重复的插件 ID。
+插件包的新增、结构调整、打包和发布统一使用 `agent-plugin-publisher` Skill。必须完成该 Skill 的冲突与相似度检查，并在用户确认后发布到正式仓库；不得另行手工复制候选包或维护第二套打包步骤。
+
+插件发布后，只在本仓库同步维护 `docs/PLUGINS.md` 中的用途、技能入口和安装条件。Marketplace 源、插件元数据和正式目录由 Skill 按同一插件 ID 更新。
 
 ## 本地校验
 
 从仓库根目录执行 Claude Code marketplace 严格校验：
 
-```sh
+```powershell
 claude plugin validate --strict .
+if ($LASTEXITCODE -ne 0) { throw 'Marketplace 校验失败' }
 ```
 
 PowerShell 7 中运行与 GitLab CI 相同范围的插件 JavaScript 和 PowerShell 用例：
@@ -34,6 +31,7 @@ $nodeTests = Get-ChildItem plugins -Recurse -File -Filter '*.test.js' |
   ForEach-Object FullName
 if ($nodeTests.Count -eq 0) { throw '没有找到插件 Node 测试' }
 node --test $nodeTests
+if ($LASTEXITCODE -ne 0) { throw 'Node 测试失败' }
 
 $psTests = Get-ChildItem plugins -Recurse -File -Filter '*.tests.ps1' |
   Where-Object { $_.FullName -match '[\\/]skills[\\/].*[\\/]scripts[\\/]tests[\\/]' }
@@ -50,10 +48,18 @@ MasterGo 页面坐标与来源校验是页面级检查，不是无参数的市�
 
 ## 提交和合并
 
-`plugin-migration` 是日常维护分支。分支创建和首次 checkout 前置条件见[新增或更新插件步骤 1–2](#新增或更新插件)。后续更新先拉取远端分支，完成本地校验后推送，并创建目标为 `main` 的 Merge Request。不要直接推送受保护的 `main`。
+`plugin-migration` 是日常维护分支。首次由 Maintainer 从 GitLab `main` 创建并推送该分支；维护者 checkout 后，提交前执行 `git pull --rebase origin plugin-migration`。完成本地校验后推送，并创建目标为 `main` 的 Merge Request。不要直接推送受保护的 `main`。
 
 GitLab CI 调用 `data_ai/cicd` 的长期维护 `main` 分支作为共享模板源。调用项目的 Job Token allowlist、Linux Docker Runner 和 masked CI/CD 变量由 Maintainer 配置；密钥不保存在仓库中。
 
+对映射文档、映射表或变体规则的改动，还必须按页面规则执行映射覆盖审计。先进入插件目录，再运行：
+
+```powershell
+node skills/mastergo-to-wpf/scripts/adapters/mtslg-iocontrol/audit-mtslg-feishu-map.js <doc> <map>
+```
+
+该命令需要本次变更对应的映射文档和映射表路径。
+
 ## 发版
 
-版本写入插件自身的 `.claude-plugin/plugin.json`。按 [`docs/plugin-release.md`](docs/plugin-release.md) 选择版本位，并为包含该版本的提交推送 `v<version>` tag。已推送 tag 不移动或覆盖。
+版本写入插件自身的 `.claude-plugin/plugin.json`。当前 GitHub Release 工作流仅为 `mastergo-wpf-transcoder` 生成发布件；按 [`docs/plugin-release.md`](docs/plugin-release.md) 选择版本位，并为包含该版本的提交推送 `v<version>` tag。其他插件通过 marketplace 源分发，不使用该 tag 工作流。已推送 tag 不移动或覆盖。

@@ -14,7 +14,7 @@ GitLab 市场源：
 
 ## 安装市场并启用基础插件
 
-`agent-plugin-publisher` 是维护 MW 插件市场的必需基础插件。所有需要新增、打包、发布或维护市场插件的人员和 Agent 都必须安装并启用它。普通插件使用者按需安装其他插件。
+维护者和普通使用者的插件安装条件统一见[插件清单](docs/PLUGINS.md)。
 
 ### Claude Code
 
@@ -34,29 +34,31 @@ claude plugin install agent-plugin-publisher@mw-plugins
 
 ```sh
 codex plugin marketplace add http://14.29.174.209:20001/data_ai/plugins.git
-codex plugin add agent-plugin-publisher@mw-plugins
 ```
 
-如果其他已登记市场里也有同名插件，先用 `codex plugin list` 查看来源，再按客户端支持的 `插件 ID@市场 ID` 形式指定来源。安装后用 `codex plugin list` 确认状态。
+随后在 Codex 的 Plugins Directory 中选择 `mw-plugins`，安装 `agent-plugin-publisher`；其他插件按[插件清单](docs/PLUGINS.md)中的使用条件按需安装。
 
 ### 从旧市场迁移
 
-在对应客户端中查看并移除旧市场登记，再添加上面的 GitLab 源：
+旧市场 ID 为 `bigstart-plugins`。先记录旧市场中已安装且仍需使用的插件，再移除旧市场登记并添加上面的 GitLab 源。Claude Code 移除市场时会卸载从该市场安装的插件，因此需从新市场重新安装需保留的插件；[Claude Code 插件管理说明](https://code.claude.com/docs/en/plugins/install)。
 
 ```sh
+claude plugin list
 claude plugin marketplace list
-claude plugin marketplace remove <旧市场 ID>
+claude plugin marketplace remove bigstart-plugins
+claude plugin marketplace add http://14.29.174.209:20001/data_ai/plugins.git
 codex plugin marketplace list
-codex plugin marketplace remove <旧市场 ID>
+codex plugin marketplace remove bigstart-plugins
+codex plugin marketplace add http://14.29.174.209:20001/data_ai/plugins.git
 ```
 
-新市场 ID 为 `mw-plugins`。重新登记后再安装 `agent-plugin-publisher@mw-plugins`。
+新市场 ID 为 `mw-plugins`。对 `agent-plugin-publisher`、`mastergo-wpf-transcoder`、`feishu-codex-bridge` 中原来已安装且仍需使用的插件，从新市场重新安装，并再次检查来源和启用状态。Claude Code 使用 `claude plugin install <plugin-id>@mw-plugins` 或会话中的 `/plugin install <plugin-id>@mw-plugins`。Codex 用户在 Plugins Directory 中选择 `mw-plugins` 并安装所需插件。维护者必须启用 `agent-plugin-publisher`，普通使用者按需选择其他插件。
 
 ### 其他兼容 Agent
 
-在客户端中登记上面的 GitLab 源，安装 `docs/PLUGINS.md` 列出的插件 ID，并按客户端提示授权 MCP。市场格式兼容不代表客户端的安装命令或 MCP 权限流程相同。
+在客户端中登记上面的 GitLab 源，按任务选择 `docs/PLUGINS.md` 中适用的插件 ID，并按客户端提示授权 MCP。市场格式兼容不代表客户端的安装命令或 MCP 权限流程相同。
 
-## 插件包结构
+## 插件包最小结构示例
 
 ```text
 .claude-plugin/
@@ -69,7 +71,9 @@ plugins/
     └── agents/          # 可选
 ```
 
-新增技能放在 `plugins/<plugin-id>/skills/<skill-id>/`，并提供 `SKILL.md`。Marketplace 条目、插件元数据和源目录必须使用一致的 ID 与路径。用户可见的插件用途、技能入口和必装要求维护在 `docs/PLUGINS.md`。
+`commands/`、`hooks/`、`references/`、`scripts/`、`output-styles/`、`themes/`、`monitors/`、`bin/`、`.lsp.json` 和 `settings.json` 也是支持的插件组件。完整组件归属与目录规则见 `agent-plugin-publisher` Skill。
+
+新增技能放在 `plugins/<plugin-id>/skills/<skill-id>/`，并提供 `SKILL.md`。Marketplace 条目、插件元数据和源目录必须使用一致的 ID 与路径。用户可见的插件用途、技能入口和安装条件维护在 `docs/PLUGINS.md`。
 
 ## 插件维护
 

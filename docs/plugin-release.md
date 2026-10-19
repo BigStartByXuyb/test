@@ -1,19 +1,19 @@
 # 插件发版规范
 
-适用对象：本仓库 `plugins/` 下的所有插件。
+当前 `.github/workflows/plugin-release.yml` 只为 `mastergo-wpf-transcoder` 生成 GitHub Release 发布件。其他 marketplace 插件通过市场源分发，不使用该工作流的版本 tag。扩展其他插件的 Release 发布时，必须同步扩展工作流并更新本文。
 
 ## 版本号与 tag
 
 - 版本号写在插件自己的 `.claude-plugin/plugin.json` 的 `version`，格式 `X.Y.Z`。
-- tag 名固定为 `v` + 该插件的 `version`，指向包含这个版本号的提交。
+- 当前 Release 工作流使用 `v` + `mastergo-wpf-transcoder` 的 `version` 作为 tag，指向包含该版本号的提交。`v<version>` tag 命名空间专供此工作流目标插件使用，其他插件不得创建相同格式的 tag。
 - 客户端按 tag 打包，并核对该 tag 里的插件版本与包内容；两者不一致时打包失败。所以 tag 与 `plugin.json` 的版本必须同一次提交到位。
-- 一个 tag 对应一个插件的一版。多个插件同时发版时各打各的 tag。
+- 一个 `v<version>` tag 对应 `mastergo-wpf-transcoder` 的一个发布版本。其他插件若增加 Release 工作流，必须为其单独定义不冲突的 tag 格式。
 - 不使用 `backup-*` 这类非版本 tag；需要留备份点用分支。
 
 ## 什么时候发版
 
 - 发版不是每次提交，而是一批要交付给客户端的功能或修复做完之后：`main` 上的提交可以先积累，等这批做完、CI 全绿再发。
-- 发版动作三步：改 `plugin.json` 的 `version` → 提交、等 CI 通过 → 打 `v<version>` 并推送。
+- 发版动作三步：改 `mastergo-wpf-transcoder/.claude-plugin/plugin.json` 的 `version` → 提交、等 CI 通过 → 打 `v<version>` 并推送。
 - 紧急修复单独发一版，不与不相关的改动混在同一个发版提交里。
 
 ## 版本号怎么选

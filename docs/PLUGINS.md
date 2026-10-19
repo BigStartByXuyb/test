@@ -2,7 +2,7 @@
 
 Marketplace 安装 ID 和源路径以仓库根目录 `.claude-plugin/marketplace.json` 为准。新增、改名或移除插件时，先更新该清单，再同步更新本表。
 
-| 插件 ID | 用途 | 技能入口 | 安装要求 |
+| 插件 ID | 用途 | 技能入口 | 安装条件 |
 | --- | --- | --- | --- |
 | `agent-plugin-publisher` | 将用户指定的本地目录打包为团队 marketplace 插件。 | `plugins/agent-plugin-publisher/skills/agent-plugin-publisher/SKILL.md` | 所有需要新增、打包、发布或维护市场插件的人员和 Agent 必装并启用。 |
 | `mastergo-wpf-transcoder` | MasterGo 设计稿转换为 MW WPF 与 MTSLG IOContorl 页面。 | `plugins/mastergo-wpf-transcoder/skills/mastergo-to-wpf/SKILL.md`；`plugins/mastergo-wpf-transcoder/skills/mastergo-iocontrol-document-format/SKILL.md` | 按 MasterGo 转换或映射文档任务安装。 |
