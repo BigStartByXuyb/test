@@ -34,6 +34,6 @@ test("rejects an index that points to another site", () => {
 
 test("rejects invalid indices", () => {
   for (const index of [-1, 1, Number.NaN, Number.POSITIVE_INFINITY]) {
-    assert.throws(() => resolveInteplmPage([page("http://192.168.0.218:7002/")], index), /有效非负索引/);
+    assert.throws(() => resolveInteplmPage([page("http://192.168.0.218:7002/")], index), /出现在 pages 输出中的非负索引/);
   }
 });

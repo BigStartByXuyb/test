@@ -1,16 +1,15 @@
 ---
 name: inteplm-deliverable-docs
-description: 仅在 IntePLM 链接指向 MEL6611 V100R001 项目，或用户明确指定 MEL6611 V100R001，并要求创建、更新、编号、填写或上传交付物文档时触发。
+description: 仅在 IntePLM 链接指向 MEL6611 V100R001 项目，或用户明确指定 MEL6611 V100R001，并要求新建、编号、填写或上传交付物文档时触发。
 ---
 
 # IntePLM 交付物文档创建与上传
 
 ## 触发条件
 
-1. 用户提供指向 `MEL6611 V100R001` 项目的 IntePLM 链接，并要求创建或更新交付物文档。
-2. 用户明确指定 `MEL6611 V100R001`，并要求填写交付物、生成编号或上传文件。
-3. 链接指向其他项目时，告知用户本 Skill 仅支持 `MEL6611 V100R001`，并建议使用对应 Skill 或人工流程。
-4. 单独出现“交付物”“新建文档”“上传文件”等通用词，不触发本 Skill。
+1. 用户提供指向 `MEL6611 V100R001` 项目的 IntePLM 链接，并要求新建交付物文档。
+2. 用户明确指定 `MEL6611 V100R001`，并要求新建交付物文档、生成编号或上传文件。
+3. 单独出现“交付物”“新建文档”“上传文件”等通用词，不触发本 Skill。
 
 ## 前置
 
@@ -36,7 +35,7 @@ $env:NODE_PATH = $playwrightNodeModules
 node "<skill-dir>/scripts/plm.cjs" [--frame=documentLayout/create] [--page=<索引>] <命令> [参数]
 ```
 
-新建文档表单在内嵌 frame 里，操作表单必须加 `--frame=documentLayout/create`；`取消/确定` 在外层页面。
+新建文档表单在内嵌 frame 里，操作表单必须加 `--frame=documentLayout/create`；表单底部的“取消/确定”在外层页面，位置选择弹窗的“确定”由 `setLocation` 自动处理。
 
 ## 命令
 
@@ -45,28 +44,36 @@ node "<skill-dir>/scripts/plm.cjs" [--frame=documentLayout/create] [--page=<索�
 | pages | | 列出标签页索引和 URL |
 | snap | 名称 | 截图 + 页面文本 |
 | frames | | 列出 frame |
+| numberOptions | 项目号和版本 | 列出编号候选项 |
 | evalFile | JS 函数文件 | 在当前页面或 frame 中执行函数 |
 | jsClick | 选择器 | 点击元素 |
 | jsText | 选择器 文本 | 聚焦后真实键盘输入(下拉筛选只能用这个) |
-| numberGen | 搜索词 选项前缀 | 生成编号 |
+| numberGen | 项目号和版本 精确选项文本 | 精确选择唯一候选项并生成编号 |
 | setName | 名称 | 写名称 |
 | setLocation | 位置节点名 | 选存储位置 |
 | upload | 本地文件路径 | 添加文件 |
-| removeRows | 行号 | 勾选行并移除文件 |
+| previewRows | 从 0 开始的行索引 | 预览待移除行 |
+| removeRows | `--confirm` 从 0 开始的行索引 | 确认后移除指定行 |
 | submit | 可选截图标签 | 点确定 |
 
 首次操作先运行 `pages`。脚本只选择 IntePLM 地址 `http://192.168.0.218:7002` 下的标签页；存在多个匹配标签页时，用 `--page=<pages 输出的索引>` 指定目标。没有匹配页或未指定歧义目标时，脚本停止。所有其他命令都支持该参数。
 
 `evalFile` 文件只包含一个 JavaScript 函数表达式，例如 `() => document.title`；函数体在当前页面或 frame 中执行。文件路径从终端当前目录解析。
 
+页面选择与行索引解析的回归测试：
+
+```powershell
+node --test "<skill-dir>/scripts/tests/page-selection.test.js" "<skill-dir>/scripts/tests/number-selection.test.js" "<skill-dir>/scripts/tests/row-selection.test.js"
+```
+
 ## 流程
 
 1. 进入项目 → 顶部 `项目计划` 页签 → 左侧计划树点开对应节点(例:`TR4A评审`) → 右侧切到 `交付物(已交/总数)` 子页签 → 找到该交付物行 → 点 `交付物链接` 列的第一个按钮(`+`),打开新建文档表单(表单 frame 变为 `documentLayout/create`)。
 2. 核对 `类型`,与 `交付物类型` 列一致。
-3. `numberGen --frame=documentLayout/create 6611 MEL6611` → 编号自动生成。
+3. `numberOptions --frame=documentLayout/create "MEL6611 V100R001"` → 查看编号候选项；依据同一对照表行确认完整选项文本后，运行 `numberGen --frame=documentLayout/create "MEL6611 V100R001" "<精确选项文本>"`。候选项没有唯一匹配时停止。
 4. `setName --frame=documentLayout/create <按对照表生成的名称>`。
 5. `setLocation --frame=documentLayout/create <位置节点名>`。
-6. 电子文件自带一行模板 → `removeRows --frame=documentLayout/create 0`。
+6. 电子文件自带一行模板 → `previewRows --frame=documentLayout/create 0`；检查预览仅包含模板行并取得用户确认后，运行 `removeRows --frame=documentLayout/create --confirm 0`。
 7. `upload --frame=documentLayout/create <本地文件路径>`,一次一个。
 8. 用户确认后 `submit`。
 
@@ -74,10 +81,10 @@ node "<skill-dir>/scripts/plm.cjs" [--frame=documentLayout/create] [--page=<索�
 
 ## 规则
 
-- 编号按对照表同一行读取，格式为项目号 + 一级码 + 二级码 + 流水码。例如系统工程类“测试报告-（机）”一行是 `MEL6611` + `08` + `13` + `01` = `MEL6611081301`；流水码必须使用系统生成值并与该行一致，表内 `02`、`03` 是对应行规定的流水码。
-- 名称逐字按对照表「优化后交付件名称」生成：仅当表格行包含 `XXX项目` 时才替换为项目中文名；`XXX` / `xxx` 替换为该交付物对应的模块名；`**` 替换为明确的过程材料名称。模板已有“模块”后缀时，模块名不重复包含该后缀。缺少模块名或材料名时先询问，不保留占位符或自行删除。括号及后缀按该行原样保留。
-  例：`XXX项目XXX测试报告(机械）-硬件类测试报告` → `皮秒大台面钻孔机开发项目<模块名>测试报告(机械）-硬件类测试报告`；缺少模块名时先询问，不提交占位符。
-- 编号自检：按生成编号中的一级码、二级码和系统流水码反查同一对照表行，确认交付物类型相符。
+- 编号按对照表同一行读取，格式为项目号 + 一级码 + 二级码 + 流水码。例如系统工程类“测试报告-（机）”一行是 `MEL6611` + `08` + `13` + `01` = `MEL6611081301`。流水码不符合该行规定值时停止并向用户说明，不继续提交；表内 `02`、`03` 是对应行规定的流水码。
+- 名称逐字按对照表「优化后交付件名称」生成：先将 `XXX项目` 替换为项目中文名，再将剩余 `XXX` / `xxx` 替换为模块名，最后将 `**` 替换为明确的过程材料名称。模板已有“模块”后缀时，模块名不重复包含该后缀。缺少模块名或材料名时先询问，不保留占位符或自行删除。括号及后缀按该行原样保留。
+  例：`XXX项目XXX模块与联合仿真测试方案` → `皮秒大台面钻孔机开发项目<模块名>模块与联合仿真测试方案`。
+- 编号自检：按生成编号中的一级码、二级码和系统流水码反查同一对照表行，确认交付物类型相符；任一字段不一致时停止并向用户说明，不修改编号或继续提交。
 - 位置 = `/<项目号 版本>/<位置节点名>`,例 `/MEL6611 V100R001/需求`。
 - 文件匹配 = 本地文件名归一化(去扩展名、空格、括号差异、项目名前缀)后对「优化后交付件名称」。
 

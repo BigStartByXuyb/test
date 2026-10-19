@@ -3,7 +3,7 @@ const INTEPLM_ORIGIN = "http://192.168.0.218:7002";
 const resolveInteplmPage = (pages, index = null) => {
   if (index !== null) {
     if (!Number.isSafeInteger(index) || index < 0 || !pages[index]) {
-      throw new Error("--page 必须是 pages 输出中的有效非负索引");
+      throw new Error("--page 必须是有效且出现在 pages 输出中的非负索引");
     }
     if (new URL(pages[index].url()).origin !== INTEPLM_ORIGIN) {
       throw new Error(`--page=${index} 不是 IntePLM 页面`);

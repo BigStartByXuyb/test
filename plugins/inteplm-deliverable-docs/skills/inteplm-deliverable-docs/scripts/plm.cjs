@@ -2,6 +2,8 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { chromium } = require("playwright");
 const { resolveInteplmPage } = require("./page-selection.cjs");
+const { resolveExactNumberOption } = require("./number-selection.cjs");
+const { parseRowIndexes } = require("./row-selection.cjs");
 
 const CDP = "http://127.0.0.1:9222";
 const SHOTS = path.join(process.env.USERPROFILE, ".codex", "browser-profiles", "inteplm-shots");
@@ -21,7 +23,7 @@ const fileRows = (t) =>
     if (!body) return [];
     return Array.from(body.querySelectorAll("tr")).map((tr) =>
       Array.from(tr.querySelectorAll("td")).map((td) =>
-        String(td.innerText || "").replace(/\s+/g, " ").slice(0, 60),
+        String(td.innerText || "").replace(/\s+/g, " "),
       ),
     );
   });
@@ -100,24 +102,37 @@ const main = async () => {
     return out({ typed: args[1], options: await t.evaluate(() => Array.from(document.querySelectorAll(".el-select-dropdown__item")).filter((i) => i.getBoundingClientRect().height > 1).map((i) => String(i.innerText || "").trim())) });
   }
 
-  if (cmd === "numberGen") {
-    await t.evaluate(() => document.querySelector(".number-generation-btn").click());
-    await page.waitForTimeout(1600);
-    const handle = await t.evaluateHandle(() => document.querySelector(".number-generation-dialog .el-select__input"));
-    await handle.asElement().focus();
-    await page.keyboard.type(args[0], { delay: 80 });
-    await page.waitForTimeout(1600);
-    await t.evaluate(
-      ({ prefix }) => {
-        Array.from(document.querySelectorAll(".el-select-dropdown__item"))
-          .find((i) => String(i.innerText || "").trim().startsWith(prefix))
-          .click();
-      },
-      { prefix: args[1] },
+  if (cmd === "numberOptions" || cmd === "numberGen") {
+    const requiredArgs = cmd === "numberOptions" ? 1 : 2;
+    if (args.length !== requiredArgs) {
+      throw new Error(cmd === "numberOptions" ? "用法: numberOptions <项目号和版本>" : "用法: numberGen <项目号和版本> <精确选项文本>");
+    }
+    if (!(await t.locator(".number-generation-dialog").count())) {
+      await t.evaluate(() => {
+        const button = document.querySelector(".number-generation-btn");
+        if (!button) throw new Error("编号生成按钮未找到");
+        button.click();
+      });
+    }
+    await t.waitForTimeout(1600);
+    await t.locator(".number-generation-dialog .el-select__input").fill(args[0]);
+    await t.waitForTimeout(1600);
+    const options = await t.evaluate(() =>
+      Array.from(document.querySelectorAll(".el-select-dropdown__item"))
+        .filter((item) => item.getBoundingClientRect().height > 1)
+        .map((item) => String(item.innerText || "").trim()),
     );
-    await page.waitForTimeout(1600);
+    if (cmd === "numberOptions") return out({ options });
+    const exactOption = resolveExactNumberOption(options, args[1]);
+    await t.evaluate((label) => {
+      const matches = Array.from(document.querySelectorAll(".el-select-dropdown__item"))
+        .filter((item) => item.getBoundingClientRect().height > 1 && String(item.innerText || "").trim() === label);
+      if (matches.length !== 1) throw new Error("编号候选项不再是唯一精确匹配");
+      matches[0].click();
+    }, exactOption);
+    await t.waitForTimeout(1600);
     await clickByText(t, "保存", ".number-generation-dialog button");
-    await page.waitForTimeout(2500);
+    await t.waitForTimeout(2500);
     return out({ inputs: await inputs(t) });
   }
 
@@ -166,15 +181,29 @@ const main = async () => {
     return out({ rows: await fileRows(t) });
   }
 
+  if (cmd === "previewRows") {
+    const rows = await fileRows(t);
+    const indexes = parseRowIndexes(args, rows.length);
+    return out({ selectedRows: indexes.map((index) => ({ index, cells: rows[index] })) });
+  }
+
   if (cmd === "removeRows") {
+    if (args[0] !== "--confirm") {
+      throw new Error("先运行 previewRows 检查所选行并取得确认，再运行 removeRows --confirm <行索引>");
+    }
+    const rows = await fileRows(t);
+    const indexes = parseRowIndexes(args.slice(1), rows.length);
+    const selectedRows = indexes.map((index) => ({ index, cells: rows[index] }));
     await t.evaluate((idxs) => {
       const rows = Array.from(document.querySelectorAll("table.vxe-table--body")[0].querySelectorAll("tr"));
-      idxs.forEach((i) => rows[i].querySelector(".vxe-cell--checkbox").click());
-    }, args.map(Number));
+      const checkboxes = idxs.map((index) => rows[index]?.querySelector(".vxe-cell--checkbox"));
+      if (checkboxes.some((checkbox) => !checkbox)) throw new Error("待移除行未找到文件勾选框");
+      checkboxes.forEach((checkbox) => checkbox.click());
+    }, indexes);
     await page.waitForTimeout(1200);
     await clickByText(t, "移除文件", "button");
     await page.waitForTimeout(2000);
-    return out({ rows: await fileRows(t) });
+    return out({ removedRows: selectedRows, rows: await fileRows(t) });
   }
 
   if (cmd === "submit") {

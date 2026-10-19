@@ -1,4 +1,4 @@
 interface:
   display_name: "IntePLM 交付物文档"
-  short_description: "在 IntePLM 新建交付物文档:生成编号、命名、选位置、删模板、上传文件"
+  short_description: "为 MEL6611 V100R001 新建 IntePLM 交付物文档并上传文件"
   default_prompt: "仅为 MEL6611 V100R001（皮秒大台面钻孔机开发项目）使用 $inteplm-deliverable-docs，在 IntePLM 里为这批本地文件批量新建交付物文档。其他项目不使用此 Skill。"
