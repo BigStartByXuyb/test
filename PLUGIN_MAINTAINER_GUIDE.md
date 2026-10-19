@@ -26,7 +26,7 @@
 claude plugin validate --strict .
 ```
 
-PowerShell 7 中运行 CI 使用的插件 JavaScript 和 PowerShell 用例：
+PowerShell 7 中运行与 GitLab CI 相同范围的插件 JavaScript 和 PowerShell 用例：
 
 ```powershell
 $nodeTests = Get-ChildItem plugins -Recurse -File -Filter '*.test.js' |
