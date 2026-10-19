@@ -18,6 +18,8 @@ GitLab 市场源：
 
 ### Claude Code
 
+以下示例用于维护者安装必需的 `agent-plugin-publisher`；普通使用者按[插件清单](docs/PLUGINS.md)的条件选择插件。
+
 ```sh
 claude plugin marketplace add http://14.29.174.209:20001/data_ai/plugins.git
 claude plugin install agent-plugin-publisher@mw-plugins
@@ -36,11 +38,11 @@ claude plugin install agent-plugin-publisher@mw-plugins
 codex plugin marketplace add http://14.29.174.209:20001/data_ai/plugins.git
 ```
 
-随后在 Codex 的 Plugins Directory 中选择 `mw-plugins`，安装 `agent-plugin-publisher`；其他插件按[插件清单](docs/PLUGINS.md)中的使用条件按需安装。
+维护者随后在 Codex 的 Plugins Directory 中选择 `mw-plugins` 并安装 `agent-plugin-publisher`；普通使用者按[插件清单](docs/PLUGINS.md)中的使用条件按需安装。
 
 ### 从旧市场迁移
 
-旧市场 ID 为 `bigstart-plugins`。先记录旧市场中已安装且仍需使用的插件，再移除旧市场登记并添加上面的 GitLab 源。Claude Code 移除市场时会卸载从该市场安装的插件，因此需从新市场重新安装需保留的插件；[Claude Code 插件管理说明](https://code.claude.com/docs/en/plugins/install)。
+旧市场 ID 为 `bigstart-plugins`。先记录旧市场中已安装且仍需使用的插件；Claude Code 使用 `claude plugin list`，Codex 在 Plugins Directory 查看已安装插件。再移除旧市场登记并添加上面的 GitLab 源。Claude Code 移除市场时会卸载从该市场安装的插件，因此需从新市场重新安装需保留的插件；[Claude Code 插件管理说明](https://code.claude.com/docs/en/plugins/install)。
 
 ```sh
 claude plugin list

@@ -44,7 +44,7 @@ foreach ($test in $psTests) {
 git diff --check
 ```
 
-MasterGo 页面坐标与来源校验是页面级检查，不是无参数的市场校验。坐标检查器需要 `--xml` 和 `--nodes` 输入；provenance 检查器按页面流水线生成的 mapping 输入执行。对应契约见 `plugins/mastergo-wpf-transcoder/skills/mastergo-to-wpf/SKILL.md`。
+MasterGo 页面坐标与来源校验是页面级检查，不是无参数的市场校验。坐标检查器的 `--xml` / `--nodes` 参数见 `plugins/mastergo-wpf-transcoder/skills/mastergo-to-wpf/scripts/adapters/mtslg-iocontrol/check-iocontrol-coords.js`；provenance 输入见同目录的 `validate-iocontrol-provenance.js`。映射覆盖审计见下方命令。
 
 ## 提交和合并
 
