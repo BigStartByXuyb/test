@@ -1,15 +1,16 @@
 ---
 name: inteplm-deliverable-docs
-description: 仅在用户提供 IntePLM 链接或明确 MEL6611 V100R001 项目上下文，并要求创建、编号、填写或上传交付物文档时触发。
+description: 仅在 IntePLM 链接指向 MEL6611 V100R001 项目，或用户明确指定 MEL6611 V100R001，并要求创建、编号、填写或上传交付物文档时触发。
 ---
 
 # IntePLM 交付物文档创建与上传
 
 ## 触发条件
 
-1. 用户提供 IntePLM 链接，并要求在 `MEL6611 V100R001` 项目创建或更新交付物文档。
+1. 用户提供指向 `MEL6611 V100R001` 项目的 IntePLM 链接，并要求创建或更新交付物文档。
 2. 用户明确指定 `MEL6611 V100R001`，并要求填写交付物、生成编号或上传文件。
-3. 单独出现“交付物”“新建文档”“上传文件”等通用词，不触发本 Skill。
+3. 链接指向其他项目时，不触发本 Skill；先停止并转交对应项目的处理流程。
+4. 单独出现“交付物”“新建文档”“上传文件”等通用词，不触发本 Skill。
 
 ## 前置
 
@@ -35,7 +36,7 @@ $env:NODE_PATH = $playwrightNodeModules
 node "<skill-dir>/scripts/plm.cjs" [--frame=documentLayout/create] <命令> [参数]
 ```
 
-新建文档表单在内嵌 frame 里,操作表单必须加 `--frame=documentLayout/create`;`取消/确定` 在外层页面。
+新建文档表单在内嵌 frame 里，操作表单必须加 `--frame=documentLayout/create`；`取消/确定` 在外层页面。
 
 ## 命令
 
@@ -48,7 +49,7 @@ node "<skill-dir>/scripts/plm.cjs" [--frame=documentLayout/create] <命令> [参
 | jsText | 选择器 文本 | 聚焦后真实键盘输入(下拉筛选只能用这个) |
 | numberGen | 搜索词 选项前缀 | 生成编号 |
 | setName | 名称 | 写名称 |
-| setLocation | 分类节点名 | 选存储位置 |
+| setLocation | 位置节点名 | 选存储位置 |
 | upload | 本地文件路径 | 添加文件 |
 | removeRows | 行号 | 勾选行并移除文件 |
 | submit | 可选截图标签 | 点确定 |
@@ -60,8 +61,8 @@ node "<skill-dir>/scripts/plm.cjs" [--frame=documentLayout/create] <命令> [参
 1. 进入项目 → 顶部 `项目计划` 页签 → 左侧计划树点开对应节点(例:`TR4A评审`) → 右侧切到 `交付物(已交/总数)` 子页签 → 找到该交付物行 → 点 `交付物链接` 列的第一个按钮(`+`),打开新建文档表单(表单 frame 变为 `documentLayout/create`)。
 2. 核对 `类型`,与 `交付物类型` 列一致。
 3. `numberGen --frame=documentLayout/create 6611 MEL6611` → 编号自动生成。
-4. `setName --frame=documentLayout/create <项目中文名 + 交付件名>`。
-5. `setLocation --frame=documentLayout/create <一级分类简称>`。
+4. `setName --frame=documentLayout/create <按对照表生成的名称>`。
+5. `setLocation --frame=documentLayout/create <位置节点名>`。
 6. 电子文件自带一行模板 → `removeRows --frame=documentLayout/create 0`。
 7. `upload --frame=documentLayout/create <本地文件路径>`,一次一个。
 8. 用户确认后 `submit`。
@@ -71,10 +72,10 @@ node "<skill-dir>/scripts/plm.cjs" [--frame=documentLayout/create] <命令> [参
 ## 规则
 
 - 编号按对照表同一行读取，格式为项目号 + 一级码 + 二级码 + 流水码。例如系统工程类“测试报告-（机）”一行是 `MEL6611` + `08` + `13` + `01` = `MEL6611081301`；流水码必须使用系统生成值并与该行一致。
-- 名称按对照表「优化后交付件名称」生成：`XXX项目` 替换为项目中文名，`XXX` / `xxx` 替换为该交付物对应的模块名，`**` 替换为明确的过程材料名称。缺少模块名或材料名时先询问，不保留占位符或自行删除。除占位符外，括号形态和 `-TR4A` 等字符按表中原样保留。
-  例:`XXX项目XXX测试报告(机械）-TR4A` → `皮秒大台面钻孔机开发项目测试报告(机械）-TR4A`。
+- 名称逐字按对照表「优化后交付件名称」生成：仅当表格行包含 `XXX项目` 时才替换为项目中文名；`XXX` / `xxx` 替换为该交付物对应的模块名；`**` 替换为明确的过程材料名称。缺少模块名或材料名时先询问，不保留占位符或自行删除。括号及后缀按该行原样保留。
+  例：`XXX项目XXX测试报告(机械）-硬件类测试报告` → `皮秒大台面钻孔机开发项目<模块名>测试报告(机械）-硬件类测试报告`；缺少模块名时先询问，不提交占位符。
 - 编号自检：按生成编号中的一级码、二级码和系统流水码反查同一对照表行，确认交付物类型相符。
-- 位置 = `/<项目号 版本>/<一级分类>`,例 `/MEL6611 V100R001/需求`。
+- 位置 = `/<项目号 版本>/<位置节点名>`,例 `/MEL6611 V100R001/需求`。
 - 文件匹配 = 本地文件名归一化(去扩展名、空格、括号差异、项目名前缀)后对「优化后交付件名称」。
 
 对照表与分类简称见 [references/deliverable-rules.md](references/deliverable-rules.md)。
