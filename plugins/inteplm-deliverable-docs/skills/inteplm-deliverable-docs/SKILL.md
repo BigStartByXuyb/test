@@ -20,11 +20,11 @@ description: 在 IntePLM(http://192.168.0.218:7002)上传交付件、新建文�
 & 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe' --remote-debugging-port=9222 "--user-data-dir=$env:USERPROFILE\.codex\browser-profiles\inteplm" --no-first-run --no-default-browser-check 'http://192.168.0.218:7002/'
 ```
 
-3. 设 Playwright 路径并调用脚本:
+3. 设 Playwright 路径并调用脚本。先解析当前 `SKILL.md` 的绝对路径；`<skill-dir>` 是包含该文件的目录。脚本路径相对于 `<skill-dir>`，不依赖终端当前目录。
 
 ```powershell
 $env:NODE_PATH='C:\Users\Maxwell\AppData\Roaming\npm\node_modules\@playwright\mcp\node_modules'
-node scripts\plm.cjs [--frame=documentLayout/create] <命令> [参数]
+node "<skill-dir>/scripts/plm.cjs" [--frame=documentLayout/create] <命令> [参数]
 ```
 
 新建文档表单在内嵌 frame 里,操作表单必须加 `--frame=documentLayout/create`;`取消/确定` 在外层页面。
