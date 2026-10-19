@@ -174,9 +174,10 @@ const main = async () => {
   }
 
   if (cmd === "upload") {
+    if (args.length !== 1) throw new Error("upload 每次只接受一个本地文件路径");
     const chooser = page.waitForEvent("filechooser", { timeout: 20000 });
     await clickByText(t, "添加文件", "button");
-    await (await chooser).setFiles(args);
+    await (await chooser).setFiles(args[0]);
     await page.waitForTimeout(3000);
     return out({ rows: await fileRows(t) });
   }

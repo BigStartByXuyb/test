@@ -56,7 +56,7 @@ node "<skill-dir>/scripts/plm.cjs" [--frame=documentLayout/create] [--page=<索�
 | removeRows | `--confirm` 从 0 开始的行索引 | 确认后移除指定行 |
 | submit | 可选截图标签 | 点确定 |
 
-首次操作先运行 `pages`。脚本只选择 IntePLM 地址 `http://192.168.0.218:7002` 下的标签页；存在多个匹配标签页时，用 `--page=<pages 输出的索引>` 指定目标。没有匹配页或未指定歧义目标时，脚本停止。所有其他命令都支持该参数。
+首次操作先运行 `pages`。脚本只选择 IntePLM 地址 `http://192.168.0.218:7002` 下的标签页；存在多个匹配标签页时，用 `--page=<pages 输出的索引>` 指定目标。没有匹配页或未指定歧义目标时，脚本停止。除 `pages` 外的命令都支持该参数。
 
 `evalFile` 文件只包含一个 JavaScript 函数表达式，例如 `() => document.title`；函数体在当前页面或 frame 中执行。文件路径从终端当前目录解析。
 
@@ -68,7 +68,7 @@ node --test "<skill-dir>/scripts/tests/page-selection.test.js" "<skill-dir>/scri
 
 ## 流程
 
-1. 进入项目 → 顶部 `项目计划` 页签 → 左侧计划树点开对应节点(例:`TR4A评审`) → 右侧切到 `交付物(已交/总数)` 子页签 → 找到该交付物行 → 点 `交付物链接` 列的第一个按钮(`+`),打开新建文档表单(表单 frame 变为 `documentLayout/create`)。
+1. 进入 `MEL6611 V100R001` 项目 → 顶部 `项目计划` 页签 → 左侧计划树点开对应节点（例：`TR4A评审`）→ 右侧切到 `交付物(已交/总数)` 子页签。结合该计划树节点路径、`交付物类型` 和 `交付物链接` 列显示的真实名称定位唯一行；多行候选无法区分时先询问用户，不默认取第一行。选定后点该行 `交付物链接` 列的第一个按钮（`+`），打开新建文档表单（表单 frame 为 `documentLayout/create`）。
 2. 核对 `类型`,与 `交付物类型` 列一致。
 3. `numberOptions --frame=documentLayout/create "MEL6611 V100R001"` → 查看编号候选项；依据同一对照表行确认完整选项文本后，运行 `numberGen --frame=documentLayout/create "MEL6611 V100R001" "<精确选项文本>"`。候选项没有唯一匹配时停止。
 4. `setName --frame=documentLayout/create <按对照表生成的名称>`。
@@ -87,7 +87,7 @@ node --test "<skill-dir>/scripts/tests/page-selection.test.js" "<skill-dir>/scri
 - 编号自检：按生成编号中的一级码、二级码和系统流水码反查同一对照表行，确认交付物类型相符；任一字段不一致时停止并向用户说明，不修改编号或继续提交。
 - `setLocation` 接收一个位置节点名（叶子节点名）；完整存储路径由项目号、版本和节点名组成，例如 `setLocation 需求` 对应 `/MEL6611 V100R001/需求`。
 - 对照表名称中的 `/` 分隔候选交付件名称。一次新建只选择与当前需求和本地文件匹配的一个名称；没有唯一匹配时先询问，不把候选名称拼成一个名称。
-- 文件匹配 = 本地文件名归一化(去扩展名、空格、括号差异、项目名前缀)后对「优化后交付件名称」。
+- 文件匹配时对本地文件名和「优化后交付件名称」候选应用相同归一化：去扩展名、空格和括号差异，并从两侧同时去除项目名前缀（如存在）。表格名称含 `/` 时先拆成候选，再逐个比较；只有一个候选匹配时才使用，无匹配或多匹配时先询问用户。
 
 对照表与分类简称见 [references/deliverable-rules.md](references/deliverable-rules.md)。
 
