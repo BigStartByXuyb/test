@@ -6,7 +6,7 @@
 
 ## 安装基础插件
 
-市场维护人员先登记 README 中的 GitLab marketplace 源，再安装并启用 `agent-plugin-publisher`。其他插件按 [插件清单](docs/PLUGINS.md) 的用途和技能入口选装。
+所有需要新增、打包、发布或维护市场插件的人员和 Agent 必须先登记 README 中的 GitLab marketplace 源，再安装并启用 `agent-plugin-publisher`。其他插件按 [插件清单](docs/PLUGINS.md) 的用途和技能入口选装。
 
 ## 新增或更新插件
 
@@ -14,7 +14,7 @@
 2. 每位维护者 checkout `plugin-migration`，提交前执行 `git pull --rebase origin plugin-migration`。
 3. 新插件放在 `plugins/<plugin-id>/`，并建立 `.claude-plugin/plugin.json`。
 4. 每项技能放在 `skills/<skill-id>/SKILL.md`；MCP 配置和 Subagent 按需要放入插件目录。
-5. 在根 `.claude-plugin/marketplace.json` 中新增或更新唯一的 `source` 条目。
+5. 在根 `.claude-plugin/marketplace.json` 中新增或更新该插件对应的一条 `source` 条目，并保留其他插件条目；每个插件恰好一条。
 6. 在 `docs/PLUGINS.md` 中同步维护用途、技能入口和安装要求。
 7. ID、目录和清单路径保持一致，不能新增重复的插件 ID。
 
@@ -37,6 +37,7 @@ node --test $nodeTests
 
 $psTests = Get-ChildItem plugins -Recurse -File -Filter '*.tests.ps1' |
   Where-Object { $_.FullName -match '[\\/]skills[\\/].*[\\/]scripts[\\/]tests[\\/]' }
+if ($psTests.Count -eq 0) { throw '没有找到插件 PowerShell 测试' }
 foreach ($test in $psTests) {
   pwsh -NoProfile -File $test.FullName
   if ($LASTEXITCODE -ne 0) { throw "PowerShell 测试失败: $($test.Name)" }
@@ -49,7 +50,7 @@ MasterGo 页面坐标与来源校验是页面级检查，不是无参数的市�
 
 ## 提交和合并
 
-`plugin-migration` 是日常维护分支。首次使用前，Maintainer 必须从 GitLab `main` 创建该分支并推送；维护者确认远端分支存在后再 checkout。后续更新先拉取远端分支，完成本地校验后推送，并创建目标为 `main` 的 Merge Request。不要直接推送受保护的 `main`。
+`plugin-migration` 是日常维护分支。分支创建和首次 checkout 前置条件见[新增或更新插件步骤 1–2](#新增或更新插件)。后续更新先拉取远端分支，完成本地校验后推送，并创建目标为 `main` 的 Merge Request。不要直接推送受保护的 `main`。
 
 GitLab CI 调用 `data_ai/cicd` 的长期维护 `main` 分支作为共享模板源。调用项目的 Job Token allowlist、Linux Docker Runner 和 masked CI/CD 变量由 Maintainer 配置；密钥不保存在仓库中。
 

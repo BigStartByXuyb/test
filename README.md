@@ -39,7 +39,9 @@ codex plugin add agent-plugin-publisher@mw-plugins
 
 如果其他已登记市场里也有同名插件，先用 `codex plugin list` 查看来源，再按客户端支持的 `插件 ID@市场 ID` 形式指定来源。安装后用 `codex plugin list` 确认状态。
 
-已有旧市场登记时，先查看登记名，移除旧登记，再添加上面的 GitLab 源：
+### 从旧市场迁移
+
+在对应客户端中查看并移除旧市场登记，再添加上面的 GitLab 源：
 
 ```sh
 claude plugin marketplace list
