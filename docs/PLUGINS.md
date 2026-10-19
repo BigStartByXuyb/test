@@ -1,6 +1,6 @@
 # 插件清单
 
-Marketplace 安装 ID 和源路径以仓库根目录 `.claude-plugin/marketplace.json` 为准。新增、改名或移除插件时，先更新该清单，再同步更新本表。
+Marketplace 安装 ID 和源路径以仓库根目录 `.claude-plugin/marketplace.json` 为准。`agent-plugin-publisher` Skill 负责按确认内容更新该清单；Skill 发布后，维护者同步更新本表。
 
 | 插件 ID | 用途 | 技能入口 | 安装条件 |
 | --- | --- | --- | --- |
