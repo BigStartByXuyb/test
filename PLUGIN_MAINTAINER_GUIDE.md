@@ -50,7 +50,11 @@ MasterGo 页面坐标与来源校验是页面级检查，不是无参数的市�
 
 `plugin-migration` 是日常维护分支。首次由 Maintainer 从 GitLab `main` 创建并推送该分支；维护者 checkout 后，提交前执行 `git pull --rebase origin plugin-migration`。完成本地校验后推送，并创建目标为 `main` 的 Merge Request。不要直接推送受保护的 `main`。
 
-GitLab MR 的 `data_ai/cicd` `main` 流水线是本仓库唯一权威合并门禁；GitHub Actions 的 `BigStartByXuyb/cicd` 固定版本只为 GitHub 上的 PR 或推送提供辅助结果，不替代 GitLab MR 结果。GitLab `main` 是合并目标，GitHub 不作为本仓库的第二个合并入口。调用项目的 Job Token allowlist、Linux Docker Runner 和 masked CI/CD 变量由 Maintainer 配置；密钥不保存在仓库中。
+GitLab MR 的 `data_ai/cicd` `main` 流水线是本仓库唯一权威合并门禁；GitHub 上的 `.github/workflows/plugin-cicd.yml` 仅提供辅助市场审计，不替代 GitLab MR 结果；`.github/workflows/plugin-release.yml` 是独立的发布工作流。GitLab `main` 是合并目标，GitHub 不作为本仓库的第二个合并入口。调用项目的 Job Token allowlist、Linux Docker Runner 和 masked CI/CD 变量由 Maintainer 配置；密钥不保存在仓库中。
+
+### 共享流水线测试范围
+
+共享测试作业定义在外部 `data_ai/cicd`。核对时使用 GitLab 子流水线记录的中央配置提交；本地已验证的中央配置提交为 `157b4bc3c055791567ad6e370ba7c4f4a9b91306`，其中插件作业名为 `plugin:runtime-js` 和 `plugin:runtime-pwsh`，分别按 `plugins -path '*/scripts/tests/*.test.js'` 与 `plugins -path '*/skills/*/scripts/tests/*.tests.ps1'` 发现用例。中央 `main` 可前进；共享作业或用例发现范围变化时同步更新本段和本地校验清单。
 
 对映射文档、映射表或变体规则的改动，还必须按页面规则执行映射覆盖审计。先进入插件目录，再运行：
 
@@ -62,4 +66,4 @@ node skills/mastergo-to-wpf/scripts/adapters/mtslg-iocontrol/audit-mtslg-feishu-
 
 ## 发版
 
-版本写入插件自身的 `.claude-plugin/plugin.json`。当前 GitHub Release 工作流仅为 `mastergo-wpf-transcoder` 生成发布件；GitLab MR 合并且 GitHub 主线同步到同一提交后，按 [`docs/plugin-release.md`](docs/plugin-release.md) 推送 `v<version>` tag 到 GitHub。GitLab tag 不触发该发布工作流。其他插件通过 marketplace 源分发，不使用该 tag 工作流。已推送 tag 不移动或覆盖。
+版本写入插件自身的 `.claude-plugin/plugin.json`。当前 GitHub Release 工作流仅为 `mastergo-wpf-transcoder` 生成发布件；GitLab MR 合并且 GitHub 主线同步到同一提交后，按 [`docs/plugin-release.md`](docs/plugin-release.md) 推送 `v<version>` tag 到 GitHub。GitLab tag 不触发该发布工作流。其他插件通过 marketplace 源分发，不使用该 tag 工作流。所有已推送 tag 保持不变；错误发布需递增版本并为新提交创建新 tag。

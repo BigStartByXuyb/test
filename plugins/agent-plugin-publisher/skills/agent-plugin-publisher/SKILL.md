@@ -76,7 +76,7 @@ description: 将用户明确指定的本地目录打包为团队 marketplace 中
 
 1. 只在 staging 目录完成静态校验。若本机有可用的插件 CLI，运行其验证命令；否则完成静态校验并明确报告未做运行时加载验证。
 2. 向用户展示 staging 路径、内容清单、冲突与相似度检查结果、校验结果和变更文件。默认到此停止。
-3. 只有用户明确确认“发布到仓库”后，才将已验证的 staging 插件复制到目标 marketplace 的 `plugins/<插件名>/`，并**必须**更新根目录 `.claude-plugin/marketplace.json`：保留全部既有条目及其顺序，新增或更新该插件的相对 `source` 条目。随后校验整个 marketplace 和新插件。Git commit、推送、tag 或远程 marketplace 发布仍需要用户在同一任务中单独明确要求。
+3. 只有用户明确确认“发布到仓库”后，才将已验证的 staging 插件复制到目标 marketplace 的 `plugins/<插件名>/`，并**必须**更新根目录 `.claude-plugin/marketplace.json`：保留全部既有条目及其顺序，新增或更新该插件的相对 `source` 条目。随后校验整个 marketplace 和新插件。Git commit、推送或远程 marketplace 发布仍需要用户在同一任务中单独明确要求。Git tag 由仓库发布规范定义；当前 `v<version>` tag 只保留给 `mastergo-wpf-transcoder`，其他插件不得创建该格式的 tag。
 4. 正式插件已安装并验证加载后，检查同一 Agent 是否仍从原始位置发现重复的 skill、MCP、subagent、hook 或其他组件。报告每个重复来源及影响。
 5. 默认不删除、移动或注销原始来源。只有用户针对列出的重复项明确确认后，才按组件分别处理：移除旧注册、移动到可恢复归档目录，或删除源文件。处理 MCP 时先确认插件版本可连接，且只移除重复配置，不删除环境变量中的凭据。
 

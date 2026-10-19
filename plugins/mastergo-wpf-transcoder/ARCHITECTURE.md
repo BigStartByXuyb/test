@@ -149,9 +149,9 @@ flowchart LR
 | 语言闭环 | Bundle 的语言绑定与字典校验 | `LangName` 引用必须存在于本页字典，各语言 key 一致 |
 | 页面壳层 | `gen-mtslg-layout.js` 校验 | MenuItem 常驻属性、Index（菜单项 `1..N` 连续编号，常驻分组不占号）、图标尺寸门禁 |
 | 容器嵌套 | `apply-container-containment.js` + `validate-iocontrol-provenance.js` | 只在命中 `childPolicy=nested-page-templates` 的容器上重挂；已挂在「非容器的已发射节点」下的子节点不参与（归属守卫，记 `already-owned-by-non-container-node`，防 DataGrid 列被外层容器抢走）；输出父节点可与 `sourceParent` 不同，但必须按 `layoutParent` 独立重算坐标；冲突只记报告不猜层级 |
-| 规则与文档一致 | GitLab CI 与本地回归的 `scripts/tests/*.test.js` | CI 全量运行插件下 `scripts/tests/*.test.js`，包含 `doc-rule-consistency.test.js` 和 `gen-iocontrol-xml.test.js`；它们覆盖 `buttonFamily` / `controlTypeRequiredAttrs`、两份 Skill 与参考文档的一致性，以及 ControlType 模板约束的发射分支 |
+| 规则与文档一致 | `doc-rule-consistency.test.js` + `gen-iocontrol-xml.test.js` | GitLab `data_ai/cicd` 的 `plugin:runtime-js`；外部共享作业提交与用例范围见[维护指南 CI 覆盖](../../../PLUGIN_MAINTAINER_GUIDE.md#共享流水线测试范围) |
 
-任一门禁以非零退出结束即禁止交付；GitLab CI 全量执行插件 JavaScript 与 PowerShell 运行时用例。规则改动后必须同步更新执行者与回归用例。
+任一门禁以非零退出结束即禁止交付。规则改动后必须同步更新执行者与回归用例。
 
 ## 8. 多语言链路
 
@@ -185,7 +185,7 @@ DSL/mapping 文案 ──► 英文等译文由 AI 产出 translations 清单并
 - Node.js 运行全部 JS 脚本；MasterGo MCP 通过 `call-mastergo-mcp.js` 调用（token 不落盘）。
 - **文档同步工具（可选，非交付链路依赖）**：把本地规则文档同步到团队在线文档时，使用本机已授权的飞书文档 CLI（可检索/读写云文档）按标题定位并比对；它不是生成或校验流程的运行依赖，环境没有该工具时跳过同步步骤，并在交付说明里标注"在线文档未同步"，不得因此阻塞页面交付。
 - 本地回归：`node --test "skills/mastergo-to-wpf/scripts/tests/*.test.js"`（跑满 `scripts/tests/` 下全部用例，含脚本复用门禁 `script-duplication.test.js`、文本换行口径 `text-newline.test.js`、文档预算 `doc-budget.test.js`、流水线契约 `pipeline-contract.test.js`、临时目录卫生 `tmp-hygiene.test.js`）、`Get-ChildItem "skills/mastergo-to-wpf/scripts/tests/*.tests.ps1" | ForEach-Object { pwsh -NoProfile -File $_.FullName }`（`mastergo-dsl-pipeline.tests.ps1` + `run-all-resume-identity.tests.ps1`）、`node skills/mastergo-to-wpf/scripts/adapters/mtslg-iocontrol/audit-mtslg-feishu-map.js <doc> <map>`。
-- GitLab MR 以 `data_ai/cicd` `main` 共享流水线作为唯一合并门禁，执行确定性校验、插件 JavaScript 与 PowerShell 用例和语义审计；GitHub Actions 的固定版本仅为 GitHub 入口提供辅助结果，不替代 GitLab MR 结论。需要页面级 XML、DSL 或映射输入的坐标与来源校验由提交者在本地执行。
+- GitLab MR 以 `data_ai/cicd` `main` 共享流水线作为唯一合并门禁；GitHub `plugin-cicd.yml` 只提供辅助审计，GitHub `plugin-release.yml` 单独发布 MasterGo 插件。共享作业定义和已核验提交见[维护指南 CI 覆盖](../../../PLUGIN_MAINTAINER_GUIDE.md#共享流水线测试范围)。需要页面级 XML、DSL 或映射输入的坐标与来源校验由提交者在本地执行。
 
 ## 11. 维护约定
 
