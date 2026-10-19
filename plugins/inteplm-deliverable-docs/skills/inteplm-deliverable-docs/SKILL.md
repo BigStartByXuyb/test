@@ -1,29 +1,37 @@
 ---
 name: inteplm-deliverable-docs
-description: 在 IntePLM(http://192.168.0.218:7002)上传交付件、新建文档、填写交付物数据时触发。
+description: 仅在用户提供 IntePLM 链接或明确 MEL6611 V100R001 项目上下文，并要求创建、编号、填写或上传交付物文档时触发。
 ---
 
-# IntePLM 交付件上传
+# IntePLM 交付物文档创建与上传
 
 ## 触发条件
 
-1. 用户给出 PLM 链接并要求填写或上传数据。
-2. 用户要求上传交付件、新建文档、生成编号、选存储位置。
-3. 出现:交付物、交付件、新建文档、编号生成、存储位置、上传文件。
+1. 用户提供 IntePLM 链接，并要求在 `MEL6611 V100R001` 项目创建或更新交付物文档。
+2. 用户明确指定 `MEL6611 V100R001`，并要求填写交付物、生成编号或上传文件。
+3. 单独出现“交付物”“新建文档”“上传文件”等通用词，不触发本 Skill。
 
 ## 前置
 
 1. 用户已登录。密码由用户在浏览器里自己输入。
-2. 启动专用 Edge:
+2. Windows 主机已安装 Edge、Node.js、npm 和全局 `@playwright/mcp`。Edge 必须支持远程调试；设置 `INTEPLM_EDGE_PATH`，或将 `msedge.exe` 加入 `PATH`。
+
+3. 启动专用 Edge:
 
 ```powershell
-& 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe' --remote-debugging-port=9222 "--user-data-dir=$env:USERPROFILE\.codex\browser-profiles\inteplm" --no-first-run --no-default-browser-check 'http://192.168.0.218:7002/'
+$edgePath = $env:INTEPLM_EDGE_PATH
+if (-not $edgePath) { $edgePath = (Get-Command msedge.exe -ErrorAction Stop).Source }
+$profileDir = Join-Path $env:USERPROFILE '.codex\browser-profiles\inteplm'
+& $edgePath --remote-debugging-port=9222 "--user-data-dir=$profileDir" --no-first-run --no-default-browser-check 'http://192.168.0.218:7002/'
 ```
 
-3. 设 Playwright 路径并调用脚本。先解析当前 `SKILL.md` 的绝对路径；`<skill-dir>` 是包含该文件的目录。脚本路径相对于 `<skill-dir>`，不依赖终端当前目录。
+4. 配置 Playwright 模块并调用脚本。`<skill-dir>` 是当前 `SKILL.md` 所在目录的绝对路径，由调用方的 Skill 安装路径解析；脚本路径不依赖终端当前目录。
 
 ```powershell
-$env:NODE_PATH='C:\Users\Maxwell\AppData\Roaming\npm\node_modules\@playwright\mcp\node_modules'
+$npmGlobalRoot = (npm root -g).Trim()
+$playwrightNodeModules = Join-Path $npmGlobalRoot '@playwright\mcp\node_modules'
+if (-not (Test-Path (Join-Path $playwrightNodeModules 'playwright'))) { throw '请先安装全局 @playwright/mcp 包' }
+$env:NODE_PATH = $playwrightNodeModules
 node "<skill-dir>/scripts/plm.cjs" [--frame=documentLayout/create] <命令> [参数]
 ```
 
@@ -35,7 +43,7 @@ node "<skill-dir>/scripts/plm.cjs" [--frame=documentLayout/create] <命令> [参
 | --- | --- | --- |
 | snap | 名称 | 截图 + 页面文本 |
 | pages / frames | | 列标签页 / frame |
-| evalFile | js 文件 | 页面内执行 JS |
+| evalFile | JS 函数文件 | 在当前页面或 frame 中执行函数 |
 | jsClick | 选择器 | 点击元素 |
 | jsText | 选择器 文本 | 聚焦后真实键盘输入(下拉筛选只能用这个) |
 | numberGen | 搜索词 选项前缀 | 生成编号 |
@@ -43,27 +51,29 @@ node "<skill-dir>/scripts/plm.cjs" [--frame=documentLayout/create] <命令> [参
 | setLocation | 分类节点名 | 选存储位置 |
 | upload | 本地文件路径 | 添加文件 |
 | removeRows | 行号 | 勾选行并移除文件 |
-| submit | 名称 | 点确定 |
+| submit | 可选截图标签 | 点确定 |
+
+`evalFile` 文件只包含一个 JavaScript 函数表达式，例如 `() => document.title`；函数体在当前页面或 frame 中执行。文件路径从终端当前目录解析。
 
 ## 流程
 
 1. 进入项目 → 顶部 `项目计划` 页签 → 左侧计划树点开对应节点(例:`TR4A评审`) → 右侧切到 `交付物(已交/总数)` 子页签 → 找到该交付物行 → 点 `交付物链接` 列的第一个按钮(`+`),打开新建文档表单(表单 frame 变为 `documentLayout/create`)。
 2. 核对 `类型`,与 `交付物类型` 列一致。
-3. `numberGen 6611 MEL6611` → 编号自动生成。
-4. `setName <项目中文名 + 交付件名>`。
-5. `setLocation <一级分类简称>`。
-6. 电子文件自带一行模板 → `removeRows 0`。
-7. `upload <本地文件路径>`,一次一个。
+3. `numberGen --frame=documentLayout/create 6611 MEL6611` → 编号自动生成。
+4. `setName --frame=documentLayout/create <项目中文名 + 交付件名>`。
+5. `setLocation --frame=documentLayout/create <一级分类简称>`。
+6. 电子文件自带一行模板 → `removeRows --frame=documentLayout/create 0`。
+7. `upload --frame=documentLayout/create <本地文件路径>`,一次一个。
 8. 用户确认后 `submit`。
 
 批量:每份交付件重复 1-8。
 
 ## 规则
 
-- 编号 = 项目号 + 一级码 + 二级码 + 流水码,例 `MEL6611`+`03`+`01`+`04` = `MEL6611030104`。流水码取系统生成值。
-- 名称 = 对照表「优化后交付件名称」:把开头的 `XXX项目` 换成项目中文名,**并删掉名称中间遗留的 `XXX` 占位**,其余字符原样保留(含 `(机械）` 这类学科标记和 `-TR4A` 后缀)。
+- 编号按对照表同一行读取，格式为项目号 + 一级码 + 二级码 + 流水码。例如系统工程类“测试报告-（机）”一行是 `MEL6611` + `08` + `13` + `01` = `MEL6611081301`；流水码必须使用系统生成值并与该行一致。
+- 名称按对照表「优化后交付件名称」生成：`XXX项目` 替换为项目中文名，`XXX` / `xxx` 替换为该交付物对应的模块名，`**` 替换为明确的过程材料名称。缺少模块名或材料名时先询问，不保留占位符或自行删除。除占位符外，括号形态和 `-TR4A` 等字符按表中原样保留。
   例:`XXX项目XXX测试报告(机械）-TR4A` → `皮秒大台面钻孔机开发项目测试报告(机械）-TR4A`。
-- 编号自检:生成的编号末段 = 一级码 + 二级码(如 系统工程类 `08` + 测试报告-（机）`13` → `MEL6611081301`),用它反查匹配的交付物类型对不对。
+- 编号自检：按生成编号中的一级码、二级码和系统流水码反查同一对照表行，确认交付物类型相符。
 - 位置 = `/<项目号 版本>/<一级分类>`,例 `/MEL6611 V100R001/需求`。
 - 文件匹配 = 本地文件名归一化(去扩展名、空格、括号差异、项目名前缀)后对「优化后交付件名称」。
 
@@ -83,7 +93,7 @@ node "<skill-dir>/scripts/plm.cjs" [--frame=documentLayout/create] <命令> [参
 2. 删除非模板内容前。
 3. 文件匹配不到或有多个候选时。
 
-## 项目
+## 支持项目
 
-- `MEL6611 V100R001`,中文名 `皮秒大台面钻孔机开发项目`。
+- 本 Skill 仅覆盖 `MEL6611 V100R001`，中文名 `皮秒大台面钻孔机开发项目`。其他项目需先补充并验证对应的交付件对照表和配置。
 - 配置目录 `~/.codex/browser-profiles/inteplm`,截图 `~/.codex/browser-profiles/inteplm-shots`。
