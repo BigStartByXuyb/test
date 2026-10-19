@@ -1,14 +1,14 @@
 ---
 name: inteplm-deliverable-docs
-description: 仅在 IntePLM 链接指向 MEL6611 V100R001 项目，或用户明确指定 MEL6611 V100R001，并要求新建、编号、填写或上传交付物文档时触发。
+description: 仅在 IntePLM 链接指向 MEL6611 V100R001 项目，或用户明确指定该项目，并要求新建交付物文档（包括生成编号、填写表单或上传文件）时触发。
 ---
 
 # IntePLM 交付物文档创建与上传
 
 ## 触发条件
 
-1. 用户提供指向 `MEL6611 V100R001` 项目的 IntePLM 链接，并要求新建交付物文档。
-2. 用户明确指定 `MEL6611 V100R001`，并要求新建交付物文档、生成编号或上传文件。
+1. 用户提供指向 `MEL6611 V100R001` 项目的 IntePLM 链接，并要求新建交付物文档（包括生成编号、填写表单或上传文件）。
+2. 用户明确指定 `MEL6611 V100R001`，并要求新建交付物文档（包括生成编号、填写表单或上传文件）。
 3. 单独出现“交付物”“新建文档”“上传文件”等通用词，不触发本 Skill。
 
 ## 前置
@@ -60,7 +60,7 @@ node "<skill-dir>/scripts/plm.cjs" [--frame=documentLayout/create] [--page=<索�
 
 `evalFile` 文件只包含一个 JavaScript 函数表达式，例如 `() => document.title`；函数体在当前页面或 frame 中执行。文件路径从终端当前目录解析。
 
-页面选择与行索引解析的回归测试：
+页面选择、编号候选与行索引解析的回归测试：
 
 ```powershell
 node --test "<skill-dir>/scripts/tests/page-selection.test.js" "<skill-dir>/scripts/tests/number-selection.test.js" "<skill-dir>/scripts/tests/row-selection.test.js"
@@ -85,7 +85,8 @@ node --test "<skill-dir>/scripts/tests/page-selection.test.js" "<skill-dir>/scri
 - 名称逐字按对照表「优化后交付件名称」生成：先将 `XXX项目` 替换为项目中文名，再将剩余 `XXX` / `xxx` 替换为模块名，最后将 `**` 替换为明确的过程材料名称。模板已有“模块”后缀时，模块名不重复包含该后缀。缺少模块名或材料名时先询问，不保留占位符或自行删除。括号及后缀按该行原样保留。
   例：`XXX项目XXX模块与联合仿真测试方案` → `皮秒大台面钻孔机开发项目<模块名>模块与联合仿真测试方案`。
 - 编号自检：按生成编号中的一级码、二级码和系统流水码反查同一对照表行，确认交付物类型相符；任一字段不一致时停止并向用户说明，不修改编号或继续提交。
-- 位置 = `/<项目号 版本>/<位置节点名>`,例 `/MEL6611 V100R001/需求`。
+- `setLocation` 接收一个位置节点名（叶子节点名）；完整存储路径由项目号、版本和节点名组成，例如 `setLocation 需求` 对应 `/MEL6611 V100R001/需求`。
+- 对照表名称中的 `/` 分隔候选交付件名称。一次新建只选择与当前需求和本地文件匹配的一个名称；没有唯一匹配时先询问，不把候选名称拼成一个名称。
 - 文件匹配 = 本地文件名归一化(去扩展名、空格、括号差异、项目名前缀)后对「优化后交付件名称」。
 
 对照表与分类简称见 [references/deliverable-rules.md](references/deliverable-rules.md)。
