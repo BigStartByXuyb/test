@@ -1,6 +1,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { chromium } = require("playwright");
+const { resolveInteplmPage } = require("./page-selection.cjs");
 
 const CDP = "http://127.0.0.1:9222";
 const SHOTS = path.join(process.env.USERPROFILE, ".codex", "browser-profiles", "inteplm-shots");
@@ -48,9 +49,14 @@ const inputs = (t) =>
 const main = async () => {
   const argv = process.argv.slice(2);
   let frameKey = null;
+  let pageIndex = null;
   const rest = [];
   for (const a of argv) {
     if (a.startsWith("--frame=")) frameKey = a.slice("--frame=".length);
+    else if (a.startsWith("--page=")) {
+      const value = a.slice("--page=".length);
+      pageIndex = /^\d+$/.test(value) ? Number(value) : Number.NaN;
+    }
     else rest.push(a);
   }
   const cmd = rest[0] || "snap";
@@ -58,9 +64,9 @@ const main = async () => {
 
   const browser = await chromium.connectOverCDP(CDP);
   const pages = browser.contexts()[0].pages().filter((p) => !p.url().startsWith("devtools://"));
-  if (cmd === "pages") return out(pages.map((p) => p.url()));
+  if (cmd === "pages") return out(pages.map((p, index) => ({ index, url: p.url() })));
 
-  const page = pages[pages.length - 1];
+  const page = resolveInteplmPage(pages, pageIndex);
   page.setDefaultTimeout(20000);
   if (cmd === "frames") return out(page.frames().map((f) => ({ name: f.name(), url: f.url() })));
 

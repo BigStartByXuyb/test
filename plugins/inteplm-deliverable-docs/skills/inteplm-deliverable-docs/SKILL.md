@@ -1,6 +1,6 @@
 ---
 name: inteplm-deliverable-docs
-description: 仅在 IntePLM 链接指向 MEL6611 V100R001 项目，或用户明确指定 MEL6611 V100R001，并要求创建、编号、填写或上传交付物文档时触发。
+description: 仅在 IntePLM 链接指向 MEL6611 V100R001 项目，或用户明确指定 MEL6611 V100R001，并要求创建、更新、编号、填写或上传交付物文档时触发。
 ---
 
 # IntePLM 交付物文档创建与上传
@@ -9,7 +9,7 @@ description: 仅在 IntePLM 链接指向 MEL6611 V100R001 项目，或用户明�
 
 1. 用户提供指向 `MEL6611 V100R001` 项目的 IntePLM 链接，并要求创建或更新交付物文档。
 2. 用户明确指定 `MEL6611 V100R001`，并要求填写交付物、生成编号或上传文件。
-3. 链接指向其他项目时，不触发本 Skill；先停止并转交对应项目的处理流程。
+3. 链接指向其他项目时，告知用户本 Skill 仅支持 `MEL6611 V100R001`，并建议使用对应 Skill 或人工流程。
 4. 单独出现“交付物”“新建文档”“上传文件”等通用词，不触发本 Skill。
 
 ## 前置
@@ -33,7 +33,7 @@ $npmGlobalRoot = (npm root -g).Trim()
 $playwrightNodeModules = Join-Path $npmGlobalRoot '@playwright\mcp\node_modules'
 if (-not (Test-Path (Join-Path $playwrightNodeModules 'playwright'))) { throw '请先安装全局 @playwright/mcp 包' }
 $env:NODE_PATH = $playwrightNodeModules
-node "<skill-dir>/scripts/plm.cjs" [--frame=documentLayout/create] <命令> [参数]
+node "<skill-dir>/scripts/plm.cjs" [--frame=documentLayout/create] [--page=<索引>] <命令> [参数]
 ```
 
 新建文档表单在内嵌 frame 里，操作表单必须加 `--frame=documentLayout/create`；`取消/确定` 在外层页面。
@@ -42,8 +42,9 @@ node "<skill-dir>/scripts/plm.cjs" [--frame=documentLayout/create] <命令> [参
 
 | 命令 | 参数 | 用途 |
 | --- | --- | --- |
+| pages | | 列出标签页索引和 URL |
 | snap | 名称 | 截图 + 页面文本 |
-| pages / frames | | 列标签页 / frame |
+| frames | | 列出 frame |
 | evalFile | JS 函数文件 | 在当前页面或 frame 中执行函数 |
 | jsClick | 选择器 | 点击元素 |
 | jsText | 选择器 文本 | 聚焦后真实键盘输入(下拉筛选只能用这个) |
@@ -53,6 +54,8 @@ node "<skill-dir>/scripts/plm.cjs" [--frame=documentLayout/create] <命令> [参
 | upload | 本地文件路径 | 添加文件 |
 | removeRows | 行号 | 勾选行并移除文件 |
 | submit | 可选截图标签 | 点确定 |
+
+首次操作先运行 `pages`。脚本只选择 IntePLM 地址 `http://192.168.0.218:7002` 下的标签页；存在多个匹配标签页时，用 `--page=<pages 输出的索引>` 指定目标。没有匹配页或未指定歧义目标时，脚本停止。所有其他命令都支持该参数。
 
 `evalFile` 文件只包含一个 JavaScript 函数表达式，例如 `() => document.title`；函数体在当前页面或 frame 中执行。文件路径从终端当前目录解析。
 
@@ -71,14 +74,16 @@ node "<skill-dir>/scripts/plm.cjs" [--frame=documentLayout/create] <命令> [参
 
 ## 规则
 
-- 编号按对照表同一行读取，格式为项目号 + 一级码 + 二级码 + 流水码。例如系统工程类“测试报告-（机）”一行是 `MEL6611` + `08` + `13` + `01` = `MEL6611081301`；流水码必须使用系统生成值并与该行一致。
-- 名称逐字按对照表「优化后交付件名称」生成：仅当表格行包含 `XXX项目` 时才替换为项目中文名；`XXX` / `xxx` 替换为该交付物对应的模块名；`**` 替换为明确的过程材料名称。缺少模块名或材料名时先询问，不保留占位符或自行删除。括号及后缀按该行原样保留。
+- 编号按对照表同一行读取，格式为项目号 + 一级码 + 二级码 + 流水码。例如系统工程类“测试报告-（机）”一行是 `MEL6611` + `08` + `13` + `01` = `MEL6611081301`；流水码必须使用系统生成值并与该行一致，表内 `02`、`03` 是对应行规定的流水码。
+- 名称逐字按对照表「优化后交付件名称」生成：仅当表格行包含 `XXX项目` 时才替换为项目中文名；`XXX` / `xxx` 替换为该交付物对应的模块名；`**` 替换为明确的过程材料名称。模板已有“模块”后缀时，模块名不重复包含该后缀。缺少模块名或材料名时先询问，不保留占位符或自行删除。括号及后缀按该行原样保留。
   例：`XXX项目XXX测试报告(机械）-硬件类测试报告` → `皮秒大台面钻孔机开发项目<模块名>测试报告(机械）-硬件类测试报告`；缺少模块名时先询问，不提交占位符。
 - 编号自检：按生成编号中的一级码、二级码和系统流水码反查同一对照表行，确认交付物类型相符。
 - 位置 = `/<项目号 版本>/<位置节点名>`,例 `/MEL6611 V100R001/需求`。
 - 文件匹配 = 本地文件名归一化(去扩展名、空格、括号差异、项目名前缀)后对「优化后交付件名称」。
 
 对照表与分类简称见 [references/deliverable-rules.md](references/deliverable-rules.md)。
+
+Codex 的展示名称、简介和默认提示由 `agents/openai.yaml` 提供；修改 Skill 的适用范围时同步更新该文件。
 
 ## 坑
 
