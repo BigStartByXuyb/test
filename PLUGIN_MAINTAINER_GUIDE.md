@@ -49,9 +49,9 @@ MasterGo 页面坐标与来源校验是页面级检查，不是无参数的市�
 
 ## 提交和合并
 
-`plugin-migration` 是日常维护分支。首次使用时从 GitLab `main` 创建该分支并推送到 GitLab；后续更新先拉取远端分支，完成本地校验后推送，并创建目标为 `main` 的 Merge Request。不要直接推送受保护的 `main`。
+`plugin-migration` 是日常维护分支。首次使用前，Maintainer 必须从 GitLab `main` 创建该分支并推送；维护者确认远端分支存在后再 checkout。后续更新先拉取远端分支，完成本地校验后推送，并创建目标为 `main` 的 Merge Request。不要直接推送受保护的 `main`。
 
-GitLab CI 使用 `data_ai/cicd` 的共享模板。调用项目的 Job Token allowlist、Linux Docker Runner 和 masked CI/CD 变量由 Maintainer 配置；密钥不保存在仓库中。
+GitLab CI 调用 `data_ai/cicd` 的长期维护 `main` 分支作为共享模板源。调用项目的 Job Token allowlist、Linux Docker Runner 和 masked CI/CD 变量由 Maintainer 配置；密钥不保存在仓库中。
 
 ## 发版
 

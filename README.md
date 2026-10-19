@@ -69,53 +69,6 @@ plugins/
 
 新增技能放在 `plugins/<plugin-id>/skills/<skill-id>/`，并提供 `SKILL.md`。Marketplace 条目、插件元数据和源目录必须使用一致的 ID 与路径。用户可见的插件用途、技能入口和必装要求维护在 `docs/PLUGINS.md`。
 
-## 本地校验
+## 插件维护
 
-在仓库根目录运行：
-
-```sh
-claude plugin validate --strict .
-```
-
-PowerShell 7 中运行插件自带测试和差异检查：
-
-```powershell
-$nodeTests = Get-ChildItem plugins -Recurse -File -Filter '*.test.js' |
-  Where-Object { $_.FullName -match '[\\/]scripts[\\/]tests[\\/]' } |
-  ForEach-Object FullName
-if ($nodeTests.Count -eq 0) { throw '没有找到插件 Node 测试' }
-node --test $nodeTests
-
-$psTests = Get-ChildItem plugins -Recurse -File -Filter '*.tests.ps1' |
-  Where-Object { $_.FullName -match '[\\/]skills[\\/].*[\\/]scripts[\\/]tests[\\/]' }
-foreach ($test in $psTests) {
-  pwsh -NoProfile -File $test.FullName
-  if ($LASTEXITCODE -ne 0) { throw "PowerShell 测试失败: $($test.Name)" }
-}
-
-git diff --check
-```
-
-## 提交与发版
-
-所有日常更新提交到 GitLab 的 `plugin-migration` 分支，检查通过后通过 Merge Request 合入受保护的 `main`。首次 checkout 该分支：
-
-```sh
-git clone http://14.29.174.209:20001/data_ai/plugins.git
-cd plugins
-git switch --track origin/plugin-migration
-```
-
-后续更新流程：
-
-```sh
-git switch plugin-migration
-git pull --rebase origin plugin-migration
-git add README.md docs/PLUGINS.md PLUGIN_MAINTAINER_GUIDE.md .claude-plugin/marketplace.json plugins/
-git commit -m "更新 <plugin-id> 插件内容"
-git push origin plugin-migration
-```
-
-向 `main` 提交 Merge Request，并等待流水线完成后合并。MR 流水线使用 `data_ai/cicd` 中固定版本的模板；Runner、Job Token allowlist 和项目 CI/CD 变量由 Maintainer 配置。
-
-插件版本记录在各自的 `.claude-plugin/plugin.json`。发版时按 [`docs/plugin-release.md`](docs/plugin-release.md) 更新版本并推送 `v<version>` tag。提交前确认没有密钥、临时文件或本机绝对路径。
+日常维护分支、插件校验、提交、MR 和发版流程统一见[维护指南](PLUGIN_MAINTAINER_GUIDE.md)。
