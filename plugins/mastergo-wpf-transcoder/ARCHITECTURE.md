@@ -30,7 +30,7 @@ plugins/mastergo-wpf-transcoder/
 │  │     ├─ adapters/               # 各路线专属：mtslg-iocontrol/（生成器、校验器与其 lib/）
 │  │     ├─ entry/                  # 编排入口：run-all.ps1、gen-mastergo-page-bundle.js
 │  │     ├─ lib/                    # 跨脚本共享实现（唯一副本，禁止再抄进脚本）
-│  │     └─ tests/                  # 开发期回归测试（CI 不跑，本地跑）
+│  │     └─ tests/                  # 开发期回归测试（Node 与 PowerShell 用例由 CI 执行）
 │  └─ mastergo-iocontrol-document-format/   # 映射文档写作规范 Skill
 ```
 
@@ -149,9 +149,9 @@ flowchart LR
 | 语言闭环 | Bundle 的语言绑定与字典校验 | `LangName` 引用必须存在于本页字典，各语言 key 一致 |
 | 页面壳层 | `gen-mtslg-layout.js` 校验 | MenuItem 常驻属性、Index（菜单项 `1..N` 连续编号，常驻分组不占号）、图标尺寸门禁 |
 | 容器嵌套 | `apply-container-containment.js` + `validate-iocontrol-provenance.js` | 只在命中 `childPolicy=nested-page-templates` 的容器上重挂；已挂在「非容器的已发射节点」下的子节点不参与（归属守卫，记 `already-owned-by-non-container-node`，防 DataGrid 列被外层容器抢走）；输出父节点可与 `sourceParent` 不同，但必须按 `layoutParent` 独立重算坐标；冲突只记报告不猜层级 |
-| 规则与文档一致（仅本地回归，CI 不执行） | 本地回归 `doc-rule-consistency.test.js` + `gen-iocontrol-xml.test.js` | 覆盖边界：`buttonFamily` / `controlTypeRequiredAttrs` ↔ 脚本内置默认 ↔ 两份 Skill ↔ 两份人读参考的常量与表述一致；发射分支由 `gen-iocontrol-xml.test.js` 的「图标字段按 ControlType 模板收窄」用例覆盖，不依赖源码文本 |
+| 规则与文档一致 | `doc-rule-consistency.test.js` + `gen-iocontrol-xml.test.js` | 覆盖 `buttonFamily` / `controlTypeRequiredAttrs` 与脚本、两份 Skill、人读参考的一致性，以及 ControlType 模板约束的发射分支；由 GitLab `data_ai/cicd` 的 `plugin:runtime-js` 执行，外部共享作业提交与用例范围见[维护指南 CI 覆盖](../../PLUGIN_MAINTAINER_GUIDE.md#共享流水线测试范围) |
 
-任一门禁以非零退出结束即禁止交付；标注「仅本地回归」的行不在 CI 执行，由提交者在本地跑完再推送。规则改动后必须同步更新执行者与回归用例。
+任一门禁以非零退出结束即禁止交付。规则改动后必须同步更新执行者与回归用例。
 
 ## 8. 多语言链路
 
@@ -185,7 +185,7 @@ DSL/mapping 文案 ──► 英文等译文由 AI 产出 translations 清单并
 - Node.js 运行全部 JS 脚本；MasterGo MCP 通过 `call-mastergo-mcp.js` 调用（token 不落盘）。
 - **文档同步工具（可选，非交付链路依赖）**：把本地规则文档同步到团队在线文档时，使用本机已授权的飞书文档 CLI（可检索/读写云文档）按标题定位并比对；它不是生成或校验流程的运行依赖，环境没有该工具时跳过同步步骤，并在交付说明里标注"在线文档未同步"，不得因此阻塞页面交付。
 - 本地回归：`node --test "skills/mastergo-to-wpf/scripts/tests/*.test.js"`（跑满 `scripts/tests/` 下全部用例，含脚本复用门禁 `script-duplication.test.js`、文本换行口径 `text-newline.test.js`、文档预算 `doc-budget.test.js`、流水线契约 `pipeline-contract.test.js`、临时目录卫生 `tmp-hygiene.test.js`）、`Get-ChildItem "skills/mastergo-to-wpf/scripts/tests/*.tests.ps1" | ForEach-Object { pwsh -NoProfile -File $_.FullName }`（`mastergo-dsl-pipeline.tests.ps1` + `run-all-resume-identity.tests.ps1`）、`node skills/mastergo-to-wpf/scripts/adapters/mtslg-iocontrol/audit-mtslg-feishu-map.js <doc> <map>`。
-- CI（`BigStartByXuyb/cicd` 复用工作流）只做**确定性校验 + 语义审计**，不跑上述单测；单测由提交者在本地执行。
+- GitLab MR 以 `data_ai/cicd` `main` 共享流水线作为唯一合并门禁；GitHub `plugin-cicd.yml` 只提供辅助审计，GitHub `plugin-release.yml` 单独发布 MasterGo 插件。共享作业定义和已核验提交见[维护指南 CI 覆盖](../../PLUGIN_MAINTAINER_GUIDE.md#共享流水线测试范围)。需要页面级 XML、DSL 或映射输入的坐标与来源校验由提交者在本地执行。
 
 ## 11. 维护约定
 
