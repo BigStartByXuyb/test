@@ -5,7 +5,8 @@ name: Plugin Release
 # 客户端从 <这个仓库>/releases/latest/download/plugin-manifest.json 取（详见客户端仓库的
 # docs/plugin-release.md）—— 打包实现只有客户端那一份脚本，这里按 commit 钉住它来调，不另抄一套。
 #
-# 与 plugin-cicd.yml 的分工：那条在 PR / main 上跑市场审计；这条只在 tag 上发发布件。
+# 与 plugin-cicd.yml 的分工：那条在 GitHub PR / main 上提供辅助市场审计；GitLab MR 的 data_ai/cicd main 才是合并门禁。
+# 本作业只发布已包含在 GitHub main 的 mastergo-wpf-transcoder v<version> tag；GitLab MR 合并后再同步到 GitHub。
 
 on:
   push:
@@ -24,6 +25,15 @@ jobs:
         with:
           path: plugin
           fetch-depth: 0
+
+      - name: Require the tag commit on GitHub main
+        working-directory: plugin
+        run: |
+          git fetch --no-tags origin main:refs/remotes/origin/main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" refs/remotes/origin/main; then
+            echo "::error title=Release tag is not on main::Release tags must point to commits already merged to GitHub main."
+            exit 1
+          fi
 
       # 打包实现（客户端仓库，按 commit 钉住）：清单形状与「什么算插件根」的判据都在那边一处。
       - name: Checkout the client repo (packer)

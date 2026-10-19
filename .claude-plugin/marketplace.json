@@ -1,11 +1,11 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
-  "name": "bigstart-plugins",
+  "name": "mw-plugins",
   "owner": {
-    "name": "BigStartByXuyb"
+    "name": "MW"
   },
   "metadata": {
-    "description": "BigStart team plugins for Claude Code and Codex."
+    "description": "MW Agent plugins for Claude Code, Codex, and compatible agents."
   },
   "plugins": [
     {

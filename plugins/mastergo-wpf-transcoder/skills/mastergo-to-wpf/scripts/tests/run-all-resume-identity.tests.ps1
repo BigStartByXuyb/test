@@ -74,7 +74,8 @@ try {
     # 1) 省略身份 → 回放冻结值（身份解析通过，落到第 11 步的缺失检查）。
     $case1 = New-Fixture -Name 'omitted'
     $out1 = Invoke-Resume -Project $case1
-    Assert-True ($out1 -match '缺少 Bundle 审计') '省略身份时应回放冻结身份并继续到第 11 步'
+    Assert-True ($out1 -match '缺少 Bundle 审计') ("省略身份时应回放冻结身份并继续到第 11 步。实际输出：
+$out1" )
     Assert-True ($out1 -notmatch '续跑不能') '省略身份时不应触发身份守卫'
     $after1 = Get-Content -LiteralPath (Join-Path $case1 'Generated\runs\Demo\run.json') -Raw | ConvertFrom-Json
     Assert-True ($after1.identity.ui -eq 'F8') '续跑不得改写冻结的 identity.ui'
