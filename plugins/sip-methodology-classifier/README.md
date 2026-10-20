@@ -22,38 +22,41 @@
 - **标准答案校验**：提供同事确认的标准答案 xlsx 时，自动标记“标准答案/同类工序”，并逐行比对主顺序/子顺序。
 - **归类依据**：每条记录标注来源；关键字兜底项进入“待确认项”Sheet。
 
-## 已验证
+## 校验方式
 
-用团队标准答案 `SIP方法论-SDC1D.xlsx` 校验：**SDC1D 408/408 行**的主顺序与子顺序完全一致。
+规则支持用**任意**同事确认的标准答案 xlsx 逐行校验。标准答案通过 `--reference` 作为可选输入传入，**不随插件分发，也没有默认文件名或路径**；不传时脚本仍会正常归类，只是“归类依据”不会有“标准答案”标记。
 
 ## 使用
 
 在 Claude Code 中直接说：
 
-> 按 SIP 方法论归类这个 zip：`D:\path\刀轮.zip`，输出到 `D:\path\SIP对应表.xlsx`
-> 标准答案在 `D:\path\SIP方法论-SDC1D.xlsx`
+> 按 SIP 方法论归类这个 zip：`D:\path\input.zip`，输出到 `D:\path\output.xlsx`
+
+如果有标准答案，再补一句（文件名由你指定）：
+
+> 标准答案在 `D:\path\reference.xlsx`
 
 或使用命令：
 
 ```
-/sip-classify --input "D:\path\刀轮.zip" --output "D:\path\SIP对应表.xlsx" --reference "D:\path\SIP方法论-SDC1D.xlsx"
+/sip-classify --input "D:\path\input.zip" --output "D:\path\output.xlsx" [--reference "D:\path\reference.xlsx"]
 ```
 
 也可以直接运行脚本：
 
 ```bash
 python -I skills/sip-methodology-classifier/scripts/build_sip_mapping.py \
-  --input "D:\path\刀轮.zip" \
-  --output "D:\path\SIP对应表.xlsx" \
-  --reference "D:\path\SIP方法论-SDC1D.xlsx"
+  --input "D:\path\input.zip" \
+  --output "D:\path\output.xlsx" \
+  [--reference "D:\path\reference.xlsx"]
 ```
 
-校验已生成的文件：
+校验已生成的文件（可选）：
 
 ```bash
 python -I skills/sip-methodology-classifier/scripts/verify_against_reference.py \
-  --output "D:\path\SIP对应表.xlsx" \
-  --reference "D:\path\SIP方法论-SDC1D.xlsx"
+  --output "D:\path\output.xlsx" \
+  --reference "D:\path\reference.xlsx"
 ```
 
 ## 输出结构
@@ -82,5 +85,6 @@ sip-methodology-classifier/
 ## 注意
 
 - 标准答案没有“共用”区：水气混行按行内容拆到通气或通水。
+- **不要假设标准答案的文件名或路径**：它是用户运行时可选的输入，由用户提供；插件内没有默认路径。
 - 新机型特有工序属于“同类工序”推断；全新技术路线的新工序会进入“待确认项”，需要文件编写同事复核后再补规则。
 - 输入 xlsx/zip 视为不可信数据：不执行宏，不运行输入目录内的程序，脚本只用 `python -I` 运行。
