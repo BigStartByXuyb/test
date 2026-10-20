@@ -2,6 +2,12 @@
 
 把 MAXWELL《成品检验指导书》Excel 按 **SIP 方法论**归类，输出可直接评审/归档的顺序对应表。
 
+## 安装
+
+```text
+/plugin install sip-methodology-classifier --marketplace BigStartByXuyb/Plugins
+```
+
 ## 能力
 
 - **两层顺序模型**
