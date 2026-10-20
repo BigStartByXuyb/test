@@ -84,6 +84,22 @@ function containerBoxAttrs(cell) {
     if (left || top) attrs.Margin = left + "," + top + ",0,0";
     return attrs;
   }
+  if (cell && cell.sizingMode === "control-slot") {
+    const attrs = designBoxAttrs(cell);
+    const margins = String(attrs.Margin || "0,0,0,0").split(",").map(function (value) { return Number(value) || 0; });
+    if (cell.width > 0 && cell.nodeWidth > 0 && round(cell.width) === round(cell.nodeWidth) && cell.offsetX > 0) {
+      attrs.Width = String(round(cell.nodeWidth));
+      attrs.HorizontalAlignment = "Left";
+      margins[0] = round(cell.offsetX);
+    }
+    if (cell.height > 0 && cell.nodeHeight > 0 && round(cell.height) === round(cell.nodeHeight) && cell.offsetY > 0) {
+      attrs.Height = String(round(cell.nodeHeight));
+      attrs.VerticalAlignment = "Top";
+      margins[1] = round(cell.offsetY);
+    }
+    if (margins[0] || margins[1]) attrs.Margin = margins[0] + "," + margins[1] + ",0,0";
+    return attrs;
+  }
   if (!cell || cell.sizingMode !== "page-slot") return designBoxAttrs(cell);
   const box = designBoxAttrs(cell);
   const axis = cell.synthAxis || (cell.children && cell.children.owner && cell.children.owner.direction) || null;

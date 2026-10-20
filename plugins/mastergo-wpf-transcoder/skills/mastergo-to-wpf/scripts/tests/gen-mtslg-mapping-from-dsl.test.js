@@ -659,6 +659,15 @@ for (const ref of ['al:root/left', 'al:root/center', 'al:root/justify', 'al:root
 console.log('PASS MTSLG DSL-to-mapping TextBlock Align regression test');
 
 // ---- 相机视口（cameraTemplates）：ControlType=Camera、不写 Style、DesignPanelID/Value 空串占位 ----
+const cameraTemplateFacts = JSON.parse(fs.readFileSync(
+  path.join(__dirname, "..", "..", "references", "component-types.json"), "utf8"
+)).cameraTemplates;
+assert.deepStrictEqual(cameraTemplateFacts.mtslgAlwaysWrittenAttrs, ["DesignPanelID", "Value"],
+  "相机空串占位字段必须限定到 MTSLG IOContorl 路线");
+assert.ok(!Object.prototype.hasOwnProperty.call(cameraTemplateFacts, "alwaysWrittenAttrs"),
+  "共享相机族不得声明跨路线恒写空串属性");
+assert.match(cameraTemplateFacts.mtslgComponentSetPolicy, /作业B（MTSLG IOContorl）/,
+  "相机空串占位口径必须在文字策略中限定到作业 B");
 const cameraDsl = {
   styles: {},
   nodes: [{

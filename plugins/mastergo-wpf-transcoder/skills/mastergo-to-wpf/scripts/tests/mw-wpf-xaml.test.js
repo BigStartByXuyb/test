@@ -312,4 +312,43 @@ function emitArgs(layoutPath, typesPath, outPath, extra = []) {
   assert.match(inner, /<TextBlock[\s\S]*Grid\.Row="0"[\s\S]*Grid\.Column="0"/, "子控件必须落在容器 Grid 的内层格子里");
 }
 
+// 8) 纯子 Grid 的普通间距通过 control-slot 子容器的 Margin 保留到真实 XAML。
+{
+  const layout = baseLayout();
+  layout.regions[1].grid.rows = [{ size: "Star", source: "design" }];
+  layout.regions[1].grid.columns = [{ size: "Star", source: "design" }];
+  layout.regions[1].grid.cells = [{
+    ref: "work/auto", container: true, sizingMode: "auto-content",
+    row: 0, column: 0, rowSpan: 1, columnSpan: 1,
+    width: 300, height: 86, nodeWidth: 300, nodeHeight: 86, offsetX: 0, offsetY: 0,
+    children: {
+      rows: [{ size: "Auto", gap: 40 }, { size: "Auto", gap: 40 }],
+      columns: [{ size: "Pixel", value: 300 }],
+      cells: ["A", "B"].map(function (suffix, index) {
+        return {
+          ref: "work/group" + suffix, container: true, sizingMode: "control-slot",
+          row: index, column: 0, rowSpan: 1, columnSpan: 1,
+          width: 300, height: 40, nodeWidth: 300, nodeHeight: 40,
+          offsetX: 0, offsetY: index ? 6 : 0,
+          children: {
+            rows: [{ size: "Pixel", value: 20 }],
+            columns: [{ size: "Pixel", value: 300 }],
+            cells: [cell("work/group" + suffix + "Text", "TextBlock", 0, 0, designBox(300, 20, 300, 20))]
+          }
+        };
+      })
+    }
+  }];
+  const layoutPath = writeJson("layout.autocontent-gap.json", layout);
+  const typesPath = writeJson("types.autocontent-gap.json", baseTypes([
+    { ref: "work/groupAText", sourceRef: "work/groupAText", controlType: "TextBlock" },
+    { ref: "work/groupBText", sourceRef: "work/groupBText", controlType: "TextBlock" }
+  ]));
+  const outPath = path.join(tmpRoot, "autocontent-gap", "View.xaml");
+  run(emitArgs(layoutPath, typesPath, outPath, ["--overwrite"]));
+  const xaml = fs.readFileSync(outPath, "utf8");
+  assert.match(xaml, /<Grid Grid\.Row="1" Grid\.Column="0" Height="40" VerticalAlignment="Top" Margin="0,6,0,0">/,
+    "auto-content 父层的普通 6px 间距必须出现在后续 control-slot Grid 的 Margin 中");
+}
+
 console.log("PASS 作业A 页面 XAML 发射（形态 / 固定区 / fail-closed / 语言键 / 覆盖保护 / 容器层）回归测试");

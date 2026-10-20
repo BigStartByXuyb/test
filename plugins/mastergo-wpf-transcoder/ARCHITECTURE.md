@@ -4,7 +4,7 @@
 
 ## 1. 插件是什么
 
-把明确指定的 MasterGo 设计稿转换成能通过目标项目硬门禁的 **MTSLG IOContorl 页面**：页面 XML、页面 Icon（XAML Geometry）、多语言字典、Layout 注册、mapping/provenance 审计，以及目标项目要求的 WPF 宿主壳（View / code-behind / ViewModel）与构建登记。
+把明确指定的 MasterGo 设计稿转换为两类正式页面交付：作业 A 的 MW WPF 真控件 XAML 页面，或作业 B 的 MTSLG IOContorl 页面 XML。两条路线生成各自的 Icon / 多语言字典 / Layout 与 mapping 或 provenance 审计，并共用目标项目要求的 WPF 宿主壳（View / code-behind / ViewModel）与构建登记。
 
 插件内保留两条路线：
 
