@@ -22,6 +22,11 @@
       "name": "feishu-codex-bridge",
       "source": "./plugins/feishu-codex-bridge",
       "description": "把本机 Codex 接到飞书：飞书消息驱动 Codex 执行并把结果回贴原消息。"
+    },
+    {
+      "name": "sip-methodology-classifier",
+      "source": "./plugins/sip-methodology-classifier",
+      "description": "把 MAXWELL《成品检验指导书》Excel 按 SIP 方法论归类：9 个主顺序 + 每个环节内部 1–12 级子顺序，支持 GBK zip、标黄列排除、多项目分表、标准答案校验。"
     }
   ]
 }
