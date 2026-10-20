@@ -74,7 +74,7 @@
 
 ## 4. ViewModel 契约
 
-ViewModel 与作业B 共用同一套生成器（`scripts/host/gen-mw-wpf-page.js`）：构造函数、`pageDesign` 之外恒含 `OnViewLoaded` / `HandleButtonEvent` 等固定成员，底部栏菜单项（`menuItems[].langName`）派生出按钮处理方法并在 `switch (message.ButtonName)` 里落 case。A 侧页面**不加载** IOContorl 页面 XML（控件在 `View.xaml` 里），因此 `.csproj` 不注册 `<Content>` 的页面 XML 项；其余注册项（View / code-behind / ViewModel / 本页 Icon / 本页语言字典）与作业B 相同。
+ViewModel 与作业B 共用同一套生成器（`scripts/host/gen-mw-wpf-page.js`）。固定成员、按钮方法名推导与宿主壳生成规则以 `page-shell-generator.md` 为完整契约；修改这些规则时按 `SKILL.md` 的读取条件打开该文档。A 侧页面**不加载** IOContorl 页面 XML（控件在 `View.xaml` 里），因此 `.csproj` 不注册 `<Content>` 的页面 XML 项；其余注册项（View / code-behind / ViewModel / 本页 Icon / 本页语言字典）与作业B 相同。
 
 ## 5. 验证
 

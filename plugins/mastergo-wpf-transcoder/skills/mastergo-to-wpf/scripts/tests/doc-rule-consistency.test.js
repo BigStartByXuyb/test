@@ -394,7 +394,10 @@ for (const rel of MUST_STATE_NO_PARENT_MATCH_KEY) {
 const SHELL_DOC = path.join(__dirname, "..", "..", "references", "adapters", "mw-wpf", "page-shell-generator.md");
 const shellDoc = fs.readFileSync(SHELL_DOC, "utf8");
 const hostGenerator = fs.readFileSync(path.join(__dirname, "..", "host", "gen-mw-wpf-page.js"), "utf8");
+assert.ok(mainSkill.includes("page-shell-generator.md") && /ViewModel 固定成员.*宿主壳生成契约/.test(mainSkill),
+  "A 的 ViewModel 与宿主壳契约必须从公开 Skill 读取路由可达");
 assert.ok(shellDoc.includes("按钮处理方法（一钮一方法）"), "页面壳文档必须登记「按钮处理方法（一钮一方法）」小节");
+assert.ok(shellDoc.includes("作业 A 不注册页面 XML Content"), "页面壳文档必须限定页面 XML Content 的作业路线");
 for (const token of ["langName", "MenuItem", "MenuItemIndex"]) {
   assert.ok(shellDoc.includes(token), "页面壳文档必须写明按钮方法名取值链里的 " + token);
 }
