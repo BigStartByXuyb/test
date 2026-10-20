@@ -23,7 +23,7 @@
 //   - 文本一律走 `{DynamicResource <LangName>}`；没有语言键的文本走待确认，不写字面量。
 //   - 尺寸与对齐照设计稿：控件写自身 bbox，格子尺寸与控件在格内的偏移取自布局产物；
 //     格子尺寸 − 控件尺寸 = 间距，差值落在哪一侧由偏移决定（唯一实现在 lib/design-box.js）。
-//   - 不发射任何间距元素（口径 A）：间距由固定带或 Margin 表达，不新增占位控件；
+//   - 不新增 spacer 控件或空 Grid 子元素（口径 A）：间距由固定带或 Margin 表达；
 //     页面根网格内容区占星号剩余空间、右栏固定；纯子 Grid 容器按子内容自适应。
 //   - 容器直接含控件时按设计稿格子尺寸与对齐发射；容器只含子 Grid 时不写固定宽高，
 //     并使用左上对齐和 Margin 保留偏移。唯一实现在 lib/design-box.js 的 containerBoxAttrs。
@@ -217,7 +217,7 @@ function constraintAttrs(cell) {
   return Object.keys(attrs).length ? attrs : null;
 }
 
-// 控件属性：顺序固定为 定位 → 约束 → 文本 → 图形 → 样式 → 协议，便于逐行比对真实页面。
+// 控件属性：顺序固定为 定位 → 约束 → 文本 → 图形 → 样式 → 普通 XAML 属性 → 协议，便于逐行比对真实页面。
 function renderControl(node, cell, ctx, depth) {
   const spec = specOf(ctx.map, node.controlType);
   if (!spec) {
@@ -274,6 +274,13 @@ function renderControl(node, cell, ctx, depth) {
 
   if (styleInfo.style && !styleInfo.pageLevel) attr("Style", "{StaticResource " + styleInfo.style + "}");
   // 页级样式命中时不写 Style：外观由 <UserControl.Resources> 的 BasedOn 统一。
+
+  // 直写属性：仅发射写法表显式列出的普通 XAML 属性，空值不写。
+  (spec.xamlAttrs || []).forEach(function (name) {
+    const source = attrs[name] !== undefined ? attrs[name] : node[name];
+    if (source === undefined || source === null || String(source).trim() === "") return;
+    attr(name, String(source));
+  });
 
   // 协议挂载：只在类型判定给出取值时发射，不写空串占位（A 侧没有「必须恒写的宿主字段」）。
   (spec.protocols || []).forEach(function (protocol) {

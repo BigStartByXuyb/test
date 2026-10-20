@@ -4,8 +4,9 @@
     "note": [
       "作业A（mw-wpf）写法表：组件类型 → WPF/XAML 怎么写。",
       "组件类型本身（设计稿组件集/变体 → ControlType）由共享类型表 references/component-types.json 唯一决定；本文件只登记「同一类型在 WPF 这一侧怎么写」，不重复类型判定。",
-      "element / styleKeys 取自框架手册 02-controls/<类别>/<条目>.md 的「声明」与「样式族表」（每条标注 manualEntry）；attrs 取自真实页面 ManualView.xaml（框架唯一 P2 业务页）与 AutoCutView.xaml（MaxWell.SLGPages 真实页面）。",
+      "SDC 控件的 element / styleKeys 取自框架手册条目（通过 manualEntry 引用）；程序集控件的 element / attrs 取自 evidence 登记的程序集元数据。真实页面与手册快照只作为映射维护时的人工证据。",
       "layoutAttrs 是真实页面的抽样证据（记录该类型实际出现过哪些布局属性），不是属性白名单：跨度由布局推导按控件覆盖带数写出，任何可落格类型都可能带 Grid.RowSpan / Grid.ColumnSpan，口径以 mw-wpf-mode.md 为准。",
+      "xamlAttrs 是普通 XAML 属性的发射白名单；protocols 是框架协议属性，两者用途不同。",
       "status: 三档按处置区分——ready = 有手册与真实页面证据，按手册发射；manual-only = 证据不全，可以发射但需人工确认（门禁 R10 提示，事后补齐缺的那一侧证据）；pending = A 侧没有对应控件或没有发射通道（如 Border：手册有条目但没有 A 侧控件），遇到即挂待确认、不发射。"
     ]
   },
@@ -601,7 +602,6 @@
     "Camera": {
       "element": "camera:CameraControl",
       "xmlNamespacePrefix": "camera",
-      "manualEntry": "02-controls/vision/camera-control.md",
       "attrs": [
         "DesignPanelID",
         "Value"
@@ -615,14 +615,18 @@
         "Grid.RowSpan",
         "Grid.ColumnSpan"
       ],
+      "xamlAttrs": [
+        "DesignPanelID",
+        "Value"
+      ],
       "protocols": [],
       "evidence": [
         "共享类型表 cameraTemplates.controlType=Camera（9 个变体）",
         "MTBase/Gui/UserControls/MaxWell.CameraDevice.dll：公开 WPF UserControl MaxWell.CameraDevice.CameraControl，含 DesignPanelID、CameraName 与图像属性",
-        "目标框架项目已编译 camera:CameraControl 页面"
+        "目标框架项目已编译 camera:CameraControl 页面；真实业务页与运行时加载待确认"
       ],
-      "status": "ready",
-      "note": "使用 MaxWell.CameraDevice.CameraControl；外观沿用运行时默认（不写 Style，与作业B cameraTemplates 同口径）。DesignPanelID / Value 在设计稿里没有来源时不发射空串，由目标工程或运行时绑定填写。",
+      "status": "manual-only",
+      "note": "使用 MaxWell.CameraDevice.CameraControl；目标工程必须引用 MaxWell.CameraDevice.dll；外观沿用运行时默认（不写 Style，与作业B cameraTemplates 同口径）。真实业务页与设备运行时加载尚未验证，首次使用登记 R10；DesignPanelID / Value 仅在页面映射提供非空值时发射。",
       "stylePolicy": "none"
     }
   }

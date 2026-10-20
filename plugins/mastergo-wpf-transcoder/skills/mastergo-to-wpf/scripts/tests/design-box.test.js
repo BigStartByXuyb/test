@@ -149,6 +149,10 @@ function node(id, type, style, children, extra) {
     width: 1070, height: 759, nodeWidth: 1026, nodeHeight: 600, offsetX: 0, offsetY: 161
   }), { Height: "600", VerticalAlignment: "Top", Margin: "0,161,0,0" },
   "根槽位按设计稿尺寸与偏移；设计稿越过格子末端 → 锚点按上边 + Margin（窗口变化时不漂）");
+  assert.deepStrictEqual(containerBoxAttrs({
+    ref: "auto-content", container: true, sizingMode: "auto-content", offsetX: 16, offsetY: 24
+  }), { HorizontalAlignment: "Left", VerticalAlignment: "Top", Margin: "16,24,0,0" },
+  "纯子 Grid 的普通间距由下一个 Auto 容器的 Margin 保留");
 }
 
 // ── ④ 发射器：属性落到 XAML，并逐格进发射报告 ────────────────────────────────────

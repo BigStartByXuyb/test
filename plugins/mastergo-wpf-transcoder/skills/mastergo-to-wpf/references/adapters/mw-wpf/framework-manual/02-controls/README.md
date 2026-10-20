@@ -138,12 +138,6 @@
 | SimpleItemsControl | SimpleItemControl.xaml | 隐式默认样式（无 x:Key） | [simple-item-control](native/simple-item-control.md) |
 | Poptip | Poptip.xaml | PoptipBaseStyle + 隐式默认 | [poptip](native/poptip.md) |
 
-### 程序集控件（非 SDC 样式库）
-
-| 控件 | 程序集 | 外观 | 条目 |
-|---|---|---|---|
-| CameraControl | MaxWell.CameraDevice.dll | 运行时默认外观 | [camera-control](vision/camera-control.md) |
-
 ## 2. 样式文件 → 控件（反向）
 
 72 个 `SDC\Style\` 文件（BaseStyle.xaml 为公共基样式；各文件经 MergedDictionaries 引用它）：

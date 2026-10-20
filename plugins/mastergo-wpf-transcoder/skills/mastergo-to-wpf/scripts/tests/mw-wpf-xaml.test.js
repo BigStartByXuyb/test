@@ -247,13 +247,18 @@ function emitArgs(layoutPath, typesPath, outPath, extra = []) {
   layout.regions[1].grid.cells = [cell("work/camera", "Camera", 0, 0, designBox(600, 160, 200, 150))];
   const layoutPath = writeJson("layout.implicit.json", layout);
   const typesPath = writeJson("types.implicit.json", baseTypes([
-    { ref: "work/camera", sourceRef: "work/camera", controlType: "Camera", absX: 0, absY: 0, w: 200, h: 150 }
+    {
+      ref: "work/camera", sourceRef: "work/camera", controlType: "Camera", absX: 0, absY: 0, w: 200, h: 150,
+      attrs: { DesignPanelID: "panel-1", Value: "camera-value" }
+    }
   ]));
   const outPath = path.join(tmpRoot, "implicit", "View.xaml");
   run(emitArgs(layoutPath, typesPath, outPath, ["--overwrite"]));
   const xaml = fs.readFileSync(outPath, "utf8");
   assert.match(xaml, /xmlns:camera="clr-namespace:MaxWell\.CameraDevice;assembly=MaxWell\.CameraDevice"/, "按写法表声明 CameraControl 命名空间");
   assert.match(xaml, /<camera:CameraControl/, "Camera 按写法表发射成 CameraControl");
+  assert.match(xaml, /DesignPanelID="panel-1"/, "Camera 按 protocols 白名单发射 DesignPanelID");
+  assert.match(xaml, /Value="camera-value"/, "Camera 按 protocols 白名单发射 Value");
   assert.ok(!xaml.includes("StaticResource null"), "隐式默认样式不得写成 BasedOn=\"{StaticResource null}\"");
   assert.ok(!/BasedOn="\{StaticResource [^}]*\}" \/>\s*$/m.test(xaml.split("<camera:CameraControl")[0].split("<UserControl.Resources>")[1] || ""),
     "隐式默认样式不得进页级 Resources");

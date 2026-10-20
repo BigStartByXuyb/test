@@ -46,7 +46,7 @@
 //     （容器的 flexContainerInfo.gap 就体现在这里）；② 相对——散条目按"最大的一段 ≥ 其余间距中位数 × 2"、
 //     只有一段间距时按"≥ 相邻条目较小者的一半"判；
 //     每层最多一条星号带；没有大空档时最后一条带吃剩余（星号），有大空档时最后一条按条目自身尺寸写死。
-//     **不发射任何间距元素**：间距由 Pixel 带、Auto 条目偏移或星号空档表达。
+//     **不新增 spacer 控件或空 Grid 子元素**：间距由固定 Pixel 带、条目偏移/Margin 或星号空档表达。
 //     **首段空档也成带**：第一个条目与网格原点之间那段（容器内缩 / 分区顶边到内容的空白）是第一条带。
 //   - 格子起点 = 网格原点 + 前面各带尺寸之和（不是"带起点"：带起点是设计稿里条目的位置，
 //     首条带前面还有首段空档，用带起点会把首段空档丢掉）。
@@ -382,7 +382,7 @@ function bandSizes(bands, axis) {
   });
 }
 
-// 只包含子容器的 Grid 按子内容自适应：条目带用 Auto，间距与首段内缩保留为固定 Pixel 带。
+// 只包含子容器的 Grid 按子内容自适应：条目带用 Auto，显著空档用 Pixel，普通间距由后续条目的偏移/Margin 保留。
 function contentBandSizes(bands) {
   return bands.map(function (band) {
     const extent = Math.max(1, Math.round(band.end - band.start));
@@ -792,7 +792,7 @@ function cameraSidebarLayout(grid, items, dslTree, size, origin) {
   sidebarCell.width = Math.round(sidebar.w);
   sidebarCell.height = rootHeight;
   sidebarCell.offsetX = 0;
-  sidebarCell.offsetY = 0;
+  sidebarCell.offsetY = Math.round(sidebar.y - rootTop);
   sidebarCell.sizingMode = containerSizingMode(sidebar.items, false);
   delete sidebarCell.shifted;
 

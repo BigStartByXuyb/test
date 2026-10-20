@@ -465,3 +465,39 @@ function sizes(bands) {
   }
 }
 
+// ---------- 12. 纯子 Grid 的自适应尺寸保留普通间距 ----------
+{
+  const group = function (id, y) {
+    return node(id, "FRAME", { width: 300, height: 40, relativeX: 0, relativeY: y }, [
+      node(id + "A", "INSTANCE", { width: 100, height: 20, relativeX: 0, relativeY: 0 }),
+      node(id + "B", "INSTANCE", { width: 100, height: 20, relativeX: 160, relativeY: 0 })
+    ], { flexContainerInfo: { flexDirection: "row" } });
+  };
+  const inner = node("inner", "FRAME", { width: 300, height: 86, relativeX: 0, relativeY: 0 }, [
+    group("groupA", 0), group("groupB", 46)
+  ], { flexContainerInfo: { flexDirection: "column" } });
+  const section = node("section", "FRAME", { width: 500, height: 86, relativeX: 100, relativeY: 115 }, [
+    inner,
+    node("sectionLabel", "TEXT", { width: 100, height: 20, relativeX: 320, relativeY: 0 })
+  ], { flexContainerInfo: { flexDirection: "row" } });
+  const layout = derive(snapshot([], [
+    section,
+    node("outside", "TEXT", { width: 100, height: 20, relativeX: 700, relativeY: 115 })
+  ]), typesOf([
+    { ref: "groupAA", controlType: "IconButton", absX: 100, absY: 200, w: 100, h: 20 },
+    { ref: "groupAB", controlType: "IconButton", absX: 260, absY: 200, w: 100, h: 20 },
+    { ref: "groupBA", controlType: "IconButton", absX: 100, absY: 246, w: 100, h: 20 },
+    { ref: "groupBB", controlType: "IconButton", absX: 260, absY: 246, w: 100, h: 20 },
+    { ref: "sectionLabel", controlType: "TextBlock", absX: 420, absY: 200, w: 100, h: 20 },
+    { ref: "outside", controlType: "TextBlock", absX: 700, absY: 200, w: 100, h: 20 }
+  ]));
+  const region = workArea(layout);
+  const sectionCell = cellOf(region, "section");
+  const innerCell = cellOf({ grid: sectionCell.children }, "inner");
+  assert.strictEqual(innerCell.sizingMode, "auto-content");
+  assert.deepStrictEqual(sizes(innerCell.children.rows), ["Auto(40)", "Auto(40)"],
+    "纯 Grid 子项各自按内容高度 Auto 自适应");
+  const nextGroup = cellOf({ grid: innerCell.children }, "groupB");
+  assert.strictEqual(nextGroup.offsetY, 6, "普通设计间距从前一条 Auto 内容轨道之后计算");
+}
+

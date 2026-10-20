@@ -39,7 +39,7 @@
 
 `scripts/adapters/mw-wpf/check-wpf-layout.js`（`run-all.ps1 -Mode mw-wpf` 的 `gates` / `verify`）逐条断言：
 
-1. **禁止写法**：发射区出现写法表未登记或登记为待确认的类型（`Border`：手册有条目但没有 A 侧控件）即失败；框架固定区里出现控件也失败。`Camera` 映射为 `MaxWell.CameraDevice.CameraControl`。
+1. **禁止写法**：发射区出现写法表未登记或登记为待确认的类型（`Border`：手册有条目但没有 A 侧控件）即失败；框架固定区里出现控件也失败。`Camera` 的元素映射与程序集前置条件见写法表 `controlTypes.Camera`；生成器不替目标工程增改程序集引用。
 2. **协议属性名**：`--types` 产物节点的 `attrs` 里，凡属协议属性名集合（由写法表 `protocols` 派生）的键，必须在该类型的 `protocols` 里登记过（只校验名字，不校验取值形状）。门禁只在 `gates` / `verify` 运行，`--types` 恒为 Bundle 定稿的 `Generated/<Target>.mapping.json`；`layout` 另用类型判定产物。
 3. **格子越界**：`row` / `column` / 跨格数必须落在本 region 的行列范围内。
 4. **空行空列**：**不失败，只作为提示（`notices`）登记**。目标框架允许 Grid 出现空行空列（框架自身控件模板里就有空列），且保留空列能让后续控件维持设计稿坐标，不因折叠空列而左移/上移。
