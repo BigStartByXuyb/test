@@ -566,18 +566,15 @@
         "Grid.RowSpan",
         "Grid.ColumnSpan"
       ],
-      "xamlAttrs": [
-        "DesignPanelID",
-        "Value"
-      ],
+      "xamlAttrs": [],
       "protocols": [],
       "evidence": [
         "共享类型表 cameraTemplates.controlType=Camera（9 个变体）",
-        "MTBase/Gui/UserControls/MaxWell.CameraDevice.dll：公开 WPF UserControl MaxWell.CameraDevice.CameraControl，含 DesignPanelID、CameraName 与图像属性",
+        "MTBase/Gui/UserControls/MaxWell.CameraDevice.dll：公开 WPF UserControl MaxWell.CameraDevice.CameraControl；程序集成员证据含 DesignPanelID、CameraName 与图像属性",
         "目标框架项目已编译 camera:CameraControl 页面；真实业务页与运行时加载待确认"
       ],
       "status": "manual-only",
-      "note": "使用 MaxWell.CameraDevice.CameraControl；目标工程必须引用 MaxWell.CameraDevice.dll；外观沿用运行时默认（不写 Style，与作业B cameraTemplates 同口径）。真实业务页与设备运行时加载尚未验证，每页使用都登记 R10；DesignPanelID / Value 仅在页面映射提供非空值时发射。"
+      "note": "使用 MaxWell.CameraDevice.CameraControl；目标工程必须引用 MaxWell.CameraDevice.dll；外观沿用运行时默认（不写 Style，与作业B cameraTemplates 同口径）。作业A 当前没有相机实例属性的可复现输入来源，因此不发射 DesignPanelID、CameraName、Value 或图像属性；真实业务页与设备运行时加载尚未验证，每页使用都登记 R10。"
     }
   }
 }
