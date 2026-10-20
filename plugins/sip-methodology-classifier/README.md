@@ -4,8 +4,11 @@
 
 ## 安装
 
+先添加团队 marketplace，再安装：
+
 ```text
-/plugin install sip-methodology-classifier --marketplace BigStartByXuyb/Plugins
+/plugin marketplace add BigStartByXuyb/Plugins
+/plugin install sip-methodology-classifier@bigstart-plugins
 ```
 
 ## 能力
