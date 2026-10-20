@@ -134,21 +134,21 @@ function node(id, type, style, children, extra) {
   assert.ok(cells.get("b3").height > 0, "末条带吃剩余，尺寸为正");
 }
 
-// ── ③ 容器格子：主轴撑满（不写主轴尺寸/对齐），交叉轴照设计稿 ─────────────────────
+// ── ③ 页面根槽位：根 Grid 管理星号尺寸，右栏与内容区交叉轴照设计稿 ─────────────────
 {
   const columnOwner = { owner: { direction: "column" }, rows: [{ size: "Pixel", value: 120 }, { size: "Star", source: "design" }], columns: [{ size: "Star", source: "design" }] };
   const rowOwner = { owner: { direction: "row" }, rows: [{ size: "Star", source: "design" }], columns: [{ size: "Pixel", value: 638 }, { size: "Star", source: "design" }] };
-  // 右栏：主轴 column → 高度不写（撑满格子，星号带吸收），位置偏移改用 Margin。
+  // 右栏根槽位：高度由页面根行填充，位置偏移由 Margin 保留。
   assert.deepStrictEqual(containerBoxAttrs({
-    ref: "rail", container: true, children: columnOwner,
+    ref: "rail", container: true, sizingMode: "page-slot", children: columnOwner,
     width: 210, height: 759, nodeWidth: 210, nodeHeight: 608, offsetX: 1, offsetY: 157
   }), { Margin: "0,157,0,0" }, "主轴那一维不写尺寸/对齐，偏移落成 Margin；交叉轴同尺寸也不写");
-  // 左中区：主轴 row → 宽度不写；交叉轴照设计稿写尺寸，越过格子末端时锚点按上边。
+  // 左中区根槽位：越过格子末端时锚点按上边，设计稿偏移由 Margin 保留。
   assert.deepStrictEqual(containerBoxAttrs({
-    ref: "left", container: true, children: rowOwner,
+    ref: "left", container: true, sizingMode: "page-slot", children: rowOwner,
     width: 1070, height: 759, nodeWidth: 1026, nodeHeight: 600, offsetX: 0, offsetY: 161
   }), { Height: "600", VerticalAlignment: "Top", Margin: "0,161,0,0" },
-  "主轴撑满、交叉轴照设计稿；设计稿越过格子末端 → 锚点按上边 + Margin（窗口变化时不漂）");
+  "根槽位按设计稿尺寸与偏移；设计稿越过格子末端 → 锚点按上边 + Margin（窗口变化时不漂）");
 }
 
 // ── ④ 发射器：属性落到 XAML，并逐格进发射报告 ────────────────────────────────────
@@ -259,7 +259,7 @@ function node(id, type, style, children, extra) {
         rows: [{ size: "Star", source: "design" }],
         columns: [{ size: "Star", source: "design" }],
         cells: [{
-          ref: "box", container: true, row: 0, column: 0, rowSpan: 1, columnSpan: 1,
+          ref: "box", container: true, sizingMode: "page-slot", row: 0, column: 0, rowSpan: 1, columnSpan: 1,
           width: 1280, height: 759, nodeWidth: 100, nodeHeight: 60, offsetX: 0, offsetY: 0,
           children: {
             rows: [{ size: "Pixel", value: 20, source: "design" }, { size: "Star", source: "design" }],

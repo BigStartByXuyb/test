@@ -23,6 +23,12 @@
 // 其余（非对称内缩）一律走 Margin 精确复现。
 const EPSILON = 2;
 
+function containerSizingMode(children, isRegionRoot) {
+  if (isRegionRoot) return "page-slot";
+  return Array.isArray(children) && children.length && children.every(function (child) { return child.container; })
+    ? "auto-content" : "control-slot";
+}
+
 function round(value) {
   return Math.round(Number(value));
 }
@@ -65,12 +71,19 @@ function designBoxAttrs(cell) {
   return attrs;
 }
 
-// 容器 Grid 的尺寸与对齐（发射器与门禁都调它，唯一实现）：
-//   ① 主轴（flex 方向 / 补组方向）不写尺寸与对齐 —— 容器撑满格子，那一维的变化由星号带吸收：
-//      顶部内容贴顶、底部内容贴底、中间（或末尾）那段空档随高度 / 宽度变长；位置偏移改用 Margin 表达；
-//   ② 交叉轴照设计稿写尺寸与对齐；但设计稿本身让容器越过格子末端（end < 0）时，位置锚点按上边 / 左边，
-//      写成 start + Margin —— 否则窗口一变容器就跟着末端漂。
+// 容器 Grid 的尺寸与对齐（发射器与门禁共用的唯一实现）：
+//   ① sizingMode=auto-content 时，Grid 按 Auto/Pixel 子轨道自适应，固定在左上角，源偏移由 Margin 保留；
+//   ② sizingMode=control-slot 时，按设计稿格子尺寸与偏移处理；
+//   ③ sizingMode=page-slot 时，页面根网格负责星号/固定轨道，容器按父格伸展或锚定。
 function containerBoxAttrs(cell) {
+  if (cell && cell.sizingMode === "auto-content") {
+    const left = typeof cell.offsetX === "number" ? Math.max(0, Math.round(cell.offsetX)) : 0;
+    const top = typeof cell.offsetY === "number" ? Math.max(0, Math.round(cell.offsetY)) : 0;
+    const attrs = { HorizontalAlignment: "Left", VerticalAlignment: "Top" };
+    if (left || top) attrs.Margin = left + "," + top + ",0,0";
+    return attrs;
+  }
+  if (!cell || cell.sizingMode !== "page-slot") return designBoxAttrs(cell);
   const box = designBoxAttrs(cell);
   const axis = cell.synthAxis || (cell.children && cell.children.owner && cell.children.owner.direction) || null;
   const stretchY = axis === "column" || axis === "y";
@@ -97,4 +110,4 @@ function containerBoxAttrs(cell) {
   return box;
 }
 
-module.exports = { EPSILON, designBoxAttrs, axisPlan, containerBoxAttrs };
+module.exports = { EPSILON, designBoxAttrs, axisPlan, containerBoxAttrs, containerSizingMode };

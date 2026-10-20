@@ -23,10 +23,10 @@
 //   - 文本一律走 `{DynamicResource <LangName>}`；没有语言键的文本走待确认，不写字面量。
 //   - 尺寸与对齐照设计稿：控件写自身 bbox，格子尺寸与控件在格内的偏移取自布局产物；
 //     格子尺寸 − 控件尺寸 = 间距，差值落在哪一侧由偏移决定（唯一实现在 lib/design-box.js）。
-//   - 不发射任何间距元素（口径 A）：间距并进前一带，或就是那一条星号带；
-//     列宽固定项照设计稿像素、容器条目自适应（多条目时按设计稿比例加权星号）、叶子控件照设计稿像素。
-//   - 容器格子撑满主轴：主轴那一维不写尺寸与对齐（变化由星号带吸收，顶部贴顶、底部贴底、中间那段随高度变长），
-//     位置偏移改用 Margin；交叉轴照设计稿。唯一实现在 lib/design-box.js 的 containerBoxAttrs。
+//   - 不发射任何间距元素（口径 A）：间距由固定带或 Margin 表达，不新增占位控件；
+//     页面根网格内容区占星号剩余空间、右栏固定；纯子 Grid 容器按子内容自适应。
+//   - 容器直接含控件时按设计稿格子尺寸与对齐发射；容器只含子 Grid 时不写固定宽高，
+//     并使用左上对齐和 Margin 保留偏移。唯一实现在 lib/design-box.js 的 containerBoxAttrs。
 
 const fs = require("fs");
 const path = require("path");
@@ -365,6 +365,28 @@ function renderResources(ctx) {
   return lines.join("\n");
 }
 
+function requiredXmlNamespaces(grid, map) {
+  const used = new Set();
+  const visit = function (current) {
+    (current.cells || []).forEach(function (cell) {
+      if (cell.controlType) {
+        const spec = (map.controlTypes || {})[cell.controlType];
+        if (spec && spec.xmlNamespacePrefix) used.add(spec.xmlNamespacePrefix);
+      }
+      if (cell.children) visit(cell.children);
+    });
+  };
+  visit(grid);
+  return Array.from(used).sort().map(function (prefix) {
+    if (!/^[A-Za-z_][A-Za-z0-9_.-]*$/.test(prefix) || ["x", "mc", "d", "s"].includes(prefix)) {
+      fail("写法表 XML 命名空间前缀无效或与框架前缀冲突: " + prefix);
+    }
+    const uri = (map.xmlNamespaces || {})[prefix];
+    if (typeof uri !== "string" || !uri) fail("写法表缺少 XML 命名空间 URI: " + prefix);
+    return "             xmlns:" + prefix + "=\"" + xmlAttr(uri) + "\"";
+  });
+}
+
 // 纯渲染：给定布局产物 + 类型判定 + 写法表，返回 { xaml, report }（不落盘）。
 function renderXaml(args, layout, typeInfo, map) {
   const report = {
@@ -405,12 +427,13 @@ function renderXaml(args, layout, typeInfo, map) {
     "             xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\"",
     "             xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\"",
     "             xmlns:d=\"http://schemas.microsoft.com/expression/blend/2008\"",
-    "             xmlns:s=\"http://www.maxwell-gp.com/\"",
+    "             xmlns:s=\"http://www.maxwell-gp.com/\""
+  ].concat(requiredXmlNamespaces(emitRegions[0].grid, map), [
     "             mc:Ignorable=\"d\"",
     "             FocusVisualStyle=\"{x:Null}\"",
     "             d:DesignHeight=\"" + xmlAttr(Math.round(layout.design.height)) +
       "\" d:DesignWidth=\"" + xmlAttr(Math.round(layout.design.width)) + "\">"
-  ];
+  ]);
   // 页级样式表要在 Resources 生成之前定稿，所以先渲染一遍 body 收集命中，再拼最终文本。
   const body = bodyLines.join("\n");
   const xaml = head.join("\n") + "\n" + renderResources(ctx) + "\n" + body + "\n</UserControl>\n";

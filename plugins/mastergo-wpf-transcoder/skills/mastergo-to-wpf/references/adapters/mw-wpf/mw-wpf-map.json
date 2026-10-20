@@ -13,6 +13,9 @@
     "note": "同一类型存在 IO 变体（绑 IO 点）与非 IO 变体时，MW 页面默认用 IO 变体：真实页面里输入/显示控件一律是 s:IOTextBox / s:IOComboBox / s:IOCheckBox / s:IOGroupBox。仅当设计稿该控件不绑 IO 点时用 native 变体。",
     "ioPreferred": true
   },
+  "xmlNamespaces": {
+    "camera": "clr-namespace:MaxWell.CameraDevice;assembly=MaxWell.CameraDevice"
+  },
   "textBinding": {
     "note": "语言键挂到哪个属性：由 ControlType 决定默认属性，样式族可覆盖（真实页面里 RightButtonStyle / UpDownRightButtonStyle 是「图标上+文字下」，文本走 IconText，其余走 Content）。",
     "byControlType": {
@@ -596,8 +599,9 @@
       "note": "A 侧没有 Border 控件：框架把它做成附加属性 controls:BorderElement.*（作用在承载元素上）。共享类型表把它判为 Border 的实例，A 发射前必须由人工确认落到哪个承载元素，禁止自行挑一个控件承载。"
     },
     "Camera": {
-      "element": "s:Camera",
-      "manualEntry": null,
+      "element": "camera:CameraControl",
+      "xmlNamespacePrefix": "camera",
+      "manualEntry": "02-controls/vision/camera-control.md",
       "attrs": [
         "DesignPanelID",
         "Value"
@@ -614,10 +618,11 @@
       "protocols": [],
       "evidence": [
         "共享类型表 cameraTemplates.controlType=Camera（9 个变体）",
-        "用户确认（2026-09-23）：作业A 侧控件就是 Camera，与作业B 的 ControlType=Camera 同名同义"
+        "MTBase/Gui/UserControls/MaxWell.CameraDevice.dll：公开 WPF UserControl MaxWell.CameraDevice.CameraControl，含 DesignPanelID、CameraName 与图像属性",
+        "目标框架项目已编译 camera:CameraControl 页面"
       ],
-      "status": "manual-only",
-      "note": "本机框架程序集版本较旧，MaxwellControl/MaxWell.UIDesign 里查不到该控件（手册也无条目），唯一证据是用户确认；首次用新框架生成后需回填手册条目。外观沿用运行时默认（不写 Style，与作业B cameraTemplates 同口径）。DesignPanelID / Value 在设计稿里没有来源：作业B 的页面 XML 按空串占位，作业A 的 XAML 不写空串占位（没有来源就不发射），由工程师或运行时绑定填写。",
+      "status": "ready",
+      "note": "使用 MaxWell.CameraDevice.CameraControl；外观沿用运行时默认（不写 Style，与作业B cameraTemplates 同口径）。DesignPanelID / Value 在设计稿里没有来源时不发射空串，由目标工程或运行时绑定填写。",
       "stylePolicy": "none"
     }
   }

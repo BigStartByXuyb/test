@@ -32,30 +32,29 @@
 //     shifted:true          该格子由推导挪位（撞格下移），不是设计稿那条带（只免间距/对齐，未免尺寸）
 //     unsized:{width?,height?} 哪一维算不出正数格子尺寸（星号带被前面的固定带吃光＝内容溢出承载物）
 //     synth:true            由代码补出来的容器（设计稿没打组：同一条列带里 ≥2 个条目，见 buildRegionGrid）
-//   网格带：rows[] / columns[] 的每项是 {size:"Pixel"|"Star", value?, source:"design"}（星号带带 gap 便于核对）；
+//   网格带：rows[] / columns[] 的尺寸为 Pixel / Star / Auto；Auto 带的 gap 记录设计期望尺寸供门禁重算；
 //     grid.owner = {ref,direction,gap,root} 记录该层对应的 flex 容器（推导内部用它成带）。
 //     发射器与门禁（R14）按 width/height/nodeWidth/nodeHeight/offsetX/offsetY 出尺寸与对齐。
 //   constraintExempt 由本脚本登记「本页不发射的带约束节点」（页面根 / 不可见 / 框架固定区）及原因，
 //   门禁据此把 R12 从失败降为提示（见 page-build-rules.md 第 5 节）。
 //
 // 规则
-//   - 分区只有两类：框架固定区（顶部栏 / 底部栏，按框架 Token 高度，emit=false）
-//     与**一个**内容区（emit=true）。框架固定区只有顶部栏与底部栏（框架加载壳只有这两条常驻带），
-//     不进页面，因此页面外层只有**一个** Grid（内容网格本身）；设计稿的业务内容（含容器链条）
-//     全部落在同一个内容区里，内部再按行列分格。
+//   - 分区只有两类：框架固定区（顶部栏 / 底部栏，按框架 Token 高度，emit=false）与一个内容区（emit=true）。
+//     相机 + 右侧栏页面在内容区根 Grid 下分成弹性内容列与固定右栏；内容列以相机局部起点开行，顶部框架/标题空白不入行。
 //   - 成带只有一条口径（口径 A）：一条带 = 条目 + 它后面的间距（= 到下一带起始边的距离）；
 //     哪一段间距成星号带走两条判据（**不写死像素阈值**）：① 结构——相邻条目分属不同子组时那段是"组间空档"
 //     （容器的 flexContainerInfo.gap 就体现在这里）；② 相对——散条目按"最大的一段 ≥ 其余间距中位数 × 2"、
 //     只有一段间距时按"≥ 相邻条目较小者的一半"判；
 //     每层最多一条星号带；没有大空档时最后一条带吃剩余（星号），有大空档时最后一条按条目自身尺寸写死。
-//     **不发射任何间距元素**：间距要么并进前一带，要么就是那段星号带。
+//     **不发射任何间距元素**：间距由 Pixel 带、Auto 条目偏移或星号空档表达。
 //     **首段空档也成带**：第一个条目与网格原点之间那段（容器内缩 / 分区顶边到内容的空白）是第一条带。
 //   - 格子起点 = 网格原点 + 前面各带尺寸之和（不是"带起点"：带起点是设计稿里条目的位置，
 //     首条带前面还有首段空档，用带起点会把首段空档丢掉）。
 //   - 行列由节点 bbox 聚类得到（列 = x 区间重叠的带，行 = y 起始边邻近的带），同样按口径 A 成带。
 //   - 落格按起始边判定归属；控件 bbox 覆盖到的带全部占住（跨带即写 RowSpan / ColumnSpan）。
 //   - flex 主轴优先：容器声明了 flexContainerInfo.flexDirection（row/column）时，主轴上的每个条目独占一条带
-//     （同一起点的条目合并成一条带），尺寸与星号位置仍走口径 A；没有声明的层级、以及声明层级的交叉轴按 bbox 聚类。
+//     （同一起点的条目合并成一条带）。纯子 Grid 层使用 Auto 条目带与固定间距，其他层级沿用口径 A；
+//     没有声明的层级、以及声明层级的交叉轴按 bbox 聚类。
 //   - 设计稿没打组的地方由代码补组：区域根网格里的散条目按**栏**收成合成容器——同一条列带（x 区间重叠）
 //     里 ≥2 个条目 → 一个列容器（栏内再按口径 A 成行）；容器条目同样参与。判据只看位置，不猜语义；
 //     收出来的容器（cell.synth，一层 Grid）与设计稿打的组同口径成带；已经成层的（owner 非空）不再补组——
@@ -74,6 +73,7 @@ const path = require("path");
 const crypto = require("crypto");
 const { fail, readJson } = require(path.join(__dirname, "..", "..", "lib", "script-helpers.js"));
 const { normalizeConstraints } = require(path.join(__dirname, "..", "..", "lib", "constraints.js"));
+const { containerSizingMode } = require(path.join(__dirname, "..", "..", "lib", "design-box.js"));
 
 const ROUTE_MAP = path.join(__dirname, "..", "..", "..", "references", "adapters", "mw-wpf", "mw-wpf-map.json");
 const EPSILON = 2;
@@ -382,11 +382,22 @@ function bandSizes(bands, axis) {
   });
 }
 
+// 只包含子容器的 Grid 按子内容自适应：条目带用 Auto，间距与首段内缩保留为固定 Pixel 带。
+function contentBandSizes(bands) {
+  return bands.map(function (band) {
+    const extent = Math.max(1, Math.round(band.end - band.start));
+    if (band.items && band.items.length) {
+      return { size: "Auto", gap: extent, source: "design" };
+    }
+    return { size: "Pixel", value: extent, source: "design" };
+  });
+}
+
 // ---------- 主轴带（声明了 flex 主轴的容器）----------
 // 条目独占一条带（否则"同一行横向排列的条目被并进同一条列带"后会被撞格规则竖排，设计稿语义丢失），
 // 尺寸与星号位置都走口径 A（bandSizes）：间距并进前一带，只有判据认定的那段空档单独成星号带。
-// 列宽策略（主轴是 row 且没有大空档）：固定项照设计稿像素，其余容器条目自适应
-// （单个 → 裸星号；多个 → 按设计稿比例加权星号）。
+// 控件槽位与混合层列宽策略（主轴是 row 且没有大空档）：固定项照设计稿像素，其余容器条目占剩余空间；
+// 纯子 Grid 层由 contentBandSizes 改用 Auto，不参与星号分配。
 // 固定项 = 子树里只有相机控件的条目（相机所在的 Grid），或**区域根网格里**贴主轴末端的最末条目（页面常驻右栏）。
 
 function itemControlTypes(item) {
@@ -437,9 +448,9 @@ function mainAxisBands(items, owner) {
   return insertBigGapStar(bands);
 }
 
-// 主轴带的尺寸：走口径 A（bandSizes）。主轴 row 且这一层没有大空档时，容器条目自适应
-// （单个 → 裸星号；多个 → 按设计稿比例加权），固定项与叶子控件照设计稿像素。
-function mainAxisSizes(bands, direction) {
+// 纯子 Grid 层按内容 Auto；页面/控件槽位层保留口径 A 与页面级星号分配。
+function mainAxisSizes(bands, direction, autoContent) {
+  if (autoContent) return contentBandSizes(bands);
   const hasStar = bands.some(function (band) { return band.star; });
   if (direction !== "row" || hasStar) return bandSizes(bands, direction === "row" ? "x" : "y");
   const autoItems = bands.filter(function (band) {
@@ -545,8 +556,9 @@ function buildContainmentTree(entries, containers, pending) {
 // 首条带前面可能还有容器内缩（padding），用带起点会把这段内缩丢掉（承载物被贴到格子起始边）。
 // owner = 本网格对应的成层容器（{ref, direction, record}）：声明了 flex 主轴时，主轴由 owner 条目独占带，
 // 交叉轴仍按聚类；没有 owner（或约束成层但无 flex 声明）时两轴都按聚类。两轴成带口径相同（口径 A）。
-function buildGridFrom(nodes, ctx, size, owner, origin) {
+function buildGridFrom(nodes, ctx, size, owner, origin, isRegionRoot) {
   if (!nodes.length) return { rows: [], columns: [], cells: [] };
+  const autoContent = !isRegionRoot && nodes.every(function (node) { return node.container; });
   const gridOrigin = origin || { x: 0, y: 0 };
   const xOf = function (n) { return n.x; };
   const yOf = function (n) { return n.y; };
@@ -569,8 +581,12 @@ function buildGridFrom(nodes, ctx, size, owner, origin) {
   // 先算出来的尺寸会与最终行列定义不一致）。
   const childSets = [];
   const occupied = new Set();
-  let rowSizes = direction === "column" ? mainAxisSizes(rows, "column") : bandSizes(rows, "y");
-  const columnSizes = direction === "row" ? mainAxisSizes(columns, "row") : bandSizes(columns, "x");
+  let rowSizes = autoContent
+    ? contentBandSizes(rows)
+    : (direction === "column" ? mainAxisSizes(rows, "column", false) : bandSizes(rows, "y"));
+  const columnSizes = autoContent
+    ? contentBandSizes(columns)
+    : (direction === "row" ? mainAxisSizes(columns, "row", false) : bandSizes(columns, "x"));
   // 撞格时在收尾星号行之前插入一个像素行（保留"最后一行吃剩余空间"的形态）。
   const appendRow = function (node) {
     const tailIsStar = rowSizes.length && rowSizes[rowSizes.length - 1].size === "Star";
@@ -611,9 +627,10 @@ function buildGridFrom(nodes, ctx, size, owner, origin) {
     if (sourceRecord && sourceRecord.constraints) cell.constraints = sourceRecord.constraints;
     if (node.container) {
       cell.container = true;
+      cell.sizingMode = containerSizingMode(childNodes, isRegionRoot);
       if (node.synth) {
         cell.synth = true;
-        // 补组容器的"主轴"就是它的排列方向（同列 → 竖直），发射器据此决定哪一维撑满。
+        // 补组容器的排列方向记录在 synthAxis；纯子 Grid 的尺寸策略仍由直接子项决定。
         cell.synthAxis = node.axis || "y";
       }
     } else {
@@ -650,20 +667,169 @@ function buildGridFrom(nodes, ctx, size, owner, origin) {
     if (Object.keys(unsized).length) cell.unsized = unsized;
     if (childSets[index].length) {
       const childRecord = ctx.dslTree && ctx.dslTree.byRef.get(cell.ref);
-      cell.children = buildGridFrom(childSets[index], ctx, contentSizeOf(cell), flexOwnerOf(childRecord), box);
+      cell.children = buildGridFrom(childSets[index], ctx, contentSizeOf(cell), flexOwnerOf(childRecord), box, false);
     }
   });
-  const grid = { rows: rowSizes, columns: columnSizes, cells: cells };
+  // 布局产物及其 XAML 消费顺序统一为逐行、行内逐列；同格起点保留推导顺序。
+  const rowMajorCells = cells.map(function (cell, index) { return { cell: cell, index: index }; })
+    .sort(function (left, right) {
+      return left.cell.row - right.cell.row || left.cell.column - right.cell.column || left.index - right.index;
+    })
+    .map(function (item) { return item.cell; });
+  const grid = { rows: rowSizes, columns: columnSizes, cells: rowMajorCells };
   if (owner && owner.direction) grid.owner = { ref: owner.ref, direction: owner.direction, gap: owner.gap, root: Boolean(owner.root) };
   return grid;
 }
 
-// 内层网格的可用尺寸＝本格承载物（容器 / 被容纳控件）的设计稿尺寸：它会被写成 Width/Height，
-// 内层 Grid 填充的是那个尺寸，不是整个格子（格子比它大时多出来的部分是间距 / 剩余空间）。
+// 内层控件槽位网格的可用尺寸＝本格承载物的设计稿尺寸；纯子 Grid 容器用内层 Auto/Pixel 轨道自适应。
 function contentSizeOf(cell) {
+  if (cell && cell.sizingMode === "auto-content" && cell.children) {
+    const widthTracks = cell.children.columns || [];
+    const heightTracks = cell.children.rows || [];
+    if (widthTracks.concat(heightTracks).every(function (track) { return track.size !== "Star"; })) {
+      const columns = bandExtents(widthTracks, 0);
+      const rows = bandExtents(heightTracks, 0);
+      return {
+        w: columns.reduce(function (total, extent) { return total + extent; }, 0),
+        h: rows.reduce(function (total, extent) { return total + extent; }, 0)
+      };
+    }
+  }
   return {
     w: cell.nodeWidth > 0 ? cell.nodeWidth : cell.width,
     h: cell.nodeHeight > 0 ? cell.nodeHeight : cell.height
+  };
+}
+
+function cameraSidebarLayout(grid, items, dslTree, size, origin) {
+  // 根画布有右侧纵向分隔线、相机和竖排按钮栏时，按两个主列重建局部 Grid；顶部框架/标题空白不作页面行。
+  const camera = items.find(function (item) { return item.controlType === "Camera"; });
+  if (!camera) return null;
+  const cameraCell = (grid.cells || []).find(function (cell) { return cell.ref === camera.ref; });
+  const cameraRecord = dslTree.byRef.get(camera.ref);
+  if (!cameraCell || !cameraRecord) return null;
+
+  const sidebar = items.find(function (item) {
+    const types = itemControlTypes(item);
+    return item.container && types.length >= 2 && types.every(function (type) { return type === "IconButton"; });
+  });
+  if (!sidebar) return null;
+  const sidebarCell = (grid.cells || []).find(function (cell) { return cell.ref === sidebar.ref; });
+  if (!sidebarCell || !sidebarCell.children) return null;
+
+  const designWidth = Number(dslTree.root.w || 0);
+  const dividerX = Array.from(dslTree.byRef.values())
+    .filter(function (record) {
+      return record.w > 0 && record.w <= 2.5 && record.h >= size.h * 0.7 &&
+        record.x >= designWidth * 0.65 && record.x < sidebar.x &&
+        record.y < origin.y + size.h && record.y + record.h > origin.y;
+    })
+    .map(function (record) { return record.x; })
+    .sort(function (a, b) { return b - a; })[0];
+  if (!(dividerX > 0 && dividerX < sidebar.x && sidebar.x + sidebar.w <= designWidth + EPSILON)) return null;
+
+  const middleCells = (grid.cells || []).filter(function (cell) {
+    return cell.ref !== cameraCell.ref && cell.ref !== sidebarCell.ref;
+  });
+  if (middleCells.length !== 1 || !middleCells[0].container || !middleCells[0].children) return null;
+  const middleCell = middleCells[0];
+  const middleItem = items.find(function (item) { return item.ref === middleCell.ref; });
+  if (!middleItem) return null;
+
+  const rootTop = Math.min(sidebar.y, cameraRecord.y);
+  const contentTop = cameraRecord.y;
+  const rootHeight = Math.round(size.h - (rootTop - origin.y));
+  const contentHeight = rootHeight - Math.round(contentTop - rootTop);
+  const sidebarWidth = Math.round(designWidth - dividerX);
+  const contentWidth = Math.round(dividerX);
+  const sidebarLeftInset = Math.round(sidebar.x - dividerX);
+  const sidebarRightInset = Math.round(designWidth - sidebar.x - sidebar.w);
+  const cameraLeftInset = Math.round(cameraRecord.x);
+  const middleX = Math.round(middleItem.x);
+  const cameraTrackWidth = middleX - cameraLeftInset;
+  const middleTrackWidth = contentWidth - cameraLeftInset - cameraTrackWidth;
+  if (!(rootHeight > 0 && contentHeight > 0 && sidebarWidth > 0 &&
+      sidebarLeftInset >= 0 && sidebarRightInset >= 0 &&
+      cameraTrackWidth > 0 && middleTrackWidth > 0)) return null;
+
+  cameraCell.row = 0;
+  cameraCell.column = 1;
+  cameraCell.rowSpan = 1;
+  cameraCell.columnSpan = 1;
+  cameraCell.width = cameraTrackWidth;
+  cameraCell.height = contentHeight;
+  cameraCell.offsetX = 0;
+  cameraCell.offsetY = 0;
+  delete cameraCell.shifted;
+
+  middleCell.row = 0;
+  middleCell.column = 2;
+  middleCell.rowSpan = 1;
+  middleCell.columnSpan = 1;
+  middleCell.width = middleTrackWidth;
+  middleCell.height = contentHeight;
+  middleCell.offsetX = 0;
+  middleCell.offsetY = Math.round(middleItem.y - contentTop);
+  middleCell.sizingMode = containerSizingMode(middleCell.children.cells, false);
+  delete middleCell.shifted;
+
+  const contentGrid = {
+    rows: [{ size: "Star", source: "design" }],
+    columns: [
+      { size: "Pixel", value: cameraLeftInset, source: "design" },
+      { size: "Pixel", value: cameraTrackWidth, source: "design" },
+      { size: "Star", source: "design" }
+    ],
+    cells: [cameraCell, middleCell]
+  };
+
+  sidebarCell.row = 0;
+  sidebarCell.column = 1;
+  sidebarCell.rowSpan = 1;
+  sidebarCell.columnSpan = 1;
+  sidebarCell.nodeWidth = Math.round(sidebar.w);
+  sidebarCell.nodeHeight = Math.round(sidebar.h);
+  sidebarCell.width = Math.round(sidebar.w);
+  sidebarCell.height = rootHeight;
+  sidebarCell.offsetX = 0;
+  sidebarCell.offsetY = 0;
+  sidebarCell.sizingMode = containerSizingMode(sidebar.items, false);
+  delete sidebarCell.shifted;
+
+  const sidebarGrid = {
+    rows: [{ size: "Star", source: "design" }],
+    columns: [
+      { size: "Pixel", value: sidebarLeftInset, source: "design" },
+      { size: "Pixel", value: Math.round(sidebar.w), source: "design" },
+      { size: "Pixel", value: sidebarRightInset, source: "design" }
+    ],
+    cells: [sidebarCell]
+  };
+
+  return {
+    grid: {
+      rows: [{ size: "Star", source: "design" }],
+      columns: [
+        { size: "Star", source: "design" },
+        { size: "Pixel", value: sidebarWidth, source: "design" }
+      ],
+      cells: [
+        {
+          ref: "synth:content-area", row: 0, column: 0, rowSpan: 1, columnSpan: 1,
+          nodeWidth: contentWidth, nodeHeight: contentHeight, container: true, synth: true,
+          synthAxis: "y", sizingMode: "page-slot", offsetX: 0,
+          offsetY: Math.round(contentTop - rootTop), width: contentWidth, height: rootHeight,
+          children: contentGrid
+        },
+        {
+          ref: "synth:right-sidebar", row: 0, column: 1, rowSpan: 1, columnSpan: 1,
+          nodeWidth: sidebarWidth, nodeHeight: rootHeight, container: true, synth: true,
+          synthAxis: "y", sizingMode: "page-slot", offsetX: 0, offsetY: 0,
+          width: sidebarWidth, height: rootHeight, children: sidebarGrid
+        }
+      ]
+    },
+    area: { x: 0, y: rootTop, w: size.w, h: rootHeight }
   };
 }
 
@@ -677,8 +843,11 @@ function buildRegionGrid(entries, containers, pending, dslTree, size, origin, gr
   if (owner) requireNoDeclaredGroups(groupsDoc, "内容区根网格已由设计稿成层（这一层不参与分组）");
   // 设计稿已经打了组（这一层由某个容器提上来的，owner 非空）就不再补组；只有散落条目才补。
   const synth = owner ? { items: flex.items, unresolved: [] } : synthRegionGroups(flex.items, groupsDoc);
+  const grid = buildGridFrom(synth.items, { childrenOf: tree.childrenOf, dslTree: dslTree }, size, owner, origin, true);
+  const cameraSidebar = !owner ? cameraSidebarLayout(grid, synth.items, dslTree, size, origin) : null;
   return {
-    grid: buildGridFrom(synth.items, { childrenOf: tree.childrenOf, dslTree: dslTree }, size, owner, origin),
+    grid: cameraSidebar ? cameraSidebar.grid : grid,
+    area: cameraSidebar ? cameraSidebar.area : null,
     unresolved: synth.unresolved,
     // 分组表只在这一层被消费（declaredGroups 校验的就是这一层的 items）：可引用的 ref 清单按它给。
     // 清单在补组之前取（顺序要紧）：补出来的栏容器不是 DSL 节点，那个 ref 写进表也不认。
@@ -927,8 +1096,10 @@ function deriveLayout(options) {
     });
     regions.push({
       id: "work-area", name: "工作区", ref: null, role: "work-area", emit: true,
-      x: 0, y: tokens.headerHeight, w: design.width,
-      h: design.height - tokens.bottomHeight - tokens.headerHeight,
+      x: work.area ? work.area.x : 0,
+      y: work.area ? work.area.y : tokens.headerHeight,
+      w: work.area ? work.area.w : design.width,
+      h: work.area ? work.area.h : design.height - tokens.bottomHeight - tokens.headerHeight,
       grid: work.grid,
       unresolved: work.unresolved
     });

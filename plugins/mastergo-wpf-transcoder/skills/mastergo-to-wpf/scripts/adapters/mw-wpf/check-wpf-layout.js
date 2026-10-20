@@ -29,8 +29,8 @@
 //       容器子树里没有可发射的控件（补内容或交设计确认）、待确认类型 / 无尺寸等不进格子的节点
 //       （先按 R1 / R9 修类型判定与映射）、产物与本次输入不同步（先重跑第 8 步）
 //   R13 尺寸约束未发射：带约束的格子必须在 View.xaml 里出现对应的 MinWidth/MaxWidth/MinHeight/MaxHeight
-//   R14 格子尺寸与尺寸/对齐发射：每个格子必须登记格子尺寸与承载物设计尺寸（含跨格累加与星号带），
-//       且发射报告里该格子的 Width/Height/对齐/Margin 必须与 lib/design-box.js 的同一实现一致
+//   R14 格子尺寸与尺寸/对齐发射：每个格子必须登记格子尺寸与承载物设计尺寸（含 Auto / 星号带与跨格累加），
+//       容器 sizingMode 必须与直接子项一致，发射报告里的 Width/Height/对齐/Margin 必须与 lib/design-box.js 一致
 //       （shifted / unsized 两类例外按类、按维，见 page-build-rules.md 第 4 节第 14 条）
 //   R6 资源键闭环：{StaticResource <键>} 必须来自写法表样式族、本页 Icon 台账或 Icon 字典合并点
 //   R7 文本：发射区不得出现字面中文；发射区每个有设计文本的控件必须挂语言键
@@ -47,7 +47,7 @@ const { readJson } = require(path.join(__dirname, "..", "..", "lib", "script-hel
 const {
   CONSTRAINT_KEYS, CONSTRAINT_ATTRS, normalizeConstraints, collectConstraints
 } = require(path.join(__dirname, "..", "..", "lib", "constraints.js"));
-const { designBoxAttrs, containerBoxAttrs } = require(path.join(__dirname, "..", "..", "lib", "design-box.js"));
+const { designBoxAttrs, containerBoxAttrs, containerSizingMode } = require(path.join(__dirname, "..", "..", "lib", "design-box.js"));
 const {
   bandExtents, extentOf, contentSizeOf
 } = require(path.join(__dirname, "gen-mw-wpf-layout.js"));
@@ -146,11 +146,19 @@ function checkDesignBoxes(layout, emission) {
     emitted.set(item.ref, item.attrs || {});
   });
   const seen = new Set();
-  const visitGrid = function (grid, size) {
+  const visitGrid = function (grid, size, isRegionRoot) {
     const columnExtents = bandExtents(grid.columns || [], size.w);
     const rowExtents = bandExtents(grid.rows || [], size.h);
     (grid.cells || []).forEach(function (cell) {
       seen.add(cell.ref);
+      if (cell.container) {
+        const childCells = cell.children && Array.isArray(cell.children.cells) ? cell.children.cells : [];
+        const expectedSizingMode = containerSizingMode(childCells, isRegionRoot);
+        if (cell.sizingMode !== expectedSizingMode) {
+          report("R14", cell.ref, "容器 sizingMode 与页面根/直接子项不一致：期望 " +
+            expectedSizingMode + "，产物为 " + (cell.sizingMode || "未登记"));
+        }
+      }
       const width = extentOf(columnExtents, cell.column, cell.columnSpan);
       const height = extentOf(rowExtents, cell.row, cell.rowSpan);
       // 撞格下移的格子没有设计稿偏移真值：期望值仍是 designBoxAttrs(cell)（有格子尺寸就写控件自身尺寸、
@@ -186,7 +194,7 @@ function checkDesignBoxes(layout, emission) {
       if (!(cell.nodeWidth > 0) || !(cell.nodeHeight > 0)) {
         report("R14", cell.ref, "布局产物没有登记承载物设计尺寸（nodeWidth / nodeHeight）");
       }
-      // 容器格子与控件格子共用 lib/design-box.js 的实现（容器还要按主轴撑满 / 交叉轴锚点，同一实现）。
+      // 容器格子与控件格子共用 lib/design-box.js 的尺寸策略实现。
       const expected = cell.container ? containerBoxAttrs(cell) : designBoxAttrs(cell);
       const actual = emitted.get(cell.ref);
       if (!actual) {
@@ -201,12 +209,12 @@ function checkDesignBoxes(layout, emission) {
           }
         });
       }
-      if (cell.children) visitGrid(cell.children, contentSizeOf(cell));
+      if (cell.children) visitGrid(cell.children, contentSizeOf(cell), false);
     });
   };
   (layout.regions || []).forEach(function (region) {
     if (region.emit === false || !region.grid) return;
-    visitGrid(region.grid, { w: region.w, h: region.h });
+    visitGrid(region.grid, { w: region.w, h: region.h }, true);
   });
   emitted.forEach(function (attrs, ref) {
     if (!seen.has(ref)) report("R14", ref, "发射报告里有布局产物中不存在的格子");
