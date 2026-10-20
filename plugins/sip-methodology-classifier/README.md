@@ -24,7 +24,13 @@
 
 ## 校验方式
 
-规则支持用**任意**同事确认的标准答案 xlsx 逐行校验。标准答案通过 `--reference` 作为可选输入传入，**不随插件分发，也没有默认文件名或路径**；不传时脚本仍会正常归类，只是“归类依据”不会有“标准答案”标记。
+规则支持用**与输入机型匹配的**标准答案 xlsx 逐行校验。标准答案通过 `--reference` 作为可选输入传入，**不随插件分发，也没有默认文件名或路径**；不传时脚本仍会正常归类，只是“归类依据”不会有“标准答案”标记。
+
+标准答案的要求：
+
+- 只读取**第一个工作表**。
+- 表头行需包含 `序号`、`检验工序`、`检验项目`、`主顺序`、`子顺序`；`子顺序` 后面可以带说明文字。
+- 逐行校验只在标准答案的工作表名出现在输入文件名中，或输入机型的 `机型代码` 与标准答案一致时进行；否则只做来源标记，不做逐行比对。
 
 ## 使用
 
@@ -36,22 +42,36 @@
 
 > 标准答案在 `D:\path\reference.xlsx`
 
-或使用命令：
+或不带标准答案直接使用命令：
 
-```
-/sip-classify --input "D:\path\input.zip" --output "D:\path\output.xlsx" [--reference "D:\path\reference.xlsx"]
+```text
+/sip-classify --input "D:\path\input.zip" --output "D:\path\output.xlsx"
 ```
 
-也可以直接运行脚本：
+带标准答案：
+
+```text
+/sip-classify --input "D:\path\input.zip" --output "D:\path\output.xlsx" --reference "D:\path\reference.xlsx"
+```
+
+也可以直接运行脚本。不带标准答案：
+
+```bash
+python -I skills/sip-methodology-classifier/scripts/build_sip_mapping.py \
+  --input "D:\path\input.zip" \
+  --output "D:\path\output.xlsx"
+```
+
+带标准答案：
 
 ```bash
 python -I skills/sip-methodology-classifier/scripts/build_sip_mapping.py \
   --input "D:\path\input.zip" \
   --output "D:\path\output.xlsx" \
-  [--reference "D:\path\reference.xlsx"]
+  --reference "D:\path\reference.xlsx"
 ```
 
-校验已生成的文件（可选）：
+校验已生成的文件（需要标准答案）：
 
 ```bash
 python -I skills/sip-methodology-classifier/scripts/verify_against_reference.py \

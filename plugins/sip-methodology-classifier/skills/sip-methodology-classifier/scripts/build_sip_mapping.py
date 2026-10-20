@@ -2,8 +2,12 @@
 """按 SIP 方法论两层顺序模型归类《成品检验指导书》。
 
 用法：
-  python -I build_sip_mapping.py --input <zip或目录> --output <输出.xlsx> \
-      [--reference <标准答案.xlsx>] [--project <单项目名称>] [--keep-temp]
+  python -I build_sip_mapping.py --input <zip或目录> --output <输出.xlsx>
+
+可选参数：
+  --reference <标准答案.xlsx>   标准答案（含 主顺序/子顺序 列），不随插件分发
+  --project <单项目名称>        xlsx 直接放在根目录时指定项目名
+  --keep-temp                   保留 zip 解压临时目录
 
 输入：
   - zip（文件名可能是 GBK）或文件夹；
