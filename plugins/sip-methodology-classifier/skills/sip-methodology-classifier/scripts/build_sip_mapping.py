@@ -5,7 +5,8 @@
   python -I build_sip_mapping.py --input <zip或目录> --output <输出.xlsx>
 
 可选参数：
-  --reference <标准答案.xlsx>   标准答案（含 主顺序/子顺序 列），不随插件分发
+  --reference <标准答案.xlsx>   标准答案（第一个工作表，表头含
+                               序号/检验工序/检验项目/主顺序/子顺序），不随插件分发
   --project <单项目名称>        xlsx 直接放在根目录时指定项目名
   --keep-temp                   保留 zip 解压临时目录
 
@@ -360,7 +361,11 @@ def write_workbook(all_rows, projects, out_path, ref=None, verify=None,
         if verify:
             parts = []
             for f, ok, bad, _ in verify:
-                parts.append(f'{f}：{ok}/{ok + bad} 行一致' + ('，0 行不符' if bad == 0 else f'，{bad} 行不符'))
+                if ok + bad == 0:
+                    parts.append(f'{f}：匹配到文件但无可比对行（未完成校验）')
+                else:
+                    parts.append(f'{f}：{ok}/{ok + bad} 行一致'
+                                 + ('，0 行不符' if bad == 0 else f'，{bad} 行不符'))
             verify_text = '；'.join(parts) if parts else '标准答案已加载，但输入中没有匹配的机型文件'
         else:
             verify_text = '标准答案已加载（未找到匹配的机型文件，未做逐行比对）'
@@ -524,7 +529,8 @@ def main():
     ap = argparse.ArgumentParser(description='按 SIP 方法论归类成品检验指导书')
     ap.add_argument('--input', required=True, help='zip 或包含 xlsx 的文件夹')
     ap.add_argument('--output', required=True, help='输出 xlsx 路径')
-    ap.add_argument('--reference', help='标准答案 xlsx（含 主顺序/子顺序 列）')
+    ap.add_argument('--reference',
+                    help='标准答案 xlsx（第一个工作表，表头含 序号/检验工序/检验项目/主顺序/子顺序）')
     ap.add_argument('--project', help='当 xlsx 直接放在根目录时，指定项目名')
     ap.add_argument('--keep-temp', action='store_true', help='保留 zip 解压临时目录')
     args = ap.parse_args()
@@ -570,6 +576,9 @@ def main():
     if verify:
         print('标准答案校验：')
         for f, ok, bad, diffs in verify:
+            if ok + bad == 0:
+                print(f'  {f}: 匹配到文件，但没有可比的序号行（未完成校验）')
+                continue
             print(f'  {f}: {ok}/{ok + bad} 一致, {bad} 不符')
             for d in diffs:
                 print('    ', d)

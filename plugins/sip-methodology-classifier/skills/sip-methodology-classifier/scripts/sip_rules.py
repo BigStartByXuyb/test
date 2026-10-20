@@ -343,6 +343,12 @@ def load_reference(path):
         v = header_key(ws.cell(header_row, c).value)
         if v and v not in col:
             col[v] = c
+    missing = [x for x in ('序号', '检验工序', '检验项目', '主顺序', '子顺序')
+               if x not in col]
+    if missing:
+        raise ValueError(
+            '标准答案缺少必需列: ' + '、'.join(missing)
+            + '（第一个工作表的表头需含 序号/检验工序/检验项目/主顺序/子顺序）')
     c_seq = col['序号']
     c_stage = col['检验工序']
     c_item = col['检验项目']
@@ -351,7 +357,7 @@ def load_reference(path):
 
     pairs, stages, seq = set(), set(), {}
     product = model = ''
-    for r in range(1, header_row):
+    for r in range(1, min(ws.max_row, 10) + 1):
         for c in range(1, ws.max_column + 1):
             v = ws.cell(r, c).value
             if not isinstance(v, str):
@@ -364,7 +370,11 @@ def load_reference(path):
     st = it = ''
     for r in range(header_row + 1, ws.max_row + 1):
         a = ws.cell(r, c_seq).value
-        if not isinstance(a, (int, float)):
+        if isinstance(a, (int, float)):
+            seq_no = int(a)
+        elif isinstance(a, str) and a.strip().isdigit():
+            seq_no = int(a.strip())
+        else:
             continue
         b = ws.cell(r, c_stage).value
         if b is not None and str(b).strip():
@@ -378,7 +388,7 @@ def load_reference(path):
         if main and sub:
             pairs.add((st, it))
             stages.add(st)
-            seq[int(a)] = (str(main).strip(), str(sub).strip())
+            seq[seq_no] = (str(main).strip(), str(sub).strip())
     return {
         'pairs': pairs,
         'stages': stages,
