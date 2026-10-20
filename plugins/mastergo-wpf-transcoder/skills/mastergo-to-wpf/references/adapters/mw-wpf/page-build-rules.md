@@ -27,7 +27,7 @@
 <ResourceDictionary Source="/<程序集名>;component/Resources/Pages/<Target>/<Target>Icons.xaml" />
 ```
 
-合并点是硬要求：A 页面用 `{StaticResource …Geometry}` 引用图形，`StaticResource` 在加载期解析，页面自身没有合并点就会抛 `XamlParseException`（框架规则 R5）。程序集名取 `.csproj` 的 `AssemblyName`（缺省回退 `RootNamespace` 末段）。
+合并点是硬要求：A 页面用 `{StaticResource …Geometry}` 引用图形，`StaticResource` 在加载期解析；页面必须合并本节登记的 Icon 字典，否则会抛 `XamlParseException`。程序集名取 `.csproj` 的 `AssemblyName`（缺省回退 `RootNamespace` 末段）。
 
 ## 3. 多语言键
 

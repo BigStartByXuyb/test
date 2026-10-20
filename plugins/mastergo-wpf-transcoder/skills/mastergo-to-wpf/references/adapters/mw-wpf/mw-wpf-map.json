@@ -5,8 +5,8 @@
       "作业A（mw-wpf）写法表：组件类型 → WPF/XAML 怎么写。",
       "组件类型本身（设计稿组件集/变体 → ControlType）由共享类型表 references/component-types.json 唯一决定；本文件只登记「同一类型在 WPF 这一侧怎么写」，不重复类型判定。",
       "控件元素、样式键、属性发射白名单和协议均由本写法表定义；证据列登记可核查的真实页面或程序集依据。",
-      "layoutAttrs 是真实页面的抽样证据（记录该类型实际出现过哪些布局属性），不是属性白名单：跨度由布局推导按控件覆盖带数写出，任何可落格类型都可能带 Grid.RowSpan / Grid.ColumnSpan，口径以 mw-wpf-mode.md 为准。",
-      "xamlAttrs 是普通 XAML 属性的发射白名单；protocols 是框架协议属性，两者用途不同。",
+      "observedAttrs 与 layoutAttrs 是真实页面的抽样证据，不是属性白名单；layoutAttrs 记录布局属性，observedAttrs 记录其他可见属性。跨度由布局推导按控件覆盖带数写出，任何可落格类型都可能带 Grid.RowSpan / Grid.ColumnSpan，口径以 mw-wpf-mode.md 为准。",
+      "xamlAttrs 是普通 XAML 属性的发射白名单，只有登记在 xamlAttrs 的普通属性才会被发射；protocols 是框架协议属性，两者用途不同。",
       "status: 三档按处置区分——ready = 映射的发射元素与属性均有直接证据，且无需逐页人工确认；manual-only = 有可复现的发射规则，但业务页或运行时接入仍需逐页确认，按写法表发射并由门禁 R10 提示；pending = A 侧没有对应控件或发射通道，遇到即挂待确认、不发射。"
     ]
   },
@@ -121,7 +121,7 @@
         "NormalRightButtonStyle",
         "ButtonIconStyle"
       ],
-      "attrs": [
+      "observedAttrs": [
         "TopLeftContent",
         "Content",
         "Icon",
@@ -163,7 +163,7 @@
         "StatusButtonBaseStyle",
         "（隐式默认样式）"
       ],
-      "attrs": [
+      "observedAttrs": [
         "Value",
         "Style",
         "IOEnable",
@@ -190,7 +190,7 @@
       "styleKeys": [
         "（隐式默认样式，TargetType=controls:IOButton）"
       ],
-      "attrs": [
+      "observedAttrs": [
         "Content",
         "Style",
         "IOEnable",
@@ -220,7 +220,7 @@
         "CheckBoxBaseStyle",
         "（隐式默认样式）"
       ],
-      "attrs": [
+      "observedAttrs": [
         "IsChecked",
         "Content",
         "Style",
@@ -253,7 +253,7 @@
         "MainMenuRadioButtonStyle",
         "RadioGroupItemBaseStyle"
       ],
-      "attrs": [
+      "observedAttrs": [
         "Content",
         "GroupName",
         "IsChecked",
@@ -284,7 +284,7 @@
         "ToggleButtonGroupItemBaseStyle",
         "（ToggleButton 隐式默认）"
       ],
-      "attrs": [
+      "observedAttrs": [
         "Content",
         "IsChecked",
         "Style",
@@ -314,7 +314,7 @@
         "IOComboBoxItemBaseStyle",
         "IOComboBoxEditableTextBox"
       ],
-      "attrs": [
+      "observedAttrs": [
         "ItemsSource",
         "SelectedIndex",
         "SelectedItem",
@@ -353,7 +353,7 @@
         "IOTextBoxBaseStyle",
         "（隐式默认样式）"
       ],
-      "attrs": [
+      "observedAttrs": [
         "IOName",
         "IOEnable",
         "IsAutoRead",
@@ -393,7 +393,7 @@
         "LeftRightButtonStyle",
         "LeftRightButtonNumberBoxStyle"
       ],
-      "attrs": [
+      "observedAttrs": [
         "Value",
         "Style",
         "controls:NumericKeypadAttach.IsEnabled",
@@ -422,7 +422,7 @@
         "IntNumberBoxBaseStyle",
         "LeftRightButtonIntNumberBoxStyle"
       ],
-      "attrs": [
+      "observedAttrs": [
         "Value",
         "Style",
         "controls:NumericKeypadAttach.IsEnabled",
@@ -451,7 +451,7 @@
         "TextBlockStyle",
         "（隐式默认样式）"
       ],
-      "attrs": [
+      "observedAttrs": [
         "Text",
         "Margin",
         "HorizontalAlignment",
@@ -468,7 +468,7 @@
         "Grid.ColumnSpan"
       ],
       "protocols": [],
-      "textRule": "文本一律 {DynamicResource <本页语言键>}，禁止硬编码中文（总则第 4 条）",
+      "textRule": "文本一律 {DynamicResource <本页语言键>}，禁止硬编码中文",
       "evidence": [
         "AutoCutView.xaml（TextBlock ×27，全部 Text={DynamicResource}）"
       ],
@@ -483,7 +483,7 @@
         "SecondaryDataGridStyle",
         "RowFreezableDataGridStyle"
       ],
-      "attrs": [
+      "observedAttrs": [
         "ItemsSource",
         "AutoGenerateColumns",
         "CanUserAddRows",
@@ -518,7 +518,7 @@
         "IOGroupBoxFour",
         "ContentGroupBoxStyle"
       ],
-      "attrs": [
+      "observedAttrs": [
         "Header",
         "IOEnable",
         "IOVisible",
@@ -547,7 +547,7 @@
     "Border": {
       "element": null,
       "styleKeys": [],
-      "attrs": [],
+      "observedAttrs": [],
       "layoutAttrs": [],
       "protocols": [],
       "evidence": [],
