@@ -430,7 +430,7 @@ function main() {
     walkProtocols(region.grid);
   });
   // R10：manual-only 类型（真实页面或目标程序集证据不完整）不阻断，
-  // 但必须登记成提示，让"首次生成需人工确认、事后补齐缺的证据"有可观测落点。
+  // 但每次页面使用都登记提示，直到映射证据补齐并更新为 ready。
   manualOnlyTypes.forEach(function (type) {
     notice("R10", null, "写法表把 " + type + " 记为 manual-only（证据不全）：发射前需人工确认，事后补齐真实页面或目标程序集证据");
   });

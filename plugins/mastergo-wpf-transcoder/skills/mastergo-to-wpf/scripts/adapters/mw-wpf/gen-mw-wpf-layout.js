@@ -699,7 +699,7 @@ function contentSizeOf(cell) {
 }
 
 function cameraSidebarLayout(grid, items, dslTree, size, origin) {
-  // 根画布有右侧纵向分隔线、相机和竖排按钮栏时，按两个主列重建局部 Grid；顶部框架/标题空白不作页面行。
+  // 命中特殊结构时以 rootTop 重基 DSL 坐标；rootTop-headerHeight 的顶部空白只用于裁切，不发射为根行或 Margin。
   const camera = items.find(function (item) { return item.controlType === "Camera"; });
   if (!camera) return null;
   const cameraCell = (grid.cells || []).find(function (cell) { return cell.ref === camera.ref; });
