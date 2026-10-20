@@ -816,30 +816,11 @@ assert.ok(modeDoc.includes("压成空格会让两行文案退化成一行"),
   assert.ok(feishuSection.length > 0, "feishu 组件库文档必须保留「组件父子相对坐标」小节");
   assert.ok(/内容区原点/.test(feishuSection) && /contentInsetStyle/.test(feishuSection),
     "「组件父子相对坐标」小节必须带容器内容区原点例外（且写明 contentInsetStyle 查表键）");
-  // 作业 A 的框架手册只需两句：本文是作业 A 参考；作业 B 的 GroupBox 是空 Style（+ 指向第 3 节）。
-  for (const manual of ["io/io-group-box.md", "native/group-box.md"]) {
-    const text = fs.readFileSync(path.join(__dirname, "..", "..", "references", "adapters", "mw-wpf", "framework-manual", "02-controls", manual), "utf8");
-    assert.ok(/作业 B（MTSLG IOContorl 页面 XML）的 GroupBox \*\*`Style` 是空串\*\*/.test(text),
-      "framework-manual/02-controls/" + manual + " 的适用范围横幅必须直说作业 B 的 GroupBox Style 是空串");
-    assert.ok(/第 3 节（坐标规则）/.test(text),
-      "framework-manual/02-controls/" + manual + " 必须指向 mtslg-mode.md 第 3 节（坐标规则）");
-    assert.ok(!/TD-065/.test(text),
-      "framework-manual/02-controls/" + manual + " 不得把该确定口径挂成待确认项");
-    assert.ok(!/作业 B 优先级|注意适用范围/.test(text),
-      "framework-manual/02-controls/" + manual + " 不得再引入「优先级/适用范围」之类的包装说法");
-  }
   // map._meta.note 的交叉引用同样必须指到第 3 节。
   assert.ok(/第 3 节（坐标规则）/.test(metaNotes), "map._meta.note 的交叉引用必须指向 mtslg-mode.md 第 3 节");
   // mtslg-mode 第 3 节必须写明这是项目框架侧的确定口径，不是待确认项。
   assert.ok(/确定口径/.test(modeDoc), "mtslg-mode.md 必须写明该口径是项目框架侧的确定口径");
   assert.ok(!/TD-065/.test(modeDoc), "mtslg-mode.md 不得把该确定口径挂成待确认项");
-  // 台账与 guide 都不得出现 TD-065：它描述的是既定事实，不属于"待框架确认"那一类。
-  const manualDir = path.join(__dirname, "..", "..", "references", "adapters", "mw-wpf", "framework-manual", "05-best-practices");
-  const ledger = fs.readFileSync(path.join(manualDir, "pending-confirmations.md"), "utf8");
-  const guide = fs.readFileSync(path.join(manualDir, "pending-confirmations-guide.md"), "utf8");
-  assert.ok(!/TD-065/.test(ledger), "pending-confirmations.md 不得登记 TD-065（该口径是确定事实）");
-  assert.ok(!/TD-065/.test(guide), "pending-confirmations-guide.md 不得登记 TD-065（该口径是确定事实）");
-  assert.ok(/TD-047~064/.test(guide), "guide 第六节的编号区间必须回到 TD-047~064");
   // 生成器只认 contentInsetStyle：不得保留"用非空 style 当查表键"的回退。
   const mappingGenerator = fs.readFileSync(
     path.join(__dirname, "..", "adapters/mtslg-iocontrol", "gen-mtslg-mapping-from-dsl.js"), "utf8");

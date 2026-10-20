@@ -18,7 +18,7 @@ description: 将明确要求的 MasterGo 设计稿转换为 MTSLG IOContorl XML�
 
 - 整页转换**一条命令跑完**（`run-all.ps1`，默认第 1→12 步）；步骤、输入、产物、失败处理看 `references/adapters/mtslg-iocontrol/pipeline-contract.md`。**不需要**读 `scripts/` 下分桶目录里的源码来复述规则。
 - 只在下面三种情况读 reference：① 本文件明确写「读 X」；② 脚本报错，按 `pipeline-contract.md` 的「怎么修」定位到该 reference 的对应小节；③ 要写/改 Bundle 清单、图标命名表、译文清单，需要字段口径。
-- 未在「参考文件读取条件」里点名、且当前任务没触发的文件不要读；作业 A 的 `references/adapters/mw-wpf/framework-manual/**` 是一次本地框架快照的参考，只在写/改 A 写法表或人工评审 A 样式族时定点查。
+- 未在「参考文件读取条件」里点名、且当前任务没触发的文件不要读。
 
 ## 触发边界
 
@@ -139,7 +139,6 @@ pwsh -NoProfile -File <skill>\scripts\entry\run-all.ps1 -List -Format json -OutF
 - 本路线必读：`references/adapters/mtslg-iocontrol/mtslg-mode.md`（页面格式、坐标、ID、merge、验证）。
 - 作业 A 必读：`references/adapters/mw-wpf/mw-wpf-mode.md`（页面格式、骨架、布局规则、ViewModel 契约）。
 - 触发才读：`references/adapters/mtslg-iocontrol/pipeline-contract.md`（跑流水线时）；`references/adapters/mtslg-iocontrol/page-build-rules.md`（处理图标命名/几何来源、多语言译文与词典、输出目录、可见性 omit 角色、辅助脚本触发时）；设计稿含顶部栏/底部栏或快捷键，或本次要创建/修改 Layout 注册 → `references/adapters/mtslg-iocontrol/feishu-layout-mapping.md`；要写或改 Bundle 清单 → `references/adapters/mtslg-iocontrol/bundle-manifest.md`。
-- 作业 A 触发才读：`references/adapters/mw-wpf/page-build-rules.md`（产物布局、本页 Icon 字典与合并点、多语言键、写入门禁）；要改 A 的写法或样式族 → `references/adapters/mw-wpf/mw-wpf-map.json` + `references/adapters/mw-wpf/framework-manual/`（定点查，不通读）。
+- 作业 A 触发才读：`references/adapters/mw-wpf/page-build-rules.md`（产物布局、本页 Icon 字典与合并点、多语言键、写入门禁）；要改 A 的写法或样式族 → `references/adapters/mw-wpf/mw-wpf-map.json`。
 - **默认不预读**：`references/adapters/mtslg-iocontrol/feishu-component-library-mapping.md`、共享类型表 `references/component-types.json` 与路线映射表 `references/adapters/mtslg-iocontrol/mtslg-iocontrol-map.json`——组件匹配、`ControlType`、槽位与属性白名单由 `resolve-mtslg-template-mapping.js` / `gen-mtslg-mapping-from-dsl.js` 在生成期按映射表执行；两个 JSON 都只经 `scripts/lib/load-template-map.js` 读取。只有脚本报出 `pending` / `unmappedComponents` / `templateConflicts` 时，才按关键词定点查（不通读）。
 - 按需：`references/project-adapter-initialization.md`（项目首次适配）、`references/mastergo-component-mapping-rules.md`（两条作业共用的来源链规则）、`references/style-library-profiles.md`（多套样式/主题/图标库并存时）。
-- 作业 A 资料里的框架手册快照（`references/adapters/mw-wpf/framework-manual/**`）不作为作业 B（页面 XML）的运行期口径依据：B 的 `GroupBox` 是空 `Style` + `IOGroupBoxSecondary` 原点，两者冲突时以 B 的口径为准。

@@ -21,7 +21,7 @@
 //   R3 格子越界：row/column/rowSpan/columnSpan 必须落在本 region 的行列范围内
 //   R4 空行空列：没有格子覆盖、也不是被星号撑开的收尾行/列
 //   R5 锚点格冲突：同一锚点格（Grid.Row/Column 起点）只允许一个控件（推导用占用表 + 行下移保证唯一）
-//   R10 待人工确认（提示）：页面用到写法表 manual-only 类型（证据不全，如 Camera 尚缺真实业务页与运行时证据）
+//   R10 待人工确认（提示）：页面用到写法表 manual-only 类型（真实页面或目标程序集证据不完整）
 //   R11 尺寸约束一致性：格子带的 min/max 宽高必须与 DSL 节点上的 constraints 逐个一致（多/少/改值都失败）
 //   R12 尺寸约束未落格：DSL 里带尺寸约束的节点在布局产物里没有对应格子、也不在该产物登记的
 //       constraintExempt 里即失败。豁免的节点只有 constraintExempt 里登记的三类（页面根 / 不可见 /
@@ -429,10 +429,10 @@ function main() {
     };
     walkProtocols(region.grid);
   });
-  // R10：manual-only 类型（证据不全：有手册条目但真实页面未出现，或只有用户确认）不阻断，
+  // R10：manual-only 类型（真实页面或目标程序集证据不完整）不阻断，
   // 但必须登记成提示，让"首次生成需人工确认、事后补齐缺的证据"有可观测落点。
   manualOnlyTypes.forEach(function (type) {
-    notice("R10", null, "写法表把 " + type + " 记为 manual-only（证据不全）：发射前需人工确认，事后补齐缺的证据（真实页面或手册条目）");
+    notice("R10", null, "写法表把 " + type + " 记为 manual-only（证据不全）：发射前需人工确认，事后补齐真实页面或目标程序集证据");
   });
   checkStyleKeys(layout, map, iconNames, xamlText);
   checkHardcodedText(xamlText, layout, typesByRef);
