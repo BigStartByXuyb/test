@@ -75,11 +75,9 @@
     }
   },
   "frameworkTokens": {
-    "note": "框架固定区不发射进页面；尺寸由项目提供的框架 Token 输入，用于布局产物登记与 Layout 注册。",
+    "note": "框架固定区不发射进页面。headerHeight 与 bottomHeight 是本适配器写法表常量，当前值分别为 85 与 180；需要调整时直接修改此处。项目配置不覆盖这些值；布局产物 source 记录对应的框架 Token 名。",
     "headerHeight": 85,
-    "bottomHeight": 180,
-    "statusBarHeight": 80,
-    "statusLightHeight": 70
+    "bottomHeight": 180
   },
   "styleRules": {
     "note": "外观只走样式族，不散写属性。选中顺序：① byVariant 命中（设计稿变体名）→ 用具名样式键；② 未命中 → 该 ControlType 的 pageDefault（具名键走页级 BasedOn，控件本身不写 Style；取 \"implicit\" 表示走框架隐式默认样式、同样不写 Style）；③ 两者都没有 → fail-closed 报出该变体待确认。命中的样式键逐一写入报告，pageDefault 兜底的记入 styleFallback 供人工评审。",

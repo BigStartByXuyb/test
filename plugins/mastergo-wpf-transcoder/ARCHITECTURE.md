@@ -23,7 +23,7 @@ plugins/mastergo-wpf-transcoder/
 ├─ skills/
 │  ├─ mastergo-to-wpf/             # 主 Skill：流程路由 + 参考文档 + 全部脚本
 │  │  ├─ SKILL.md                  # 唯一流程路由与硬规则总表
-│  │  ├─ references/               # 规则事实源（适配器文档、映射表、框架手册）
+│  │  ├─ references/               # 规则事实源（适配器规则、映射表、共享类型表）
 │  │  └─ scripts/                  # 交付链路脚本（运行时），按职责分桶
 │  │     ├─ core/                   # 与目标无关：取数、快照、显隐、运行登记表、契约与仓库门禁
 │  │     ├─ host/                   # WPF 宿主壳生成（两条路线共用）
