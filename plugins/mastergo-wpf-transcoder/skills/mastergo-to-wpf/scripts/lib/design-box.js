@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 "use strict";
 
-// 控件在格子里的「尺寸 + 对齐」唯一实现。
+// mw-wpf 的容器尺寸模式分类与格内「尺寸 + 对齐」共享实现。
 //
 // 口径：格子尺寸照设计稿（含间距），控件写自身设计稿尺寸，两者的差就是间距；
 // 差值落在哪一侧由设计稿偏移决定——偏移≈0 贴起始边、到末端≈0 贴末端、两侧≈相等居中，
@@ -16,8 +16,9 @@
 //   - 有格子尺寸、没有偏移（撞格下移的格子）→ 只写控件自身尺寸，不写对齐，不猜差值落哪一侧；
 //   - 某一维没有格子尺寸（推导给不出正数：内容溢出承载物）→ 该维什么都不写（保持 Stretch），另一维照写。
 //
-// 消费者：adapters/mw-wpf/gen-mw-wpf-xaml.js（发射属性并写进发射报告）、
-//         adapters/mw-wpf/check-wpf-layout.js（按同一实现核对发射报告）。
+// 消费者：adapters/mw-wpf/gen-mw-wpf-layout.js（分类容器 sizingMode）、
+//         adapters/mw-wpf/gen-mw-wpf-xaml.js（发射属性并写进报告）、
+//         adapters/mw-wpf/check-wpf-layout.js（复算分类并核对发射报告）。
 
 // 与布局推导同一容差：贴边 / 居中只在"完全贴合"时成立（偏移或剩余 ≤ EPS，或两侧相等）；
 // 其余（非对称内缩）一律走 Margin 精确复现。

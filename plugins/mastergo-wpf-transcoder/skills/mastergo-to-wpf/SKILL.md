@@ -8,7 +8,7 @@ description: 将明确要求的 MasterGo 设计稿转换为 MTSLG IOContorl XML�
 两条路线都启用，产物形态不同、**判定与采集链路共用**：
 
 - 作业 B `mtslg-iocontrol`（缺省）：栅格绝对坐标 + 控件属性的页面 XML；
-- 作业 A `mw-wpf`：真 WPF XAML 页面（框架 `s:` 控件 + Grid 布局），`-Mode mw-wpf` 选择。
+- 作业 A `mw-wpf`：真 WPF XAML 页面（以框架 `s:` 控件为主、Camera 使用 `camera:` 控件 + Grid 布局），`-Mode mw-wpf` 选择。
 
 路线只决定**同一份类型判定结果怎么写**、以及 `mapping` / `layout` / `bundle` / `gates` / `verify` 用哪个脚本；用哪些脚本、读哪张表、产物落在哪，由 `references/adapters/<路线>/adapter.json` 描述符给出，`run-all.ps1 -Mode <路线>` 按它派发。**一次运行只走一条路线**：续跑不能换路线（换路线要从 `fetch` 新开运行），也不得生成混合产物。
 

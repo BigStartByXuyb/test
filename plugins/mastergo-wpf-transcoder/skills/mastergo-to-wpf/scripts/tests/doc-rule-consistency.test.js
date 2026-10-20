@@ -214,7 +214,6 @@ assert.ok(!(required.Camera || []).includes("Style"), "Camera 的恒写字段集
 for (const attr of ["DesignPanelID", "Value"]) {
   assert.ok((required.Camera || []).includes(attr), "Camera 恒写字段必须包含 " + attr);
 }
-assert.ok((map.controlTypes.Camera.attrs || []).includes("DesignPanelID"), "controlTypes.Camera 必须允许 DesignPanelID");
 assert.ok(feishuMapping.includes("cameraTemplates"), "人读映射文档必须登记相机族（cameraTemplates）");
 // 相机视口内部文本的处置必须显式登记，且 omit 角色要在校验器里放行（否则内部文本会漏成根级 TextBlock）。
 assert.ok(cameraFamily.innerTextPolicy && cameraFamily.innerTextPolicy.role,

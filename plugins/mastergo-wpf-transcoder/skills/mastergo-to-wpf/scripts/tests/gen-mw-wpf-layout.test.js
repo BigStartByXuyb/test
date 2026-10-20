@@ -501,3 +501,40 @@ function sizes(bands) {
   assert.strictEqual(nextGroup.offsetY, 6, "普通设计间距从前一条 Auto 内容轨道之后计算");
 }
 
+// ---------- 13. 相机 + 右栏布局只在 owner 为空时启用 ----------
+{
+  const pageChildren = function () {
+    return [
+      node("camera", "INSTANCE", { width: 600, height: 600, relativeX: 20, relativeY: 115 }),
+      node("middle", "FRAME", { width: 400, height: 240, relativeX: 650, relativeY: 117 }, [
+        node("middleA", "TEXT", { width: 120, height: 20, relativeX: 0, relativeY: 0 }),
+        node("middleB", "TEXT", { width: 120, height: 20, relativeX: 0, relativeY: 40 })
+      ], { flexContainerInfo: { flexDirection: "column" } }),
+      node("sidebar", "FRAME", { width: 170, height: 200, relativeX: 1100, relativeY: 97 }, [
+        node("rightA", "INSTANCE", { width: 170, height: 70, relativeX: 0, relativeY: 0 }),
+        node("rightB", "INSTANCE", { width: 170, height: 70, relativeX: 0, relativeY: 100 })
+      ], { flexContainerInfo: { flexDirection: "column" } }),
+      node("divider", "RECTANGLE", { width: 1, height: 600, relativeX: 1075, relativeY: 97 })
+    ];
+  };
+  const types = typesOf([
+    { ref: "camera", controlType: "Camera", absX: 20, absY: 200, w: 600, h: 600 },
+    { ref: "middleA", controlType: "TextBlock", absX: 650, absY: 202, w: 120, h: 20 },
+    { ref: "middleB", controlType: "TextBlock", absX: 650, absY: 242, w: 120, h: 20 },
+    { ref: "rightA", controlType: "IconButton", absX: 1100, absY: 182, w: 170, h: 70 },
+    { ref: "rightB", controlType: "IconButton", absX: 1100, absY: 282, w: 170, h: 70 }
+  ]);
+  const plain = workArea(derive(snapshot([], pageChildren()), types));
+  assert.strictEqual(cellOf(plain, "synth:content-area").row, 0,
+    "无设计稿根 owner 时启用相机 + 右栏两列根布局");
+  assert.strictEqual(cellOf(plain, "synth:right-sidebar").row, 0);
+  assert.strictEqual(cellOf({ grid: cellOf(plain, "synth:content-area").children }, "camera").row, 0,
+    "相机在内容区局部 Grid 的首行");
+
+  const ownedRoot = node("ownedRoot", "FRAME", { width: 1280, height: 759, relativeX: 0, relativeY: 0 },
+    pageChildren(), { flexContainerInfo: { flexDirection: "row" } });
+  const owned = workArea(derive(snapshot([], [ownedRoot]), types));
+  assert.strictEqual(owned.grid.cells.some(function (cell) { return cell.ref === "synth:content-area"; }), false,
+    "设计稿根 owner 存在时回退到原有层级网格");
+}
+

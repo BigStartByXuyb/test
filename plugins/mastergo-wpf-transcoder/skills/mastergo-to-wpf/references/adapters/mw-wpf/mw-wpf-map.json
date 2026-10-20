@@ -557,10 +557,6 @@
     "Camera": {
       "element": "camera:CameraControl",
       "xmlNamespacePrefix": "camera",
-      "attrs": [
-        "DesignPanelID",
-        "Value"
-      ],
       "layoutAttrs": [
         "Width",
         "Height",
@@ -581,8 +577,7 @@
         "目标框架项目已编译 camera:CameraControl 页面；真实业务页与运行时加载待确认"
       ],
       "status": "manual-only",
-      "note": "使用 MaxWell.CameraDevice.CameraControl；目标工程必须引用 MaxWell.CameraDevice.dll；外观沿用运行时默认（不写 Style，与作业B cameraTemplates 同口径）。真实业务页与设备运行时加载尚未验证，首次使用登记 R10；DesignPanelID / Value 仅在页面映射提供非空值时发射。",
-      "stylePolicy": "none"
+      "note": "使用 MaxWell.CameraDevice.CameraControl；目标工程必须引用 MaxWell.CameraDevice.dll；外观沿用运行时默认（不写 Style，与作业B cameraTemplates 同口径）。真实业务页与设备运行时加载尚未验证，首次使用登记 R10；DesignPanelID / Value 仅在页面映射提供非空值时发射。"
     }
   }
 }

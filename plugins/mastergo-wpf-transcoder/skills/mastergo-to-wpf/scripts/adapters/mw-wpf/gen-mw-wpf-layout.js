@@ -449,8 +449,7 @@ function mainAxisBands(items, owner) {
 }
 
 // 纯子 Grid 层按内容 Auto；页面/控件槽位层保留口径 A 与页面级星号分配。
-function mainAxisSizes(bands, direction, autoContent) {
-  if (autoContent) return contentBandSizes(bands);
+function mainAxisSizes(bands, direction) {
   const hasStar = bands.some(function (band) { return band.star; });
   if (direction !== "row" || hasStar) return bandSizes(bands, direction === "row" ? "x" : "y");
   const autoItems = bands.filter(function (band) {
@@ -583,10 +582,10 @@ function buildGridFrom(nodes, ctx, size, owner, origin, isRegionRoot) {
   const occupied = new Set();
   let rowSizes = autoContent
     ? contentBandSizes(rows)
-    : (direction === "column" ? mainAxisSizes(rows, "column", false) : bandSizes(rows, "y"));
+    : (direction === "column" ? mainAxisSizes(rows, "column") : bandSizes(rows, "y"));
   const columnSizes = autoContent
     ? contentBandSizes(columns)
-    : (direction === "row" ? mainAxisSizes(columns, "row", false) : bandSizes(columns, "x"));
+    : (direction === "row" ? mainAxisSizes(columns, "row") : bandSizes(columns, "x"));
   // 撞格时在收尾星号行之前插入一个像素行（保留"最后一行吃剩余空间"的形态）。
   const appendRow = function (node) {
     const tailIsStar = rowSizes.length && rowSizes[rowSizes.length - 1].size === "Star";
@@ -686,14 +685,12 @@ function contentSizeOf(cell) {
   if (cell && cell.sizingMode === "auto-content" && cell.children) {
     const widthTracks = cell.children.columns || [];
     const heightTracks = cell.children.rows || [];
-    if (widthTracks.concat(heightTracks).every(function (track) { return track.size !== "Star"; })) {
-      const columns = bandExtents(widthTracks, 0);
-      const rows = bandExtents(heightTracks, 0);
-      return {
-        w: columns.reduce(function (total, extent) { return total + extent; }, 0),
-        h: rows.reduce(function (total, extent) { return total + extent; }, 0)
-      };
-    }
+    const columns = bandExtents(widthTracks, 0);
+    const rows = bandExtents(heightTracks, 0);
+    return {
+      w: columns.reduce(function (total, extent) { return total + extent; }, 0),
+      h: rows.reduce(function (total, extent) { return total + extent; }, 0)
+    };
   }
   return {
     w: cell.nodeWidth > 0 ? cell.nodeWidth : cell.width,

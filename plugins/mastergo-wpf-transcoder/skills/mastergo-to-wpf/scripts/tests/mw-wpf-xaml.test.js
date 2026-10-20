@@ -255,10 +255,19 @@ function emitArgs(layoutPath, typesPath, outPath, extra = []) {
   const outPath = path.join(tmpRoot, "implicit", "View.xaml");
   run(emitArgs(layoutPath, typesPath, outPath, ["--overwrite"]));
   const xaml = fs.readFileSync(outPath, "utf8");
+  const routeMap = JSON.parse(fs.readFileSync(ROUTE_MAP, "utf8"));
   assert.match(xaml, /xmlns:camera="clr-namespace:MaxWell\.CameraDevice;assembly=MaxWell\.CameraDevice"/, "按写法表声明 CameraControl 命名空间");
   assert.match(xaml, /<camera:CameraControl/, "Camera 按写法表发射成 CameraControl");
-  assert.match(xaml, /DesignPanelID="panel-1"/, "Camera 按 protocols 白名单发射 DesignPanelID");
-  assert.match(xaml, /Value="camera-value"/, "Camera 按 protocols 白名单发射 Value");
+  assert.deepStrictEqual(routeMap.controlTypes.Camera.xamlAttrs, ["DesignPanelID", "Value"],
+    "Camera 的普通 XAML 属性使用唯一的 xamlAttrs 发射白名单");
+  assert.ok(!Object.prototype.hasOwnProperty.call(routeMap.controlTypes.Camera, "attrs"),
+    "Camera 不得保留重复的普通属性目录");
+  assert.deepStrictEqual(routeMap.controlTypes.Camera.protocols, [],
+    "Camera 普通属性不得重复登记为框架协议");
+  assert.ok(!Object.prototype.hasOwnProperty.call(routeMap.controlTypes.Camera, "stylePolicy"),
+    "Camera 默认样式只由 styleRules.pageDefault 表达");
+  assert.match(xaml, /DesignPanelID="panel-1"/, "Camera 按 xamlAttrs 白名单发射 DesignPanelID");
+  assert.match(xaml, /Value="camera-value"/, "Camera 按 xamlAttrs 白名单发射 Value");
   assert.ok(!xaml.includes("StaticResource null"), "隐式默认样式不得写成 BasedOn=\"{StaticResource null}\"");
   assert.ok(!/BasedOn="\{StaticResource [^}]*\}" \/>\s*$/m.test(xaml.split("<camera:CameraControl")[0].split("<UserControl.Resources>")[1] || ""),
     "隐式默认样式不得进页级 Resources");
