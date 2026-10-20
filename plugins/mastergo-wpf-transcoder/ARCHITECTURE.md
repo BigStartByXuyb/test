@@ -107,8 +107,8 @@ flowchart LR
 | 层 | 位置（仓库内路径一律以插件根为基准） | 作用 |
 |---|---|---|
 | 组件集 / 变体 / 槽位（跨路线共用） | `skills/mastergo-to-wpf/references/component-types.json` | **机器可读事实源**：各模板族（`match`、`variants`）、跨路线共用的 `layoutRules` |
-| 路线写入规则 | `skills/mastergo-to-wpf/references/adapters/<路线>/<路线>-map.json` | **机器可读事实源**：该路线的控件写法。作业 B 通过 `extends` 合并共享类型表；作业 A 由 `adapter.json.typeMap` 直接读取共享类型表，`mw-wpf-map.json` 独立装载写法规则。 |
-| 映射表读取 | `skills/mastergo-to-wpf/scripts/lib/load-template-map.js` | **唯一读取入口**：合并 `extends` 后形状与拆分前一致；脚本不得自行 `JSON.parse` |
+| 路线写入规则 | `skills/mastergo-to-wpf/references/adapters/<路线>/<路线>-map.json` | **机器可读事实源**：该路线的控件写法。作业 B 写法表声明 `extends`，与共享类型表经加载器合并；作业 A 的 `mw-wpf-map.json` 是独立的平面写法表，不声明 `extends`。 |
+| 组合映射表读取 | `skills/mastergo-to-wpf/scripts/lib/load-template-map.js` | 共享组件映射与声明 `extends` 的路线表经此入口组合；作业 B 的写入表通过 `extends` 合并共享表。作业 A 的 `adapter.json.typeMap` 是类型判定输入，`templateMap` 指向独立平面 `mw-wpf-map.json`，由 XAML 发射器、门禁与宿主按普通 JSON 读取；回归测试禁止该写入表声明 `extends` 或 `familyOverlays`。 |
 | 组件映射说明 | `skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/feishu-component-library-mapping.md` | 模板与槽位的人读口径（与在线阅读副本同步） |
 | 页面壳层与 Layout | `skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/feishu-layout-mapping.md` | MenuItem 常驻属性、Index、设计稿标记（与在线阅读副本同步） |
 | 页面格式与验证 | `skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/mtslg-mode.md` | 坐标、TextBlock 尺寸、运行时约束、验证流程 |

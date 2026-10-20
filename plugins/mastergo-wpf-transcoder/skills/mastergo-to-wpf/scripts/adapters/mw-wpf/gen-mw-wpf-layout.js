@@ -790,7 +790,7 @@ function cameraSidebarLayout(grid, items, dslTree, size, origin) {
   sidebarCell.height = rootHeight;
   sidebarCell.offsetX = 0;
   sidebarCell.offsetY = Math.round(sidebar.y - rootTop);
-  sidebarCell.sizingMode = containerSizingMode(sidebar.items, false);
+  sidebarCell.sizingMode = containerSizingMode(sidebarCell.children.cells, false);
   delete sidebarCell.shifted;
 
   const sidebarGrid = {

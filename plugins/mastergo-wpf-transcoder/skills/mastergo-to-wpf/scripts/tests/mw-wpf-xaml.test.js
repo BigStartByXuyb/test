@@ -256,6 +256,8 @@ function emitArgs(layoutPath, typesPath, outPath, extra = []) {
   run(emitArgs(layoutPath, typesPath, outPath, ["--overwrite"]));
   const xaml = fs.readFileSync(outPath, "utf8");
   const routeMap = JSON.parse(fs.readFileSync(ROUTE_MAP, "utf8"));
+  assert.ok(!routeMap.extends && !routeMap.familyOverlays,
+    "MW WPF 写法表是独立平面表，不得绕过组合映射加载器声明 extends/overlays");
   assert.ok(Object.values(routeMap.controlTypes).every(spec => !Object.prototype.hasOwnProperty.call(spec, "attrs")),
     "MW WPF 写法表不得把观察属性 attrs 作为第二份发射白名单");
   assert.match(xaml, /xmlns:camera="clr-namespace:MaxWell\.CameraDevice;assembly=MaxWell\.CameraDevice"/, "按写法表声明 CameraControl 命名空间");
