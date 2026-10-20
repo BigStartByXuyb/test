@@ -357,7 +357,8 @@ def load_reference(path):
 
     pairs, stages, seq = set(), set(), {}
     product = model = ''
-    for r in range(1, min(ws.max_row, 10) + 1):
+    # 只扫描表头之前的 10 行，不含表头及其下方数据行
+    for r in range(max(1, header_row - 10), header_row):
         for c in range(1, ws.max_column + 1):
             v = ws.cell(r, c).value
             if not isinstance(v, str):
