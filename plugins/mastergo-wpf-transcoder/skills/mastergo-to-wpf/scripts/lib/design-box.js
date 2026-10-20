@@ -11,9 +11,9 @@
 //   cell.width / cell.height           格子尺寸（含跨格累加；像素带照值，星号带吃剩余）
 //   cell.nodeWidth / cell.nodeHeight   控件（或容器）自身的设计稿尺寸
 //   cell.offsetX / cell.offsetY        控件起点相对格子起点的偏移（撞格下移的格子不登记）
-// 三种落空的情况各写各的：
-//   - 格子尺寸与控件尺寸相等且偏移为 0 → 不写尺寸也不写对齐（Stretch 正好填满）；
-//   - 等尺寸但偏移大于 0 → 写控件尺寸、起始对齐与 Margin，保留设计稿偏移；
+// designBoxAttrs 的四种情况各写各的：
+//   - 格子尺寸与控件尺寸相等 → 不写尺寸也不写对齐（Stretch 正好填满）；
+//   - 尺寸不同且有偏移 → 按偏移选择对齐，非对称间距用 Margin 保留；
 //   - 有格子尺寸、没有偏移（撞格下移的格子）→ 只写控件自身尺寸，不写对齐，不猜差值落哪一侧；
 //   - 某一维没有格子尺寸（推导给不出正数：内容溢出承载物）→ 该维什么都不写（保持 Stretch），另一维照写。
 //
@@ -75,7 +75,7 @@ function designBoxAttrs(cell) {
 
 // 容器 Grid 的尺寸与对齐（发射器与门禁共用的唯一实现）：
 //   ① sizingMode=auto-content 时，Grid 按 Auto/Pixel 子轨道自适应，固定在左上角，源偏移由 Margin 保留；
-//   ② sizingMode=control-slot 时，按设计稿格子尺寸与偏移处理；
+//   ② sizingMode=control-slot 时，按设计稿格子尺寸与偏移处理；等尺寸但偏移大于 0 的轴也写自身尺寸、起始对齐与 Margin；
 //   ③ sizingMode=page-slot 时，页面根网格负责星号/固定轨道，容器按父格伸展或锚定。
 function containerBoxAttrs(cell) {
   if (cell && cell.sizingMode === "auto-content") {

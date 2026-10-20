@@ -495,8 +495,9 @@ function sizes(bands) {
   const sectionCell = cellOf(region, "section");
   const innerCell = cellOf({ grid: sectionCell.children }, "inner");
   assert.strictEqual(innerCell.sizingMode, "auto-content");
+  assert.strictEqual(innerCell.children.owner.direction, "column", "fixture uses column as the declared main axis");
   assert.deepStrictEqual(sizes(innerCell.children.rows), ["Auto(40)", "Auto(40)"],
-    "纯 Grid 子项各自按内容高度 Auto 自适应");
+    "column 主轴的 auto-content 容器仍按子项内容高度 Auto 自适应");
   const nextGroup = cellOf({ grid: innerCell.children }, "groupB");
   assert.strictEqual(nextGroup.offsetY, 6, "普通设计间距从前一条 Auto 内容轨道之后计算");
 }
