@@ -685,6 +685,13 @@
   },
   "extends": "../../component-types.json",
   "familyOverlays": {
+    "cameraTemplates": {
+      "mtslgAlwaysWrittenAttrs": [
+        "DesignPanelID",
+        "Value"
+      ],
+      "mtslgComponentSetPolicy": "作业B（MTSLG IOContorl）相机视口只发射 DesignPanelID / Value / Width / Height，不发射 Style。DesignPanelID 与 Value 在设计稿里没有可靠来源时按作业B固定模板写空串占位，由工程师或运行时绑定填写；Width/Height 取实例自身 bbox，坐标按作业B页面规则计算。IOName 空占位由 controlTypeRequiredAttrs.Camera 单独要求。"
+    },
     "infoGroupTemplates": {
       "styleInsets": {
         "IOGroupBoxBaseStyle": {

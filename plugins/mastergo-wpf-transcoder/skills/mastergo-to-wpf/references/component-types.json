@@ -3,7 +3,7 @@
     "source": "references/component-types.json",
     "note": [
       "共享层（目标无关）：设计稿的组件集/变体 → ControlType 与槽位，以及 Layout.xml 的推导规则。",
-      "本文件被各适配器引用（适配器映射表用 extends 指向它），两条路线由此共用同一套类型判定。",
+      "作业B 的写法表通过 extends 合并本文件；作业A 的 adapter.json.typeMap 直接引用本文件。两条路线共用类型判定，写入规则留在各自路线。",
       "目标专属的写入规则（属性、坐标口径、Tag、列定义几何等）留在各自适配器的映射表里；本文件中适配器专属策略必须以适配器名作为字段前缀，不能作为跨路线通用规则。"
     ]
   },
@@ -1071,16 +1071,12 @@
     "innerCandidatePolicyNote": "相机族只按实例**自身**的组件集名命中，禁止用「内部实例子节点名」当候选：页面根的第一个实例子节点常常就是相机（集成图像），走内部名会把整页误判成 Camera。",
     "controlType": "Camera",
     "stylePolicy": "none",
-    "mtslgAlwaysWrittenAttrs": [
-      "DesignPanelID",
-      "Value"
-    ],
     "innerTextPolicy": {
       "decision": "omit",
       "role": "camera-viewport-internal",
       "note": "相机视口是一个整体：组件内部的一切绘制内容（网格、坐标、通道名、JOG mode、拟合结果等）都不处理，只发射外层 Camera 控件。内部 TEXT 必须显式 consume + 以本角色 omit，避免漏进通用文本循环被发射成根级 TextBlock。该角色已登记进 validate-iocontrol-provenance.js 的 OMIT_ROLES。"
     },
-    "mtslgComponentSetPolicy": "作业B（MTSLG IOContorl）相机视口组件（团队组件库「集成图像」画廊里的 集成图像 / 晶圆图 组件集）按组件集名（= 实例自身名）命中，命中后发射一个 ControlType=Camera 的视口控件。只发射 DesignPanelID / Value / Width / Height（外加恒写集合里的 IOName 空占位），**不发射 Style**——直接用运行时默认控件外观。DesignPanelID（相机编号）与 Value（相机名称）在设计稿里没有可靠来源（相机实例不带公开属性、也没有承载相机名的文本），按作业B固定模板写空串占位，由工程师或运行时绑定填写；Width/Height 取实例自身 bbox；坐标按作业B页面规则计算。",
+    "componentSetPolicy": "相机视口按实例自身的组件集名命中，并产生一个 ControlType=Camera 节点；组件内部绘制内容由 innerTextPolicy 统一处理。各路线分别决定属性发射与坐标换算。",
     "variants": {
       "集成图像": {
         "componentSet": "集成图像",

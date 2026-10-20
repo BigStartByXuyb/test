@@ -167,7 +167,7 @@ function rightSidebarDsl(rootName, properties, innerName, buttonType) {
   };
 }
 
-function runMappingCase(name, dsl, icons, extraArgs) {
+function runMappingCase(name, dsl, icons, extraArgs, mapPath) {
   const caseDir = path.join(dir, name);
   fs.mkdirSync(caseDir, { recursive: true });
   const caseDsl = path.join(caseDir, 'dsl.snapshot.json');
@@ -181,7 +181,7 @@ function runMappingCase(name, dsl, icons, extraArgs) {
   fs.writeFileSync(caseVisibility, JSON.stringify({ nodes: [] }, null, 2));
   fs.writeFileSync(caseIconMap, JSON.stringify({ icons }, null, 2));
   const caseResult = spawnSync(process.execPath, [script,
-    '--dsl', caseDsl, '--visibility', caseVisibility, '--template-map', templateMap,
+    '--dsl', caseDsl, '--visibility', caseVisibility, '--template-map', mapPath || templateMap,
     '--icon-map', caseIconMap, '--out', caseOutput
   ].concat(extraArgs || []), { encoding: 'utf8' });
   assert.strictEqual(caseResult.status, 0, caseResult.stderr || caseResult.stdout);
@@ -659,15 +659,18 @@ for (const ref of ['al:root/left', 'al:root/center', 'al:root/justify', 'al:root
 console.log('PASS MTSLG DSL-to-mapping TextBlock Align regression test');
 
 // ---- 相机视口（cameraTemplates）：ControlType=Camera、不写 Style、DesignPanelID/Value 空串占位 ----
-const cameraTemplateFacts = JSON.parse(fs.readFileSync(
+const cameraTemplateFacts = loadTemplateMap(templateMap).cameraTemplates;
+assert.deepStrictEqual(cameraTemplateFacts.mtslgAlwaysWrittenAttrs, ["DesignPanelID", "Value"],
+  "相机空串占位字段必须只从 MTSLG 写法表 familyOverlay 读取");
+assert.match(cameraTemplateFacts.mtslgComponentSetPolicy, /作业B（MTSLG IOContorl）/,
+  "相机空串占位口径必须在 MTSLG 路线策略中限定到作业 B");
+const sharedCameraFacts = JSON.parse(fs.readFileSync(
   path.join(__dirname, "..", "..", "references", "component-types.json"), "utf8"
 )).cameraTemplates;
-assert.deepStrictEqual(cameraTemplateFacts.mtslgAlwaysWrittenAttrs, ["DesignPanelID", "Value"],
-  "相机空串占位字段必须限定到 MTSLG IOContorl 路线");
-assert.ok(!Object.prototype.hasOwnProperty.call(cameraTemplateFacts, "alwaysWrittenAttrs"),
-  "共享相机族不得声明跨路线恒写空串属性");
-assert.match(cameraTemplateFacts.mtslgComponentSetPolicy, /作业B（MTSLG IOContorl）/,
-  "相机空串占位口径必须在文字策略中限定到作业 B");
+assert.ok(!Object.prototype.hasOwnProperty.call(sharedCameraFacts, "mtslgAlwaysWrittenAttrs"),
+  "共享相机类型不得携带 MTSLG 恒写属性");
+assert.ok(!Object.prototype.hasOwnProperty.call(sharedCameraFacts, "alwaysWrittenAttrs"),
+  "共享相机类型不得声明跨路线恒写空串属性");
 const cameraDsl = {
   styles: {},
   nodes: [{
@@ -703,6 +706,15 @@ const innerAudit = cameraMapping.textAudit.find(item => item.sourceRef === 'cam:
 assert.ok(innerAudit, '相机视口内部文本必须进入 textAudit（显式登记处置）');
 assert.strictEqual(innerAudit.decision, 'omit', '相机内部文本必须 decision=omit');
 assert.strictEqual(innerAudit.role, 'camera-viewport-internal', '相机内部文本必须用专用 omit 角色');
+
+const sharedTypeMap = path.join(__dirname, '..', '..', 'references', 'component-types.json');
+const wpfCameraTypes = runMappingCase('camera-wpf-types', cameraDsl, [], [], sharedTypeMap);
+const wpfCameraNode = wpfCameraTypes.nodes.find(node => node.controlType === 'Camera');
+assert.ok(wpfCameraNode, '作业A 共享类型判定仍命中 Camera');
+assert.strictEqual(wpfCameraNode.attrs.DesignPanelID, undefined,
+  '作业A 共享类型判定不得注入 MTSLG 的 DesignPanelID 空占位');
+assert.strictEqual(wpfCameraNode.attrs.Value, undefined,
+  '作业A 共享类型判定不得注入 MTSLG 的 Value 空占位');
 
 console.log('PASS MTSLG DSL-to-mapping camera viewport regression test');
 

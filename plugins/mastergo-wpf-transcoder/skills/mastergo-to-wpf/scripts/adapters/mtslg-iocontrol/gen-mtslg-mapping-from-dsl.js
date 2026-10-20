@@ -1012,7 +1012,8 @@ for (const { item: inst, match } of matched) {
       throw new Error("cameraTemplates.stylePolicy 必须是 none：相机视口用运行时默认控件外观，不发射 Style");
     }
     const attrs = {};
-    for (const attr of cameraSpec.mtslgAlwaysWrittenAttrs) attrs[attr] = "";
+    // 作业B的 familyOverlay 才登记 MTSLG 空占位；作业A直读共享类型表，不生成这些属性。
+    for (const attr of cameraSpec.mtslgAlwaysWrittenAttrs || []) attrs[attr] = "";
     addNode(inst.ref, spec.controlType, attrs, { variant });
         addInstance(match, inst.ref, []);
     // 内部 TEXT 显式 consume + omit：既不发射成页面 TextBlock，也不让它们漏进通用文本循环。
