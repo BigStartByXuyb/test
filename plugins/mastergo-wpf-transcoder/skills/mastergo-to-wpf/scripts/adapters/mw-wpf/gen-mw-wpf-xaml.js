@@ -217,7 +217,7 @@ function constraintAttrs(cell) {
   return Object.keys(attrs).length ? attrs : null;
 }
 
-// 控件属性：顺序固定为 定位 → 约束 → 文本 → 图形 → 样式 → 普通 XAML 属性 → 协议，便于逐行比对真实页面。
+// 控件属性：顺序固定为 定位 → 约束 → 尺寸/对齐 → 图形 → 文本 → 样式 → 普通 XAML 属性 → 协议，便于逐行比对真实页面。
 function renderControl(node, cell, ctx, depth) {
   const spec = specOf(ctx.map, node.controlType);
   if (!spec) {
