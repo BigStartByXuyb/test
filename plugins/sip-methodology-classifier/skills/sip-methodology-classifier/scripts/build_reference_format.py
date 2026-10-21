@@ -136,7 +136,7 @@ def transform_source(src_path, row_map):
                 left=Side(style=left), right=Side(style=right),
                 top=Side(style=top), bottom=Side(style=bottom))
 
-    # M/N（未解析/跳过行留空，不写兜底值）
+    # M/N（未解析/跳过行留空，不填分类值）
     unclassified = []
     ws.cell(1, 13, '主顺序')
     ws.cell(1, 14, '子顺序（1级优先进行，12级最后进行）')
@@ -278,7 +278,9 @@ def main():
     if total_unclassified:
         print(f'未解析/跳过行: {total_unclassified}（M/N 留空，请复核）')
     if total_rule_inferred:
-        print(f'规则推断行: {total_rule_inferred}（M/N 已按兜底填写，建议复核）')
+        print(f'规则推断行: {total_rule_inferred}'
+              '（关键字推断，M/N 可能落在任一主/子顺序；'
+              '完全无法推断时用 (3. 通电检验, 5级)，建议复核）')
     if ref:
         for line in format_results(verify_file(args.output, ref)):
             print(line)

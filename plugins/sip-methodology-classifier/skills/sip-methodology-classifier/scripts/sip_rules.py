@@ -257,7 +257,7 @@ def _classify_raw(stage, item, sub, std, method):
         if any(k in std for k in ('外观', '安装', '完好', '牢固', '无损伤')):
             return (W, '1级')
         return (D, '5级')
-    # 兜底关键字：返回 None 表示需要人工确认
+    # 关键字推断；返回 None 表示完全无法推断
     if any(k in stage for k in ('精度', '补偿')):
         return (D, '4级')
     if any(k in stage for k in ('外观', '整理', '清洁', '标识', '布局', '门板', '盖板',
@@ -283,7 +283,7 @@ def _classify_raw(stage, item, sub, std, method):
 
 
 def _explicit_match(stage, item):
-    """是否命中了明确规则（而不是关键字兜底）。"""
+    """是否命中了明确规则（而不是关键字推断）。"""
     if (stage, item) in EXACT:
         return True
     if stage.startswith('流量、压力及位置检查'):
@@ -301,7 +301,7 @@ def classify(stage, item, sub='', std='', method='',
     归类依据：
       标准答案  - 标准答案中存在同名 (工序, 项目)
       同类工序  - 标准答案中存在同名工序，或命中了明确的工序/项目规则
-      规则推断  - 仅靠关键字兜底，需人工复核
+      规则推断  - 关键字推断（M/N 可能落在任一主/子顺序；完全无法推断时用 (3.通电,5级)），需人工复核
     """
     result = _classify_raw(stage, item, sub, std, method)
     if result is None:

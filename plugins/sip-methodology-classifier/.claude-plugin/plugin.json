@@ -1,7 +1,7 @@
 {
   "name": "sip-methodology-classifier",
   "description": "把 MAXWELL《成品检验指导书》Excel 按 SIP 方法论归类：9 个主顺序 + 每个环节内部 1–12 级子顺序，支持 GBK zip、标黄列排除、多项目分表、标准答案校验。",
-  "version": "1.1.4",
+  "version": "1.1.5",
   "author": {
     "name": "xuyb"
   },
