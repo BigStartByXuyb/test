@@ -7,8 +7,8 @@
 先添加团队 marketplace，再安装：
 
 ```text
-/plugin marketplace add BigStartByXuyb/Plugins
-/plugin install sip-methodology-classifier@bigstart-plugins
+/plugin marketplace add http://14.29.174.209:20001/data_ai/plugins.git
+/plugin install sip-methodology-classifier@mw-plugins
 ```
 
 ## 能力

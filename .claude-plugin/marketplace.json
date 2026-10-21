@@ -1,11 +1,11 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
-  "name": "bigstart-plugins",
+  "name": "mw-plugins",
   "owner": {
-    "name": "BigStartByXuyb"
+    "name": "MW"
   },
   "metadata": {
-    "description": "BigStart team plugins for Claude Code and Codex."
+    "description": "MW Agent plugins for Claude Code, Codex, and compatible agents."
   },
   "plugins": [
     {
@@ -27,6 +27,11 @@
       "name": "sip-methodology-classifier",
       "source": "./plugins/sip-methodology-classifier",
       "description": "把 MAXWELL《成品检验指导书》Excel 按 SIP 方法论归类：9 个主顺序 + 每个环节内部 1–12 级子顺序，支持 GBK zip、标黄列排除、多项目分表、标准答案校验。"
+    },
+    {
+      "name": "inteplm-deliverable-docs",
+      "source": "./plugins/inteplm-deliverable-docs",
+      "description": "仅适用于 MEL6611 V100R001：在 IntePLM 新建交付物文档并上传文件。"
     }
   ]
 }

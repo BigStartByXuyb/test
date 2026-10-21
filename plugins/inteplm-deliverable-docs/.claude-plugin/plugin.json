@@ -1,0 +1,16 @@
+{
+  "name": "inteplm-deliverable-docs",
+  "description": "仅适用于 MEL6611 V100R001：在 IntePLM 新建交付物文档并上传文件。",
+  "version": "1.0.0",
+  "author": {
+    "name": "黄一真"
+  },
+  "keywords": [
+    "inteplm",
+    "plm",
+    "deliverable",
+    "upload",
+    "document"
+  ],
+  "license": "UNLICENSED"
+}
