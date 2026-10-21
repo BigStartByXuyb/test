@@ -14,7 +14,6 @@
 可选参数：
   --reference <标准答案.xlsx>   标准答案（第一个工作表，表头含
                                序号/检验工序/检验项目/主顺序/子顺序），不随插件分发
-  --project <单项目名称>        xlsx 直接放在根目录时指定项目名
   --keep-temp                   保留 zip 解压临时目录
 """
 import argparse
@@ -32,8 +31,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 if HERE not in sys.path:
     sys.path.insert(0, HERE)
 
-from sip_rules import classify, load_reference, norm, header_key  # noqa: E402
-from build_sip_mapping import parse_sheet, discover_projects  # noqa: E402
+from sip_rules import classify, load_reference, header_key  # noqa: E402
+from sip_source import parse_sheet, discover_projects, find_header_row  # noqa: E402
 from extract_gbk_zip import extract as extract_zip  # noqa: E402
 
 try:
@@ -60,12 +59,6 @@ def normalize_text(s):
     return s.replace('l/min', 'L/min')
 
 
-def find_header_row(ws):
-    for r in range(1, min(ws.max_row, 15) + 1):
-        vals = [norm(ws.cell(r, c).value) for c in range(1, ws.max_column + 1)]
-        if '序号' in vals and '检验工序' in vals and '检验项目' in vals:
-            return r
-    raise ValueError('找不到表头行（需要 序号/检验工序/检验项目）')
 
 
 def transform_source(src_path, row_map):
@@ -142,13 +135,17 @@ def transform_source(src_path, row_map):
                 left=Side(style=left), right=Side(style=right),
                 top=Side(style=top), bottom=Side(style=bottom))
 
-    # M/N
+    # M/N（未分类行留空，不写兜底值）
+    unclassified = []
     ws.cell(1, 13, '主顺序')
     ws.cell(1, 14, '子顺序（1级优先进行，12级最后进行）')
     for r in range(2, last_seq_row + 1):
-        main, sub = row_map.get(r, ('3. 通电检验', '5级'))
-        ws.cell(r, 13, main)
-        ws.cell(r, 14, sub)
+        if r in row_map:
+            main, sub = row_map[r]
+            ws.cell(r, 13, main)
+            ws.cell(r, 14, sub)
+        else:
+            unclassified.append(r)
 
     # 样式
     for c in range(1, 15):
@@ -171,7 +168,7 @@ def transform_source(src_path, row_map):
         ws.column_dimensions[col].width = w
     ws.freeze_panes = 'A3'
     ws.title = os.path.splitext(os.path.basename(src_path))[0][:31]
-    return wb
+    return wb, unclassified
 
 
 def copy_sheet(dst_wb, src_ws, title):
@@ -212,16 +209,34 @@ def safe_name(name, used):
     return name
 
 
-def verify_reference(out_ws, ref_path):
-    ref = load_workbook(ref_path, data_only=True).worksheets[0]
-    value_diffs = 0
-    for r in range(1, max(ref.max_row, out_ws.max_row) + 1):
-        for c in range(1, 15):
-            if ref.cell(r, c).value != out_ws.cell(r, c).value:
-                value_diffs += 1
-    ref_m = set(str(x) for x in ref.merged_cells.ranges)
-    out_m = set(str(x) for x in out_ws.merged_cells.ranges)
-    return value_diffs, ref_m == out_m
+def verify_classification(out_ws, ref):
+    """按序号比对 M/N，返回 (一致数, 不符数, 差异样例)。
+
+    同格式输出没有机型代码列，按 Sheet 名（= 源机型文件名）与标准答案的工作表名匹配；
+    不比较原始单元格位置，避免标准答案表头行不同造成伪差异。
+    """
+    ok = bad = 0
+    diffs = []
+    for r in range(2, out_ws.max_row + 1):
+        seqv = out_ws.cell(r, 1).value
+        if isinstance(seqv, (int, float)):
+            seq = int(seqv)
+        elif isinstance(seqv, str) and seqv.strip().isdigit():
+            seq = int(seqv.strip())
+        else:
+            continue
+        exp = ref['seq'].get(seq)
+        if exp is None:
+            continue
+        got = (str(out_ws.cell(r, 13).value or '').strip(),
+               str(out_ws.cell(r, 14).value or '').strip())
+        if got == exp:
+            ok += 1
+        else:
+            bad += 1
+            if len(diffs) < 5:
+                diffs.append((seq, got, exp))
+    return ok, bad, diffs
 
 
 def main():
@@ -230,7 +245,6 @@ def main():
     ap.add_argument('--output', required=True, help='输出 xlsx 路径')
     ap.add_argument('--reference',
                     help='标准答案 xlsx（第一个工作表，表头含 序号/检验工序/检验项目/主顺序/子顺序）')
-    ap.add_argument('--project', help='当 xlsx 直接放在根目录时，指定项目名')
     ap.add_argument('--keep-temp', action='store_true', help='保留 zip 解压临时目录')
     args = ap.parse_args()
 
@@ -244,12 +258,13 @@ def main():
         raise SystemExit(f'输入不存在或不是目录/zip: {args.input}')
 
     ref = load_reference(args.reference) if args.reference else None
-    projects = discover_projects(root, args.project)
+    projects = discover_projects(root)
 
     out_wb = Workbook()
     out_wb.remove(out_wb.active)
     used = set()
     total = 0
+    total_unclassified = 0
     verify_info = []
 
     for pname, pdir, files in projects:
@@ -266,18 +281,20 @@ def main():
                     ref['stages'] if ref else None)
                 # 源表行号 -> 转换后行号（减标题行数）
                 row_map[row['src'] - n_title] = (main, sub)
-            wb = transform_source(path, row_map)
+            wb, unclassified = transform_source(path, row_map)
             ws = wb.worksheets[0]
             title = safe_name(ws.title, used)
             dst = copy_sheet(out_wb, ws, title)
             total += max(0, dst.max_row - 1)
-            print(f'  {title}: {max(0, dst.max_row - 1)} 行')
+            total_unclassified += len(unclassified)
+            print(f'  {title}: {max(0, dst.max_row - 1)} 行'
+                  + (f'（未分类行 {len(unclassified)}，M/N 留空）' if unclassified else ''))
 
             if ref:
                 stem = os.path.splitext(f)[0]
                 if ref.get('sheet_title') and ref['sheet_title'].lower() in stem.lower():
-                    vd, same_merges = verify_reference(dst, args.reference)
-                    verify_info.append((stem, vd, same_merges))
+                    ok, bad, diffs = verify_classification(dst, ref)
+                    verify_info.append((stem, ok, bad, diffs))
 
     if not out_wb.sheetnames:
         raise SystemExit('没有生成任何 Sheet')
@@ -285,8 +302,15 @@ def main():
     out_wb.save(args.output)
     print(f'\n已生成: {os.path.abspath(args.output)}')
     print(f'总数据行: {total}')
-    for stem, vd, same_merges in verify_info:
-        print(f'标准答案比对 {stem}: 值差异 {vd}，合并区域{"一致" if same_merges else "不一致"}')
+    if total_unclassified:
+        print(f'未分类行: {total_unclassified}（M/N 留空，请复核）')
+    for stem, ok, bad, diffs in verify_info:
+        if ok + bad == 0:
+            print(f'标准答案比对 {stem}: 匹配到文件但无可比序号（未完成校验）')
+        else:
+            print(f'标准答案比对 {stem}: {ok}/{ok + bad} 一致, {bad} 不符')
+            for d in diffs:
+                print('   ', d)
     if tmp and not args.keep_temp:
         shutil.rmtree(tmp, ignore_errors=True)
     return 0

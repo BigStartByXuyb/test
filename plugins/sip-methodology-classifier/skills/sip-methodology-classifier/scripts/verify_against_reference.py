@@ -22,7 +22,7 @@ if HERE not in sys.path:
     sys.path.insert(0, HERE)
 
 from openpyxl import load_workbook
-from sip_rules import load_reference, norm, header_key
+from sip_rules import load_reference, header_key
 
 try:
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
@@ -31,17 +31,23 @@ except Exception:
 
 
 def read_output(path):
-    """返回 {机型文件: {'model': 机型代码, 'rows': {原序号: (主顺序, 子顺序)}}}。"""
+    """读取输出工作簿，兼容两种格式。
+
+    - 同格式：表头第 1 行，A 列序号 + M/N；用 Sheet 名作为机型文件。
+    - 分析视图：表头含 机型文件/原序号 + M/N；按行读取机型代码。
+
+    返回 {机型文件: {'model': 机型代码, 'rows': {原序号: (主顺序, 子顺序)}}}。
+    """
     wb = load_workbook(path, data_only=True)
     out = {}
     for ws in wb.worksheets:
         if ws.title == '说明' or ws.title.startswith('待确认'):
             continue
-        # 表头行：含 主顺序/子顺序/机型文件/原序号
         hr = None
         for r in range(1, min(ws.max_row, 15) + 1):
-            vals = [norm(ws.cell(r, c).value) for c in range(1, ws.max_column + 1)]
-            if '主顺序' in vals and '子顺序' in vals and '机型文件' in vals and '原序号' in vals:
+            vals = [header_key(ws.cell(r, c).value) for c in range(1, ws.max_column + 1)]
+            if '主顺序' in vals and '子顺序' in vals and (
+                    '序号' in vals or '原序号' in vals):
                 hr = r
                 break
         if hr is None:
@@ -51,24 +57,38 @@ def read_output(path):
             v = header_key(ws.cell(hr, c).value)
             if v and v not in col:
                 col[v] = c
-        c_file = col['机型文件']
-        c_seq = col['原序号']
         c_main = col['主顺序']
         c_sub = col['子顺序']
-        c_model = col.get('机型代码')
-        for r in range(hr + 1, ws.max_row + 1):
-            f = ws.cell(r, c_file).value
-            seq = ws.cell(r, c_seq).value
-            main = ws.cell(r, c_main).value
-            sub = ws.cell(r, c_sub).value
-            if not f or not isinstance(seq, (int, float)) or not main or not sub:
-                continue
-            rec = out.setdefault(str(f), {'model': '', 'rows': {}})
-            if c_model:
-                mv = ws.cell(r, c_model).value
-                if mv is not None and str(mv).strip():
-                    rec['model'] = str(mv).strip()
-            rec['rows'][int(seq)] = (str(main).strip(), str(sub).strip())
+
+        if '机型文件' in col and '原序号' in col:
+            # 分析视图
+            c_file = col['机型文件']
+            c_seq = col['原序号']
+            c_model = col.get('机型代码')
+            for r in range(hr + 1, ws.max_row + 1):
+                f = ws.cell(r, c_file).value
+                seq = ws.cell(r, c_seq).value
+                main = ws.cell(r, c_main).value
+                sub = ws.cell(r, c_sub).value
+                if not f or not isinstance(seq, (int, float)) or not main or not sub:
+                    continue
+                rec = out.setdefault(str(f), {'model': '', 'rows': {}})
+                if c_model:
+                    mv = ws.cell(r, c_model).value
+                    if mv is not None and str(mv).strip():
+                        rec['model'] = str(mv).strip()
+                rec['rows'][int(seq)] = (str(main).strip(), str(sub).strip())
+        elif '序号' in col:
+            # 同格式输出
+            c_seq = col['序号']
+            rec = out.setdefault(ws.title, {'model': '', 'rows': {}})
+            for r in range(hr + 1, ws.max_row + 1):
+                seq = ws.cell(r, c_seq).value
+                main = ws.cell(r, c_main).value
+                sub = ws.cell(r, c_sub).value
+                if not isinstance(seq, (int, float)) or not main or not sub:
+                    continue
+                rec['rows'][int(seq)] = (str(main).strip(), str(sub).strip())
     return out
 
 
