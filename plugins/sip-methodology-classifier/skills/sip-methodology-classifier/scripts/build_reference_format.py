@@ -136,7 +136,7 @@ def transform_source(src_path, row_map):
                 left=Side(style=left), right=Side(style=right),
                 top=Side(style=top), bottom=Side(style=bottom))
 
-    # M/N（未分类行留空，不写兜底值）
+    # M/N（未解析/跳过行留空，不写兜底值）
     unclassified = []
     ws.cell(1, 13, '主顺序')
     ws.cell(1, 14, '子顺序（1级优先进行，12级最后进行）')

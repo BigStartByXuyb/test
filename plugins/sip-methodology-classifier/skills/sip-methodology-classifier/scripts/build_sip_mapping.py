@@ -189,7 +189,7 @@ def write_workbook(all_rows, projects, out_path, ref=None, verify=None,
     verify_text = '未提供标准答案文件'
     if ref:
         if verify:
-            verify_text = '；'.join(format_results(verify))
+            verify_text = '；'.join(format_results(verify, include_diffs=False))
         else:
             verify_text = '标准答案已加载（未找到匹配的机型文件，未做逐行比对）'
 

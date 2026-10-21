@@ -128,7 +128,7 @@ def verify_records(records, ref):
     return results
 
 
-def format_results(results):
+def format_results(results, include_diffs=True):
     lines = []
     if not results:
         return ['标准答案比对: 没有匹配的机型文件（未完成校验）']
@@ -145,8 +145,10 @@ def format_results(results):
         if r['blank']:
             line += f", {r['blank']} 行 M/N 为空（未完成）"
         lines.append(line)
-        for d in r['diffs']:
-            lines.append(f'   {d}')
+        if include_diffs:
+            for seq, got, exp in r['diffs']:
+                lines.append(f'   序号 {seq}: 输出 {got[0]} / {got[1]}；'
+                             f'标准 {exp[0]} / {exp[1]}')
     return lines
 
 
