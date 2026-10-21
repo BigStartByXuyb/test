@@ -1,6 +1,6 @@
 # sip-methodology-classifier
 
-把 MAXWELL《成品检验指导书》Excel 按 **SIP 方法论**归类，输出可直接评审/归档的顺序对应表。
+把 MAXWELL《成品检验指导书》Excel 按 **SIP 方法论**归类，输出与参考样张同格式的顺序对应表。
 
 ## 安装
 
@@ -16,15 +16,26 @@
 - **两层顺序模型**
   - 主顺序：9 个环节（铭牌核对 → 外观检验 → 通电检验 → 通气检验 → 通水检验 → 老化测试 → 工艺验证 → 通断电检验 → 备份杀毒检验）
   - 子顺序：每个环节内部 1级 → 12级
-- **多项目分表**：一级子文件夹 = 项目（如 `刀轮/`、`扩片/`），每个项目一个 Sheet。
+- **同格式输出**：每个机型一个 Sheet，表头第 1 行，保留原 A–L 列与合并单元格，追加 M 主顺序 / N 子顺序；列宽、字体、填充、边框、冻结窗格按参考样张统一。
 - **标黄排除**：自动排除标黄的检验频率/重要等级/检验记录表/备注列及黄色文件编号/版本。
 - **GBK zip**：支持 Windows 下 GBK 文件名的 zip。
-- **标准答案校验**：提供**与输入机型匹配**的标准答案 xlsx 时，自动标记“标准答案/同类工序”；匹配到对应机型时逐行比对主顺序/子顺序，匹配不到时只标记来源、不做比对。
-- **归类依据**：每条记录标注来源；关键字兜底项进入“待确认项”Sheet。
+- **标准答案校验**：提供**与输入机型匹配**的标准答案 xlsx 时，逐行比对主顺序/子顺序，匹配不到时只做来源标记、不做比对。
+- **分析视图（可选）**：按 SIP 环节分组、带“归类依据/待确认项”的汇总表。
+
+## 输出格式（默认同格式）
+
+默认生成与参考样张同格式的工作簿：
+
+- 每个机型一个 Sheet，表头在第 1 行。
+- 保留原 A–L 列（序号/检验工序/检验项目/检验标准/检验方法/检验工具），追加 M 主顺序、N 子顺序。
+- 保留原合并单元格、列宽、字体、填充、边框、冻结窗格；行顺序保持原表顺序。
+- 标点规范化为全角括号/冒号，折叠连续空格，`l/min` → `L/min`。
+
+已用 SDC1D 参考样张逐项比对：**A–N 值差异 0，697 个合并单元格完全一致**；列宽、表头字体/填充、数据字体、边框均匹配。参考样张中个别单元格的手工换行设置（28 处）和主题色表示方式（8 处）不做硬编码复刻，输出保留源表自身的换行/主题色，视觉一致。
 
 ## 校验方式
 
-规则支持用**与输入机型匹配的**标准答案 xlsx 逐行校验。标准答案通过 `--reference` 作为可选输入传入，**不随插件分发，也没有默认文件名或路径**；不传时脚本仍会正常归类，只是“归类依据”不会有“标准答案”标记。
+规则支持用**与输入机型匹配的**标准答案 xlsx 逐行校验。标准答案通过 `--reference` 作为可选输入传入，**不随插件分发，也没有默认文件名或路径**；不传时脚本仍会正常归类。
 
 标准答案的要求：
 
@@ -32,8 +43,7 @@
 - 表头行必须在前 **12 行**内，且包含 `序号`、`检验工序`、`检验项目`、`主顺序`、`子顺序`；`子顺序` 后面可以带说明文字。
 - `机型代码` 需写在表头之前的单元格（表头之前 10 行内、不含表头，以“机型代码：”开头）；没有机型代码时只按工作表名匹配。
 - `序号` 必须是数值或纯数字文本；非数字序号行会被跳过。
-- 主脚本 `build_sip_mapping.py` 与独立校验脚本 `verify_against_reference.py` 使用同一匹配规则：标准答案的工作表名出现在输入文件名中，**或**输入机型的 `机型代码` 与标准答案一致。
-- 匹配到文件但没有任何可比序号时，控制台和“说明”页会显示“未完成校验”，不会显示“0 行不符”。
+- 主脚本与独立校验脚本使用同一匹配规则：标准答案的工作表名出现在输入文件名中，**或**输入机型的 `机型代码` 与标准答案一致。
 
 ## 使用
 
@@ -57,10 +67,10 @@
 /sip-classify --input "D:\path\input.zip" --output "D:\path\output.xlsx" --reference "D:\path\reference.xlsx"
 ```
 
-也可以直接运行脚本。不带标准答案：
+也可以直接运行同格式脚本。不带标准答案：
 
 ```bash
-python -I skills/sip-methodology-classifier/scripts/build_sip_mapping.py \
+python -I skills/sip-methodology-classifier/scripts/build_reference_format.py \
   --input "D:\path\input.zip" \
   --output "D:\path\output.xlsx"
 ```
@@ -68,13 +78,22 @@ python -I skills/sip-methodology-classifier/scripts/build_sip_mapping.py \
 带标准答案：
 
 ```bash
-python -I skills/sip-methodology-classifier/scripts/build_sip_mapping.py \
+python -I skills/sip-methodology-classifier/scripts/build_reference_format.py \
   --input "D:\path\input.zip" \
   --output "D:\path\output.xlsx" \
   --reference "D:\path\reference.xlsx"
 ```
 
-校验已生成的文件（需要标准答案）：
+需要按 SIP 环节分组的分析视图时：
+
+```bash
+python -I skills/sip-methodology-classifier/scripts/build_sip_mapping.py \
+  --input "D:\path\input.zip" \
+  --output "D:\path\analysis.xlsx" \
+  --reference "D:\path\reference.xlsx"
+```
+
+校验已生成的文件（需要标准答案，适用于分析视图或同格式输出的机型 Sheet）：
 
 ```bash
 python -I skills/sip-methodology-classifier/scripts/verify_against_reference.py \
@@ -82,7 +101,11 @@ python -I skills/sip-methodology-classifier/scripts/verify_against_reference.py 
   --reference "D:\path\reference.xlsx"
 ```
 
-## 输出结构
+## 输出结构（默认同格式）
+
+- `<机型>`：每个机型一个 Sheet，表头第 1 行，A–L 原列 + M 主顺序 / N 子顺序，保留原合并单元格与行顺序。
+
+可选分析视图（`build_sip_mapping.py`）：
 
 - `说明`：任务、标准答案校验、标黄处理、两层顺序模型、数据源、环节统计、同类工序统计。
 - `<项目名>`：每条检验一行，列为主顺序、子顺序、机型文件、产品名称、机型代码、原序号、检验工序、检验项目、子项、检验标准、检验方法、检验工具、归类依据。
@@ -100,7 +123,8 @@ sip-methodology-classifier/
     ├── reference/order-model.md
     └── scripts/
         ├── sip_rules.py                  # 规则表（唯一机器口径）
-        ├── build_sip_mapping.py          # 主脚本
+        ├── build_reference_format.py     # 默认：同格式输出（每机型一个 Sheet）
+        ├── build_sip_mapping.py          # 可选：按环节分组的分析视图
         ├── extract_gbk_zip.py            # GBK zip 解压
         └── verify_against_reference.py   # 标准答案校验
 ```
@@ -109,5 +133,6 @@ sip-methodology-classifier/
 
 - 标准答案没有“共用”区：水气混行按行内容拆到通气或通水。
 - **不要假设标准答案的文件名或路径**：它是用户运行时可选的输入，由用户提供；插件内没有默认路径。
-- 新机型特有工序属于“同类工序”推断；全新技术路线的新工序会进入“待确认项”，需要文件编写同事复核后再补规则。
+- 新机型特有工序属于“同类工序”推断；全新技术路线的新工序会进入分析视图的“待确认项”，需要文件编写同事复核后再补规则。
+- 同格式输出保持原表行顺序；需要按 SIP 环节分组查看时使用分析视图。
 - 输入 xlsx/zip 视为不可信数据：不执行宏，不运行输入目录内的程序，脚本只用 `python -I` 运行。
