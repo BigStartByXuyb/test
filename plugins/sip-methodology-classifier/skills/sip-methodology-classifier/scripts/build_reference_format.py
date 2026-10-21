@@ -236,6 +236,7 @@ def main():
     used = set()
     total = 0
     total_unclassified = 0
+    total_rule_inferred = 0
 
     for pname, pdir, files in projects:
         for f in files:
@@ -244,11 +245,14 @@ def main():
             probe = load_workbook(path, data_only=True)
             n_title = find_header_row(probe.worksheets[0]) - 1
             row_map = {}
+            rule_inferred = 0
             for row in rows:
-                (main, sub), _ = classify(
+                (main, sub), source = classify(
                     row['stage'], row['item'], row['sub'], row['std'], row['method'],
                     ref['pairs'] if ref else None,
                     ref['stages'] if ref else None)
+                if source == '规则推断':
+                    rule_inferred += 1
                 # 源表行号 -> 转换后行号（减标题行数）
                 row_map[row['src'] - n_title] = (main, sub)
             wb, unclassified = transform_source(path, row_map)
@@ -257,8 +261,13 @@ def main():
             dst = copy_sheet(out_wb, ws, title)
             total += max(0, dst.max_row - 1)
             total_unclassified += len(unclassified)
-            print(f'  {title}: {max(0, dst.max_row - 1)} 行'
-                  + (f'（未分类行 {len(unclassified)}，M/N 留空）' if unclassified else ''))
+            total_rule_inferred += rule_inferred
+            extra = ''
+            if unclassified:
+                extra += f'（未解析/跳过行 {len(unclassified)}，M/N 留空）'
+            if rule_inferred:
+                extra += f'（规则推断 {rule_inferred}，建议复核）'
+            print(f'  {title}: {max(0, dst.max_row - 1)} 行{extra}')
 
     if not out_wb.sheetnames:
         raise SystemExit('没有生成任何 Sheet')
@@ -267,7 +276,9 @@ def main():
     print(f'\n已生成: {os.path.abspath(args.output)}')
     print(f'总数据行: {total}')
     if total_unclassified:
-        print(f'未分类行: {total_unclassified}（M/N 留空，请复核）')
+        print(f'未解析/跳过行: {total_unclassified}（M/N 留空，请复核）')
+    if total_rule_inferred:
+        print(f'规则推断行: {total_rule_inferred}（M/N 已按兜底填写，建议复核）')
     if ref:
         for line in format_results(verify_file(args.output, ref)):
             print(line)

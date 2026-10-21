@@ -35,6 +35,7 @@ from sip_rules import (MAIN_ORDER, SUB_ORDER, MAIN_IDX, SUB_IDX,
                        classify, load_reference)
 from extract_gbk_zip import extract as extract_zip
 from sip_source import parse_sheet, discover_projects
+from sip_verify import verify_records, format_results
 
 try:
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
@@ -68,36 +69,6 @@ SUB_MEANING = {
                   ('3级', '机台备份'), ('4级', '备份后软件确认'), ('5级', '杀毒软件安装'),
                   ('6级', '查杀病毒记录'), ('7级', '加密执行确认'), ('8级', 'USB接口确认')],
 }
-
-
-# ---------------------------------------------------------------- 校验
-def verify_reference(all_rows, ref):
-    if not ref:
-        return []
-    targets = set()
-    for row in all_rows:
-        stem = row['file'].lower()
-        if ref.get('sheet_title') and ref['sheet_title'].lower() in stem:
-            targets.add(row['file'])
-        elif ref.get('model') and row['model'] == ref['model']:
-            targets.add(row['file'])
-    out = []
-    for f in sorted(targets):
-        rows = [r for r in all_rows if r['file'] == f]
-        ok = bad = 0
-        diffs = []
-        for r in rows:
-            exp = ref['seq'].get(r['seq'])
-            if exp is None:
-                continue
-            if (r['main'], r['sublevel']) == exp:
-                ok += 1
-            else:
-                bad += 1
-                if len(diffs) < 8:
-                    diffs.append((r['seq'], (r['main'], r['sublevel']), exp))
-        out.append((f, ok, bad, diffs))
-    return out
 
 
 # ---------------------------------------------------------------- 输出
@@ -218,14 +189,7 @@ def write_workbook(all_rows, projects, out_path, ref=None, verify=None,
     verify_text = '未提供标准答案文件'
     if ref:
         if verify:
-            parts = []
-            for f, ok, bad, _ in verify:
-                if ok + bad == 0:
-                    parts.append(f'{f}：匹配到文件但无可比对行（未完成校验）')
-                else:
-                    parts.append(f'{f}：{ok}/{ok + bad} 行一致'
-                                 + ('，0 行不符' if bad == 0 else f'，{bad} 行不符'))
-            verify_text = '；'.join(parts) if parts else '标准答案已加载，但输入中没有匹配的机型文件'
+            verify_text = '；'.join(format_results(verify))
         else:
             verify_text = '标准答案已加载（未找到匹配的机型文件，未做逐行比对）'
 
@@ -431,16 +395,14 @@ def main():
     if not all_rows:
         raise SystemExit('没有解析到任何有效数据行')
 
-    verify = verify_reference(all_rows, ref)
+    records = [{'sheet': x['project'], 'file': x['file'], 'model': x['model'],
+                'seq': x['seq'], 'main': x['main'], 'sub': x['sublevel']}
+               for x in all_rows]
+    verify = verify_records(records, ref) if ref else []
     if verify:
         print('标准答案校验：')
-        for f, ok, bad, diffs in verify:
-            if ok + bad == 0:
-                print(f'  {f}: 匹配到文件，但没有可比的序号行（未完成校验）')
-                continue
-            print(f'  {f}: {ok}/{ok + bad} 一致, {bad} 不符')
-            for d in diffs:
-                print('    ', d)
+        for line in format_results(verify):
+            print('  ' + line)
 
     write_workbook(all_rows, projects, args.output, ref, verify, skipped_total)
     print(f'\n已生成: {os.path.abspath(args.output)}')

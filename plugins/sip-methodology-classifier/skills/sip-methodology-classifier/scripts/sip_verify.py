@@ -11,7 +11,12 @@
   blank = 有对应标准答案，但 M/N 为空（未分类/未完成）
   missing = 标准答案中没有该序号（不计入一致/不符）
 """
+import os
 import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+if HERE not in sys.path:
+    sys.path.insert(0, HERE)
 
 from openpyxl import load_workbook
 
