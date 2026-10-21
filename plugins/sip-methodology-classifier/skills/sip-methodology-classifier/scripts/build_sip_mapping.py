@@ -202,7 +202,7 @@ def write_workbook(all_rows, projects, out_path, ref=None, verify=None,
         ('共用项处理', '团队标准答案没有单独的“共用”区：同一工序中既涉及水又涉及气的行，'
                     '按行内容拆分到“4.通气检验”或“5.通水检验”。'),
         ('归类依据', '每条记录最后一列：标准答案＝标准答案中已有同名工序/项目；'
-                  '同类工序＝按同一语义套用的新机型工序；规则推断＝关键字推断，M/N 可能落在任一主/子顺序；完全无法推断时用 (3. 通电检验, 5级)，需人工复核。'),
+                  '同类工序＝按同一语义套用的新机型工序；规则推断＝关键字推断，只会落在主顺序 2–9、子顺序 1–5 级；完全无法推断时用 (3. 通电检验, 5级)，需人工复核。'),
         ('标黄跳过行', f'解析时跳过序号单元格为黄色的行：{skipped_yellow} 行。'),
     ]
     for k, v in intro:
@@ -322,7 +322,7 @@ def write_workbook(all_rows, projects, out_path, ref=None, verify=None,
     for col, w in zip('ABCDE', [10, 22, 32, 16, 10]):
         ws2.column_dimensions[col].width = w
     ws2.merge_cells('A1:E1')
-    ws2['A1'] = '规则推断项清单（新机型特有工序，建议文件编写同事复核）'
+    ws2['A1'] = '规则推断项清单（关键字推断，建议复核）'
     ws2['A1'].font = Font(name='微软雅黑', size=12, bold=True, color='C00000')
     for i, h in enumerate(['机型文件', '检验工序', '检验项目', '主顺序', '子顺序'], 1):
         c = ws2.cell(row=3, column=i, value=h)

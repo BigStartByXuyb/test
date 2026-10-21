@@ -279,7 +279,7 @@ def main():
         print(f'未解析/跳过行: {total_unclassified}（M/N 留空，请复核）')
     if total_rule_inferred:
         print(f'规则推断行: {total_rule_inferred}'
-              '（关键字推断，M/N 可能落在任一主/子顺序；'
+              '（关键字推断，只会落在主顺序 2–9、子顺序 1–5 级；'
               '完全无法推断时用 (3. 通电检验, 5级)，建议复核）')
     if ref:
         for line in format_results(verify_file(args.output, ref)):
