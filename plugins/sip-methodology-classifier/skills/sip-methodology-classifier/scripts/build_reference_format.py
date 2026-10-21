@@ -33,6 +33,7 @@ if HERE not in sys.path:
 
 from sip_rules import classify, load_reference, header_key  # noqa: E402
 from sip_source import parse_sheet, discover_projects, find_header_row  # noqa: E402
+from sip_verify import verify_file, format_results  # noqa: E402
 from extract_gbk_zip import extract as extract_zip  # noqa: E402
 
 try:
@@ -209,36 +210,6 @@ def safe_name(name, used):
     return name
 
 
-def verify_classification(out_ws, ref):
-    """按序号比对 M/N，返回 (一致数, 不符数, 差异样例)。
-
-    同格式输出没有机型代码列，按 Sheet 名（= 源机型文件名）与标准答案的工作表名匹配；
-    不比较原始单元格位置，避免标准答案表头行不同造成伪差异。
-    """
-    ok = bad = 0
-    diffs = []
-    for r in range(2, out_ws.max_row + 1):
-        seqv = out_ws.cell(r, 1).value
-        if isinstance(seqv, (int, float)):
-            seq = int(seqv)
-        elif isinstance(seqv, str) and seqv.strip().isdigit():
-            seq = int(seqv.strip())
-        else:
-            continue
-        exp = ref['seq'].get(seq)
-        if exp is None:
-            continue
-        got = (str(out_ws.cell(r, 13).value or '').strip(),
-               str(out_ws.cell(r, 14).value or '').strip())
-        if got == exp:
-            ok += 1
-        else:
-            bad += 1
-            if len(diffs) < 5:
-                diffs.append((seq, got, exp))
-    return ok, bad, diffs
-
-
 def main():
     ap = argparse.ArgumentParser(description='按参考样张格式生成 SIP 对应表')
     ap.add_argument('--input', required=True, help='zip 或包含 xlsx 的文件夹')
@@ -265,7 +236,6 @@ def main():
     used = set()
     total = 0
     total_unclassified = 0
-    verify_info = []
 
     for pname, pdir, files in projects:
         for f in files:
@@ -290,12 +260,6 @@ def main():
             print(f'  {title}: {max(0, dst.max_row - 1)} 行'
                   + (f'（未分类行 {len(unclassified)}，M/N 留空）' if unclassified else ''))
 
-            if ref:
-                stem = os.path.splitext(f)[0]
-                if ref.get('sheet_title') and ref['sheet_title'].lower() in stem.lower():
-                    ok, bad, diffs = verify_classification(dst, ref)
-                    verify_info.append((stem, ok, bad, diffs))
-
     if not out_wb.sheetnames:
         raise SystemExit('没有生成任何 Sheet')
     os.makedirs(os.path.dirname(os.path.abspath(args.output)) or '.', exist_ok=True)
@@ -304,13 +268,9 @@ def main():
     print(f'总数据行: {total}')
     if total_unclassified:
         print(f'未分类行: {total_unclassified}（M/N 留空，请复核）')
-    for stem, ok, bad, diffs in verify_info:
-        if ok + bad == 0:
-            print(f'标准答案比对 {stem}: 匹配到文件但无可比序号（未完成校验）')
-        else:
-            print(f'标准答案比对 {stem}: {ok}/{ok + bad} 一致, {bad} 不符')
-            for d in diffs:
-                print('   ', d)
+    if ref:
+        for line in format_results(verify_file(args.output, ref)):
+            print(line)
     if tmp and not args.keep_temp:
         shutil.rmtree(tmp, ignore_errors=True)
     return 0
