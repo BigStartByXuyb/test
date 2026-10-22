@@ -27,7 +27,7 @@
 <ResourceDictionary Source="/<程序集名>;component/Resources/Pages/<Target>/<Target>Icons.xaml" />
 ```
 
-合并点是硬要求：A 页面用 `{StaticResource …Geometry}` 引用图形，`StaticResource` 在加载期解析，页面自身没有合并点就会抛 `XamlParseException`（框架规则 R5）。程序集名取 `.csproj` 的 `AssemblyName`（缺省回退 `RootNamespace` 末段）。
+合并点是硬要求：A 页面用 `{StaticResource …Geometry}` 引用图形，`StaticResource` 在加载期解析；页面必须合并本节登记的 Icon 字典，否则会抛 `XamlParseException`。程序集名取 `.csproj` 的 `AssemblyName`（缺省回退 `RootNamespace` 末段）。
 
 ## 3. 多语言键
 
@@ -39,7 +39,7 @@
 
 `scripts/adapters/mw-wpf/check-wpf-layout.js`（`run-all.ps1 -Mode mw-wpf` 的 `gates` / `verify`）逐条断言：
 
-1. **禁止写法**：发射区出现写法表未登记或登记为待确认的类型（`Border`：手册有条目但没有 A 侧控件）即失败；框架固定区里出现控件也失败。`Camera` 是 `manual-only`（证据不全，只有用户确认），可以发射。
+1. **禁止写法**：发射区出现写法表未登记或登记为待确认的类型（`Border`：A 侧没有对应控件条目）即失败；框架固定区里出现控件也失败。`Camera` 的元素映射与程序集前置条件见写法表 `controlTypes.Camera`；生成器不替目标工程增改程序集引用。
 2. **协议属性名**：`--types` 产物节点的 `attrs` 里，凡属协议属性名集合（由写法表 `protocols` 派生）的键，必须在该类型的 `protocols` 里登记过（只校验名字，不校验取值形状）。门禁只在 `gates` / `verify` 运行，`--types` 恒为 Bundle 定稿的 `Generated/<Target>.mapping.json`；`layout` 另用类型判定产物。
 3. **格子越界**：`row` / `column` / 跨格数必须落在本 region 的行列范围内。
 4. **空行空列**：**不失败，只作为提示（`notices`）登记**。目标框架允许 Grid 出现空行空列（框架自身控件模板里就有空列），且保留空列能让后续控件维持设计稿坐标，不因折叠空列而左移/上移。
@@ -48,11 +48,11 @@
 7. **文本**：发射区不得出现字面中文；发射区每个有设计文本的控件必须挂语言键（`LangName`）。唯一例外是映射表在值槽位登记 `langRefPolicy: "none"` 的节点（选择框的 `Value`）——它与作业B 同一条豁免，判据是那条登记，不是文本长相。
 8. **尺寸来源**：框架固定区必须是 `framework:<Token>`（未被框架钉住的那一维是自由伸展的星号，来源仍是 `design`）；发射区一律取 `design`（口径 A 下不再有 `gap` 来源的带）。
 9. **推导待确认**：布局推导阶段挂起的节点（未归格 / 无尺寸 / 结构对不上 / 类型无处发射）逐条失败——它与第 1 条不同：第 1 条是"写法表没这个类型"，第 9 条是"布局推导没把它放下"。
-10. **待人工确认（提示）**：页面用到写法表 `status: manual-only` 的类型（证据不全：有手册条目但真实页面未出现，或只有用户确认，如 `Camera`）时，登记提示 `R10`，不失败——"首次生成需人工确认、事后补齐缺的证据"以提示为落点。
+10. **待人工确认（提示）**：每个页面用到写法表 `status: manual-only` 的类型时，都登记提示 `R10`，不失败——每次页面生成均提示人工确认，直到证据补齐并将映射状态更新为 `ready`。
 11. **尺寸约束一致性**：格子带的尺寸约束必须与 DSL 节点上的 `constraints` 逐个一致（多一项 / 少一项 / 改数值都失败）——约束是设计意图，不允许推导侧改动。
 12. **尺寸约束未落格**：带约束的节点在布局产物里既没有对应格子、也不在产物登记的 `constraintExempt` 里即失败（`R12`）——约束是设计意图，产物漏了就是漏了。豁免只有 `constraintExempt` 里登记的三类（页面根 / 不可见 / 框架固定区）；其余未落格的带约束节点（含待确认类型、无尺寸等）一律失败。判定范围与常见成因见第 5 节第 4 条。
 13. **尺寸约束未发射**：带约束的格子必须在 `View.xaml` 里出现对应的 `MinWidth / MaxWidth / MinHeight / MaxHeight`（入参前提见 `check-wpf-layout.js` 头部 CLI 注释）。
-14. **格子尺寸与尺寸/对齐发射**：每个格子必须登记格子尺寸（像素带照值、星号带吃剩余、跨格按 span 累加）与承载物设计尺寸；口径 A 下没有间隙元素（间距并进前一带或就是那条星号带），所以不再核对 `spacers`；发射报告里该格子的 `Width / Height / HorizontalAlignment / VerticalAlignment / Margin` 必须与 `scripts/lib/design-box.js` 的同一实现一致（格子尺寸 − 控件尺寸 = 间距，差值落在哪一侧由设计稿偏移决定）。缺格子尺寸、格子尺寸与行列定义重算不一致、报告缺条目或取值不一致都失败（入参前提见 `check-wpf-layout.js` 头部 CLI 注释）。**例外按类说明**（只免掉真正没有真值的那部分）：`cell.shifted`（为避让撞格被挪出设计带）设计稿偏移没有真值——只写控件自身尺寸、不表达间距 / 对齐，只有这一半按提示登记，格子尺寸与承载物设计尺寸照常要求与核对；`cell.unsized = {width?,height?}`（星号带被前面的固定带吃光＝内容溢出承载物）按维免尺寸——该维什么都不写，且只在该维重算值非正数时才放行（重算 > 0 即失败，说明产物被改坏）。发射报告缺条目、取值不一致与第 11 / 13 条照常失败。
+14. **格子尺寸与尺寸/对齐发射**：每个格子必须登记格子尺寸（Pixel 照值、Star 吃剩余、Auto 按设计期望尺寸复核、跨格按 span 累加）与承载物设计尺寸；容器 `sizingMode` 必须与页面根槽位及直接子项类型一致；发射报告里该格子的 `Width / Height / HorizontalAlignment / VerticalAlignment / Margin` 必须与 `scripts/lib/design-box.js` 的同一实现一致（格子尺寸 − 控件尺寸 = 间距，差值落在哪一侧由设计稿偏移决定）。缺格子尺寸、格子尺寸与行列定义重算不一致、容器 sizingMode 错误、报告缺条目或取值不一致都失败（入参前提见 `check-wpf-layout.js` 头部 CLI 注释）。**例外按类说明**（只免掉真正没有真值的那部分）：`cell.shifted`（为避让撞格被挪出设计带）设计稿偏移没有真值——只写控件自身尺寸、不表达间距 / 对齐，只有这一半按提示登记，格子尺寸与承载物设计尺寸照常要求与核对；`cell.unsized = {width?,height?}`（星号带被前面的固定带吃光＝内容溢出承载物）按维免尺寸——该维什么都不写，且只在该维重算值非正数时才放行（重算 > 0 即失败，说明产物被改坏）。发射报告缺条目、取值不一致与第 11 / 13 条照常失败。
 
 门禁报告落在 `Generated/_inputs/<Target>.wpf-gate.json`；发射器自己的报告（命中的样式键、未命中变体、待办文本、值槽位豁免的值、跳过的固定区）落在 `Generated/_inputs/<Target>.wpf-xaml.report.json`。
 

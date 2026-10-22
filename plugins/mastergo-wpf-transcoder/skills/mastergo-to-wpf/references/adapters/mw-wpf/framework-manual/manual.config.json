@@ -1,6 +1,0 @@
-{
-  "_comment": "公共手册不绑定机器路径；运行时从目标项目 framework.config.json、.csproj 和项目本地索引注入这些目录。",
-  "source_root": "{source_root}",
-  "index_root": "{index_root}",
-  "demo_root": "{demo_root}"
-}

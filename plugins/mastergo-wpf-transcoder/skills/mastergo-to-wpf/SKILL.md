@@ -8,7 +8,7 @@ description: 将明确要求的 MasterGo 设计稿转换为 MTSLG IOContorl XML�
 两条路线都启用，产物形态不同、**判定与采集链路共用**：
 
 - 作业 B `mtslg-iocontrol`（缺省）：栅格绝对坐标 + 控件属性的页面 XML；
-- 作业 A `mw-wpf`：真 WPF XAML 页面（框架 `s:` 控件 + Grid 布局），`-Mode mw-wpf` 选择。
+- 作业 A `mw-wpf`：真 WPF XAML 页面（以框架 `s:` 控件为主、Camera 使用 `camera:` 控件 + Grid 布局），`-Mode mw-wpf` 选择。
 
 路线只决定**同一份类型判定结果怎么写**、以及 `mapping` / `layout` / `bundle` / `gates` / `verify` 用哪个脚本；用哪些脚本、读哪张表、产物落在哪，由 `references/adapters/<路线>/adapter.json` 描述符给出，`run-all.ps1 -Mode <路线>` 按它派发。**一次运行只走一条路线**：续跑不能换路线（换路线要从 `fetch` 新开运行），也不得生成混合产物。
 
@@ -18,7 +18,7 @@ description: 将明确要求的 MasterGo 设计稿转换为 MTSLG IOContorl XML�
 
 - 整页转换**一条命令跑完**（`run-all.ps1`，默认第 1→12 步）；步骤、输入、产物、失败处理看 `references/adapters/mtslg-iocontrol/pipeline-contract.md`。**不需要**读 `scripts/` 下分桶目录里的源码来复述规则。
 - 只在下面三种情况读 reference：① 本文件明确写「读 X」；② 脚本报错，按 `pipeline-contract.md` 的「怎么修」定位到该 reference 的对应小节；③ 要写/改 Bundle 清单、图标命名表、译文清单，需要字段口径。
-- 未在「参考文件读取条件」里点名、且当前任务没触发的文件不要读；作业 A 的 `references/adapters/mw-wpf/framework-manual/**` 是一次本地框架快照的参考，只在写/改 A 写法表或人工评审 A 样式族时定点查。
+- 未在「参考文件读取条件」里点名、且当前任务没触发的文件不要读。
 
 ## 触发边界
 
@@ -118,10 +118,11 @@ pwsh -NoProfile -File <skill>\scripts\entry\run-all.ps1 -List -Format json -OutF
 
 作业 A（`-Mode mw-wpf`）另有这些硬门禁，细则见对应 reference：
 
-- **尺寸照设计稿，外观只走样式族**：Grid 行列、控件尺寸与对齐都照设计稿；成带走**口径 A**——一条带 = 条目 + 它后面的间距，相邻条目之间哪一段间距落成星号带只看设计稿自身（分组结构优先，散条目按相对判据），每层最多一条星号带，**不发射任何间距元素**；没打组的地方先按可选的分组表成栏（`Generated/_inputs/<Target>.layout-groups.json`，只写哪些 ref 同属一组），表没覆盖到的再由机械判据兜底（同一条列带里 ≥2 个条目 → 栏容器，只按栏补、不按行补），两处都没落到的条目登记进分区 `unresolved`；列宽固定项（相机所在 Grid / 区域根网格里贴主轴末端的最末条目＝常驻右栏）照设计稿像素、容器条目自适应、叶子控件照设计稿像素（根：`scripts/lib/design-box.js` 与 `mw-wpf-mode.md` 第 2 节第 3 条）；配色、边框、状态、模板一律用样式族键，设计稿与样式族冲突时停下报告，不得散写属性凑 → `references/adapters/mw-wpf/mw-wpf-mode.md`
+- **尺寸按布局规则、外观只走样式族**：控件尺寸与对齐照设计稿；纯子 Grid 容器按内容自适应，直接承载控件的 Grid 按设计稿尺寸。相机 + 右侧栏页面会将 `rootTop - headerHeight` 之前的顶部空白/标题区从页面产物中裁掉，其他页面按完整内容区推导；详细触发条件见 `mw-wpf-mode.md` 第 2 节第 1 条。成带走**口径 A**——一条带 = 条目 + 它后面的间距，相邻条目之间哪一段间距落成星号带只看设计稿自身（分组结构优先，散条目按相对判据），每层最多一条星号带；不新增 spacer 控件或 Grid 子元素，间距由固定 Pixel 带或 `Margin` 表达。没打组的地方先按可选的分组表成栏（`Generated/_inputs/<Target>.layout-groups.json`，只写哪些 ref 同属一组），表没覆盖到的再由机械判据兜底（同一条列带里 ≥2 个条目 → 栏容器，只按栏补、不按行补），两处都没落到的条目登记进分区 `unresolved`；尺寸、对齐和组自适应的唯一实现与完整判据见 `scripts/lib/design-box.js` 与 `mw-wpf-mode.md` 第 2 节第 3 条；配色、边框、状态、模板一律用样式族键，设计稿与样式族冲突时停下报告，不得散写属性凑 → `references/adapters/mw-wpf/mw-wpf-mode.md`
 - **框架固定区不进页面**：顶部栏 / 底部栏由框架渲染（尺寸用框架 Token），设计稿里的对应区域只用于生成 Layout 注册与菜单项；设计稿的右下角常驻分组与 IOContorl 同口径（不发射 / 不计格 / 不登记图标）→ `references/adapters/mw-wpf/mw-wpf-mode.md`
 - **页面必须合并本页 Icon 字典**：A 页面用 `{StaticResource …Geometry}` 引用图形，缺合并点会在加载期抛 `XamlParseException` → `references/adapters/mw-wpf/page-build-rules.md`
-- **无对应条目的类型 fail-closed**：写法表把 `Border` 登记为待确认（A 侧没有 Border 控件），遇到即挂待确认、不发射；`Camera` 是 `manual-only`（手册与真实页面都没有该控件，仅用户确认作业A 侧就是 `s:Camera`），可以发射，首次用新框架生成后回填手册条目 → `references/adapters/mw-wpf/mw-wpf-map.json`
+- **控件映射与目标程序集**：`Camera` 映射到 `MaxWell.CameraDevice.CameraControl`，状态为 `manual-only`，每页使用都提示 R10；目标工程必须引用 `MaxWell.CameraDevice.dll`。真实业务页与设备运行时加载仍待确认 → `references/adapters/mw-wpf/mw-wpf-map.json` 与 `references/adapters/mw-wpf/page-build-rules.md`
+- **无对应条目的类型 fail-closed**：写法表把 `Border` 登记为待确认（A 侧没有 Border 控件），遇到即挂待确认、不发射 → `references/adapters/mw-wpf/mw-wpf-map.json`
 - **布局门禁**：`scripts/adapters/mw-wpf/check-wpf-layout.js`（条目清单、失败与提示口径见 `references/adapters/mw-wpf/page-build-rules.md` 第 4 节，入参前提见脚本头 CLI 注释，本节不复述）
 
 ## 交付与验收
@@ -136,9 +137,8 @@ pwsh -NoProfile -File <skill>\scripts\entry\run-all.ps1 -List -Format json -OutF
 ## 参考文件读取条件
 
 - 本路线必读：`references/adapters/mtslg-iocontrol/mtslg-mode.md`（页面格式、坐标、ID、merge、验证）。
-- 作业 A 必读：`references/adapters/mw-wpf/mw-wpf-mode.md`（页面格式、骨架、布局规则、ViewModel 契约）。
+- 作业 A 必读：`references/adapters/mw-wpf/mw-wpf-mode.md`（页面格式、骨架、布局规则、ViewModel 概览）。
 - 触发才读：`references/adapters/mtslg-iocontrol/pipeline-contract.md`（跑流水线时）；`references/adapters/mtslg-iocontrol/page-build-rules.md`（处理图标命名/几何来源、多语言译文与词典、输出目录、可见性 omit 角色、辅助脚本触发时）；设计稿含顶部栏/底部栏或快捷键，或本次要创建/修改 Layout 注册 → `references/adapters/mtslg-iocontrol/feishu-layout-mapping.md`；要写或改 Bundle 清单 → `references/adapters/mtslg-iocontrol/bundle-manifest.md`。
-- 作业 A 触发才读：`references/adapters/mw-wpf/page-build-rules.md`（产物布局、本页 Icon 字典与合并点、多语言键、写入门禁）；要改 A 的写法或样式族 → `references/adapters/mw-wpf/mw-wpf-map.json` + `references/adapters/mw-wpf/framework-manual/`（定点查，不通读）。
+- 作业 A 触发才读：`references/adapters/mw-wpf/page-build-rules.md`（产物布局、本页 Icon 字典与合并点、多语言键、写入门禁）；要改 A 的写法或样式族 → `references/adapters/mw-wpf/mw-wpf-map.json`；要改 A 的 ViewModel 固定成员、按钮方法名或宿主壳生成契约 → `references/adapters/mw-wpf/page-shell-generator.md`。
 - **默认不预读**：`references/adapters/mtslg-iocontrol/feishu-component-library-mapping.md`、共享类型表 `references/component-types.json` 与路线映射表 `references/adapters/mtslg-iocontrol/mtslg-iocontrol-map.json`——组件匹配、`ControlType`、槽位与属性白名单由 `resolve-mtslg-template-mapping.js` / `gen-mtslg-mapping-from-dsl.js` 在生成期按映射表执行；两个 JSON 都只经 `scripts/lib/load-template-map.js` 读取。只有脚本报出 `pending` / `unmappedComponents` / `templateConflicts` 时，才按关键词定点查（不通读）。
 - 按需：`references/project-adapter-initialization.md`（项目首次适配）、`references/mastergo-component-mapping-rules.md`（两条作业共用的来源链规则）、`references/style-library-profiles.md`（多套样式/主题/图标库并存时）。
-- 作业 A 资料里的框架手册快照（`references/adapters/mw-wpf/framework-manual/**`）不作为作业 B（页面 XML）的运行期口径依据：B 的 `GroupBox` 是空 `Style` + `IOGroupBoxSecondary` 原点，两者冲突时以 B 的口径为准。

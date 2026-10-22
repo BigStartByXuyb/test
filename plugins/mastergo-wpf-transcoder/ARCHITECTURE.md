@@ -4,7 +4,7 @@
 
 ## 1. 插件是什么
 
-把明确指定的 MasterGo 设计稿转换成能通过目标项目硬门禁的 **MTSLG IOContorl 页面**：页面 XML、页面 Icon（XAML Geometry）、多语言字典、Layout 注册、mapping/provenance 审计，以及目标项目要求的 WPF 宿主壳（View / code-behind / ViewModel）与构建登记。
+把明确指定的 MasterGo 设计稿转换为两类正式页面交付：作业 A 的 MW WPF 真控件 XAML 页面，或作业 B 的 MTSLG IOContorl 页面 XML。两条路线生成各自的 Icon / 多语言字典 / Layout 与 mapping 或 provenance 审计，并共用目标项目要求的 WPF 宿主壳（View / code-behind / ViewModel）与构建登记。
 
 插件内保留两条路线：
 
@@ -23,7 +23,7 @@ plugins/mastergo-wpf-transcoder/
 ├─ skills/
 │  ├─ mastergo-to-wpf/             # 主 Skill：流程路由 + 参考文档 + 全部脚本
 │  │  ├─ SKILL.md                  # 唯一流程路由与硬规则总表
-│  │  ├─ references/               # 规则事实源（适配器文档、映射表、框架手册）
+│  │  ├─ references/               # 规则事实源（适配器规则、映射表、共享类型表）
 │  │  └─ scripts/                  # 交付链路脚本（运行时），按职责分桶
 │  │     ├─ core/                   # 与目标无关：取数、快照、显隐、运行登记表、契约与仓库门禁
 │  │     ├─ host/                   # WPF 宿主壳生成（两条路线共用）
@@ -98,7 +98,7 @@ flowchart LR
 | `scripts/adapters/mtslg-iocontrol/lib/icon-ownership.js` | 图标归属判据（树包含优先、前缀回退、取最深命中） | `gen-mtslg-mapping-from-dsl.js`、`discover-mtslg-page-icon-map.js` |
 | `scripts/adapters/mtslg-iocontrol/lib/icon-registration-policy.js` | 图标**登记判据**的唯一实现（「这个 PATH 要不要进本页台账」：模板族变体的 `iconPolicy`、布局族底部栏 MenuItem、常驻分组、宿主壳标记、装饰名；取值全部读映射表） | `discover-mtslg-page-icon-map.js` |
 | `scripts/lib/constraints.js` | 尺寸约束（min/max 宽高）的唯一实现：键集、`> 0 才算设置`的归一化、键名 → WPF 属性名、DSL 遍历与收集 | `core/apply-constraints.js`、`adapters/mw-wpf/gen-mw-wpf-layout.js`、`adapters/mw-wpf/gen-mw-wpf-xaml.js`、`adapters/mw-wpf/check-wpf-layout.js` |
-| `scripts/lib/design-box.js` | 控件在格子里的「尺寸 + 对齐」唯一实现：格子尺寸 − 控件尺寸 = 间距，差值落在哪一侧由格内偏移决定——贴边 / 居中只写对齐，非对称内缩＝贴起始边 + `Margin` 补偏移；`shifted` / `unsized` 例外见 `skills/mastergo-to-wpf/references/adapters/mw-wpf/page-build-rules.md` 第 4 节第 14 条 | `adapters/mw-wpf/gen-mw-wpf-xaml.js`、`adapters/mw-wpf/check-wpf-layout.js` |
+| `scripts/lib/design-box.js` | 容器 `sizingMode` 分类与格内「尺寸 + 对齐」共享实现；`shifted` / `unsized` 例外见 `skills/mastergo-to-wpf/references/adapters/mw-wpf/page-build-rules.md` 第 4 节第 14 条 | `adapters/mw-wpf/gen-mw-wpf-layout.js`、`adapters/mw-wpf/gen-mw-wpf-xaml.js`、`adapters/mw-wpf/check-wpf-layout.js` |
 
 规则：**同一个功能要复用，不许反复造轮子**。新脚本需要已存在的工具就 `require` 共享模块；确实职责不同但同名的函数，登记到 `scripts/lib/script-reuse-registry.json` 并写清 `reason`（登记是显式决定，不是隐藏白名单）。发版前 `tests/script-duplication.test.js` 必须 PASS。
 
@@ -107,8 +107,8 @@ flowchart LR
 | 层 | 位置（仓库内路径一律以插件根为基准） | 作用 |
 |---|---|---|
 | 组件集 / 变体 / 槽位（跨路线共用） | `skills/mastergo-to-wpf/references/component-types.json` | **机器可读事实源**：各模板族（`match`、`variants`）、跨路线共用的 `layoutRules` |
-| 路线写入规则 | `skills/mastergo-to-wpf/references/adapters/<路线>/<路线>-map.json` | **机器可读事实源**：`controlTypes`、`controlTypeRequiredAttrs`、`controlTypeAttrDefaults`、`buttonFamily` 等该路线的写法；用 `extends` 指向共享类型表 |
-| 映射表读取 | `skills/mastergo-to-wpf/scripts/lib/load-template-map.js` | **唯一读取入口**：合并 `extends` 后形状与拆分前一致；脚本不得自行 `JSON.parse` |
+| 路线写入规则 | `skills/mastergo-to-wpf/references/adapters/<路线>/<路线>-map.json` | **机器可读事实源**：该路线的控件写法。作业 B 写法表声明 `extends`，与共享类型表经加载器合并；作业 A 的 `mw-wpf-map.json` 是独立的平面写法表，不声明 `extends`。 |
+| 组合映射表读取 | `skills/mastergo-to-wpf/scripts/lib/load-template-map.js` | 共享组件映射与声明 `extends` 的路线表经此入口组合；作业 B 的写入表通过 `extends` 合并共享表。作业 A 的 `adapter.json.typeMap` 是类型判定输入，`templateMap` 指向独立平面 `mw-wpf-map.json`，由 XAML 发射器、门禁与宿主按普通 JSON 读取；回归测试禁止该写入表声明 `extends` 或 `familyOverlays`。 |
 | 组件映射说明 | `skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/feishu-component-library-mapping.md` | 模板与槽位的人读口径（与在线阅读副本同步） |
 | 页面壳层与 Layout | `skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/feishu-layout-mapping.md` | MenuItem 常驻属性、Index、设计稿标记（与在线阅读副本同步） |
 | 页面格式与验证 | `skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/mtslg-mode.md` | 坐标、TextBlock 尺寸、运行时约束、验证流程 |

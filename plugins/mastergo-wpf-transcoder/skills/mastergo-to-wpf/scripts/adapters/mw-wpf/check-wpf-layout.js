@@ -21,7 +21,7 @@
 //   R3 格子越界：row/column/rowSpan/columnSpan 必须落在本 region 的行列范围内
 //   R4 空行空列：没有格子覆盖、也不是被星号撑开的收尾行/列
 //   R5 锚点格冲突：同一锚点格（Grid.Row/Column 起点）只允许一个控件（推导用占用表 + 行下移保证唯一）
-//   R10 待人工确认（提示）：页面用到写法表 manual-only 类型（证据不全，如 Camera 只有用户确认）
+//   R10 待人工确认（提示）：页面用到写法表 manual-only 类型（真实页面或目标程序集证据不完整）
 //   R11 尺寸约束一致性：格子带的 min/max 宽高必须与 DSL 节点上的 constraints 逐个一致（多/少/改值都失败）
 //   R12 尺寸约束未落格：DSL 里带尺寸约束的节点在布局产物里没有对应格子、也不在该产物登记的
 //       constraintExempt 里即失败。豁免的节点只有 constraintExempt 里登记的三类（页面根 / 不可见 /
@@ -29,8 +29,8 @@
 //       容器子树里没有可发射的控件（补内容或交设计确认）、待确认类型 / 无尺寸等不进格子的节点
 //       （先按 R1 / R9 修类型判定与映射）、产物与本次输入不同步（先重跑第 8 步）
 //   R13 尺寸约束未发射：带约束的格子必须在 View.xaml 里出现对应的 MinWidth/MaxWidth/MinHeight/MaxHeight
-//   R14 格子尺寸与尺寸/对齐发射：每个格子必须登记格子尺寸与承载物设计尺寸（含跨格累加与星号带），
-//       且发射报告里该格子的 Width/Height/对齐/Margin 必须与 lib/design-box.js 的同一实现一致
+//   R14 格子尺寸与尺寸/对齐发射：每个格子必须登记格子尺寸与承载物设计尺寸（含 Auto / 星号带与跨格累加），
+//       容器 sizingMode 必须与直接子项一致，发射报告里的 Width/Height/对齐/Margin 必须与 lib/design-box.js 一致
 //       （shifted / unsized 两类例外按类、按维，见 page-build-rules.md 第 4 节第 14 条）
 //   R6 资源键闭环：{StaticResource <键>} 必须来自写法表样式族、本页 Icon 台账或 Icon 字典合并点
 //   R7 文本：发射区不得出现字面中文；发射区每个有设计文本的控件必须挂语言键
@@ -47,7 +47,7 @@ const { readJson } = require(path.join(__dirname, "..", "..", "lib", "script-hel
 const {
   CONSTRAINT_KEYS, CONSTRAINT_ATTRS, normalizeConstraints, collectConstraints
 } = require(path.join(__dirname, "..", "..", "lib", "constraints.js"));
-const { designBoxAttrs, containerBoxAttrs } = require(path.join(__dirname, "..", "..", "lib", "design-box.js"));
+const { designBoxAttrs, containerBoxAttrs, containerSizingMode } = require(path.join(__dirname, "..", "..", "lib", "design-box.js"));
 const {
   bandExtents, extentOf, contentSizeOf
 } = require(path.join(__dirname, "gen-mw-wpf-layout.js"));
@@ -146,11 +146,19 @@ function checkDesignBoxes(layout, emission) {
     emitted.set(item.ref, item.attrs || {});
   });
   const seen = new Set();
-  const visitGrid = function (grid, size) {
+  const visitGrid = function (grid, size, isRegionRoot) {
     const columnExtents = bandExtents(grid.columns || [], size.w);
     const rowExtents = bandExtents(grid.rows || [], size.h);
     (grid.cells || []).forEach(function (cell) {
       seen.add(cell.ref);
+      if (cell.container) {
+        const childCells = cell.children && Array.isArray(cell.children.cells) ? cell.children.cells : [];
+        const expectedSizingMode = containerSizingMode(childCells, isRegionRoot);
+        if (cell.sizingMode !== expectedSizingMode) {
+          report("R14", cell.ref, "容器 sizingMode 与页面根/直接子项不一致：期望 " +
+            expectedSizingMode + "，产物为 " + (cell.sizingMode || "未登记"));
+        }
+      }
       const width = extentOf(columnExtents, cell.column, cell.columnSpan);
       const height = extentOf(rowExtents, cell.row, cell.rowSpan);
       // 撞格下移的格子没有设计稿偏移真值：期望值仍是 designBoxAttrs(cell)（有格子尺寸就写控件自身尺寸、
@@ -186,7 +194,7 @@ function checkDesignBoxes(layout, emission) {
       if (!(cell.nodeWidth > 0) || !(cell.nodeHeight > 0)) {
         report("R14", cell.ref, "布局产物没有登记承载物设计尺寸（nodeWidth / nodeHeight）");
       }
-      // 容器格子与控件格子共用 lib/design-box.js 的实现（容器还要按主轴撑满 / 交叉轴锚点，同一实现）。
+      // 容器格子与控件格子共用 lib/design-box.js 的尺寸策略实现。
       const expected = cell.container ? containerBoxAttrs(cell) : designBoxAttrs(cell);
       const actual = emitted.get(cell.ref);
       if (!actual) {
@@ -201,12 +209,12 @@ function checkDesignBoxes(layout, emission) {
           }
         });
       }
-      if (cell.children) visitGrid(cell.children, contentSizeOf(cell));
+      if (cell.children) visitGrid(cell.children, contentSizeOf(cell), false);
     });
   };
   (layout.regions || []).forEach(function (region) {
     if (region.emit === false || !region.grid) return;
-    visitGrid(region.grid, { w: region.w, h: region.h });
+    visitGrid(region.grid, { w: region.w, h: region.h }, true);
   });
   emitted.forEach(function (attrs, ref) {
     if (!seen.has(ref)) report("R14", ref, "发射报告里有布局产物中不存在的格子");
@@ -421,10 +429,10 @@ function main() {
     };
     walkProtocols(region.grid);
   });
-  // R10：manual-only 类型（证据不全：有手册条目但真实页面未出现，或只有用户确认）不阻断，
-  // 但必须登记成提示，让"首次生成需人工确认、事后补齐缺的证据"有可观测落点。
+  // R10：manual-only 类型（真实页面或目标程序集证据不完整）不阻断，
+  // 但每次页面使用都登记提示，直到映射证据补齐并更新为 ready。
   manualOnlyTypes.forEach(function (type) {
-    notice("R10", null, "写法表把 " + type + " 记为 manual-only（证据不全）：发射前需人工确认，事后补齐缺的证据（真实页面或手册条目）");
+    notice("R10", null, "写法表把 " + type + " 记为 manual-only（证据不全）：发射前需人工确认，事后补齐真实页面或目标程序集证据");
   });
   checkStyleKeys(layout, map, iconNames, xamlText);
   checkHardcodedText(xamlText, layout, typesByRef);

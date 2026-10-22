@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 "use strict";
 
-// 控件在格子里的「尺寸 + 对齐」唯一实现。
+// mw-wpf 的容器尺寸模式分类与格内「尺寸 + 对齐」共享实现。
 //
 // 口径：格子尺寸照设计稿（含间距），控件写自身设计稿尺寸，两者的差就是间距；
 // 差值落在哪一侧由设计稿偏移决定——偏移≈0 贴起始边、到末端≈0 贴末端、两侧≈相等居中，
@@ -11,17 +11,25 @@
 //   cell.width / cell.height           格子尺寸（含跨格累加；像素带照值，星号带吃剩余）
 //   cell.nodeWidth / cell.nodeHeight   控件（或容器）自身的设计稿尺寸
 //   cell.offsetX / cell.offsetY        控件起点相对格子起点的偏移（撞格下移的格子不登记）
-// 三种落空的情况各写各的：
+// designBoxAttrs 的四种情况各写各的：
 //   - 格子尺寸与控件尺寸相等 → 不写尺寸也不写对齐（Stretch 正好填满）；
+//   - 尺寸不同且有偏移 → 按偏移选择对齐，非对称间距用 Margin 保留；
 //   - 有格子尺寸、没有偏移（撞格下移的格子）→ 只写控件自身尺寸，不写对齐，不猜差值落哪一侧；
 //   - 某一维没有格子尺寸（推导给不出正数：内容溢出承载物）→ 该维什么都不写（保持 Stretch），另一维照写。
 //
-// 消费者：adapters/mw-wpf/gen-mw-wpf-xaml.js（发射属性并写进发射报告）、
-//         adapters/mw-wpf/check-wpf-layout.js（按同一实现核对发射报告）。
+// 消费者：adapters/mw-wpf/gen-mw-wpf-layout.js（分类容器 sizingMode）、
+//         adapters/mw-wpf/gen-mw-wpf-xaml.js（发射属性并写进报告）、
+//         adapters/mw-wpf/check-wpf-layout.js（复算分类并核对发射报告）。
 
 // 与布局推导同一容差：贴边 / 居中只在"完全贴合"时成立（偏移或剩余 ≤ EPS，或两侧相等）；
 // 其余（非对称内缩）一律走 Margin 精确复现。
 const EPSILON = 2;
+
+function containerSizingMode(children, isRegionRoot) {
+  if (isRegionRoot) return "page-slot";
+  return Array.isArray(children) && children.length && children.every(function (child) { return child.container; })
+    ? "auto-content" : "control-slot";
+}
 
 function round(value) {
   return Math.round(Number(value));
@@ -65,12 +73,35 @@ function designBoxAttrs(cell) {
   return attrs;
 }
 
-// 容器 Grid 的尺寸与对齐（发射器与门禁都调它，唯一实现）：
-//   ① 主轴（flex 方向 / 补组方向）不写尺寸与对齐 —— 容器撑满格子，那一维的变化由星号带吸收：
-//      顶部内容贴顶、底部内容贴底、中间（或末尾）那段空档随高度 / 宽度变长；位置偏移改用 Margin 表达；
-//   ② 交叉轴照设计稿写尺寸与对齐；但设计稿本身让容器越过格子末端（end < 0）时，位置锚点按上边 / 左边，
-//      写成 start + Margin —— 否则窗口一变容器就跟着末端漂。
+// 容器 Grid 的尺寸与对齐（发射器与门禁共用的唯一实现）：
+//   ① sizingMode=auto-content 时，Grid 按 Auto/Pixel 子轨道自适应，固定在左上角，源偏移由 Margin 保留；
+//   ② sizingMode=control-slot 时，按设计稿格子尺寸与偏移处理；等尺寸但偏移大于 0 的轴也写自身尺寸、起始对齐与 Margin；
+//   ③ sizingMode=page-slot 时，页面根网格负责星号/固定轨道，容器按父格伸展或锚定。
 function containerBoxAttrs(cell) {
+  if (cell && cell.sizingMode === "auto-content") {
+    const left = typeof cell.offsetX === "number" ? Math.max(0, Math.round(cell.offsetX)) : 0;
+    const top = typeof cell.offsetY === "number" ? Math.max(0, Math.round(cell.offsetY)) : 0;
+    const attrs = { HorizontalAlignment: "Left", VerticalAlignment: "Top" };
+    if (left || top) attrs.Margin = left + "," + top + ",0,0";
+    return attrs;
+  }
+  if (cell && cell.sizingMode === "control-slot") {
+    const attrs = designBoxAttrs(cell);
+    const margins = String(attrs.Margin || "0,0,0,0").split(",").map(function (value) { return Number(value) || 0; });
+    if (cell.width > 0 && cell.nodeWidth > 0 && round(cell.width) === round(cell.nodeWidth) && cell.offsetX > 0) {
+      attrs.Width = String(round(cell.nodeWidth));
+      attrs.HorizontalAlignment = "Left";
+      margins[0] = round(cell.offsetX);
+    }
+    if (cell.height > 0 && cell.nodeHeight > 0 && round(cell.height) === round(cell.nodeHeight) && cell.offsetY > 0) {
+      attrs.Height = String(round(cell.nodeHeight));
+      attrs.VerticalAlignment = "Top";
+      margins[1] = round(cell.offsetY);
+    }
+    if (margins[0] || margins[1]) attrs.Margin = margins[0] + "," + margins[1] + ",0,0";
+    return attrs;
+  }
+  if (!cell || cell.sizingMode !== "page-slot") return designBoxAttrs(cell);
   const box = designBoxAttrs(cell);
   const axis = cell.synthAxis || (cell.children && cell.children.owner && cell.children.owner.direction) || null;
   const stretchY = axis === "column" || axis === "y";
@@ -97,4 +128,4 @@ function containerBoxAttrs(cell) {
   return box;
 }
 
-module.exports = { EPSILON, designBoxAttrs, axisPlan, containerBoxAttrs };
+module.exports = { EPSILON, designBoxAttrs, axisPlan, containerBoxAttrs, containerSizingMode };

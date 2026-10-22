@@ -247,14 +247,33 @@ function emitArgs(layoutPath, typesPath, outPath, extra = []) {
   layout.regions[1].grid.cells = [cell("work/camera", "Camera", 0, 0, designBox(600, 160, 200, 150))];
   const layoutPath = writeJson("layout.implicit.json", layout);
   const typesPath = writeJson("types.implicit.json", baseTypes([
-    { ref: "work/camera", sourceRef: "work/camera", controlType: "Camera", absX: 0, absY: 0, w: 200, h: 150 }
+    {
+      ref: "work/camera", sourceRef: "work/camera", controlType: "Camera", absX: 0, absY: 0, w: 200, h: 150,
+      attrs: { DesignPanelID: "panel-1", Value: "camera-value" }
+    }
   ]));
   const outPath = path.join(tmpRoot, "implicit", "View.xaml");
   run(emitArgs(layoutPath, typesPath, outPath, ["--overwrite"]));
   const xaml = fs.readFileSync(outPath, "utf8");
-  assert.match(xaml, /<s:Camera/, "Camera 按写法表发射成 s:Camera");
+  const routeMap = JSON.parse(fs.readFileSync(ROUTE_MAP, "utf8"));
+  assert.ok(!routeMap.extends && !routeMap.familyOverlays,
+    "MW WPF 写法表是独立平面表，不得绕过组合映射加载器声明 extends/overlays");
+  assert.ok(Object.values(routeMap.controlTypes).every(spec => !Object.prototype.hasOwnProperty.call(spec, "attrs")),
+    "MW WPF 写法表不得把观察属性 attrs 作为第二份发射白名单");
+  assert.match(xaml, /xmlns:camera="clr-namespace:MaxWell\.CameraDevice;assembly=MaxWell\.CameraDevice"/, "按写法表声明 CameraControl 命名空间");
+  assert.match(xaml, /<camera:CameraControl/, "Camera 按写法表发射成 CameraControl");
+  assert.deepStrictEqual(routeMap.controlTypes.Camera.xamlAttrs, [],
+    "作业A Camera 当前没有可复现的实例属性来源，因此不发射普通 XAML 属性");
+  assert.ok(!Object.prototype.hasOwnProperty.call(routeMap.controlTypes.Camera, "observedAttrs"),
+    "Camera 不得保留无页面依据的属性观察目录");
+  assert.deepStrictEqual(routeMap.controlTypes.Camera.protocols, [],
+    "Camera 普通属性不得重复登记为框架协议");
+  assert.ok(!Object.prototype.hasOwnProperty.call(routeMap.controlTypes.Camera, "stylePolicy"),
+    "Camera 默认样式只由 styleRules.pageDefault 表达");
+  assert.doesNotMatch(xaml, /\b(?:DesignPanelID|CameraName|Value)=/,
+    "作业A Camera 不得发射没有流水线输入来源的实例属性");
   assert.ok(!xaml.includes("StaticResource null"), "隐式默认样式不得写成 BasedOn=\"{StaticResource null}\"");
-  assert.ok(!/BasedOn="\{StaticResource [^}]*\}" \/>\s*$/m.test(xaml.split("<s:Camera")[0].split("<UserControl.Resources>")[1] || ""),
+  assert.ok(!/BasedOn="\{StaticResource [^}]*\}" \/>\s*$/m.test(xaml.split("<camera:CameraControl")[0].split("<UserControl.Resources>")[1] || ""),
     "隐式默认样式不得进页级 Resources");
 }
 
@@ -295,6 +314,45 @@ function emitArgs(layoutPath, typesPath, outPath, extra = []) {
   const inner = container.slice(0, container.indexOf("</Grid>"));
   assert.match(inner, /<Grid\.RowDefinitions>/, "容器 Grid 必须有内层行列定义");
   assert.match(inner, /<TextBlock[\s\S]*Grid\.Row="0"[\s\S]*Grid\.Column="0"/, "子控件必须落在容器 Grid 的内层格子里");
+}
+
+// 8) 纯子 Grid 的普通间距通过 control-slot 子容器的 Margin 保留到真实 XAML。
+{
+  const layout = baseLayout();
+  layout.regions[1].grid.rows = [{ size: "Star", source: "design" }];
+  layout.regions[1].grid.columns = [{ size: "Star", source: "design" }];
+  layout.regions[1].grid.cells = [{
+    ref: "work/auto", container: true, sizingMode: "auto-content",
+    row: 0, column: 0, rowSpan: 1, columnSpan: 1,
+    width: 300, height: 86, nodeWidth: 300, nodeHeight: 86, offsetX: 0, offsetY: 0,
+    children: {
+      rows: [{ size: "Auto", gap: 40 }, { size: "Auto", gap: 40 }],
+      columns: [{ size: "Pixel", value: 300 }],
+      cells: ["A", "B"].map(function (suffix, index) {
+        return {
+          ref: "work/group" + suffix, container: true, sizingMode: "control-slot",
+          row: index, column: 0, rowSpan: 1, columnSpan: 1,
+          width: 300, height: 40, nodeWidth: 300, nodeHeight: 40,
+          offsetX: 0, offsetY: index ? 6 : 0,
+          children: {
+            rows: [{ size: "Pixel", value: 20 }],
+            columns: [{ size: "Pixel", value: 300 }],
+            cells: [cell("work/group" + suffix + "Text", "TextBlock", 0, 0, designBox(300, 20, 300, 20))]
+          }
+        };
+      })
+    }
+  }];
+  const layoutPath = writeJson("layout.autocontent-gap.json", layout);
+  const typesPath = writeJson("types.autocontent-gap.json", baseTypes([
+    { ref: "work/groupAText", sourceRef: "work/groupAText", controlType: "TextBlock" },
+    { ref: "work/groupBText", sourceRef: "work/groupBText", controlType: "TextBlock" }
+  ]));
+  const outPath = path.join(tmpRoot, "autocontent-gap", "View.xaml");
+  run(emitArgs(layoutPath, typesPath, outPath, ["--overwrite"]));
+  const xaml = fs.readFileSync(outPath, "utf8");
+  assert.match(xaml, /<Grid Grid\.Row="1" Grid\.Column="0" Height="40" VerticalAlignment="Top" Margin="0,6,0,0">/,
+    "auto-content 父层的普通 6px 间距必须出现在后续 control-slot Grid 的 Margin 中");
 }
 
 console.log("PASS 作业A 页面 XAML 发射（形态 / 固定区 / fail-closed / 语言键 / 覆盖保护 / 容器层）回归测试");
