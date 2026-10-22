@@ -575,23 +575,31 @@ function sizes(bands) {
 
 // ---------- 14. 根横向布局的普通末端容器保持弹性，已识别右栏才固定 ----------
 {
-  const rootWithTail = function (tailType) {
-    const root = node("rootRow", "FRAME", { width: 1280, height: 759, relativeX: 0, relativeY: 0 }, [
-      node("camera", "INSTANCE", { width: 600, height: 500, relativeX: 0, relativeY: 0 }),
-      node("tail", "FRAME", { width: 680, height: 500, relativeX: 600, relativeY: 0 }, [
+  const rootWithTail = function (tailType, leafFirst) {
+    const tail = node("tail", "FRAME", { width: 680, height: 500, relativeX: 600, relativeY: 0 }, [
         node("tailA", "INSTANCE", { width: 120, height: 20, relativeX: 0, relativeY: 0 }),
         node("tailB", "INSTANCE", { width: 120, height: 20, relativeX: 0, relativeY: 40 })
-      ], { flexContainerInfo: { flexDirection: "column" } })
-    ], { flexContainerInfo: { flexDirection: "row" } });
-    return workArea(derive(snapshot([], [root]), typesOf([
+      ], { flexContainerInfo: { flexDirection: "column" } });
+    const label = node("tailLabel", "TEXT", { width: 100, height: 20, relativeX: 600, relativeY: 80 });
+    const trailing = typeof leafFirst === "boolean" ? (leafFirst ? [label, tail] : [tail, label]) : [tail];
+    const root = node("rootRow", "FRAME", { width: 1280, height: 759, relativeX: 0, relativeY: 0 }, [
+      node("camera", "INSTANCE", { width: 600, height: 500, relativeX: 0, relativeY: 0 })
+    ].concat(trailing), { flexContainerInfo: { flexDirection: "row" } });
+    const types = [
       { ref: "camera", controlType: "Camera", absX: 0, absY: 85, w: 600, h: 500 },
       { ref: "tailA", controlType: tailType, absX: 600, absY: 85, w: 120, h: 20 },
       { ref: "tailB", controlType: tailType, absX: 600, absY: 125, w: 120, h: 20 }
-    ])));
+    ];
+    if (typeof leafFirst === "boolean") types.push({ ref: "tailLabel", controlType: "TextBlock", absX: 600, absY: 165, w: 100, h: 20 });
+    return workArea(derive(snapshot([], [root]), typesOf(types)));
   };
   assert.deepStrictEqual(sizes(rootWithTail("TextBlock").grid.columns), [600, "Star"],
     "普通主内容容器即使是根层贴边末项也不按右栏固定");
   assert.deepStrictEqual(sizes(rootWithTail("IconButton").grid.columns), [600, 680],
     "独占根层贴边末带且符合右栏结构的容器保持设计宽度");
+  for (const leafFirst of [false, true]) {
+    assert.deepStrictEqual(sizes(rootWithTail("TextBlock", leafFirst).grid.columns), [600, "Star"],
+      "同起点混合容器与叶子控件共享弹性轨道，不受条目顺序影响");
+  }
 }
 

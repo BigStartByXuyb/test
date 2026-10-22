@@ -397,7 +397,7 @@ function contentBandSizes(bands) {
 // ---------- 主轴带（声明了 flex 主轴的容器）----------
 // 条目独占一条带（否则"同一行横向排列的条目被并进同一条列带"后会被撞格规则竖排，设计稿语义丢失），
 // 带位置与显著空档走口径 A；尺寸由下方主轴策略或普通 bandSizes 分配。
-// 控件槽位与混合层列宽策略（主轴是 row 且没有大空档）：固定项照设计稿像素，其余容器条目占剩余空间；
+// 控件槽位与混合层列宽策略（主轴是 row 且没有大空档）：固定带照设计稿像素，其余含容器的带占剩余空间；
 // 纯子 Grid 层由 contentBandSizes 改用 Auto，不参与星号分配。
 // 固定项 = 相机所在条目，或区域根横向主轴末带中贴右边缘的已识别右栏；普通末端容器保持弹性。
 
@@ -464,24 +464,24 @@ function mainAxisBands(items, owner) {
 function mainAxisSizes(bands, direction) {
   const hasStar = bands.some(function (band) { return band.star; });
   if (direction !== "row" || hasStar) return bandSizes(bands, direction === "row" ? "x" : "y");
-  const autoItems = bands.filter(function (band) {
-    return band.kind === "item" && !band.fixed && isAutoItem(band.items[0]);
+  const autoBands = bands.filter(function (band) {
+    return band.kind === "item" && !band.fixed && isAutoBand(band);
   });
   return bands.map(function (band, index) {
     const next = bands[index + 1];
-    if (band.fixed || !isAutoItem(band.items[0])) {
+    if (band.fixed || !isAutoBand(band)) {
       if (!next) return { size: "Pixel", value: Math.max(1, Math.round(band.size)), source: "design" };
       return { size: "Pixel", value: Math.max(1, Math.round(next.start - band.start)), source: "design" };
     }
-    return autoItems.length > 1
+    return autoBands.length > 1
       ? { size: "Star", weight: band.size, source: "design" }
       : { size: "Star", source: "design" };
   });
 }
 
-// 自适应条目 = 容器（中间区就是容器）；叶子控件保持设计稿像素，避免窗口缩放时被拉变形。
-function isAutoItem(item) {
-  return Boolean(item && item.container);
+// 同起点条目共享轨道：固定带之外，只要包含容器就分配余量；结果不依赖带内条目顺序。
+function isAutoBand(band) {
+  return Boolean(band && Array.isArray(band.items) && band.items.some(function (item) { return item.container; }));
 }
 
 // 成层容器的 flex 描述（方向 / gap / 绝对 bbox）：主轴显式成带用它；没有 flex 声明时返回 null。
