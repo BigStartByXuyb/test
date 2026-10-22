@@ -45,7 +45,8 @@
 //     哪一段间距成星号带走两条判据（**不写死像素阈值**）：① 结构——相邻条目分属不同子组时那段是"组间空档"
 //     （容器的 flexContainerInfo.gap 就体现在这里）；② 相对——散条目按"最大的一段 ≥ 其余间距中位数 × 2"、
 //     只有一段间距时按"≥ 相邻条目较小者的一半"判；
-//     每层最多一条星号带；没有大空档时最后一条带吃剩余（星号），有大空档时最后一条按条目自身尺寸写死。
+//     普通成带每层最多一条星号带；没有大空档时最后一条带吃剩余，有大空档时最后一条按条目自身尺寸写死。
+//     无大空档的 row 主轴另按 mainAxisSizes 分配：相机与已识别右栏固定，其余容器分配星号、叶子控件固定。
 //     **不新增 spacer 控件或空 Grid 子元素**：间距由固定 Pixel 带、条目偏移/Margin 或星号空档表达。
 //     **首段空档也成带**：第一个条目与网格原点之间那段（容器内缩 / 分区顶边到内容的空白）是第一条带。
 //   - 格子起点 = 网格原点 + 前面各带尺寸之和（不是"带起点"：带起点是设计稿里条目的位置，
@@ -299,7 +300,7 @@ function buildFlexItems(entries, tree) {
 //      （容器的 flexContainerInfo.gap 就体现在这里）——读设计稿的结构，不猜；
 //   ② 散条目（设计师没打组、读不到结构）：同层最大的一段间距 ≥ 其余间距中位数 × STAR_RATIO 才算空档
 //      —— 判的是"比周围大得多"这个相对关系，设计稿放大缩小都成立，与绝对像素无关。
-// 两条都不命中就不给星号（全固定，末条带吃剩余）。每层最多一条星号带。
+// 两条都不命中就不插入空档星号带，末条尺寸由后续策略分配；每层最多一条弹性空档带。
 const STAR_RATIO = 2;      // 多段间距时：最大的一段 ≥ 其余间距中位数 × 2 才算"空档"
 const GUTTER_RATIO = 0.5;  // 只有一段间距时：它 ≥ 相邻条目较小者的一半才算"空档"，否则是槽间距
 
@@ -395,10 +396,10 @@ function contentBandSizes(bands) {
 
 // ---------- 主轴带（声明了 flex 主轴的容器）----------
 // 条目独占一条带（否则"同一行横向排列的条目被并进同一条列带"后会被撞格规则竖排，设计稿语义丢失），
-// 尺寸与星号位置都走口径 A（bandSizes）：间距并进前一带，只有判据认定的那段空档单独成星号带。
-// 控件槽位与混合层列宽策略（主轴是 row 且没有大空档）：固定项照设计稿像素，其余容器条目占剩余空间；
+// 带位置与显著空档走口径 A；尺寸由下方主轴策略或普通 bandSizes 分配。
+// 控件槽位与混合层列宽策略（主轴是 row 且没有大空档）：固定带照设计稿像素，其余含容器的带占剩余空间；
 // 纯子 Grid 层由 contentBandSizes 改用 Auto，不参与星号分配。
-// 固定项 = 子树里只有相机控件的条目（相机所在的 Grid），或**区域根网格里**贴主轴末端的最末条目（页面常驻右栏）。
+// 固定项 = 相机所在条目，或区域根横向主轴末带中贴右边缘的已识别右栏；普通末端容器保持弹性。
 
 function itemControlTypes(item) {
   const types = [];
@@ -407,6 +408,16 @@ function itemControlTypes(item) {
     (node.items || []).forEach(walk);
   })(item);
   return types;
+}
+
+// 右栏结构：至少两个控件且全为 IconButton 的容器；多个候选取唯一最靠右者，同 x 不猜。
+function rightSidebarItem(items) {
+  const candidates = items.filter(function (item) {
+    const types = itemControlTypes(item);
+    return item.container && types.length >= 2 && types.every(function (type) { return type === "IconButton"; });
+  }).sort(function (left, right) { return right.x - left.x; });
+  if (!candidates.length || (candidates.length > 1 && Math.abs(candidates[0].x - candidates[1].x) <= EPSILON)) return null;
+  return candidates[0];
 }
 
 // 相机所在的 Grid：条目本身是相机控件，或它的子树里只有相机（相机链 / 只为相机服务的容器）。
@@ -440,10 +451,11 @@ function mainAxisBands(items, owner) {
       fixed: cameraOnlyItem(item)
     });
   });
-  // 页面常驻右栏判据（只在区域根网格）：贴主轴末端的那条粒子带固定。
-  if (owner.root && bands.length) {
+  // 右栏固定优先于无大空档时的弹性容器分配，仅作用于区域根横向布局的独占末带。
+  const sidebar = owner.root && horizontal ? rightSidebarItem(items) : null;
+  if (sidebar && bands.length > 1) {
     const last = bands[bands.length - 1];
-    if (Math.abs(last.end - containerEnd) <= EPSILON) last.fixed = true;
+    if (last.items.length === 1 && last.items[0] === sidebar && Math.abs(last.end - containerEnd) <= EPSILON) last.fixed = true;
   }
   return insertBigGapStar(bands);
 }
@@ -452,24 +464,24 @@ function mainAxisBands(items, owner) {
 function mainAxisSizes(bands, direction) {
   const hasStar = bands.some(function (band) { return band.star; });
   if (direction !== "row" || hasStar) return bandSizes(bands, direction === "row" ? "x" : "y");
-  const autoItems = bands.filter(function (band) {
-    return band.kind === "item" && !band.fixed && isAutoItem(band.items[0]);
+  const autoBands = bands.filter(function (band) {
+    return band.kind === "item" && !band.fixed && isAutoBand(band);
   });
   return bands.map(function (band, index) {
     const next = bands[index + 1];
-    if (band.fixed || !isAutoItem(band.items[0])) {
+    if (band.fixed || !isAutoBand(band)) {
       if (!next) return { size: "Pixel", value: Math.max(1, Math.round(band.size)), source: "design" };
       return { size: "Pixel", value: Math.max(1, Math.round(next.start - band.start)), source: "design" };
     }
-    return autoItems.length > 1
+    return autoBands.length > 1
       ? { size: "Star", weight: band.size, source: "design" }
       : { size: "Star", source: "design" };
   });
 }
 
-// 自适应条目 = 容器（中间区就是容器）；叶子控件保持设计稿像素，避免窗口缩放时被拉变形。
-function isAutoItem(item) {
-  return Boolean(item && item.container);
+// 同起点条目共享轨道：固定带之外，只要包含容器就分配余量；结果不依赖带内条目顺序。
+function isAutoBand(band) {
+  return Boolean(band && Array.isArray(band.items) && band.items.some(function (item) { return item.container; }));
 }
 
 // 成层容器的 flex 描述（方向 / gap / 绝对 bbox）：主轴显式成带用它；没有 flex 声明时返回 null。
@@ -706,10 +718,7 @@ function cameraSidebarLayout(grid, items, dslTree, size, origin) {
   const cameraRecord = dslTree.byRef.get(camera.ref);
   if (!cameraCell || !cameraRecord) return null;
 
-  const sidebar = items.find(function (item) {
-    const types = itemControlTypes(item);
-    return item.container && types.length >= 2 && types.every(function (type) { return type === "IconButton"; });
-  });
+  const sidebar = rightSidebarItem(items);
   if (!sidebar) return null;
   const sidebarCell = (grid.cells || []).find(function (cell) { return cell.ref === sidebar.ref; });
   if (!sidebarCell || !sidebarCell.children) return null;
@@ -834,7 +843,7 @@ function buildRegionGrid(entries, containers, pending, dslTree, size, origin, gr
   const tree = buildContainmentTree(entries, containers, pending);
   const flex = buildFlexItems(tree.roots, dslTree);
   const owner = flexOwnerOf(flex.owner);
-  // 区域根网格是页面内容区那一层：页面常驻右栏（贴主轴末端的最末条目）在这一层固定。
+  // 标记页面内容区根层，供主轴带应用已识别右栏的固定宽度规则。
   if (owner) owner.root = true;
   // 设计稿已经打了组（这一层由某个容器提上来的，owner 非空）时，这一层不参与分组——分组表也不参与。
   if (owner) requireNoDeclaredGroups(groupsDoc, "内容区根网格已由设计稿成层（这一层不参与分组）");

@@ -19,7 +19,7 @@
 //   R2 协议属性名：--types 产物节点的 attrs 里，凡属协议属性名集合（由写法表 protocols 派生）的键，
 //                  必须在该类型的 protocols 里登记过（不校验取值形状；布局格子不承载协议属性）
 //   R3 格子越界：row/column/rowSpan/columnSpan 必须落在本 region 的行列范围内
-//   R4 空行空列：没有格子覆盖、也不是被星号撑开的收尾行/列
+//   R4 空行空列：没有格子覆盖的非 Star 行/列提示；Star 可承载弹性容器或保留空档
 //   R5 锚点格冲突：同一锚点格（Grid.Row/Column 起点）只允许一个控件（推导用占用表 + 行下移保证唯一）
 //   R10 待人工确认（提示）：页面用到写法表 manual-only 类型（真实页面或目标程序集证据不完整）
 //   R11 尺寸约束一致性：格子带的 min/max 宽高必须与 DSL 节点上的 constraints 逐个一致（多/少/改值都失败）
@@ -231,15 +231,14 @@ function checkCells(region, map, layout) {
       report("R8", region.id, "行列尺寸缺少 source");
       return;
     }
-    // 星号带（原语）：口径 A 下每层最多一条（结构优先；散条目按相对判据），其余带一律照设计稿像素。
-    if (size.size === "Star") return;
+    // Star 可表示弹性空档、收尾余量或承载容器的加权轨道；来源校验与其他设计轨道一致。
     // 框架固定区只在**被框架钉住的那一维**上用 Token（顶部栏 / 底部栏都钉在高度上）；
     // 另一维是自由伸展的星号，来源仍是设计稿。
     if (isFramework && size.size === "Pixel" && size.source.indexOf("framework:") !== 0) {
       report("R8", region.id, "框架固定区的固定尺寸必须用 framework:<Token>，当前: " + size.source);
     }
-    if (!isFramework && size.source !== "design") {
-      report("R8", region.id, "发射区尺寸必须取设计稿（source=design），当前: " + size.source);
+    if (!(isFramework && size.size === "Pixel") && size.source !== "design") {
+      report("R8", region.id, "非框架固定尺寸必须取设计稿（source=design），当前: " + size.source);
     }
   });
   const seen = new Map();
@@ -265,7 +264,7 @@ function checkCells(region, map, layout) {
   });
   if (region.emit === false) return;
 
-  // R4：空行空列 → 提示，不失败（框架允许；收尾的星号行/列本来就是用来吃掉剩余空间的）。
+  // R4：非 Star 空行空列只提示；Star 可承载弹性容器或保留余量/空档，空置时不提示。
   const coveredRows = new Set();
   const coveredColumns = new Set();
   region.grid.cells.forEach(function (cell) {
@@ -273,7 +272,6 @@ function checkCells(region, map, layout) {
     for (let c = cell.column; c < cell.column + (cell.columnSpan || 1); c += 1) coveredColumns.add(c);
   });
   region.grid.rows.forEach(function (size, index) {
-    // 口径 A 的星号带本来就不承载控件，不给提示。
     if (!coveredRows.has(index) && size.size !== "Star") {
       notice("R4", region.id, "第 " + (index + 1) + " 行没有控件覆盖（也不是星号带）");
     }
