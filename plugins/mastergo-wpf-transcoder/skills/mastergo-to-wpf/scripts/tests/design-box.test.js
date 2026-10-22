@@ -3,7 +3,7 @@
 
 // 格子尺寸与「尺寸/对齐」回归：布局推导登记 → XAML 发射 → 门禁 R14。
 // 锁定的口径（page-build-rules.md 第 4 节第 14 条 / mw-wpf-mode.md 第 2 节第 3 条）：
-//   1) 格子尺寸照设计稿：像素带 = 到下一带起点的距离，唯一收尾星号带 = 可用尺寸 − 其余像素带之和；
+//   1) 格子尺寸照设计稿：像素带取设计跨度，Star 按权重分配剩余尺寸，Auto 按设计期望尺寸复核；
 //   2) 控件写自身设计稿尺寸，格子尺寸 − 控件尺寸 = 间距，差值落在哪一侧由格内偏移决定
 //      （贴起始边 / 贴末端 / 居中 / 非对称内缩用对齐 + Margin 精确复现）；
 //   3) designBoxAttrs 等尺寸时不写尺寸/对齐；control-slot 容器等尺寸但偏移大于 0 时用尺寸/起始对齐/Margin 保留偏移；跨格按 span 累加；
@@ -231,6 +231,14 @@ function node(id, type, style, children, extra) {
   };
   assert.strictEqual(run(layoutPath, reportPath).status, 0, "产物自洽时 R14 必须通过");
 
+  const wrongStarSource = JSON.parse(JSON.stringify(layout));
+  wrongStarSource.regions[0].grid.columns[0].source = "invented";
+  assert.strictEqual(run(writeJson("gate-star-source.json", wrongStarSource), reportPath).status, 2,
+    "承载格子的 Star 轨道同样必须校验设计来源");
+  const sourceReport = JSON.parse(fs.readFileSync(outPath, "utf8"));
+  assert.ok(sourceReport.findings.some(function (item) { return item.rule === "R8"; }),
+    "Star 来源错误必须由 R8 报告");
+
   const tampered = JSON.parse(JSON.stringify(layout));
   tampered.regions[0].grid.cells[0].height = 200;
   const tamperedPath = writeJson("gate-layout-tampered.json", tampered);
@@ -248,8 +256,7 @@ function node(id, type, style, children, extra) {
 }
 
 // ── ⑤ 格子算不出正数尺寸（内容溢出承载物）→ unsized：不写尺寸/对齐，门禁按提示登记 ─────
-// 口径 A 下星号带只承载"大空档"，正常推导不会出现载体落进零尺寸星号带；这一节按格子级
-// （手写布局 JSON）验证门禁对 unsized 的判别强度，形态与"溢出"一致。
+// Star 可承载弹性容器或表示空档；此处用手写布局 JSON 验证余量非正时的 unsized 判别强度。
 {
   const types = {
     byRef: new Map([
