@@ -252,7 +252,7 @@ def _classify_raw(stage, item, sub, std, method):
     if stage in STAGE_RULES:
         return STAGE_RULES[stage]
     if stage in BOM_STAGES:
-        if method and '核对' in method and BOM_RE.match(std):
+        if BOM_RE.match(std):
             return (M, '2级')
         if any(k in std for k in ('外观', '安装', '完好', '牢固', '无损伤')):
             return (W, '1级')
