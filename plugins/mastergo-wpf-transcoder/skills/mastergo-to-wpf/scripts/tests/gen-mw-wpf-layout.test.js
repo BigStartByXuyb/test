@@ -5,7 +5,7 @@
 // 锁定六件事（口径 A）：
 //   1) 一条带 = 条目 + 它后面的间距（= 到下一带起始边的距离），不发射任何间距元素；
 //   2) 哪一段间距落成星号带只看设计稿自身（分组结构优先，散条目按相对判据，真值见 gen-mw-wpf-layout.js），每层最多一条；
-//      没有大空档时最后一条带吃剩余（星号），有大空档时最后一条按条目自身尺寸写死；
+//      普通成带没有大空档时末条吃剩余，有大空档时末条按自身尺寸；无大空档 row 主轴另按固定项/弹性容器分配；
 //   3) 页面根与控件槽位按设计尺寸和星号余量布局；直接子项全是 Grid 的容器按 Auto 内容尺寸；
 //   4) 没有 flex 声明的层级仍按 x 区间重叠 / y 起始边聚类，同一套口径 A 成带；
 //   5) 设计稿没打组的地方由代码补组：区域根网格里同一条列带（x 区间重叠）里 ≥2 个条目 → 合成一个栏容器（栏内再成行）；
@@ -544,6 +544,14 @@ function sizes(bands) {
   assert.strictEqual(cellOf({ grid: cellOf(plain, "synth:content-area").children }, "camera").row, 0,
     "相机在内容区局部 Grid 的首行");
 
+  const multipleSidebarTypes = typesOf(Array.from(types.byRef.values()).map(function (item) {
+    return item.ref === "middleA" || item.ref === "middleB"
+      ? Object.assign({}, item, { controlType: "IconButton" }) : item;
+  }));
+  const multipleSidebars = workArea(derive(snapshot([], pageChildren(false)), multipleSidebarTypes));
+  assert.strictEqual(cellOf(multipleSidebars, "synth:right-sidebar").column, 1,
+    "中间区同样全是按钮时仍选择最靠右的右栏候选");
+
   const nestedSidebarTypes = typesOf([
     { ref: "camera", controlType: "Camera", absX: 20, absY: 200, w: 600, h: 600 },
     { ref: "middleA", controlType: "TextBlock", absX: 650, absY: 202, w: 120, h: 20 },
@@ -563,5 +571,27 @@ function sizes(bands) {
   const owned = workArea(derive(snapshot([], [ownedRoot]), types));
   assert.strictEqual(owned.grid.cells.some(function (cell) { return cell.ref === "synth:content-area"; }), false,
     "设计稿根 owner 存在时回退到原有层级网格");
+}
+
+// ---------- 14. 根横向布局的普通末端容器保持弹性，已识别右栏才固定 ----------
+{
+  const rootWithTail = function (tailType) {
+    const root = node("rootRow", "FRAME", { width: 1280, height: 759, relativeX: 0, relativeY: 0 }, [
+      node("camera", "INSTANCE", { width: 600, height: 500, relativeX: 0, relativeY: 0 }),
+      node("tail", "FRAME", { width: 680, height: 500, relativeX: 600, relativeY: 0 }, [
+        node("tailA", "INSTANCE", { width: 120, height: 20, relativeX: 0, relativeY: 0 }),
+        node("tailB", "INSTANCE", { width: 120, height: 20, relativeX: 0, relativeY: 40 })
+      ], { flexContainerInfo: { flexDirection: "column" } })
+    ], { flexContainerInfo: { flexDirection: "row" } });
+    return workArea(derive(snapshot([], [root]), typesOf([
+      { ref: "camera", controlType: "Camera", absX: 0, absY: 85, w: 600, h: 500 },
+      { ref: "tailA", controlType: tailType, absX: 600, absY: 85, w: 120, h: 20 },
+      { ref: "tailB", controlType: tailType, absX: 600, absY: 125, w: 120, h: 20 }
+    ])));
+  };
+  assert.deepStrictEqual(sizes(rootWithTail("TextBlock").grid.columns), [600, "Star"],
+    "普通主内容容器即使是根层贴边末项也不按右栏固定");
+  assert.deepStrictEqual(sizes(rootWithTail("IconButton").grid.columns), [600, 680],
+    "独占根层贴边末带且符合右栏结构的容器保持设计宽度");
 }
 

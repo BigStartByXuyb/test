@@ -217,7 +217,7 @@ function constraintAttrs(cell) {
   return Object.keys(attrs).length ? attrs : null;
 }
 
-// 控件属性：顺序固定为 定位 → 约束 → 尺寸/对齐 → 图形 → 文本 → 样式 → 普通 XAML 属性 → 协议，便于逐行比对真实页面。
+// 控件属性：顺序固定为 定位 → 约束 → 尺寸/对齐 → 图形 → 文本 → 样式 → 协议，便于逐行比对真实页面。
 function renderControl(node, cell, ctx, depth) {
   const spec = specOf(ctx.map, node.controlType);
   if (!spec) {
@@ -274,13 +274,6 @@ function renderControl(node, cell, ctx, depth) {
 
   if (styleInfo.style && !styleInfo.pageLevel) attr("Style", "{StaticResource " + styleInfo.style + "}");
   // 页级样式命中时不写 Style：外观由 <UserControl.Resources> 的 BasedOn 统一。
-
-  // 直写属性：仅发射写法表显式列出的普通 XAML 属性，空值不写。
-  (spec.xamlAttrs || []).forEach(function (name) {
-    const source = attrs[name] !== undefined ? attrs[name] : node[name];
-    if (source === undefined || source === null || String(source).trim() === "") return;
-    attr(name, String(source));
-  });
 
   // 协议挂载：只在类型判定给出取值时发射，不写空串占位（A 侧没有「必须恒写的宿主字段」）。
   (spec.protocols || []).forEach(function (protocol) {

@@ -259,11 +259,9 @@ function emitArgs(layoutPath, typesPath, outPath, extra = []) {
   assert.ok(!routeMap.extends && !routeMap.familyOverlays,
     "MW WPF 写法表是独立平面表，不得绕过组合映射加载器声明 extends/overlays");
   assert.ok(Object.values(routeMap.controlTypes).every(spec => !Object.prototype.hasOwnProperty.call(spec, "attrs")),
-    "MW WPF 写法表不得把观察属性 attrs 作为第二份发射白名单");
+    "MW WPF 写法表使用 observedAttrs 记录观察属性");
   assert.match(xaml, /xmlns:camera="clr-namespace:MaxWell\.CameraDevice;assembly=MaxWell\.CameraDevice"/, "按写法表声明 CameraControl 命名空间");
   assert.match(xaml, /<camera:CameraControl/, "Camera 按写法表发射成 CameraControl");
-  assert.deepStrictEqual(routeMap.controlTypes.Camera.xamlAttrs, [],
-    "作业A Camera 当前没有可复现的实例属性来源，因此不发射普通 XAML 属性");
   assert.ok(!Object.prototype.hasOwnProperty.call(routeMap.controlTypes.Camera, "observedAttrs"),
     "Camera 不得保留无页面依据的属性观察目录");
   assert.deepStrictEqual(routeMap.controlTypes.Camera.protocols, [],
