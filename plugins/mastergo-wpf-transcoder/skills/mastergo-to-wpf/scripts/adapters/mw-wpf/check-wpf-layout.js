@@ -57,8 +57,6 @@ const counts = {};
 const manualOnlyTypes = new Set();
 
 // 提示（notice）：不失败、不进 findings，只在报告里登记事实。
-// 目标框架允许 Grid 出现空行空列（框架自身控件模板里就有空列），保留空列还能让后续控件保持设计稿坐标，
-// 因此"空行空列"只作为提示登记。
 const notices = [];
 
 function report(rule, ref, message) {
