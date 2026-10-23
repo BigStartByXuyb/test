@@ -7,7 +7,7 @@
   - 'exp'  扩片机
   - 'slg'  激光切割设备
   - 'trunk' 显式只用主干
-  - 'unknown' 未识别设备族：按主干规则归类，输出标注“未知类型，需复核”
+  - 'unknown' 未识别设备族：按主干规则归类，输出标注“未知类型（按主干，需复核）”
 """
 from sip_rules_trunk import (  # noqa: F401
     M, W, D, Q, S, L, G, U, B,
