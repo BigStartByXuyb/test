@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
 """文件类型（设备族）识别：决定走哪个规则分支。
 
-优先级：SLG（激光） > EXP（扩片） > SDC（刀轮/切割） > 主干。
+优先级：SLG（激光） > EXP（扩片） > SDC（刀轮/切割） > unknown。
 文件名前缀（SDC/EXP/SLG）优先参与判断，避免产品名不含关键词时误判。
+无法识别时返回 'unknown'：仍按主干规则归类，但输出会标注“未知类型，需复核”，
+与“已知设备族使用主干规则”区分开。
 """
 import os
 
@@ -20,12 +22,12 @@ def detect_family(product, model, stages, file_name=''):
         return 'exp'
     if stem.startswith('SDC') or 'SDC' in m or '刀轮' in p or '切割' in p:
         return 'sdc'
-    return 'trunk'
+    return 'unknown'
 
 
 def detect_family_from_rows(rows, file_name=''):
     if not rows:
-        return 'trunk'
+        return 'unknown'
     return detect_family(rows[0].get('product', ''),
                          rows[0].get('model', ''),
                          [r.get('stage', '') for r in rows],

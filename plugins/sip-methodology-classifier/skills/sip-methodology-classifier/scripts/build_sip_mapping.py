@@ -104,8 +104,9 @@ def write_workbook(all_rows, projects, out_path, ref=None, verify=None,
     center = Alignment(horizontal='center', vertical='center', wrap_text=True)
 
     headers = ['主顺序', '子顺序', '机型文件', '产品名称', '机型代码', '原序号',
-               '检验工序', '检验项目', '子项', '检验标准', '检验方法', '检验工具', '归类依据']
-    widths = [15, 8, 10, 24, 15, 8, 16, 30, 16, 46, 12, 13, 10]
+               '检验工序', '检验项目', '子项', '检验标准', '检验方法', '检验工具',
+               '归类依据', '设备族']
+    widths = [15, 8, 10, 24, 15, 8, 16, 30, 16, 46, 12, 13, 10, 10]
 
     used = set()
     project_order = [p[0] for p in projects]
@@ -114,14 +115,14 @@ def write_workbook(all_rows, projects, out_path, ref=None, verify=None,
         ws.sheet_view.showGridLines = False
         for i, w in enumerate(widths, 1):
             ws.column_dimensions[get_column_letter(i)].width = w
-        ws.merge_cells('A1:M1')
+        ws.merge_cells('A1:N1')
         ws['A1'] = f'{pname} · SIP 方法论顺序对应表'
         ws['A1'].font = Font(name='微软雅黑', size=14, bold=True, color='1F3864')
         ws['A1'].alignment = Alignment(horizontal='center', vertical='center')
         ws.row_dimensions[1].height = 28
-        ws.merge_cells('A2:M2')
+        ws.merge_cells('A2:N2')
         ws['A2'] = ('主顺序＝SIP 九个环节（1→9）；子顺序＝每个环节内部执行次序（1级优先，12级最后）。'
-                    '原表标黄内容不纳入。归类依据列：标准答案/同类工序/规则推断。')
+                    '原表标黄内容不纳入。归类依据列：标准答案/同类工序/分支规则/主干规则/规则推断。')
         ws['A2'].font = Font(name='微软雅黑', size=9, color='808080')
         ws['A2'].alignment = Alignment(vertical='center', wrap_text=True)
         ws.row_dimensions[2].height = 30
@@ -141,12 +142,12 @@ def write_workbook(all_rows, projects, out_path, ref=None, verify=None,
             grp = [x for x in rows if x['main'] == main]
             if not grp:
                 continue
-            ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=13)
+            ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=14)
             c = ws.cell(row=r, column=1, value=f'▶ {main}　（{len(grp)} 项）')
             c.font = main_font
             c.fill = main_fill
             c.alignment = Alignment(vertical='center')
-            for col in range(1, 14):
+            for col in range(1, 15):
                 ws.cell(row=r, column=col).fill = main_fill
                 ws.cell(row=r, column=col).border = border
             ws.row_dimensions[r].height = 22
@@ -155,26 +156,27 @@ def write_workbook(all_rows, projects, out_path, ref=None, verify=None,
                 sgrp = [x for x in grp if x['sublevel'] == sub]
                 if not sgrp:
                     continue
-                ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=13)
+                ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=14)
                 c = ws.cell(row=r, column=1, value=f'　　{sub}　（{len(sgrp)} 项）')
                 c.font = sub_font
                 c.alignment = Alignment(vertical='center')
-                for col in range(1, 14):
+                for col in range(1, 15):
                     ws.cell(row=r, column=col).fill = sub_fill
                     ws.cell(row=r, column=col).border = border
                 r += 1
                 for x in sgrp:
                     vals = [x['main'], x['sublevel'], x['file'], x['product'],
                             x['model'], x['seq'], x['stage'], x['item'], x['sub'],
-                            x['std'], x['method'], x['tool'], x['source']]
+                            x['std'], x['method'], x['tool'], x['source'],
+                            family_label(x.get('family'))]
                     for i, v in enumerate(vals, 1):
                         c = ws.cell(row=r, column=i, value=v)
                         c.font = body_font
                         c.border = border
-                        c.alignment = center if i in (1, 2, 3, 5, 6, 11, 12, 13) else wrap
+                        c.alignment = center if i in (1, 2, 3, 5, 6, 11, 12, 13, 14) else wrap
                     r += 1
         ws.freeze_panes = 'C4'
-        ws.auto_filter.ref = f'A3:M{r - 1}'
+        ws.auto_filter.ref = f'A3:N{r - 1}'
 
     # --------------------------- 说明
     ws = wb.create_sheet('说明', 0)
@@ -202,8 +204,12 @@ def write_workbook(all_rows, projects, out_path, ref=None, verify=None,
                    '浅蓝色版本更新标注保留。'),
         ('共用项处理', '团队标准答案没有单独的“共用”区：同一工序中既涉及水又涉及气的行，'
                     '按行内容拆分到“4.通气检验”或“5.通水检验”。'),
-        ('归类依据', '每条记录最后一列：标准答案＝标准答案中已有同名工序/项目；'
-                  '同类工序＝按同一语义套用的新机型工序；规则推断＝关键字推断，只会落在主顺序 2–9、子顺序 1–5 级；完全无法推断时用 (3. 通电检验, 5级)，需人工复核。'),
+        ('归类依据', '每条记录倒数第二列：标准答案＝标准答案中已有同名工序/项目；'
+                  '同类工序＝按同一语义套用的新机型工序；分支规则＝命中设备族分支规则；'
+                  '主干规则＝命中通用主干规则；规则推断＝关键字推断，只会落在主顺序 2–9、子顺序 1–5 级；'
+                  '完全无法推断时用 (3. 通电检验, 5级)，需人工复核。'),
+        ('设备族', '每条记录最后一列：SDC/EXP/SLG 为识别到的设备族；'
+                '“未知类型（按主干，需复核）”表示未识别出设备族，当前按主干规则归类。'),
         ('标黄跳过行', f'解析时跳过序号单元格为黄色的行：{skipped_yellow} 行。'),
     ]
     for k, v in intro:

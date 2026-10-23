@@ -6,7 +6,8 @@
   - 'sdc'  刀轮/晶圆切割机
   - 'exp'  扩片机
   - 'slg'  激光切割设备
-  - 'trunk' 未识别，只用主干
+  - 'trunk' 显式只用主干
+  - 'unknown' 未识别设备族：按主干规则归类，输出标注“未知类型，需复核”
 """
 from sip_rules_trunk import (  # noqa: F401
     M, W, D, Q, S, L, G, U, B,
@@ -21,7 +22,8 @@ import sip_family_exp as _exp  # noqa: E402
 import sip_family_slg as _slg  # noqa: E402
 
 _FAMILY_MODULES = {'sdc': _sdc, 'exp': _exp, 'slg': _slg}
-_FAMILY_NAMES = {'trunk': '主干', 'sdc': 'SDC', 'exp': 'EXP', 'slg': 'SLG'}
+_FAMILY_NAMES = {'trunk': '主干', 'sdc': 'SDC', 'exp': 'EXP', 'slg': 'SLG',
+                 'unknown': '未知类型（按主干，需复核）'}
 
 
 def family_label(family):
@@ -203,5 +205,5 @@ def classify(stage, item, sub='', std='', method='',
     if layer == 'branch':
         return result, '分支规则'
     if layer == 'trunk':
-        return result, ('同类工序' if family in ('sdc', 'exp') else '主干规则')
+        return result, '主干规则'
     return result, '规则推断'

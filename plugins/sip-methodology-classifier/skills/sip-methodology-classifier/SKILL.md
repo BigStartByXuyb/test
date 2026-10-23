@@ -40,11 +40,11 @@ description: 把 MAXWELL《成品检验指导书》Excel 按 SIP 方法论归类
 
 - **主干 `scripts/sip_rules_trunk.py`**：9 个主顺序、1–12 子顺序、通用规则（BOM 规格三分法、流量压力行级拆分、气管水管、离子棒、安全防护、老化、通断电、备份杀毒等）。
 - **分支**：
-  - `scripts/sip_family_sdc.py`：刀轮/晶圆切割机
-  - `scripts/sip_family_exp.py`：扩片机
+  - `scripts/sip_family_sdc.py`：刀轮/晶圆切割机（当前规则继承主干，分支文件预留扩展）
+  - `scripts/sip_family_exp.py`：扩片机（当前规则继承主干，分支文件预留扩展）
   - `scripts/sip_family_slg.py`：激光切割设备（**草稿，待文件编写同事确认**）
-- **识别 `scripts/sip_family_detect.py`**：按文件名前缀（SDC/EXP/SLG）、机型代码、产品名称、工序特征判定；识别不了走主干，并在交付说明中标注“未知类型，需复核”。
-- **优先级**：分支规则优先，主干兜底；新增设备品类只加一个分支文件，不改格式引擎和校验逻辑。
+- **识别 `scripts/sip_family_detect.py`**：按文件名前缀（SDC/EXP/SLG）、机型代码、产品名称、工序特征判定；识别不了记为 `unknown`，仍按主干规则归类，但脚本输出会显示“未知类型（按主干，需复核）”，交付说明也要标注。
+- **优先级**：分支规则优先，主干兜底。新增设备品类需要三步：新增一个分支文件、在 `sip_rules.py` 的 `_FAMILY_MODULES` 注册、在 `sip_family_detect.py` 加识别条件；不改格式引擎和校验逻辑。
 
 ## 工作流
 

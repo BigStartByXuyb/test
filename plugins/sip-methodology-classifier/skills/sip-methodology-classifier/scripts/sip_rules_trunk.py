@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
-"""SIP 方法论归类规则（机器可执行口径）。
+"""SIP 方法论归类规则——主干（通用/已验证基线）。
 
 主顺序：9 个环节；子顺序：每个环节内部 1级→12级。
-规则支持用任意标准答案 xlsx 逐行校验（由调用方通过 load_reference 传入，不假定文件名或路径）。
-新增机型特有工序时，优先补 STAGE_RULES / EXACT / 行级拆分，不要改动标准答案已有归属。
+本模块只存放规则数据和标准答案读取；归类逻辑与分支合并由 `sip_rules.py` 统一调度。
+通用工序补这里的 STAGE_RULES / EXACT；设备族特有工序加到对应 `sip_family_*.py`，
+不要改动标准答案已有归属。
 """
 import re
 
@@ -191,133 +192,6 @@ BOM_STAGES = {
     '控制系统', '电阻',
 }
 BOM_RE = re.compile(r'^\s*\d+\s*pcs', re.I)
-
-
-# ---------------------------------------------------------------- 分类
-def _classify_raw(stage, item, sub, std, method):
-    key = (stage, item)
-    if key in EXACT:
-        if item == '接触式测高位置及刀刃外观确认':
-            return (D, '6级') if '刀刃外观' in std else (D, '5级')
-        return EXACT[key]
-    if stage.startswith('流量、压力及位置检查'):
-        if 'NCS检查' in item:
-            return (S, '1级') if ('水柱' in std or '冲洗' in std) else (Q, '2级')
-        if '水气帘' in item:
-            return (S, '1级')
-        if '气帘角度' in item or '水帘角度' in item:
-            return (S, '1级')
-        if '吹气' in item or '光尺气帘' in item:
-            return (Q, '2级')
-        if '真空' in item:
-            return (Q, '3级')
-        if '二流体' in item:
-            return (S, '1级')
-        if '喷水架' in item:
-            return (S, '2级')
-        if any(k in item for k in ('自清洁', '水帘', '水压', '清洗水')) or '水柱' in std:
-            return (S, '1级')
-        if any(k in item for k in ('气帘', '正压', '压力', '氮气', '热风', '红外')):
-            return (Q, '2级')
-        if any(k in item for k in ('气缸', '位置', '水平', '轴间距', '测高行程')):
-            return (D, '5级')
-        if any(k in item for k in ('流量', '传感', '高度', '隔板')):
-            return (S, '1级')
-    if stage == '工控机':
-        text = item + std
-        if '断电' in text:
-            return (U, '2级')
-        if ('序列号' in text or 'S/N' in text or '核对规格' in item
-                or BOM_RE.match(std)):
-            return (M, '2级')
-        return (D, '12级')
-    if stage == '加密狗':
-        text = item + std
-        if '永久版本' in text or '序列号' in text:
-            return (B, '1级')
-        return (M, '2级')
-    if stage == '料库检料传感器确认':
-        return (D, '6级')
-    if stage == '气管、水管':
-        return (S, '3级') if ('水管' in std and '气管' not in std) else (Q, '4级')
-    if stage == '离子棒':
-        return (W, '1级') if ('安装位置' in std or '安装在' in std) else (D, '9级')
-    if stage == 'NCS光纤':
-        return (W, '1级') if ('外观' in std or '无挤压' in std) else (W, '2级')
-    if stage == '安全防护检查':
-        return (S, '3级') if ('漏水' in std or '漏水' in item) else (D, '12级')
-    if stage == '陶瓷手臂':
-        return (W, '1级') if '拆解打包' in (item + std) else (D, '9级')
-    if stage in ('工艺验收', '工艺验收标准'):
-        if any(k in (item + std) for k in ('尺寸', '厚度', '宽度', '深度')):
-            return (G, '1级')
-        if any(k in (item + std) for k in ('外观', '崩边', '沾污', '破裂', '分段', '分离')):
-            return (G, '2级')
-        return (G, '1级')
-    if stage in STAGE_RULES:
-        return STAGE_RULES[stage]
-    if stage in BOM_STAGES:
-        if BOM_RE.match(std):
-            return (M, '2级')
-        if any(k in std for k in ('外观', '安装', '完好', '牢固', '无损伤')):
-            return (W, '1级')
-        return (D, '5级')
-    # 关键字推断；返回 None 表示完全无法推断
-    if any(k in stage for k in ('精度', '补偿')):
-        return (D, '4级')
-    if any(k in stage for k in ('外观', '整理', '清洁', '标识', '布局', '门板', '盖板',
-                                '接头', '地脚', '颜色', '外壳')):
-        return (W, '1级')
-    if any(k in stage for k in ('复位', '气缸', '电机', '转速', '噪音', '功能', '流程',
-                                '测试', '点检', '单元', '工位')):
-        return (D, '5级')
-    if any(k in stage for k in ('真空', '气密', '气幕')) or (
-            '气' in stage and '水' not in stage):
-        return (Q, '2级')
-    if '水' in stage or '漏' in stage:
-        return (S, '3级')
-    if '老化' in stage:
-        return (L, '2级')
-    if '工艺' in stage:
-        return (G, '1级')
-    if '断电' in stage:
-        return (U, '1级')
-    if any(k in stage for k in ('备份', '杀毒', '病毒', 'USB', 'window', '加密')):
-        return (B, '3级')
-    return None
-
-
-def _explicit_match(stage, item):
-    """是否命中了明确规则（而不是关键字推断）。"""
-    if (stage, item) in EXACT:
-        return True
-    if stage.startswith('流量、压力及位置检查'):
-        return True
-    if stage in ('工控机', '料库检料传感器确认', '气管、水管', '离子棒', 'NCS光纤',
-                 '安全防护检查', '陶瓷手臂', '工艺验收', '工艺验收标准'):
-        return True
-    return stage in STAGE_RULES or stage in BOM_STAGES
-
-
-def classify(stage, item, sub='', std='', method='',
-             ref_pairs=None, ref_stages=None):
-    """返回 ((主顺序, 子顺序), 归类依据)。
-
-    归类依据：
-      标准答案  - 标准答案中存在同名 (工序, 项目)
-      同类工序  - 标准答案中存在同名工序，或命中了明确的工序/项目规则
-      规则推断  - 关键字推断（只会落在主顺序 2–9、子顺序 1–5 级；完全无法推断时用 (3. 通电检验, 5级)），需人工复核
-    """
-    result = _classify_raw(stage, item, sub, std, method)
-    if result is None:
-        return (D, '5级'), '规则推断'
-    if ref_pairs is not None and (stage, item) in ref_pairs:
-        return result, '标准答案'
-    if ref_stages is not None and stage in ref_stages:
-        return result, '同类工序'
-    if _explicit_match(stage, item):
-        return result, '同类工序'
-    return result, '规则推断'
 
 
 # ---------------------------------------------------------------- 标准答案读取
