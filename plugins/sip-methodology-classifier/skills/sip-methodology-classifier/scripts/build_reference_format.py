@@ -31,8 +31,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 if HERE not in sys.path:
     sys.path.insert(0, HERE)
 
-from sip_rules import classify, load_reference, header_key  # noqa: E402
+from sip_rules import classify, load_reference, header_key, family_label  # noqa: E402
 from sip_source import parse_sheet, discover_projects, find_header_row  # noqa: E402
+from sip_family_detect import detect_family_from_rows  # noqa: E402
 from sip_verify import verify_file, format_results  # noqa: E402
 from extract_gbk_zip import extract as extract_zip  # noqa: E402
 
@@ -244,15 +245,23 @@ def main():
             rows, _ = parse_sheet(path, pname)
             probe = load_workbook(path, data_only=True)
             n_title = find_header_row(probe.worksheets[0]) - 1
+            family = detect_family_from_rows(rows, file_name=f)
             row_map = {}
             rule_inferred = 0
+            branch_hits = 0
+            trunk_hits = 0
             for row in rows:
                 (main, sub), source = classify(
                     row['stage'], row['item'], row['sub'], row['std'], row['method'],
                     ref['pairs'] if ref else None,
-                    ref['stages'] if ref else None)
+                    ref['stages'] if ref else None,
+                    family=family)
                 if source == '规则推断':
                     rule_inferred += 1
+                elif source == '分支规则':
+                    branch_hits += 1
+                elif source == '主干规则':
+                    trunk_hits += 1
                 # 源表行号 -> 转换后行号（减标题行数）
                 row_map[row['src'] - n_title] = (main, sub)
             wb, unclassified = transform_source(path, row_map)
@@ -262,9 +271,13 @@ def main():
             total += max(0, dst.max_row - 1)
             total_unclassified += len(unclassified)
             total_rule_inferred += rule_inferred
-            extra = ''
+            extra = f' [分支 {family_label(family)}]'
             if unclassified:
                 extra += f'（未解析/跳过行 {len(unclassified)}，M/N 留空）'
+            if branch_hits:
+                extra += f'（分支规则 {branch_hits}）'
+            if trunk_hits:
+                extra += f'（主干规则 {trunk_hits}）'
             if rule_inferred:
                 extra += f'（规则推断 {rule_inferred}，建议复核）'
             print(f'  {title}: {max(0, dst.max_row - 1)} 行{extra}')

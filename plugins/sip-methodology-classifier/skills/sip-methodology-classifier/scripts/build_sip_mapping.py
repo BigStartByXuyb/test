@@ -32,9 +32,10 @@ from openpyxl.utils import get_column_letter
 
 import sip_rules
 from sip_rules import (MAIN_ORDER, SUB_ORDER, MAIN_IDX, SUB_IDX,
-                       classify, load_reference)
+                       classify, load_reference, family_label)
 from extract_gbk_zip import extract as extract_zip
 from sip_source import parse_sheet, discover_projects
+from sip_family_detect import detect_family_from_rows
 from sip_verify import verify_records, format_results
 
 try:
@@ -381,16 +382,20 @@ def main():
             path = os.path.join(pdir, f)
             rows, skipped = parse_sheet(path, pname)
             skipped_total += skipped
+            family = detect_family_from_rows(rows, file_name=f)
             for row in rows:
                 (main, sub), source = classify(
                     row['stage'], row['item'], row['sub'], row['std'], row['method'],
                     ref['pairs'] if ref else None,
-                    ref['stages'] if ref else None)
+                    ref['stages'] if ref else None,
+                    family=family)
                 row['main'] = main
                 row['sublevel'] = sub
                 row['source'] = source
+                row['family'] = family
             all_rows.extend(rows)
-            print(f'  {f}: {len(rows)} 行' + (f'（跳过黄行 {skipped}）' if skipped else ''))
+            print(f'  {f}: {len(rows)} 行 [分支 {family_label(family)}]'
+                  + (f'（跳过黄行 {skipped}）' if skipped else ''))
 
     if not all_rows:
         raise SystemExit('没有解析到任何有效数据行')
