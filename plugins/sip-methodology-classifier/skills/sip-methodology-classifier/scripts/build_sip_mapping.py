@@ -339,7 +339,8 @@ def write_workbook(all_rows, projects, out_path, ref=None, verify=None,
         c.border = border
     pending = [x for x in all_rows if x['source'] == '规则推断']
     if not pending:
-        ws2.cell(row=4, column=1, value='无（所有工序均按标准答案或同类工序规则归类）').font = body_font
+        ws2.cell(row=4, column=1,
+                 value='无（其余均按标准答案/同类工序/分支规则/主干规则归类）').font = body_font
     else:
         rr = 4
         for x in pending:
