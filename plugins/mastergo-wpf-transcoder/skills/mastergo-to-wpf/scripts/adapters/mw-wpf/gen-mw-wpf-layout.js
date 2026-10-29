@@ -710,7 +710,7 @@ function contentSizeOf(cell) {
   };
 }
 
-function cameraSidebarLayout(grid, items, dslTree, size, origin) {
+function cameraSidebarLayout(grid, items, dslTree, size, origin, ctx) {
   // 命中特殊结构时以 rootTop 重基 DSL 坐标；rootTop-headerHeight 的顶部空白只用于裁切，不发射为根行或 Margin。
   const camera = items.find(function (item) { return item.controlType === "Camera"; });
   if (!camera) return null;
@@ -737,10 +737,9 @@ function cameraSidebarLayout(grid, items, dslTree, size, origin) {
   const middleCells = (grid.cells || []).filter(function (cell) {
     return cell.ref !== cameraCell.ref && cell.ref !== sidebarCell.ref;
   });
-  if (middleCells.length !== 1 || !middleCells[0].container || !middleCells[0].children) return null;
-  const middleCell = middleCells[0];
-  const middleItem = items.find(function (item) { return item.ref === middleCell.ref; });
-  if (!middleItem) return null;
+  if (!middleCells.length || middleCells.some(function (cell) {
+    return cell.column < cameraCell.column || cell.column >= sidebarCell.column;
+  })) return null;
 
   const rootTop = Math.min(sidebar.y, cameraRecord.y);
   const contentTop = cameraRecord.y;
@@ -751,7 +750,10 @@ function cameraSidebarLayout(grid, items, dslTree, size, origin) {
   const sidebarLeftInset = Math.round(sidebar.x - dividerX);
   const sidebarRightInset = Math.round(designWidth - sidebar.x - sidebar.w);
   const cameraLeftInset = Math.round(cameraRecord.x);
-  const middleX = Math.round(middleItem.x);
+  const middleX = Math.min.apply(null, middleCells.map(function (cell) {
+    const item = items.find(function (candidate) { return candidate.ref === cell.ref; });
+    return item ? Math.round(item.x) : Infinity;
+  }));
   const cameraTrackWidth = middleX - cameraLeftInset;
   const middleTrackWidth = contentWidth - cameraLeftInset - cameraTrackWidth;
   if (!(rootHeight > 0 && contentHeight > 0 && sidebarWidth > 0 &&
@@ -768,16 +770,17 @@ function cameraSidebarLayout(grid, items, dslTree, size, origin) {
   cameraCell.offsetY = 0;
   delete cameraCell.shifted;
 
-  middleCell.row = 0;
-  middleCell.column = 2;
-  middleCell.rowSpan = 1;
-  middleCell.columnSpan = 1;
-  middleCell.width = middleTrackWidth;
-  middleCell.height = contentHeight;
-  middleCell.offsetX = 0;
-  middleCell.offsetY = Math.round(middleItem.y - contentTop);
-  middleCell.sizingMode = containerSizingMode(middleCell.children.cells, false);
-  delete middleCell.shifted;
+  const middleItems = items.filter(function (item) {
+    return item.ref !== camera.ref && item.ref !== sidebar.ref;
+  });
+  const middleGrid = buildGridFrom(middleItems, ctx, { w: middleTrackWidth, h: contentHeight }, null,
+    { x: middleX, y: contentTop }, false);
+  const middleCell = {
+    ref: "synth:middle-content", row: 0, column: 2, rowSpan: 1, columnSpan: 1,
+    nodeWidth: middleTrackWidth, nodeHeight: contentHeight, container: true, synth: true,
+    synthAxis: "y", sizingMode: containerSizingMode(middleGrid.cells, false), offsetX: 0, offsetY: 0,
+    width: middleTrackWidth, height: contentHeight, children: middleGrid
+  };
 
   const contentGrid = {
     rows: [{ size: "Star", source: "design" }],
@@ -850,7 +853,8 @@ function buildRegionGrid(entries, containers, pending, dslTree, size, origin, gr
   // 设计稿已经打了组（这一层由某个容器提上来的，owner 非空）就不再补组；只有散落条目才补。
   const synth = owner ? { items: flex.items, unresolved: [] } : synthRegionGroups(flex.items, groupsDoc);
   const grid = buildGridFrom(synth.items, { childrenOf: tree.childrenOf, dslTree: dslTree }, size, owner, origin, true);
-  const cameraSidebar = !owner ? cameraSidebarLayout(grid, synth.items, dslTree, size, origin) : null;
+  const cameraSidebar = !owner ? cameraSidebarLayout(grid, synth.items, dslTree, size, origin,
+    { childrenOf: tree.childrenOf, dslTree: dslTree }) : null;
   return {
     grid: cameraSidebar ? cameraSidebar.grid : grid,
     area: cameraSidebar ? cameraSidebar.area : null,
