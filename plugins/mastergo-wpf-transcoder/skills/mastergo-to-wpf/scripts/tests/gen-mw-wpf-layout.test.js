@@ -528,16 +528,16 @@ function sizes(bands) {
         ...sidebarItems
       ], { flexContainerInfo: { flexDirection: "column" } }),
       node("divider", "RECTANGLE", { width: 1, height: 600, relativeX: 1075, relativeY: 97 }),
-      node("middleLabelA", "TEXT", { width: 100, height: 20, relativeX: 660, relativeY: 250 }),
-      node("middleLabelB", "TEXT", { width: 100, height: 20, relativeX: 820, relativeY: 290 })
+      node("middleLabelA", "TEXT", { width: 20, height: 20, relativeX: 630, relativeY: 250 }),
+      node("middleLabelB", "TEXT", { width: 20, height: 20, relativeX: 1050, relativeY: 290 })
     ];
   };
   const types = typesOf([
     { ref: "camera", controlType: "Camera", absX: 20, absY: 200, w: 600, h: 600 },
     { ref: "middleA", controlType: "TextBlock", absX: 650, absY: 202, w: 120, h: 20 },
     { ref: "middleB", controlType: "TextBlock", absX: 650, absY: 242, w: 120, h: 20 },
-    { ref: "middleLabelA", controlType: "TextBlock", absX: 660, absY: 335, w: 100, h: 20 },
-    { ref: "middleLabelB", controlType: "TextBlock", absX: 820, absY: 375, w: 100, h: 20 },
+    { ref: "middleLabelA", controlType: "TextBlock", absX: 630, absY: 335, w: 20, h: 20 },
+    { ref: "middleLabelB", controlType: "TextBlock", absX: 1050, absY: 375, w: 20, h: 20 },
     { ref: "rightA", controlType: "IconButton", absX: 1100, absY: 182, w: 170, h: 70 },
     { ref: "rightB", controlType: "IconButton", absX: 1100, absY: 282, w: 170, h: 70 }
   ]);
@@ -551,11 +551,13 @@ function sizes(bands) {
     "多个中间条目不应阻止先生成内容区 + 固定右栏两列");
   const plainContent = cellOf(plain, "synth:content-area");
   const middleArea = cellOf({ grid: plainContent.children }, "synth:middle-content");
-  assert.ok(middleArea && middleArea.children.cells.length >= 1,
-    "多个中间条目必须收纳进内容区中间容器");
+  const middleRefs = middleArea.children.cells.map(function (cell) { return cell.ref; });
+  assert.ok(middleRefs.includes("middleLabelA") && middleRefs.includes("middleLabelB"),
+    "多个独立中间条目必须全部收纳进内容区中间容器");
 
   const multipleSidebarTypes = typesOf(Array.from(types.byRef.values()).map(function (item) {
-    return item.ref === "middleA" || item.ref === "middleB"
+    return item.ref === "middleA" || item.ref === "middleB" ||
+      item.ref === "middleLabelA" || item.ref === "middleLabelB"
       ? Object.assign({}, item, { controlType: "IconButton" }) : item;
   }));
   const multipleSidebars = workArea(derive(snapshot([], pageChildren(false)), multipleSidebarTypes));

@@ -738,7 +738,7 @@ function cameraSidebarLayout(grid, items, dslTree, size, origin, ctx) {
     return cell.ref !== cameraCell.ref && cell.ref !== sidebarCell.ref;
   });
   if (!middleCells.length || middleCells.some(function (cell) {
-    return cell.column < cameraCell.column || cell.column >= sidebarCell.column;
+    return cell.column <= cameraCell.column || cell.column >= sidebarCell.column;
   })) return null;
 
   const rootTop = Math.min(sidebar.y, cameraRecord.y);
