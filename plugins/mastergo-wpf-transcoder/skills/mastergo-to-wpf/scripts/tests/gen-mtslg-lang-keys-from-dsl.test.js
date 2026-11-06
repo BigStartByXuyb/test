@@ -64,6 +64,10 @@ const mapping = {
     { sourceRef: "p/btn-dup-b", controlType: "IconButton", sourceText: "设备维护", valueSource: "dsl.text", attrs: { Value: "设备维护", Icon: "DeviceMaintenanceGeometry" } },
     // 不同文案但派生出的语义名相同 → 仍需要稳定数字后缀，不静默覆盖。
     { sourceRef: "p/btn-collide", controlType: "IconButton", sourceText: "维护设置", valueSource: "dsl.text", attrs: { Value: "维护设置", Icon: "DeviceMaintenanceGeometry" } },
+    // 两条文案的**译文只差大小写**（中文「对焦步进量」→ "Focus Step"，设计稿自带英文 "Focus step"）：
+    // 派生出来的 key 不能只差大小写 —— 下游门禁按不区分大小写判重复，会当场判这一页失败。
+    { sourceRef: "p/tb-focus-step", controlType: "TextBlock", sourceText: "对焦步进量", valueSource: "dsl.text", attrs: { Value: "对焦步进量" } },
+    { sourceRef: "p/tb-focus-step-en", controlType: "TextBlock", sourceText: "Focus step", valueSource: "dsl.text", attrs: { Value: "Focus step" } },
     // 纯 ASCII 文案：没有 Icon 也要有语义名。
     { sourceRef: "p/tb-aux", controlType: "TextBlock", sourceText: "AUX.", valueSource: "dsl.text", attrs: { Value: "AUX." } },
     // 兜底：中文 + 无 Icon + 图层名不可用。
@@ -123,7 +127,8 @@ const layoutPath = write("layout-manifest.json", layoutManifest);
 const translationsPath = write("translations.json", {
   "配方管理": "Recipe Management",
   "全自动操作": "Full Auto Operation",
-  "工件边缘录入": "Workpiece Edge Teaching"
+  "工件边缘录入": "Workpiece Edge Teaching",
+  "对焦步进量": "Focus Step"
 });
 
 const outPath = path.join(root, "lang.json");
@@ -210,6 +215,15 @@ assert.ok(!keyByRef.has("DemoRecipeDeviceMaintenance2"), "同文案不得再派�
 assert.strictEqual(keyByRef.get("p/btn-collide"), "DemoRecipeDeviceMaintenance2");
 assert.ok(report.duplicateKeys.some((item) => item.key === "DemoRecipeDeviceMaintenance2"));
 
+// 6.2) 译文只差大小写（"Focus Step" 与设计稿自带的 "Focus step"）时，两个 key 也不能只差大小写 ——
+// 下游门禁按不区分大小写判重复（verify-page.ps1 的 Group-Object），只差大小写就等于这一页失败。
+const focusKeys = [keyByRef.get("p/tb-focus-step"), keyByRef.get("p/tb-focus-step-en")];
+assert.ok(focusKeys.every(Boolean), "两条文案都要产键：" + emittedKeys);
+assert.notStrictEqual(focusKeys[0].toLowerCase(), focusKeys[1].toLowerCase(),
+  "两个 key 不能只差大小写：" + focusKeys.join(" / "));
+assert.strictEqual(focusKeys[0], "DemoRecipeFocusStep", "先到的保留原名");
+assert.strictEqual(focusKeys[1], "DemoRecipeFocusStep2", "后到的按既有规则加稳定后缀");
+
 // 7) 全量多语言：数字 / 符号 / 版本号 / 型号 / 功能键这类中英文写法相同的文本**同样产键挂 LangName**，
 //    只是 EN 值等于原文（不记待翻译）；逐条登记进报告 identicalTextKeys 供交付说明核对。
 for (const ref of ["p/tb-sn", "p/tb-ver2", "p/tb-model", "p/tb-pct", "p/tb-hotkey"]) {
@@ -254,7 +268,8 @@ for (const entry of languages.keys) {
 }
 assert.strictEqual(report.translatedFromCatalog, 3,
   "字典命中（菜单 参数维护 / 软件版本 / 确定）应计入 translatedFromCatalog");
-assert.strictEqual(report.translatedFromInput, 3, "译文清单命中（标题 / 全自动操作 / 工件边缘录入）应计入 translatedFromInput");
+assert.strictEqual(report.translatedFromInput, 4,
+  "译文清单命中（标题 / 全自动操作 / 工件边缘录入 / 对焦步进量）应计入 translatedFromInput");
 const pendingKeys = new Set(report.pendingTranslations.map((item) => item.key));
 for (const entry of languages.keys) {
   const needsTranslation = /[\u4e00-\u9fa5]/.test(entry.text.CN);
