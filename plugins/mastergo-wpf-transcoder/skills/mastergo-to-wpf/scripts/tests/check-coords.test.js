@@ -40,14 +40,16 @@ const makeMapping = (groupY) => ({
     { ref: 'page/root/group/label', type: 'TEXT', name: '周期名称', parentRef: 'page/root/group', pageAbsX: 120, pageAbsY: 60, width: 100, height: 20 },
     { ref: 'page/root/group2', type: 'INSTANCE', name: '信息模块-手动控制弹层', parentRef: 'page/root', pageAbsX: 400, pageAbsY: 300, width: 300, height: 200 },
     { ref: 'page/root/group2/label', type: 'TEXT', name: '标题', parentRef: 'page/root/group2', pageAbsX: 420, pageAbsY: 350, width: 100, height: 20 },
-    { ref: 'page/root/btn', type: 'INSTANCE', name: '轴操作', parentRef: 'page/root', pageAbsX: 900, pageAbsY: 202, width: 40, height: 40 }
+    { ref: 'page/root/btn', type: 'INSTANCE', name: '轴操作', parentRef: 'page/root', pageAbsX: 900, pageAbsY: 202, width: 40, height: 40,
+      constraints: { minWidth: 80, maxWidth: 194 } }
   ],
   nodes: [
     { ref: 'page/root/group', xmlId: 'grp', sourceRef: 'page/root/group', controlType: 'GroupBox', contentInset: { left: 1, top: 35 }, expectedWidth: 300, expectedHeight: 200 },
     { ref: 'page/root/group/label', xmlId: 'lbl', sourceRef: 'page/root/group/label', controlType: 'TextBlock', layoutParent: 'page/root/group', expectedHeight: 40 },
     { ref: 'page/root/group2', xmlId: 'grp2', sourceRef: 'page/root/group2', controlType: 'GroupBox', contentInset: { left: 1, top: 40 }, expectedWidth: 300, expectedHeight: 200 },
     { ref: 'page/root/group2/label', xmlId: 'lbl2', sourceRef: 'page/root/group2/label', controlType: 'TextBlock', layoutParent: 'page/root/group2', expectedHeight: 40 },
-    { ref: 'page/root/btn', xmlId: 'btn', sourceRef: 'page/root/btn', controlType: 'IconButton', expectedWidth: 40, expectedHeight: 40 }
+    { ref: 'page/root/btn', xmlId: 'btn', sourceRef: 'page/root/btn', controlType: 'IconButton', expectedWidth: 40, expectedHeight: 40,
+      constraints: { minWidth: 80, maxWidth: 194 } }
   ]
 });
 
@@ -64,6 +66,8 @@ assert.strictEqual(ok.run.status, 0, ok.run.stderr);
 const coords = new Map(JSON.parse(fs.readFileSync(ok.outPath, 'utf8')).map((item) => [item.id, item]));
 assert.strictEqual(coords.get('grp').contentOriginY, 192, '根级容器原点 = 192');
 assert.strictEqual(coords.get('btn').contentOriginY, 192, '根级按钮原点 = 192');
+assert.strictEqual(coords.get('btn').constraints, undefined,
+  '非 TextBlock 节点上的 constraints 不得进入坐标核对输入');
 assert.strictEqual(coords.get('lbl').contentOriginY, 35,
   '父容器 pageAbsY = 0 + inset.top = 35 → 35（旧写法 `|| 192` 会算成 227）');
 assert.strictEqual(coords.get('lbl2').contentOriginY, 340, '父容器 pageAbsY = 300 + inset.top = 40 → 340');

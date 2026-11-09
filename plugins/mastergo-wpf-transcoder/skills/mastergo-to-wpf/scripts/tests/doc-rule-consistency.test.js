@@ -1117,3 +1117,42 @@ const mapData = loadTemplateMap(MAP);
   }
 }
 console.log("PASS TextBlock Align 口径（映射表 textBlockAlign ↔ 生成器发射 ↔ 人读文档）一致性回归测试");
+
+// ---------- 12. TextBlock 宽度口径：只发射 constraints，不发射常规 Width ----------
+{
+  const mapData = loadTemplateMap(MAP);
+  const align = mapData.textBlockAlign;
+  const mappingGenerator = fs.readFileSync(
+    path.join(__dirname, "..", "adapters/mtslg-iocontrol", "gen-mtslg-mapping-from-dsl.js"), "utf8");
+  const coordNodes = fs.readFileSync(path.join(__dirname, "..", "lib", "coord-nodes.js"), "utf8");
+  const coordChecker = fs.readFileSync(
+    path.join(__dirname, "..", "adapters/mtslg-iocontrol", "check-iocontrol-coords.js"), "utf8");
+  const helpers = fs.readFileSync(path.join(__dirname, "..", "lib", "script-helpers.js"), "utf8");
+  const docs = [
+    ["mastergo-iocontrol-document-format/SKILL.md", docFormat],
+    ["feishu-component-library-mapping.md", feishuMapping],
+    ["mtslg-mode.md", modeDoc],
+    ["script-helpers.js", helpers]
+  ];
+  assert.match(mappingGenerator,
+    /controlType === "TextBlock" && Object\.keys\(constraints\)\.length/,
+    "mapping 输出节点只允许 TextBlock 携带 constraints");
+  assert.match(coordNodes,
+    /isTextBlock && node\.constraints \? \{ constraints: node\.constraints \}/,
+    "坐标核对输入只允许 TextBlock 转发 constraints");
+  assert.match(coordChecker,
+    /if \(xn\.ControlType === ['"]TextBlock['"]\) \{[\s\S]*MinWidth[\s\S]*MaxWidth/,
+    "坐标门禁只能在 TextBlock 分支内核对 MinWidth/MaxWidth");
+  assert.ok(!/Width 仍是 NaN|Width 固定 NaN/.test(
+    JSON.stringify(align) + docs.map((entry) => entry[1]).join("\n")),
+    "TextBlock 宽度文档不得再写 Width=NaN 的旧口径");
+  assert.match(align.distanceWidthSource, /不发射 TextBlock 的常规 Width/,
+    "textBlockAlign.distanceWidthSource 必须写明 TextBlock 不发射常规 Width");
+  for (const [name, text] of docs) {
+    assert.match(text, /不发射(?: TextBlock 的)?常规 `?Width`?/,
+      name + " 必须写明 TextBlock 不发射常规 Width");
+  }
+  assert.match(docFormat, /通用模板里的 `Width` \/ `Height` 只适用于非 TextBlock 控件/,
+    "文档格式规范必须明确通用 Width/Height 字段的 TextBlock 例外");
+}
+console.log("PASS TextBlock width contract（MinWidth/MaxWidth only；非 TextBlock constraints 忽略）");

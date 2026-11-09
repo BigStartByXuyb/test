@@ -80,6 +80,7 @@ const dsl = {
   components: []
 };
 dsl.nodes[0].children[0].children[4].children[0].constraints = { minWidth: 40, maxWidth: 120 };
+dsl.nodes[0].children[0].children[0].constraints = { minWidth: 10, maxWidth: 20 };
 
 fs.writeFileSync(dslPath, JSON.stringify({
   schemaVersion: 'mastergo-dsl-capture/1',
@@ -129,6 +130,10 @@ assert.deepStrictEqual(constrainedText.constraints, { minWidth: 40, maxWidth: 12
   'TextBlock 必须把 DSL 尺寸约束带进映射');
 assert.deepStrictEqual(mapping.sourceNodes.find(node => node.ref === constrainedText.sourceRef).constraints,
   { minWidth: 40, maxWidth: 120 }, 'sourceNodes 必须保留同一份尺寸约束');
+const nonTextConstrained = mapping.nodes.find(node => node.sourceRef === innerRef + '/plus5');
+assert.strictEqual(nonTextConstrained.controlType, 'IconButton');
+assert.strictEqual(nonTextConstrained.constraints, undefined,
+  '非 TextBlock 节点上的 constraints 不得进入映射输出节点');
 
 // ---- 右栏族：componentSet 命中、iconSize 机械取值 ----
 function rightSidebarDsl(rootName, properties, innerName, buttonType) {

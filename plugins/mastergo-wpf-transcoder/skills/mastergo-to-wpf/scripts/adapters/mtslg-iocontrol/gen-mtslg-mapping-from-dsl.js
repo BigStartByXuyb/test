@@ -671,7 +671,7 @@ function addNode(sourceRef, controlType, attrs, options = {}) {
     heightSource: geometry ? "table.column-template"
       : (controlType === "TextBlock" ? "mtslg.textblock.fixed-40" : "dsl.bbox"),
     ...(controlType === "TextBlock" ? { dslWidth: s.width } : {}),
-    ...(Object.keys(constraints).length ? { constraints } : {}),
+    ...(controlType === "TextBlock" && Object.keys(constraints).length ? { constraints } : {}),
     ...(geometry ? {
       nodeKind: options.nodeKind || "table-column",
       geometrySource: "table.column-template",

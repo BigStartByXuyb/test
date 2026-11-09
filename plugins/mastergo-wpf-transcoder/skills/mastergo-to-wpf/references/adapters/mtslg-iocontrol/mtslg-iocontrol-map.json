@@ -97,7 +97,7 @@
     "distanceLeftBasis": "Left = 控件**左边缘**到输出父容器**内容区左边缘**的距离 = pageAbsX − 内容区原点X（与既有的 Left 完全一致）",
     "distanceRightBasis": "Left = 以控件**右上角**为原点，量到输出父容器**外框右边缘**的距离 = 父外框右边缘 − (pageAbsX + 设计稿 bbox 宽度)",
     "distanceCenterPolicy": "center 与左对齐同口径（center 归 defaultValue 那一侧）",
-    "distanceWidthSource": "设计稿 bbox 宽度（mapping nodes[].dslWidth / sourceNodes[].width）；产物 XML 的 Width 仍是 NaN（自适应），宽度只参与这里的 Left 计算",
+    "distanceWidthSource": "设计稿 bbox 宽度（mapping nodes[].dslWidth / sourceNodes[].width）；产物 XML 不发射 TextBlock 的常规 Width，宽度只参与这里的 Left 计算与约束溯源",
     "distanceParentRightEdge": "页面根 = 根节点宽度（页面宽度）；容器 = 容器 pageAbsX + 容器宽度（**外框**右边缘，不是内容区右边缘）",
     "distanceImplementation": "scripts/lib/script-helpers.js 的 isRightAlignedTextBlock（分支判据）/ parentOuterRightEdge / textBlockLeftValue（唯一实现）；坐标核对输入的唯一实现是 scripts/lib/coord-nodes.js",
     "note": "TextBlock 的 Align 恒写、必写（进 controlTypeRequiredAttrs，且只有 TextBlock 有这个属性）：textAlign 归一成小写后命中 rightMatch 就发射 rightValue，其余（left / center / 字段缺失 / 其它取值）一律发射 defaultValue——**默认左对齐**。目标框架只认 Left / Right 两种取值，因此 Align **不适用必写字段的「取不到来源写空字符串」通用口径**：映射缺失 / 空串 / 第三种值由渲染层与校验层直接判失败（fail-closed）。**Align=Right 会同时改变 Left 的口径**（不再是\"到左边缘\"，而是按 distanceRightBasis 算出的\"到右边缘\"距离）。分支判据与计算都只有一处实现：`scripts/lib/script-helpers.js` 的 `isRightAlignedTextBlock`（判据）/ `textBlockLeftValue`（两条口径），映射生成器 / 容器重挂 / XML 渲染 / provenance 校验直接调用；坐标核对输入的唯一实现是 `scripts/lib/coord-nodes.js`（Bundle 与 check-coords.mjs 共用，右对齐节点在那里算出 `expectedLeft`）。本块的 distance* 字段是**登记点（人读 + 回归断言比对真值），不是脚本的运行期输入**（角色与 textNewlinePolicy.mapRole 相同）。"

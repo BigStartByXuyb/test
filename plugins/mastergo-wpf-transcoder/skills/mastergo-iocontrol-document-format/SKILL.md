@@ -109,7 +109,7 @@ description: 强制规范 MasterGo → MTSLG IOContorl 映射文档的写法，�
 ## 特殊规则
 
 - 图标字段随 `ControlType` 的固定模板决定：模板含图标字段的 `IconButton` 恒写 `Icon`、`IconWidth`、`IconHeight`，无图标槽位时写空字符串值；有图标槽位时 `IconWidth`/`IconHeight` 取值是**台账命中条目节点**的 bbox（`sourceRef`，缺失回退 `sourceId`；**不是控件宽高**），`Icon` 取已登记的资源键。台账条目因此必须登记在**只包住该图标图形**的节点上（图标组 / 图标实例 / 图标 PATH）；登记在按钮级容器上会取到按钮尺寸。模板不含图标字段的 `Button`、`StatusButton` 以及其余无图标控件不得出现 `Icon`、`IconWidth`、`IconHeight`。
-- `FontSize`、`Height`、宽度约束始终分开表达；`TextBlock` 的 `Height` 固定 `40`，不发射常规 `Width`，只发射设计稿 `constraints` 中的 `MinWidth` / `MaxWidth`；不得用字号、行高、文本 bbox 高度或文本 bbox 宽度替代；非 TextBlock 控件的宽高必须来自对应 MasterGo bbox。
+- `FontSize`、`Height`、宽度约束始终分开表达；通用模板里的 `Width` / `Height` 只适用于非 TextBlock 控件。`TextBlock` 的 `Height` 固定 `40`，不发射常规 `Width`，只发射设计稿 `constraints` 中的 `MinWidth` / `MaxWidth`；不得用字号、行高、文本 bbox 高度或文本 bbox 宽度替代。非 TextBlock 控件的宽高必须来自对应 MasterGo bbox。
 - 表格（`tableTemplates`）：命中后发射一个 `DataGrid` 根节点 + 由表头可见文本从左到右派生的列定义子节点；根节点几何取表格图层 bbox（原样直传，图层声明尺寸覆盖不了内容范围时记入审计交设计侧修正），列节点几何取 `columnTemplate` 固定值。行数据只登记不发射控件；表头文本承载列 `Value`（`valueSource=dsl.text`），其余行内文本走 `omit` 角色 `table-data-cell`。
 - 坐标必须来自对应 MasterGo bbox，并按项目统一内容区坐标规则计算；模板不能决定实例坐标。
 - 根级示例标题/工件示教标题按 `design-artifact-title` 规则处理，不得混入业务 XML；保留或剥离都要记录原因。

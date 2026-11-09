@@ -66,6 +66,23 @@ if (constrainedTextResult.status !== 0 || !/OK id="label"/.test(constrainedTextR
 }
 console.log('PASS TextBlock width constraints regression test');
 
+// 非 TextBlock 不消费 constraints：即使节点表带了约束，也不得要求 XML 发射 MinWidth/MaxWidth。
+const nonTextConstrainedPath = path.join(dir, 'non-text-constrained.xml');
+const nonTextConstrainedNodesPath = path.join(dir, 'non-text-constrained-nodes.json');
+fs.writeFileSync(nonTextConstrainedPath,
+  '<IOContorl ID="panel" ControlType="Border" Left="10" Top="10" Width="100" Height="40" />');
+fs.writeFileSync(nonTextConstrainedNodesPath, JSON.stringify([
+  { id: 'panel', x: 10, y: 202, w: 100, h: 40, contentOriginX: 0, contentOriginY: 192,
+    constraints: { minWidth: 80, maxWidth: 194 } }
+]));
+const nonTextConstrainedResult = spawnSync(process.execPath,
+  [path.join(__dirname, '..', 'adapters/mtslg-iocontrol', 'check-iocontrol-coords.js'),
+    '--xml', nonTextConstrainedPath, '--nodes', nonTextConstrainedNodesPath], { encoding: 'utf8' });
+if (nonTextConstrainedResult.status !== 0 || !/OK id="panel"/.test(nonTextConstrainedResult.stdout)) {
+  throw new Error(`非 TextBlock 不得核对宽度约束:\n${nonTextConstrainedResult.stdout}`);
+}
+console.log('PASS non-TextBlock constraints are ignored');
+
 // ---- 度量归一化与缺度量报错：数值字符串算数值；缺度量必须点名 MISMATCH（不允许静默跳过）----
 // 与 provenance / bundle 坐标门禁同口径：Number("292") 视为数值，缺字段必须失败。
 // 独立夹具：TextBlock 不发射常规 Width。

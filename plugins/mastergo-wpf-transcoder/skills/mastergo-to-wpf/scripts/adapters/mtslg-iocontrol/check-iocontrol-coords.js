@@ -133,16 +133,16 @@ for (const xn of xmlNodes) {
   if (!close(xt, st, tolerance)) problems.push(`Top xml=${xt} dsl=${st}`);
   if (xn.ControlType === 'TextBlock') {
     if (xn.Width !== undefined) problems.push('TextBlock 不得发射常规 Width');
+    for (const [attr, key] of [['MinWidth', 'minWidth'], ['MaxWidth', 'maxWidth']]) {
+      const expected = src.constraints && src.constraints[key];
+      if (expected === undefined || expected === null) {
+        if (xn[attr] !== undefined) problems.push(`${attr} 未登记却已发射`);
+      } else if (!close(num(xn[attr]), num(expected), tolerance)) {
+        problems.push(`${attr} xml=${num(xn[attr])} dsl=${num(expected)}`);
+      }
+    }
   } else if (!close(xw, sw, tolerance)) {
     problems.push(`Width xml=${xw} dsl=${sw}`);
-  }
-  for (const [attr, key] of [['MinWidth', 'minWidth'], ['MaxWidth', 'maxWidth']]) {
-    const expected = src.constraints && src.constraints[key];
-    if (expected === undefined || expected === null) {
-      if (xn[attr] !== undefined) problems.push(`${attr} 未登记却已发射`);
-    } else if (!close(num(xn[attr]), num(expected), tolerance)) {
-      problems.push(`${attr} xml=${num(xn[attr])} dsl=${num(expected)}`);
-    }
   }
   if (!close(xh, sh, tolerance)) problems.push(`Height xml=${xh} dsl=${sh}`);
 

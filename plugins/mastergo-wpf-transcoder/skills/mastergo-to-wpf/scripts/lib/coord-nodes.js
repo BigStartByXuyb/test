@@ -95,7 +95,7 @@ function buildCoordNodes(mapping, options) {
       h: number(node.expectedHeight !== undefined ? node.expectedHeight : source.height),
       contentOriginX: originX,
       contentOriginY: originY
-    }, node.constraints ? { constraints: node.constraints } : {},
+    }, isTextBlock && node.constraints ? { constraints: node.constraints } : {},
       expectedLeft !== null ? { expectedLeft: expectedLeft } : {});
   });
 }
