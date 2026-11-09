@@ -1128,6 +1128,7 @@ console.log("PASS TextBlock Align 口径（映射表 textBlockAlign ↔ 生成�
   const coordChecker = fs.readFileSync(
     path.join(__dirname, "..", "adapters/mtslg-iocontrol", "check-iocontrol-coords.js"), "utf8");
   const helpers = fs.readFileSync(path.join(__dirname, "..", "lib", "script-helpers.js"), "utf8");
+  const architecture = fs.readFileSync(path.join(__dirname, "..", "..", "..", "..", "ARCHITECTURE.md"), "utf8");
   const docs = [
     ["mastergo-iocontrol-document-format/SKILL.md", docFormat],
     ["feishu-component-library-mapping.md", feishuMapping],
@@ -1154,5 +1155,19 @@ console.log("PASS TextBlock Align 口径（映射表 textBlockAlign ↔ 生成�
   }
   assert.match(docFormat, /通用模板里的 `Width` \/ `Height` 只适用于非 TextBlock 控件/,
     "文档格式规范必须明确通用 Width/Height 字段的 TextBlock 例外");
+  assert.match(docFormat, /`Width` 只适用于非 TextBlock 控件/,
+    "XML 字段清单必须把 Width 限定在非 TextBlock 控件");
+  assert.match(modeDoc, /TextBlock 不发射常规 `Width`，merge 会删除旧 `Width`/,
+    "merge 语义必须写明 TextBlock 的旧 Width 会被删除");
+  assert.ok(!/Left\/Top\/Width\/Height 按映射更新/.test(modeDoc),
+    "merge 语义不得再把 Width 无条件列为几何更新项");
+  assert.ok(!/文本位置和尺寸也从各自节点 bbox 读取/.test(feishuMapping),
+    "组件模板说明不得把 TextBlock 的尺寸笼统写成 bbox 直传");
+  assert.match(feishuMapping, /文本位置和高度也从各自节点 bbox 读取/,
+    "组件模板说明必须区分文本位置/高度与 TextBlock 宽度约束");
+  assert.match(architecture, /B：`adapters\/mtslg-iocontrol\/gen-mtslg-mapping-from-dsl\.js`/,
+    "架构文档必须登记 B 路线对 constraints 共享模块的消费");
+  assert.match(architecture, /TextBlock 拒绝常规 `Width`，改为核对 `MinWidth` \/ `MaxWidth`/,
+    "架构文档必须同步坐标门禁的 TextBlock 宽度例外");
 }
 console.log("PASS TextBlock width contract（MinWidth/MaxWidth only；非 TextBlock constraints 忽略）");
