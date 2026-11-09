@@ -1129,6 +1129,9 @@ console.log("PASS TextBlock Align 口径（映射表 textBlockAlign ↔ 生成�
     path.join(__dirname, "..", "adapters/mtslg-iocontrol", "check-iocontrol-coords.js"), "utf8");
   const helpers = fs.readFileSync(path.join(__dirname, "..", "lib", "script-helpers.js"), "utf8");
   const architecture = fs.readFileSync(path.join(__dirname, "..", "..", "..", "..", "ARCHITECTURE.md"), "utf8");
+  const runAll = fs.readFileSync(path.join(__dirname, "..", "entry", "run-all.ps1"), "utf8");
+  const pipelineContract = fs.readFileSync(
+    path.join(__dirname, "..", "..", "references", "adapters", "mtslg-iocontrol", "pipeline-contract.md"), "utf8");
   const docs = [
     ["mastergo-iocontrol-document-format/SKILL.md", docFormat],
     ["feishu-component-library-mapping.md", feishuMapping],
@@ -1174,8 +1177,20 @@ console.log("PASS TextBlock Align 口径（映射表 textBlockAlign ↔ 生成�
     "merge 语义不得再把 Width 无条件列为几何更新项");
   assert.ok(!/文本位置和尺寸也从各自节点 bbox 读取/.test(feishuMapping),
     "组件模板说明不得把 TextBlock 的尺寸笼统写成 bbox 直传");
-  assert.match(feishuMapping, /文本位置和高度也从各自节点 bbox 读取/,
-    "组件模板说明必须区分文本位置/高度与 TextBlock 宽度约束");
+  assert.match(feishuMapping, /文本位置从各自节点 bbox 读取，TextBlock 高度固定 40/,
+    "组件模板说明必须区分文本位置、固定高度与 TextBlock 宽度约束");
+  assert.match(runAll,
+    /A 的控件与容器 Grid 使用 Min\/MaxWidth\/Height，B 的 TextBlock 使用 Min\/MaxWidth/,
+    "mapping 步骤说明必须保留 A/B 各自完整的约束作用域");
+  assert.match(pipelineContract,
+    /A 的控件与容器 Grid 使用 Min\/MaxWidth\/Height，B 的 TextBlock 使用 Min\/MaxWidth/,
+    "流水线契约必须与 A/B 的实际约束发射范围一致");
+  assert.match(runAll,
+    /if \(\$BundleDslJson -ne \$SnapshotJson\) \{\s*Register-RunArtifact -Key 'mappingDsl'/,
+    "inputs 重算约束 DSL 时必须同步登记 mappingDsl");
+  assert.match(pipelineContract,
+    /重新解析并登记合并后的 DSL 作为 Bundle 映射输入；新增或修改约束后可直接从 inputs 续跑/,
+    "流水线契约必须说明 inputs 的约束登记与续跑边界");
   assert.match(architecture, /B：`adapters\/mtslg-iocontrol\/gen-mtslg-mapping-from-dsl\.js`/,
     "架构文档必须登记 B 路线对 constraints 共享模块的消费");
   assert.match(architecture, /TextBlock 拒绝常规 `Width`，改为核对 `MinWidth` \/ `MaxWidth`/,

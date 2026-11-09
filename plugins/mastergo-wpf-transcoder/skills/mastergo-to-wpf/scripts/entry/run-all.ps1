@@ -123,7 +123,7 @@ $Steps = @(
     },
     [pscustomobject]@{
         Id = 5; Name = 'mapping'; Title = 'mapping 草稿（按当前台账）'
-        Inputs   = @('dsl.snapshot.json + visibility.json', '正式映射表 mtslg-iocontrol-map.json', '图标台账（尚无台账时用空 candidates 占位）', '尺寸约束 JSON（可选；先合并进 DSL，供 A/B 的 TextBlock MinWidth/MaxWidth 使用）')
+        Inputs   = @('dsl.snapshot.json + visibility.json', '正式映射表 mtslg-iocontrol-map.json', '图标台账（尚无台账时用空 candidates 占位）', '尺寸约束 JSON（可选；先合并进 DSL；A 的控件与容器 Grid 使用 Min/MaxWidth/Height，B 的 TextBlock 使用 Min/MaxWidth）')
         Outputs  = @('Generated/runs/<Target>/mapping 草稿与映射审计（unmappedComponents / pending / templateConflicts）')
         Failures = @('组件与固定模板冲突', '结构签名部分命中')
         Recovery = @('只补输入（用 manifest.excludeInstances 隔离该实例、把偏差写进待确认），不改 mapping 产物；重跑：-Progress mapping')
@@ -157,7 +157,7 @@ $Steps = @(
     },
     [pscustomobject]@{
         Id = 9; Name = 'inputs'; Title = '校验译文并生成 Bundle 清单'
-        Inputs   = @('Layout 清单', '运行登记表 run.json（采集输入只按它取）', '尺寸约束 JSON（可选；有约束时同时登记合并后的 DSL 作为 Bundle 映射输入）', '译文清单 Generated/_inputs/<Target>.lang-translations.json（术语表可选）')
+        Inputs   = @('Layout 清单', '运行登记表 run.json（采集输入只按它取）', '尺寸约束 JSON（可选；重新解析并登记合并后的 DSL 作为 Bundle 映射输入；新增或修改约束后可直接从 inputs 续跑）', '译文清单 Generated/_inputs/<Target>.lang-translations.json（术语表可选）')
         Outputs  = @('Bundle 清单 Generated/_inputs/<Target>.bundle.json（含 runRegistry 指纹）')
         Failures = @('缺区域前缀 area', '缺 --run-json 或译文清单', '发现未登记的旧同名采集文件', '登记表 sha256 与文件不符')
         Recovery = @('补齐输入后重跑：-Progress inputs（采集输入只按登记表取，未登记的旧同名文件一律拒绝）')
@@ -349,6 +349,13 @@ function Assert-RegisteredInput {
 }
 
 # 本步产出的文件 → 登记表键（键名是消费端唯一认的入口，见 lib/run-registry.js 的 ARTIFACT_KEYS）
+function Register-RunArtifact {
+    param([string] $Key, [string] $Path, [int] $StepId)
+    if (Test-Path -LiteralPath $Path) {
+        Invoke-Registry @('artifact', '--run', $RunJson, '--key', $Key, '--path', $Path, '--step', "$StepId") | Out-Null
+    }
+}
+
 function Register-StepArtifacts {
     param([string] $StepName, [int] $StepId)
     $pairs = @()
@@ -384,9 +391,7 @@ function Register-StepArtifacts {
         'inputs'     { $pairs += , @('bundleManifest', $BundleJson) }
     }
     foreach ($pair in $pairs) {
-        if (Test-Path -LiteralPath $pair[1]) {
-            Invoke-Registry @('artifact', '--run', $RunJson, '--key', $pair[0], '--path', $pair[1], '--step', "$StepId") | Out-Null
-        }
+        Register-RunArtifact -Key $pair[0] -Path $pair[1] -StepId $StepId
     }
 }
 
@@ -820,6 +825,11 @@ foreach ($step in $Steps) {
                 # Bundle 会从 DSL 重新生成最终 mapping：约束必须先合进这份输入，
                 # 否则 B 的 TextBlock 宽度会在草稿之后丢失。
                 $BundleDslJson = Resolve-LayoutDslSnapshot -LogFile $log
+                # 约束可在 mapping 之后才落盘；inputs 重算的这份 DSL 必须同步成为当前登记产物，
+                # 否则 Bundle 清单会去解析 mapping 步留下的旧哈希。
+                if ($BundleDslJson -ne $SnapshotJson) {
+                    Register-RunArtifact -Key 'mappingDsl' -Path $BundleDslJson -StepId $step.Id
+                }
                 $args = @((Join-Path $ScriptsFolder 'adapters/mtslg-iocontrol/build-bundle-manifest.mjs'), $LayoutManifestJson, $BundleJson, $ProjectRoot, $Ui)
                 # 采集输入只从运行登记表取（并写进清单让 Bundle 复校），不再让清单自己拼顶层路径。
                 # 路线随清单一起给出：空项目会在这里落脚手架，framework.config.json 的 mode 必须是本次路线。
