@@ -74,7 +74,7 @@ description: 强制规范 MasterGo → MTSLG IOContorl 映射文档的写法，�
 
 <IOContorl ... />
 
-文案→Value；业务字段/动作→IOName/IOCommand；位置与高度→Left/Top/Height，`: Width→Width` 只适用于非 TextBlock 控件。
+文案→Value；业务字段/动作→IOName/IOCommand；位置与高度→Left/Top/Height，`Width→Width` 只适用于非 TextBlock 控件。
 固定模板中已声明但 MasterGo 或目标项目没有可靠来源的可选属性，保留属性并输出空字符串值；不在固定模板中的属性不新增。节点本身只有在可见性规则、页面根级大标题规则或宿主结构边界明确剥离时才省略；组件库 placeholder 标记不构成省略理由。
 例外：按钮族（IconButton / Button / StatusButton）的 `PageName`、`IOVisible`、`IOCommand`、`IOEnable`，以及模板含图标字段的 `IconButton` 的 `Icon`、`IconWidth`、`IconHeight`，都属于固定字段：无论固定模板是否逐条声明、无论能否取到来源都必须发射，取不到时写空字符串值（**变体登记 `omitRequiredAttrs` 时该变体做减法：登记的属性不发射，生成器与校验器共用 `omittedAttrs()` 判据（见飞书组件库映射规范「组件级固定变体的公共口径」）**；`IconWidth`/`IconHeight` 有图标槽位时改取**台账命中条目节点**的 bbox —— 该条目 `sourceRef` 指向的节点，四舍五入取整；因此台账条目必须登记在只包住该图标图形的节点上）。模板不含图标字段的 `Button`、`StatusButton` 不发射 `Icon`/`IconWidth`/`IconHeight`。该口径以映射表 `buttonFamily` 与 `controlTypeRequiredAttrs` 为准（映射表位置：以插件根为基准的 `skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/mtslg-iocontrol-map.json`），冲突时以映射表为准。
 ```

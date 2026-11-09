@@ -1153,6 +1153,9 @@ console.log("PASS TextBlock Align 口径（映射表 textBlockAlign ↔ 生成�
     "TextBlock 宽度文档不得再写 Width=NaN 的旧口径");
   assert.match(align.distanceWidthSource, /不发射 TextBlock 的常规 Width/,
     "textBlockAlign.distanceWidthSource 必须写明 TextBlock 不发射常规 Width");
+  assert.match(mapData._meta.note.join("\n"),
+    /TextBlock 例外：commonAttrs \/ geometryAttrs 中的 Width 不进入 IOContorl XML/,
+    "映射表全局属性清单必须登记 TextBlock 的 Width 例外");
   for (const [name, text] of docs) {
     assert.match(text, /不发射(?: TextBlock 的)?常规 `?Width`?/,
       name + " 必须写明 TextBlock 不发射常规 Width");
@@ -1161,6 +1164,10 @@ console.log("PASS TextBlock Align 口径（映射表 textBlockAlign ↔ 生成�
     "文档格式规范必须明确通用 Width/Height 字段的 TextBlock 例外");
   assert.match(docFormat, /`Width` 只适用于非 TextBlock 控件/,
     "XML 字段清单必须把 Width 限定在非 TextBlock 控件");
+  assert.match(docFormat, /`Width→Width` 只适用于非 TextBlock 控件/,
+    "文档格式示例必须使用无前导冒号的 Width→Width 记法");
+  assert.ok(!/`:\s+Width→Width`/.test(docFormat),
+    "文档格式示例不得把属性映射分隔冒号包进 Width→Width 代码片段");
   assert.match(modeDoc, /TextBlock 不发射常规 `Width`，merge 会删除旧 `Width`/,
     "merge 语义必须写明 TextBlock 的旧 Width 会被删除");
   assert.ok(!/Left\/Top\/Width\/Height 按映射更新/.test(modeDoc),
