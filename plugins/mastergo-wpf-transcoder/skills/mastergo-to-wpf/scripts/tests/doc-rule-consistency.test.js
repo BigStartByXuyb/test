@@ -1179,6 +1179,10 @@ console.log("PASS TextBlock Align 口径（映射表 textBlockAlign ↔ 生成�
     "组件模板说明不得把 TextBlock 的尺寸笼统写成 bbox 直传");
   assert.match(feishuMapping, /文本位置从各自节点 bbox 读取，TextBlock 高度固定 40/,
     "组件模板说明必须区分文本位置、固定高度与 TextBlock 宽度约束");
+  assert.match(feishuMapping, /不能用外层组件高度、文字 bbox、字号或行高改写 Height/,
+    "TextBlock 高度禁止来源必须逐字段点名");
+  assert.ok(!/改写这两个值/.test(feishuMapping),
+    "TextBlock 高度与宽度约束不得再用模糊指代");
   assert.match(runAll,
     /A 的控件与容器 Grid 使用 Min\/MaxWidth\/Height，B 的 TextBlock 使用 Min\/MaxWidth/,
     "mapping 步骤说明必须保留 A/B 各自完整的约束作用域");

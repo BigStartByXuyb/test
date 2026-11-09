@@ -164,7 +164,7 @@ $Steps = @(
     },
     [pscustomobject]@{
         Id = 10; Name = 'bundle'; Title = 'Bundle 生成页面 XML / Icon / Layout / 宿主壳'
-        Inputs   = @('Bundle 清单', '复校通过的采集输入（getDsl/snapshot/extractSvg，按登记表取）')
+        Inputs   = @('Bundle 清单（含 mappingDslPath 时由清单内嵌传递合并后的约束 DSL）', '复校通过的采集输入（getDsl/snapshot/extractSvg，按登记表取）')
         Outputs  = @('页面 XML、本页 Icons.xaml、CN/EN 语言字典、Layout 增量注册、View + code-behind + ViewModel、宿主壳', 'Bundle 审计与其 files[] 统一登记')
         Failures = @('同名目标文件已存在且未 -Overwrite', 'area/路径不合法', '语言键引用闭环失败', '清单指纹与登记表不符')
         Recovery = @('确认要替换时用 operation=replace-existing + -Overwrite（覆盖前逐个备份，保留最近 2 份），否则改名或先确认；重跑：-Progress bundle')

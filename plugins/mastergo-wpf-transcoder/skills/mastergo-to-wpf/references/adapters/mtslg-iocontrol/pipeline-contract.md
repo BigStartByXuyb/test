@@ -180,7 +180,7 @@ pwsh -NoProfile -File <skill>\scripts\entry\run-all.ps1 -ProjectRoot <项目> -T
 ### 10. `bundle` —— Bundle 生成页面 XML / Icon / Layout / 宿主壳
 
 - **输入**：
-  - Bundle 清单
+  - Bundle 清单（含 mappingDslPath 时由清单内嵌传递合并后的约束 DSL）
   - 复校通过的采集输入（getDsl/snapshot/extractSvg，按登记表取）
 - **产物**：
   - 页面 XML、本页 Icons.xaml、CN/EN 语言字典、Layout 增量注册、View + code-behind + ViewModel、宿主壳

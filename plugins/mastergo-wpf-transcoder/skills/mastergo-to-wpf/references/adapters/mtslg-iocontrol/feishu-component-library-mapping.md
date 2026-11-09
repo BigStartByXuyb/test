@@ -552,7 +552,7 @@ Style 与内部组件对照（只对下表列出的真实值成立）：
 - `Align` 会同时决定 **`Left` 的口径**（同一个属性名、两个含义）：`Align=Left` 时 `Left` = 控件左边缘到父容器**内容区左边缘**的距离；`Align=Right` 时 `Left` = 以控件**右上角**为原点，量到父容器**外框右边缘**的距离 = `父外框右边缘 − (控件 pageAbsX + 设计稿 bbox 宽度)`（页面根用**页面宽度**，容器用**容器 left + width**）。产物不发射 TextBlock 的常规 `Width`；设计稿 bbox 宽度只用于这里的 `Left` 计算与约束溯源。口径真值源是映射表 `textBlockAlign.distance*`，实现在 `scripts/lib/script-helpers.js`。
 - 独立文本节点统一映射为 `TextBlock`，不因所在组件或变体改变 ControlType。
 - 如果文本是输入框、选择框等控件内部内容，则保留为所属控件内容，不额外拆分为 TextBlock。
-- 文本的 Value、FontSize、FontWeight 和坐标必须来自对应 MasterGo 节点；所有 MTSLG TextBlock 的 Height 固定为 40，不发射常规 Width，只发射 DSL `constraints` 里的 MinWidth / MaxWidth。不能用外层组件高度、文字 bbox、组件语义或文本 bbox 宽度改写这两个值（文本 bbox 宽度只作为 `dslWidth` 来源记录在 mapping 中）。
+- 文本的 Value、FontSize、FontWeight 和坐标必须来自对应 MasterGo 节点；所有 MTSLG TextBlock 的 Height 固定为 40，不发射常规 Width，只发射 DSL `constraints` 里的 MinWidth / MaxWidth。不能用外层组件高度、文字 bbox、字号或行高改写 Height；也不能用文字 bbox 宽度、外层组件高度或组件语义改写 MinWidth / MaxWidth（文本 bbox 宽度只作为 `dslWidth` 来源记录在 mapping 中）。
 - 独立的标题、单位、说明文字和其他文本节点，统一映射为 `ControlType="TextBlock"`；如果文字是输入框、选择框等控件内部内容，则保留为所属控件内容，不额外拆分。
 - FontSize 只表示字体字号，Height 只表示控件布局边界；两者必须分别读取。所有 MTSLG TextBlock 使用固定 Height=40，禁止把外层组件高度、文字 bbox、字号或行高赋给 Height。
 - 每个输出控件的 Left、Top 必须来自自身 MasterGo bbox，非 TextBlock 控件的 Width/Height 也来自自身 bbox；TextBlock 的 Height 固定为 `40`，宽度只按 DSL `constraints` 发射 `MinWidth` / `MaxWidth`，不发射常规 Width；输入框和选择框外框的 Height 按已命中的 40/36/32/28 变体处理；固定模板、相邻控件或父容器不能代替真实尺寸。
