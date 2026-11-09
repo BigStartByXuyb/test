@@ -981,7 +981,20 @@ function main() {
       manifest[field] = RUN_REGISTRY.projectRelative(projectRoot, abs);
       bound[field] = manifest[field];
     }
+    if (manifest.mappingDslPath) {
+      const abs = RUN_REGISTRY.resolveArtifact(runRegistryData, "mappingDsl", { projectRoot });
+      const entry = runRegistryData.artifacts.mappingDsl;
+      if (expectedDigests.mappingDsl && expectedDigests.mappingDsl !== entry.sha256) {
+        fail("Bundle 清单登记的 mappingDsl sha256 与运行登记表不一致：清单=" + expectedDigests.mappingDsl +
+          "，登记表=" + entry.sha256 + "（清单被改写，或与登记表不是同一次运行）");
+      }
+      manifest.mappingDslPath = RUN_REGISTRY.projectRelative(projectRoot, abs);
+      bound.mappingDslPath = manifest.mappingDslPath;
+    }
     console.log("运行登记表: runId=" + runRegistryData.runId + "，采集输入按登记表绑定：" + JSON.stringify(bound));
+  }
+  if (manifest.mappingDslPath && !runRegistryData) {
+    fail("mappingDslPath 必须由运行登记表绑定：请用 run-all.ps1 生成清单，或补齐 runRegistry");
   }
   // 审计产物路径（与下方 generatedDir/mappingAudit 同口径，定义提前以便在这里前置校验）。
   const mappingAuditPath = path.join(projectRoot, "Generated", manifest.pageName + ".mapping.json");

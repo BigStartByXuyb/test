@@ -76,6 +76,15 @@ if (!runJsonArg) {
 }
 const runJsonFile = path.resolve(projectRoot, runJsonArg);
 const runJsonData = runRegistry.loadRegistry(runJsonFile);
+let resolvedMappingDslFile = null;
+if (mappingDslFile) {
+  resolvedMappingDslFile = runRegistry.resolveArtifact(runJsonData, "mappingDsl", { projectRoot });
+  if (path.resolve(resolvedMappingDslFile) !== path.resolve(mappingDslFile)) {
+    throw new Error("--mapping-dsl 不是本次运行登记的 mappingDsl 产物：参数=" +
+      runRegistry.projectRelative(projectRoot, mappingDslFile) + "，登记表=" +
+      runRegistry.projectRelative(projectRoot, resolvedMappingDslFile));
+  }
+}
 const resolvedInputs = {
   snapshot: runRegistry.resolveArtifact(runJsonData, "snapshot", { projectRoot }),
   visibility: runRegistry.resolveArtifact(runJsonData, "visibility", { projectRoot }),
@@ -112,7 +121,7 @@ const manifest = {
   scaffold: true,
   projectMode: "scaffold",
   dslPath: runRegistry.projectRelative(projectRoot, resolvedInputs.snapshot),
-  ...(mappingDslFile ? { mappingDslPath: runRegistry.projectRelative(projectRoot, mappingDslFile) } : {}),
+  ...(resolvedMappingDslFile ? { mappingDslPath: runRegistry.projectRelative(projectRoot, resolvedMappingDslFile) } : {}),
   visibilityPath: runRegistry.projectRelative(projectRoot, resolvedInputs.visibility),
   svgPath: runRegistry.projectRelative(projectRoot, resolvedInputs.extractSvg),
   iconMapPath: inputs("icon-map.json"),
@@ -140,7 +149,8 @@ manifest.runRegistry = {
   digests: {
     snapshot: runJsonData.artifacts.snapshot.sha256,
     visibility: runJsonData.artifacts.visibility.sha256,
-    extractSvg: runJsonData.artifacts.extractSvg.sha256
+    extractSvg: runJsonData.artifacts.extractSvg.sha256,
+    ...(resolvedMappingDslFile ? { mappingDsl: runJsonData.artifacts.mappingDsl.sha256 } : {})
   }
 };
 

@@ -1139,11 +1139,15 @@ console.log("PASS TextBlock Align 口径（映射表 textBlockAlign ↔ 生成�
     /controlType === "TextBlock" && Object\.keys\(constraints\)\.length/,
     "mapping 输出节点只允许 TextBlock 携带 constraints");
   assert.match(coordNodes,
-    /isTextBlock && node\.constraints \? \{ constraints: node\.constraints \}/,
+    /isTextBlock && textConstraints \? \{ constraints: textConstraints \}/,
     "坐标核对输入只允许 TextBlock 转发 constraints");
   assert.match(coordChecker,
     /if \(xn\.ControlType === ['"]TextBlock['"]\) \{[\s\S]*MinWidth[\s\S]*MaxWidth/,
     "坐标门禁只能在 TextBlock 分支内核对 MinWidth/MaxWidth");
+  assert.match(coordChecker, /constraintAttributes\(src\.constraints\)/,
+    "坐标门禁必须消费 constraints.js 的归一化与键名映射");
+  assert.match(coordChecker, /TextBlock 的 w 固定为 NaN[\s\S]*dslWidth/,
+    "坐标核对器头注释必须与 coord-nodes.js 的 TextBlock 输出一致");
   assert.ok(!/Width 仍是 NaN|Width 固定 NaN/.test(
     JSON.stringify(align) + docs.map((entry) => entry[1]).join("\n")),
     "TextBlock 宽度文档不得再写 Width=NaN 的旧口径");

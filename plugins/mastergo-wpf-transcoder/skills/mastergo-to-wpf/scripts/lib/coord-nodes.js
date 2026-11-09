@@ -87,6 +87,7 @@ function buildCoordNodes(mapping, options) {
           " 缺少页面/父容器宽度或设计稿 bbox 宽度（不能猜）");
       }
     }
+    const textConstraints = node.constraints || source.constraints;
     return Object.assign({
       id: node.xmlId || node.id || node.ref,
       x: number(source.pageAbsX !== undefined ? source.pageAbsX : node.absX),
@@ -95,7 +96,7 @@ function buildCoordNodes(mapping, options) {
       h: number(node.expectedHeight !== undefined ? node.expectedHeight : source.height),
       contentOriginX: originX,
       contentOriginY: originY
-    }, isTextBlock && node.constraints ? { constraints: node.constraints } : {},
+    }, isTextBlock && textConstraints ? { constraints: textConstraints } : {},
       expectedLeft !== null ? { expectedLeft: expectedLeft } : {});
   });
 }

@@ -74,6 +74,9 @@ const constrainedDsl = write(runDir + "/dsl.constrained.json", {
   dsl: { nodes: [{ id: "label", constraints: { minWidth: 80, maxWidth: 194 } }] },
   nodeCount: 3
 });
+result = runRegistry(["artifact", "--run", registryFile, "--key", "mappingDsl", "--path", constrainedDsl, "--step", "6"]);
+assert.strictEqual(result.status, 0, result.stderr);
+const registeredWithMapping = JSON.parse(fs.readFileSync(registryFile, "utf8"));
 const constrainedBundleJson = path.join(root, "Generated/_inputs/F2Demo.constrained-bundle.json");
 result = run([layoutManifest, constrainedBundleJson, root, "F2", "--run-json", registryFile,
   "--mapping-dsl", constrainedDsl, "--replace-existing"]);
@@ -81,6 +84,7 @@ assert.strictEqual(result.status, 0, result.stderr);
 const constrainedManifest = JSON.parse(fs.readFileSync(constrainedBundleJson, "utf8"));
 assert.strictEqual(constrainedManifest.dslPath, runDir + "/dsl.snapshot.json");
 assert.strictEqual(constrainedManifest.mappingDslPath, runDir + "/dsl.constrained.json");
+assert.strictEqual(constrainedManifest.runRegistry.digests.mappingDsl, registeredWithMapping.artifacts.mappingDsl.sha256);
 
 // 3) 采集产物未登记（缺 snapshot）→ 必须失败，并指出是登记表缺项
 const missingRun = JSON.parse(fs.readFileSync(registryFile, "utf8"));

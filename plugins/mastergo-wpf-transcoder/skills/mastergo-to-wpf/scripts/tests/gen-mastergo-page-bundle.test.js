@@ -9,6 +9,7 @@ const { tmpDir } = require(path.join(__dirname, "helpers", "tmp-dir.js"));
 const { spawnSync } = require("child_process");
 
 const script = path.join(__dirname, "..", "entry", "gen-mastergo-page-bundle.js");
+const registryCli = path.join(__dirname, "..", "core", "run-registry.mjs");
 const scriptText = fs.readFileSync(script, "utf8");
 assert.match(
   scriptText,
@@ -119,6 +120,33 @@ fs.writeFileSync(iconMap, JSON.stringify({
   icons: [{ sourceId: "page/icon-a", name: "ActionGeometry", comment: "操作", sourceRef: "icon/a" }]
 }), "utf8");
 
+// 初始 Bundle 也按正式运行生成：mapping DSL 必须由登记表绑定并带 sha256。
+const initialRunDir = path.join(project, "Generated", "runs", "F2NewPage");
+fs.mkdirSync(initialRunDir, { recursive: true });
+for (const [dest, src] of [
+  ["dsl.snapshot.json", dslSnapshot],
+  ["visibility.json", visibility],
+  ["extractSvg.json", svg],
+  ["dsl.constrained.json", constrainedDslSnapshot]
+]) {
+  fs.copyFileSync(src, path.join(initialRunDir, dest));
+}
+let initialRegistry = spawnSync(process.execPath, [registryCli, "init", "--project-root", project,
+  "--target", "F2NewPage", "--file-id", "test-file", "--layer-id", "body-text", "--ui", "F2"], { encoding: "utf8" });
+assert.strictEqual(initialRegistry.status, 0, initialRegistry.stderr);
+const initialRegistryFile = path.join(initialRunDir, "run.json");
+for (const [key, name, step] of [
+  ["snapshot", "dsl.snapshot.json", 2],
+  ["visibility", "visibility.json", 4],
+  ["extractSvg", "extractSvg.json", 3],
+  ["mappingDsl", "dsl.constrained.json", 6]
+]) {
+  initialRegistry = spawnSync(process.execPath, [registryCli, "artifact", "--run", initialRegistryFile, "--key", key,
+    "--path", "Generated/runs/F2NewPage/" + name, "--step", String(step)], { encoding: "utf8" });
+  assert.strictEqual(initialRegistry.status, 0, initialRegistry.stderr);
+}
+const initialRegistryDoc = JSON.parse(fs.readFileSync(initialRegistryFile, "utf8"));
+
 const manifest = path.join(root, "bundle.json");
 fs.writeFileSync(manifest, JSON.stringify({
   projectRoot: project,
@@ -145,7 +173,17 @@ fs.writeFileSync(manifest, JSON.stringify({
     topLeftContent: "F1", index: 1
   }],
   layoutStatus: "complete",
-  layoutEvidence: { matchedBottomBarItems: 1, unresolvedBottomBarItems: 0 }
+  layoutEvidence: { matchedBottomBarItems: 1, unresolvedBottomBarItems: 0 },
+  runRegistry: {
+    path: "Generated/runs/F2NewPage/run.json",
+    runId: initialRegistryDoc.runId,
+    digests: {
+      snapshot: initialRegistryDoc.artifacts.snapshot.sha256,
+      visibility: initialRegistryDoc.artifacts.visibility.sha256,
+      extractSvg: initialRegistryDoc.artifacts.extractSvg.sha256,
+      mappingDsl: initialRegistryDoc.artifacts.mappingDsl.sha256
+    }
+  }
 }, null, 2), "utf8");
 
 // 统一文件登记 + 收尾清理：<generatedRoot>/_work/ 是中间工作目录（输入清单、派生清单、校验脚本），
@@ -361,6 +399,15 @@ assert.match(scriptText, /buildCoordNodes\(mapping/,
 assert.doesNotMatch(scriptText, /normalizedCoordNodes|coordNumber/,
   "坐标核对输入不得在编排器里再内联一份（唯一实现在 lib/coord-nodes.js）");
 
+/* 显式 mapping 的替换式生成不使用采集输入：把登记表及其 DSL 绑定一并去掉。 */
+function useExplicitMapping(item) {
+  delete item.dslPath;
+  delete item.visibilityPath;
+  delete item.mappingDslPath;
+  delete item.runRegistry;
+  return item;
+}
+
 // 数值字符串度量（手写 / merge mapping 常见：写成 "292" 而不是 292）必须照常核对并通过。
 const stringMetricMapping = JSON.parse(
   fs.readFileSync(path.join(project, "Generated/F2NewPage.mapping.json"), "utf8")
@@ -374,8 +421,7 @@ const stringMetricMappingPath = path.join(root, "string-metric-mapping.json");
 fs.writeFileSync(stringMetricMappingPath, JSON.stringify(stringMetricMapping, null, 2), "utf8");
 const stringMetricManifest = JSON.parse(fs.readFileSync(manifest, "utf8"));
 stringMetricManifest.operation = "replace-existing";
-delete stringMetricManifest.dslPath;
-delete stringMetricManifest.visibilityPath;
+useExplicitMapping(stringMetricManifest);
 stringMetricManifest.mappingPath = stringMetricMappingPath;
 const stringMetricManifestPath = path.join(root, "string-metric-manifest.json");
 fs.writeFileSync(stringMetricManifestPath, JSON.stringify(stringMetricManifest, null, 2), "utf8");
@@ -442,8 +488,7 @@ nestingOffManifest.pageXmlPath = "Resources/Pages/NestingOff/NestingOffPage.xml"
 nestingOffManifest.iconPath = "Resources/Pages/NestingOff/NestingOffIcons.xaml";
 nestingOffManifest.operation = "replace-existing";
 nestingOffManifest.nesting = { enabled: false };
-delete nestingOffManifest.dslPath;
-delete nestingOffManifest.visibilityPath;
+useExplicitMapping(nestingOffManifest);
 nestingOffManifest.mappingPath = nestingOffMapping;
 const nestingOffManifestPath = path.join(root, "nesting-off.json");
 fs.writeFileSync(nestingOffManifestPath, JSON.stringify(nestingOffManifest, null, 2), "utf8");
@@ -583,6 +628,8 @@ const langPageTextKeys = [
 ];
 function langManifestFor(pageName, languages) {
   const item = JSON.parse(JSON.stringify(langBase));
+  delete item.mappingDslPath;
+  delete item.runRegistry;
   item.name = pageName;
   item.pageTarget = pageName;
   item.pageLangName = pageName + "PageTitle";
@@ -839,8 +886,7 @@ fs.writeFileSync(comboMappingPath, JSON.stringify(comboMapping, null, 2), "utf8"
 const comboManifest = langManifestFor("LangCombo", { auto: true, locales: ["CN", "EN"], keyCatalog: autoCatalog });
 comboManifest.operation = "replace-existing";
 comboManifest.mappingPath = comboMappingPath;
-delete comboManifest.dslPath;
-delete comboManifest.visibilityPath;
+useExplicitMapping(comboManifest);
 const comboManifestPath = path.join(root, "lang-combo.json");
 fs.writeFileSync(comboManifestPath, JSON.stringify(comboManifest, null, 2), "utf8");
 result = spawnSync(process.execPath, [script, "--manifest", comboManifestPath], { encoding: "utf8" });
@@ -898,7 +944,6 @@ assert.match(langOffAudit.languageDisabledReason, /确认不做多语言/);
 // ---- 运行登记表绑定（B）：采集输入只认登记表，且拒绝旧同名影子文件 ----
 // 背景：采集产物改成按页归档（Generated/runs/<Target>/）后，消费端一度仍在读顶层 Generated/*.json，
 // 而顶层恰好留着上一次运行的旧文件 → 静默用了旧数据。这里逐条锁住新行为。
-const registryCli = path.join(__dirname, "..", "core", "run-registry.mjs");
 const registryTarget = "LangRegistry";
 const registryRunDir = path.join(project, "Generated", "runs", registryTarget);
 fs.mkdirSync(registryRunDir, { recursive: true });

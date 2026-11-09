@@ -363,6 +363,9 @@ function Register-StepArtifacts {
         'svg'        { $pairs += , @('extractSvg', $SvgJson) }
         'visibility' { $pairs += , @('visibility', $VisibilityJson) }
         'mapping'    {
+            if ($MappingDslJson -and $MappingDslJson -eq $ConstrainedDslJson -and (Test-Path -LiteralPath $MappingDslJson)) {
+                $pairs += , @('mappingDsl', $MappingDslJson)
+            }
             if ($Mode -eq 'mw-wpf') { $pairs += , @('componentTypes', $TypeAuditJson) }
             else { $pairs += , @('mappingDraft', $DraftMappingJson) }
         }

@@ -66,6 +66,23 @@ if (constrainedTextResult.status !== 0 || !/OK id="label"/.test(constrainedTextR
 }
 console.log('PASS TextBlock width constraints regression test');
 
+// 约束归一化复用 constraints.js：0 / 非正数等于未设置，不能被坐标门禁当成期望值再报 MISMATCH。
+const normalizedTextPath = path.join(dir, 'normalized-text.xml');
+const normalizedTextNodesPath = path.join(dir, 'normalized-text-nodes.json');
+fs.writeFileSync(normalizedTextPath,
+  '<IOContorl ID="label" ControlType="TextBlock" Left="10" Top="10" Height="40" />');
+fs.writeFileSync(normalizedTextNodesPath, JSON.stringify([
+  { id: 'label', x: 10, y: 202, w: 'NaN', h: 40, contentOriginX: 0, contentOriginY: 192,
+    constraints: { minWidth: 0, maxWidth: -1 } }
+]));
+const normalizedTextResult = spawnSync(process.execPath,
+  [path.join(__dirname, '..', 'adapters/mtslg-iocontrol', 'check-iocontrol-coords.js'),
+    '--xml', normalizedTextPath, '--nodes', normalizedTextNodesPath], { encoding: 'utf8' });
+if (normalizedTextResult.status !== 0 || !/OK id="label"/.test(normalizedTextResult.stdout)) {
+  throw new Error(`非正数约束必须按未设置处理:\n${normalizedTextResult.stdout}`);
+}
+console.log('PASS constraint normalization is shared with constraints.js');
+
 // 非 TextBlock 不消费 constraints：即使节点表带了约束，也不得要求 XML 发射 MinWidth/MaxWidth。
 const nonTextConstrainedPath = path.join(dir, 'non-text-constrained.xml');
 const nonTextConstrainedNodesPath = path.join(dir, 'non-text-constrained-nodes.json');

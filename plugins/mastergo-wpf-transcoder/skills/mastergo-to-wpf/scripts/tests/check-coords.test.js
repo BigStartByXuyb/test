@@ -37,7 +37,8 @@ const makeMapping = (groupY) => ({
     { ref: 'page/root', type: 'COMPONENT', name: '页', parentRef: null, pageAbsX: 0, pageAbsY: 0, width: 1280, height: 1024 },
     Object.assign({ ref: 'page/root/group', type: 'INSTANCE', name: '信息分组-模块化', parentRef: 'page/root', pageAbsX: 100, width: 300, height: 200 },
       groupY === null ? {} : { pageAbsY: groupY }),
-    { ref: 'page/root/group/label', type: 'TEXT', name: '周期名称', parentRef: 'page/root/group', pageAbsX: 120, pageAbsY: 60, width: 100, height: 20 },
+    { ref: 'page/root/group/label', type: 'TEXT', name: '周期名称', parentRef: 'page/root/group', pageAbsX: 120, pageAbsY: 60, width: 100, height: 20,
+      constraints: { minWidth: 64, maxWidth: 160 } },
     { ref: 'page/root/group2', type: 'INSTANCE', name: '信息模块-手动控制弹层', parentRef: 'page/root', pageAbsX: 400, pageAbsY: 300, width: 300, height: 200 },
     { ref: 'page/root/group2/label', type: 'TEXT', name: '标题', parentRef: 'page/root/group2', pageAbsX: 420, pageAbsY: 350, width: 100, height: 20 },
     { ref: 'page/root/btn', type: 'INSTANCE', name: '轴操作', parentRef: 'page/root', pageAbsX: 900, pageAbsY: 202, width: 40, height: 40,
@@ -70,6 +71,8 @@ assert.strictEqual(coords.get('btn').constraints, undefined,
   '非 TextBlock 节点上的 constraints 不得进入坐标核对输入');
 assert.strictEqual(coords.get('lbl').contentOriginY, 35,
   '父容器 pageAbsY = 0 + inset.top = 35 → 35（旧写法 `|| 192` 会算成 227）');
+assert.deepStrictEqual(coords.get('lbl').constraints, { minWidth: 64, maxWidth: 160 },
+  'TextBlock 的 constraints 只在 sourceNodes 上时也要进入坐标核对输入');
 assert.strictEqual(coords.get('lbl2').contentOriginY, 340, '父容器 pageAbsY = 300 + inset.top = 40 → 340');
 
 // ③ 父容器缺 pageAbsY：必须失败并点名节点（不猜原点），而不是拿 192/0 顶上。
