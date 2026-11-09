@@ -6,7 +6,7 @@
 //     按登记表解析 + 校验，并把 sha256 写进清单（manifest.runRegistry.digests），Bundle 会复校；
 //     没有 --run-json 直接报错（清单不允许自己拼采集输入路径）。
 // 用法: node build-bundle-manifest.mjs <layout-manifest.json> <out-bundle.json> <projectRoot> <area>
-//        --run-json <run.json> [--page-title <标题>] [--mode <路线>] [--replace-existing]
+//        --run-json <run.json> [--mapping-dsl <约束合并后的 DSL>] [--page-title <标题>] [--mode <路线>] [--replace-existing]
 //
 // `area`（区域前缀）**必填且不做推导**：它决定 `UI/<区域>/View|ViewModel` 的输出目录，
 // 唯一实现是 run-all.ps1 的取值链（命令行 -Ui → 项目登记表 pages[].ui → derivation 的 F<n>
@@ -28,7 +28,7 @@ const flags = {};
 for (let index = 0; index < process.argv.slice(2).length; index += 1) {
   const token = process.argv.slice(2)[index];
   if (token === "--replace-existing") { flags.replaceExisting = true; continue; }
-  if (token === "--run-json" || token === "--page-title" || token === "--mode") {
+  if (token === "--run-json" || token === "--mapping-dsl" || token === "--page-title" || token === "--mode") {
     const value = process.argv.slice(2)[index + 1];
     if (value === undefined || value.startsWith("--")) throw new Error(token + " 缺少取值");
     flags[token.slice(2)] = value;
@@ -39,8 +39,9 @@ for (let index = 0; index < process.argv.slice(2).length; index += 1) {
   positional.push(token);
 }
 const [layoutManifestFile, outFile, projectRootArg, areaArg] = positional;
+const mappingDslArg = flags["mapping-dsl"] || null;
 if (!layoutManifestFile || !outFile) {
-  console.error("usage: node build-bundle-manifest.mjs <layout-manifest.json> <out-bundle.json> <projectRoot> <area> --run-json <run.json> [--page-title <标题>] [--mode <路线>] [--replace-existing]");
+  console.error("usage: node build-bundle-manifest.mjs <layout-manifest.json> <out-bundle.json> <projectRoot> <area> --run-json <run.json> [--mapping-dsl <约束合并后的 DSL>] [--page-title <标题>] [--mode <路线>] [--replace-existing]");
   process.exit(2);
 }
 // area 必填：位置在 projectRoot 之后，因此"缺 area"优先于"缺 --run-json"报错（与参数顺序一致）。
@@ -52,6 +53,13 @@ if (!areaArg || !String(areaArg).trim()) {
 const area = String(areaArg).trim();
 
 const projectRoot = path.resolve(projectRootArg || ".");
+const mappingDslFile = mappingDslArg ? path.resolve(projectRoot, mappingDslArg) : null;
+if (mappingDslFile && mappingDslFile !== projectRoot && !mappingDslFile.startsWith(projectRoot + path.sep)) {
+  throw new Error("--mapping-dsl 必须位于项目根目录内: " + mappingDslArg);
+}
+if (mappingDslFile && !fs.existsSync(mappingDslFile)) {
+  throw new Error("--mapping-dsl 文件不存在: " + mappingDslFile);
+}
 const layout = JSON.parse(fs.readFileSync(layoutManifestFile, "utf8"));
 const name = layout.pageTarget;
 if (!name) throw new Error("Layout 清单缺少 pageTarget，无法推导页面名");
@@ -104,6 +112,7 @@ const manifest = {
   scaffold: true,
   projectMode: "scaffold",
   dslPath: runRegistry.projectRelative(projectRoot, resolvedInputs.snapshot),
+  ...(mappingDslFile ? { mappingDslPath: runRegistry.projectRelative(projectRoot, mappingDslFile) } : {}),
   visibilityPath: runRegistry.projectRelative(projectRoot, resolvedInputs.visibility),
   svgPath: runRegistry.projectRelative(projectRoot, resolvedInputs.extractSvg),
   iconMapPath: inputs("icon-map.json"),

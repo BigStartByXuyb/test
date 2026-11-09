@@ -55,7 +55,7 @@ fs.writeFileSync(buttonMapping, JSON.stringify({
     { ref: 'btnIcon', parentRef: 'root', pageAbsX: 300, pageAbsY: 292, relativeX: 300, relativeY: 292, width: 170, height: 80 },
     { ref: 'btnIcon/icon', parentRef: 'btnIcon', pageAbsX: 312, pageAbsY: 306, relativeX: 12, relativeY: 14, width: 97.0352783203125, height: 65.99 },
     { ref: 'status', parentRef: 'root', pageAbsX: 500, pageAbsY: 292, relativeX: 500, relativeY: 292, width: 140, height: 75 },
-    { ref: 'label', parentRef: 'root', pageAbsX: 200, pageAbsY: 292, relativeX: 200, relativeY: 292, width: 80, height: 22, type: 'TEXT', text: '速度' }
+    { ref: 'label', parentRef: 'root', pageAbsX: 200, pageAbsY: 292, relativeX: 200, relativeY: 292, width: 80, height: 22, type: 'TEXT', text: '速度', constraints: { minWidth: 80, maxWidth: 194 } }
   ],
   textAudit: [{ sourceRef: 'label', sourceText: '速度', visibility: true, role: 'content', decision: 'emit', outputRefs: ['TXT_1'] }],
   nodes: [
@@ -77,6 +77,7 @@ fs.writeFileSync(buttonMapping, JSON.stringify({
     {
       ref: 'label', sourceRef: 'label', sourceParent: 'root', id: 'TXT_1', xmlId: 'TXT_1',
       controlType: 'TextBlock', absX: 200, absY: 292, w: 80, h: 22,
+      constraints: { minWidth: 80, maxWidth: 194 },
       sourceText: '速度', valueSource: 'dsl.text', attrs: { Value: '速度', Align: 'Left' }
     }
   ]
@@ -122,7 +123,7 @@ const PAGE_ATTR_ORDER = [
   'SelectedValuePath', 'Filter', 'DefaultValue', 'MinValue', 'MaxValue', 'MinRange',
   'MaxRange', 'DecimalPlaces', 'Keypad', 'MaxLength', 'DisableRow', 'DesignPanelID',
   'ParameterName',
-  'Width', 'Height', 'IconWidth', 'IconHeight', 'Left', 'Top'
+  'MinWidth', 'MaxWidth', 'Width', 'Height', 'IconWidth', 'IconHeight', 'Left', 'Top'
 ];
 const statusTag = (buttonXml.match(/<IOContorl[^>]*ControlType="StatusButton"[\s\S]*?\/>/) || [''])[0];
 assert.ok(statusTag, 'fresh 输出必须包含 StatusButton 节点');
@@ -138,7 +139,9 @@ assertAttrOrder(iconButtonTag, PAGE_ATTR_ORDER, '带图标 IconButton');
 assertAttrOrder(buttonTag, PAGE_ATTR_ORDER, '无图标 IconButton');
 assertAttrOrder(statusTag, PAGE_ATTR_ORDER, 'StatusButton');
 assertAttrOrder(textTag, PAGE_ATTR_ORDER, 'TextBlock');
-assert.match(textTag, /Width="NaN"/, 'TextBlock 的 Width 必须固定为 NaN');
+assert.ok(!/(?:^|\s)Width="/.test(textTag), 'TextBlock 不得发射常规 Width');
+assert.match(textTag, /MinWidth="80"/, 'TextBlock 必须发射 DSL 的最小宽');
+assert.match(textTag, /MaxWidth="194"/, 'TextBlock 必须发射 DSL 的最大宽');
 assert.match(textTag, /Height="40"/, 'TextBlock 的 Height 必须固定为 40');
 // Align 是 TextBlock 的必写字段（映射表 textBlockAlign / controlTypeRequiredAttrs）：渲染层按映射透传，
 // 且**必须**是 Left / Right —— Align 不走「必写字段取不到来源写空串」那条通用通路（渲染层 fail-closed）。
@@ -278,7 +281,7 @@ assert.match(mergedIconButtonTag, /PageName="Jump:Home"/, 'merge 必须保留已
 assert.match(mergedIconButtonTag, /IconWidth="97"/, 'merge 必须把 IconWidth 覆盖为图标 bbox 宽度');
 assert.match(mergedIconButtonTag, /IconHeight="66"/, 'merge 必须把 IconHeight 覆盖为图标 bbox 高度');
 const mergedTextTag = (mergedXmlText.match(/<IOContorl[^>]*ID="TXT_1"[\s\S]*?\/>/) || [''])[0];
-assert.match(mergedTextTag, /Width="NaN"/, 'merge 必须把 TextBlock 的 Width 覆写为 NaN');
+assert.ok(!/(?:^|\s)Width="/.test(mergedTextTag), 'merge 必须移除 TextBlock 的常规 Width');
 assert.match(mergedTextTag, /Height="40"/, 'merge 必须保持 TextBlock 的 Height=40');
 assert.match(mergedTextTag, /Value="速度"/, 'merge 必须按 dsl.text 覆盖旧文本，保证 Value 与设计文本一致');
 
@@ -583,6 +586,60 @@ console.log('PASS button-family rules are read from the template map');
 console.log('PASS icon attributes follow the ControlType template scope');
 console.log('PASS merge new siblings follow visual-row order');
 
+// ---- merge 全新嵌套子树：TextBlock 同样只发射 MinWidth/MaxWidth，不发射常规 Width ----
+const mergeNestedMapping = path.join(dir, 'merge-nested-mapping.json');
+const mergeNestedExisting = path.join(dir, 'merge-nested-existing.xml');
+const mergeNestedMerged = path.join(dir, 'merge-nested-merged.xml');
+fs.writeFileSync(mergeNestedMapping, JSON.stringify({
+  rootRef: 'root',
+  sourceNodes: [
+    { ref: 'root', parentRef: null, pageAbsX: 0, pageAbsY: 0, relativeX: 0, relativeY: 0, width: 1280, height: 1024 },
+    { ref: 'group', parentRef: 'root', pageAbsX: 100, pageAbsY: 200, relativeX: 100, relativeY: 200, width: 300, height: 160 },
+    {
+      ref: 'group/label', parentRef: 'group', pageAbsX: 116, pageAbsY: 232, relativeX: 16, relativeY: 32,
+      width: 80, height: 16, type: 'TEXT', text: '嵌套标签',
+      constraints: { minWidth: 80, maxWidth: 194 }
+    }
+  ],
+  textAudit: [
+    { sourceRef: 'group/label', sourceText: '嵌套标签', visibility: true, role: 'content', decision: 'emit', outputRefs: ['NESTED_LABEL'] }
+  ],
+  nodes: [
+    {
+      ref: 'group', sourceRef: 'group', id: 'NESTED_GROUP', xmlId: 'NESTED_GROUP', controlType: 'GroupBox',
+      parent: null, absX: 100, absY: 200, w: 300, h: 160, expectedWidth: 300, expectedHeight: 160,
+      widthSource: 'dsl.bbox', heightSource: 'dsl.bbox', attrs: { Header: '' }
+    },
+    {
+      ref: 'group/label', sourceRef: 'group/label', id: 'NESTED_LABEL', xmlId: 'NESTED_LABEL', controlType: 'TextBlock',
+      parent: 'group', absX: 116, absY: 232, w: 80, h: 16, sourceText: '嵌套标签', valueSource: 'dsl.text',
+      expectedWidth: 'NaN', expectedHeight: 40, widthSource: 'mtslg.textblock.omit-width',
+      heightSource: 'mtslg.textblock.fixed-40', dslWidth: 80,
+      constraints: { minWidth: 80, maxWidth: 194 }, attrs: { Value: '嵌套标签', Align: 'Left' }
+    }
+  ]
+}, null, 2));
+fs.writeFileSync(mergeNestedExisting, [
+  '<?xml version="1.0" encoding="utf-8"?>',
+  '<IOContorl ID="" Left="NaN" Top="NaN" Width="NaN" Height="NaN">',
+  '    <IOContorl ID="NESTED_GROUP" ControlType="GroupBox" Header="" Left="100" Top="8" Width="300" Height="160">',
+  '    </IOContorl>',
+  '</IOContorl>',
+  ''
+].join('\n'));
+const mergeNestedRun = spawnSync(process.execPath, [
+  path.join(__dirname, '..', 'adapters/mtslg-iocontrol', 'gen-iocontrol-xml.js'),
+  '--merge', mergeNestedExisting, mergeNestedMapping, '--out', mergeNestedMerged
+], { encoding: 'utf8' });
+assert.strictEqual(mergeNestedRun.status, 0, '嵌套子树 merge 必须成功: ' + mergeNestedRun.stderr);
+const nestedTag = (fs.readFileSync(mergeNestedMerged, 'utf8').match(/<IOContorl[^>]*ID="NESTED_LABEL"[\s\S]*?\/>/) || [''])[0];
+assert.ok(nestedTag, '嵌套 TextBlock 必须新增');
+assert.match(nestedTag, /MinWidth="80"/, '嵌套 TextBlock 必须发射 MinWidth');
+assert.match(nestedTag, /MaxWidth="194"/, '嵌套 TextBlock 必须发射 MaxWidth');
+assert.ok(!/(?:^|\s)Width="/.test(nestedTag), '嵌套 TextBlock 不得发射常规 Width');
+
+console.log('PASS merge new nested TextBlock width constraints');
+
 // ---- 表格列定义（nodeKind=table-column）：几何按 columnTemplate 固定发射、不写 Width ----
 const tableMap = path.join(__dirname, '..', '..', 'references', 'adapters', 'mtslg-iocontrol', 'mtslg-iocontrol-map.json');
 const tableMapping = path.join(dir, 'table-mapping.json');
@@ -734,6 +791,7 @@ const langTag = (fs.readFileSync(langMergedOut, 'utf8').match(/<IOContorl[^>]*ID
 assert.match(langTag, /LangName="F2DemoNewLabel"/, 'LangName 必须跟随设计稿覆盖');
 assert.match(langTag, /Value="新标签"/, '文案（dsl.text）按设计稿覆盖');
 assert.match(langTag, /IOName="KeepMe"/, '人工的业务属性必须保留');
+assert.ok(!/(?:^|\s)Width="/.test(langTag), 'merge 必须移除 TextBlock 的常规 Width');
 assert.match(langRun.stderr + langRun.stdout, /语言键覆盖/, '语言键被覆盖时必须写进报告');
 
 console.log('PASS merge 唯一性硬门 + LangName 跟随设计稿回归测试');

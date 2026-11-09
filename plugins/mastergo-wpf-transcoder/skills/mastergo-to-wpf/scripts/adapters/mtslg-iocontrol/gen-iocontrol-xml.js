@@ -39,12 +39,13 @@
  *   iconSize 只在「模板含图标字段」且「节点带 Icon」时被消费，映射残留的尺寸不单独生效；
  *   带 Icon 却没有 iconSize 视为映射不完整，直接失败，禁止猜图标尺寸。
  *
- * TextBlock 固定属性：Height 固定 40；Width 固定 "NaN"（不用设计稿文本 bbox 宽度），
+ * TextBlock 固定属性：Height 固定 40；不发射常规 Width，
+ * 只发射设计稿 constraints 里的 MinWidth / MaxWidth（不用设计稿文本 bbox 宽度），
  * FontSize 仍取 DSL 字体事实；Align 恒写且只有 TextBlock 有（DSL 节点 textAlign=right → "Right"，
  * 其余含缺失 → "Left" 默认左对齐）。
  *
  * merge 语义（改现有页面的强制模式）：
- *   1. 几何（Left/Top/Width/Height）按映射更新；
+ *   1. 几何（Left/Top/Height；TextBlock 的 MinWidth/MaxWidth）按映射更新，TextBlock 旧 Width 删除；
  *   2. ControlType 按映射更新（变化时写冲突报告）；
  *   3. 业务属性：现有 XML 已有同名的 → 一律保留现有值（值不同写冲突报告，不覆盖）；
  *      现有 XML 没有的 → 按映射新增（写新增报告）；
@@ -64,6 +65,7 @@ const fs = require('fs');
 const { validateTextAudit } = require('./validate-iocontrol-provenance');
 // 模板表规则块的解析唯一实现（见 scripts/adapters/mtslg-iocontrol/lib/iocontrol-map-rules.js；禁止在本脚本再抄一份）。
 const MAP_RULES = require('./lib/iocontrol-map-rules');
+const { constraintAttributes } = require('../../lib/constraints');
 // XML 属性转义（含换行 → &#x0a;）的唯一实现（见 scripts/lib/script-helpers.js；禁止在本脚本再抄一份）。
 const { xmlAttr, normalizeForCompare, omittedAttrs,
   parentOuterRightEdge, textBlockLeftValue, isRightAlignedTextBlock } = require('../../lib/script-helpers');
@@ -431,10 +433,10 @@ function outputHeight(node) {
   return type === 'TextBlock' ? 40 : node.h;
 }
 
-// TextBlock 宽度固定为 NaN（自适应），不使用设计稿文本 bbox 宽度；其余控件仍用自身 bbox。
+// TextBlock 不发射常规 Width；其余控件仍用自身 bbox。
 function outputWidth(node) {
   const type = node.controlType || (node.attrs && node.attrs.ControlType);
-  if (type === 'TextBlock') return 'NaN';
+  if (type === 'TextBlock') return null;
   return node.w;
 }
 
@@ -505,16 +507,29 @@ function applyNodeGeometry(node, attrMap, parentAbsX, parentAbsY, insetLeft, ins
   if (outputHeight(node) !== undefined && outputHeight(node) !== null) attrMap.Height = fmtNum(outputHeight(node));
 }
 
+// TextBlock 的宽度只发射设计稿约束，不发射常规 Width。
+function applyTextBlockWidthConstraints(node, attrMap) {
+  const type = node.controlType || (node.attrs && node.attrs.ControlType);
+  if (type === 'TextBlock' && node.constraints) {
+    const widthAttrs = constraintAttributes(node.constraints);
+    for (const name of ['MinWidth', 'MaxWidth']) {
+      if (widthAttrs[name] !== undefined) attrMap[name] = widthAttrs[name];
+    }
+  }
+}
+
 // 就地补齐模板属性：表格列定义按 columnTemplate 发射（字段已在映射里），其余节点按固定必写字段集。
 function applyTemplateAttrs(node, attrMap) {
   if (isTableColumnNode(node)) return;
+  applyTextBlockWidthConstraints(node, attrMap);
   applyButtonFamilyAttrs(node, attrMap);
   applyRequiredAttrs(node, attrMap);
 }
 
 // 属性渲染顺序（目标项目页面既有惯例）：
 //   身份/类型/样式 → Icon → 文本(TopLeftContent/Value/Header) → LangName →
-//   运行时字段(PageName/IO*) → 控件尺寸(Width/Height) → 图标尺寸(IconWidth/IconHeight) → 位置(Left/Top)
+//   运行时字段(PageName/IO*) → 宽度约束(MinWidth/MaxWidth) → 控件尺寸(Width/Height)
+//   → 图标尺寸(IconWidth/IconHeight) → 位置(Left/Top)
 const ATTR_ORDER = [
   'ID', 'ControlType', 'Style', 'Icon', 'IconText', 'TopLeftContent', 'Value', 'Header', 'LangName',
   'PageName', 'IOName', 'IOCommand', 'IOVisible', 'IOEnable', 'IOParam', 'IOStyle', 'IOState', 'IOGroup',
@@ -525,7 +540,7 @@ const ATTR_ORDER = [
   'SelectedValuePath', 'Filter', 'DefaultValue', 'MinValue', 'MaxValue', 'MinRange',
   'MaxRange', 'DecimalPlaces', 'Keypad', 'MaxLength', 'DisableRow', 'DesignPanelID',
   'ParameterName',
-  'Width', 'Height', 'IconWidth', 'IconHeight', 'Left', 'Top',
+  'MinWidth', 'MaxWidth', 'Width', 'Height', 'IconWidth', 'IconHeight', 'Left', 'Top',
 ];
 const GEOM_ATTRS = ['Left', 'Top', 'Width', 'Height'];
 
@@ -808,11 +823,14 @@ function mergeMode() {
   const replacements = new Map(); // tokenIdx -> newChunk
   for (const { n, attrMap, tokenIdx, matchKind } of rendered.values()) {
     if (tokenIdx === null) continue;
+    const type = n.controlType || (n.attrs && n.attrs.ControlType);
     const t = tokens[tokenIdx];
     const finalAttrs = new Map();
     for (const a of t.attrs) finalAttrs.set(a.name, a.value);
-    // 按钮族的 IconWidth/IconHeight 属于生成器按图标 bbox 计算的属性，按几何语义覆盖。
-    const geometryKeys = GEOM_ATTRS.concat(buttonFamilyIconSizeAttrNames(n));
+    // TextBlock 的约束宽和按钮族的 IconWidth/IconHeight 都属于生成器计算的布局属性：
+    // 映射有值就更新，映射没有就删除，不能把旧常规 Width 留在现有页面里。
+    const widthConstraintKeys = type === 'TextBlock' ? ['MinWidth', 'MaxWidth'] : [];
+    const geometryKeys = GEOM_ATTRS.concat(widthConstraintKeys, buttonFamilyIconSizeAttrNames(n));
     for (const k of geometryKeys) {
       if (attrMap[k] !== undefined && attrMap[k] !== null) {
         if (!finalAttrs.has(k)) {
@@ -821,6 +839,9 @@ function mergeMode() {
           report.updated.push(`[${n.ref}] ${k}: "${finalAttrs.get(k)}" -> "${attrMap[k]}" (匹配:${matchKind})`);
         }
         finalAttrs.set(k, attrMap[k]);
+      } else if (finalAttrs.has(k)) {
+        report.updated.push(`[${n.ref}] ${k}: "${finalAttrs.get(k)}" -> 不发射 (匹配:${matchKind})`);
+        finalAttrs.delete(k);
       }
     }
     if (attrMap.ControlType !== undefined && finalAttrs.get('ControlType') !== attrMap.ControlType) {
@@ -942,6 +963,7 @@ function mergeMode() {
         am.Top = fmtNum(normalizedY(node.absY) - pa2.y);
         if (outputWidth(node) !== undefined && outputWidth(node) !== null) am.Width = fmtNum(outputWidth(node));
         if (outputHeight(node) !== undefined && outputHeight(node) !== null) am.Height = fmtNum(outputHeight(node));
+        applyTextBlockWidthConstraints(node, am);
         applyButtonFamilyAttrs(node, am);
         applyRequiredAttrs(node, am);
       }

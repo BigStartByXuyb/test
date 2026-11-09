@@ -99,6 +99,7 @@ pwsh -NoProfile -File <skill>\scripts\entry\run-all.ps1 -ProjectRoot <项目> -T
   - dsl.snapshot.json + visibility.json
   - 正式映射表 mtslg-iocontrol-map.json
   - 图标台账（尚无台账时用空 candidates 占位）
+  - 尺寸约束 JSON（可选；先合并进 DSL，供 A/B 的 TextBlock MinWidth/MaxWidth 使用）
 - **产物**：
   - Generated/runs/<Target>/mapping 草稿与映射审计（unmappedComponents / pending / templateConflicts）
 - **失败语义**：
@@ -164,6 +165,7 @@ pwsh -NoProfile -File <skill>\scripts\entry\run-all.ps1 -ProjectRoot <项目> -T
 - **输入**：
   - Layout 清单
   - 运行登记表 run.json（采集输入只按它取）
+  - 尺寸约束 JSON（可选；有约束时同时登记合并后的 DSL 作为 Bundle 映射输入）
   - 译文清单 Generated/_inputs/<Target>.lang-translations.json（术语表可选）
 - **产物**：
   - Bundle 清单 Generated/_inputs/<Target>.bundle.json（含 runRegistry 指纹）

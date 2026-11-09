@@ -18,7 +18,7 @@
  * `expectedLeft` 是可选字段：只有 TextBlock `Align="Right"` 会给 —— 它的 Left 口径是"以控件右上角
  * 为原点量到父容器外框右边缘的距离"，不是 x − contentOriginX；给了就以它为准核对 Left（由
  * check-coords.mjs 按 lib/script-helpers.js 的同一实现独立算出），其余字段口径不变。
- * TextBlock 的 Width 固定为 NaN（自适应），节点表按 NaN 传入即可。
+ * TextBlock 不发射常规 Width；节点表保留 bbox 宽度用于文字定位，约束宽单独核对。
  * contentOriginX/contentOriginY 的取值 = 该节点在 XML 里的父容器页面绝对坐标：
  *   - 根级节点（父容器是页面根）：X 用 0，Y 用 192（顶层公共栏 126 + 示例标题 66，只在根级扣一次）；
  *   - 嵌套节点：用父容器的 pageAbsX / pageAbsY（生成器对嵌套节点按父容器相对发射，不再扣 192）。
@@ -131,7 +131,19 @@ for (const xn of xmlNodes) {
   const problems = [];
   if (!close(xl, sl, tolerance)) problems.push(`Left xml=${xl} dsl=${sl}`);
   if (!close(xt, st, tolerance)) problems.push(`Top xml=${xt} dsl=${st}`);
-  if (!close(xw, sw, tolerance)) problems.push(`Width xml=${xw} dsl=${sw}`);
+  if (xn.ControlType === 'TextBlock') {
+    if (xn.Width !== undefined) problems.push('TextBlock 不得发射常规 Width');
+  } else if (!close(xw, sw, tolerance)) {
+    problems.push(`Width xml=${xw} dsl=${sw}`);
+  }
+  for (const [attr, key] of [['MinWidth', 'minWidth'], ['MaxWidth', 'maxWidth']]) {
+    const expected = src.constraints && src.constraints[key];
+    if (expected === undefined || expected === null) {
+      if (xn[attr] !== undefined) problems.push(`${attr} 未登记却已发射`);
+    } else if (!close(num(xn[attr]), num(expected), tolerance)) {
+      problems.push(`${attr} xml=${num(xn[attr])} dsl=${num(expected)}`);
+    }
+  }
   if (!close(xh, sh, tolerance)) problems.push(`Height xml=${xh} dsl=${sh}`);
 
   if (problems.length === 0) {

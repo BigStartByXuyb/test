@@ -65,6 +65,7 @@ Bundle 的页面 XML 步骤恒为 `--fresh`，因此**没有合并语义**：`op
 |---|---|---|
 | `svgPath` | **必填** | `extractSvg` 落盘的 JSON；没有运行时 Icon 时也必须给合法的 `{ "svgs": [] }` 文件（`main()` → `[svgPath, iconMapPath, templateMapPath]` 逐个做存在性检查，`fail("输入文件不存在: ")`） |
 | `dslPath` + `visibilityPath` | **新建页面必填** | 同时提供且文件存在；mapping 由本次生成创建（`main()` → `fail("新建页面必须提供当前页面的 dslPath 和 visibilityPath；mapping 将在本次生成中创建")`、`fail("dslPath/visibilityPath 输入文件不存在")`） |
+| `mappingDslPath` | 可选 | 已完成尺寸约束合并的 DSL；提供时最终 mapping 从这份 DSL 生成，`dslPath` 仍由运行登记表绑定原始采集快照。 |
 | `mappingPath` | **必填（所有模式）** | mapping 的**工作落盘路径**：新建页面时由本次生成写入（随后会被重新生成覆盖，不是输入真值）；已有页面在未提供 `dslPath`/`visibilityPath` 时作为已有 mapping 读入。**不要指向 `Generated/<页面名>.mapping.json`（审计产物）**——新建模式下会因"目标文件已存在"失败（`main()` → `fail("必须提供 mappingPath：…")`、`fail("mappingPath 不能与审计产物同路径: ")`）。 |
 | `iconMapPath` | **必填（文件始终必填）** | 图标台账输入；脚本无条件做存在性检查，**没有图标槽位的页面也必须给一份合法的空 `icons[]` 文件** |
 | `templateMapPath` | 可选 | 缺省 = 插件内 `mtslg-iocontrol-map.json`（脚本常量 `DEFAULT_TEMPLATE_MAP`）；它是**脚本在生成期读取**的运行期输入，只是不需要模型预读进上下文 |

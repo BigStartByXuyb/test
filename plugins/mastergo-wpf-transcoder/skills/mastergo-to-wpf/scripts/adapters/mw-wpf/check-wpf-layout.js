@@ -193,7 +193,9 @@ function checkDesignBoxes(layout, emission) {
         report("R14", cell.ref, "布局产物没有登记承载物设计尺寸（nodeWidth / nodeHeight）");
       }
       // 容器格子与控件格子共用 lib/design-box.js 的尺寸策略实现。
-      const expected = cell.container ? containerBoxAttrs(cell) : designBoxAttrs(cell);
+      const expected = cell.container
+        ? containerBoxAttrs(cell)
+        : designBoxAttrs(cell, { omitWidth: cell.controlType === "TextBlock" });
       const actual = emitted.get(cell.ref);
       if (!actual) {
         report("R14", cell.ref, "发射报告里没有这个格子的尺寸/对齐记录");

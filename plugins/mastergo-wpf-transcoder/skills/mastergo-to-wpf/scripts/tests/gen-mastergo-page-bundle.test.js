@@ -100,6 +100,13 @@ fs.writeFileSync(dslSnapshot, JSON.stringify({
   componentDocumentLinks: [],
   rules: []
 }, null, 2), "utf8");
+const constrainedDslSnapshot = path.join(root, "dsl.constrained.json");
+const constrainedSnapshot = JSON.parse(fs.readFileSync(dslSnapshot, "utf8"));
+const constrainedLabel = constrainedSnapshot.dsl.nodes[0].children[0].children
+  .find((node) => node.id === "body-text/inner/value-group")
+  .children.find((node) => node.id === "body-text/inner/value-group/value");
+constrainedLabel.constraints = { minWidth: 80, maxWidth: 194 };
+fs.writeFileSync(constrainedDslSnapshot, JSON.stringify(constrainedSnapshot, null, 2), "utf8");
 const visibility = path.join(root, "visibility.json");
 fs.writeFileSync(visibility, JSON.stringify({ nodes: [] }, null, 2), "utf8");
 
@@ -128,6 +135,7 @@ fs.writeFileSync(manifest, JSON.stringify({
   layoutPath: "Resources/Layout/Layout.xml",
   mappingPath: mapping,
   dslPath: dslSnapshot,
+  mappingDslPath: constrainedDslSnapshot,
   visibilityPath: visibility,
   svgPath: svg,
   iconMapPath: iconMap,
@@ -183,6 +191,16 @@ for (const stale of ["Common/Pages/F2NewPagePage.xml", "Resources/Icons/F2NewPag
 }
 assert.match(fs.readFileSync(path.join(project, "Resources/Pages/F2NewPage/F2NewPageIcons.xaml"), "utf8"), /ActionGeometry/);
 assert.match(fs.readFileSync(path.join(project, "Resources/Pages/F2NewPage/F2NewPagePage.xml"), "utf8"), /Value="\+5"/);
+const constrainedPageXml = fs.readFileSync(path.join(project, "Resources/Pages/F2NewPage/F2NewPagePage.xml"), "utf8");
+const constrainedMapping = JSON.parse(fs.readFileSync(path.join(project, "Generated/F2NewPage.mapping.json"), "utf8"));
+const constrainedNode = constrainedMapping.nodes.find((node) => node.sourceRef === "body-text/inner/value-group/value");
+assert.ok(constrainedNode, "约束 DSL 中的 TextBlock 必须进入最终 mapping");
+assert.strictEqual(constrainedNode.controlType, "TextBlock");
+assert.deepStrictEqual(constrainedNode.constraints, { minWidth: 80, maxWidth: 194 });
+assert.strictEqual(constrainedNode.expectedWidth, "NaN");
+assert.strictEqual(constrainedNode.widthSource, "mtslg.textblock.omit-width");
+assert.match(constrainedPageXml, /MinWidth="80"/, "Bundle 最终页面必须保留 MinWidth");
+assert.match(constrainedPageXml, /MaxWidth="194"/, "Bundle 最终页面必须保留 MaxWidth");
 // 必写字段：TextBlock 即使没有 IO 来源也要发射空 IOName 占位
 assert.match(fs.readFileSync(path.join(project, "Resources/Pages/F2NewPage/F2NewPagePage.xml"), "utf8"), /IOName=""/);
 assert.match(fs.readFileSync(path.join(project, "Resources/Layout/Layout.xml"), "utf8"), /Index="1"/);

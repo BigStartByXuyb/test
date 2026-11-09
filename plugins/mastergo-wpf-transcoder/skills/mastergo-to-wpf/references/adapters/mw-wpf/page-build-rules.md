@@ -62,10 +62,10 @@
 
 1. **取约束**：需要一份**外部导出的约束 JSON**（本仓库不产出该文件）。形状固定为 `{ pageId, nodes: [{ id, minWidth, maxWidth, minHeight, maxHeight, … }] }`；**未设置返回 `0`（不是 `null`）**，只有 `> 0` 才算设置。
 2. **合并**：`scripts/core/apply-constraints.js --dsl <dsl.snapshot.json> --constraints <约束.json>` 把 `node.constraints = { minWidth, maxWidth, minHeight, maxHeight }`（只保留 `> 0` 的项）合并进 DSL 快照，**不改动 DSL 任何原生字段**。配对先按完整 id，再按复合 id 末段兜底（实例内子层两边链长不同）；末段歧义不猜，记进报告。
-3. **入口**：`run-all.ps1 -Constraints <约束.json>`；不给就自动找 `Generated/_inputs/<Target>.constraints.json`；两者都没有 = 无约束。`-RequireConstraints` 要求约束来源必须存在且至少配上一条（缺失或全空直接失败，不静默退化成"无约束"）。解析与合并只有 `Resolve-LayoutDslSnapshot` 一处实现：`layout` 与 `gates` / `verify` 都调它重算，不读磁盘上遗留的合并快照。
+3. **入口**：`run-all.ps1 -Constraints <约束.json>`；不给就自动找 `Generated/_inputs/<Target>.constraints.json`；两者都没有 = 无约束。`-RequireConstraints` 要求约束来源必须存在且至少配上一条（缺失或全空直接失败，不静默退化成"无约束"）。解析与合并只有 `Resolve-LayoutDslSnapshot` 一处实现：`mapping`、`layout` 与 `gates` / `verify` 都调它重算，不读磁盘上遗留的合并快照。
 4. **透传**：布局推导只把 `constraints` 透传进对应格子（`cell.constraints`），不推算、不补默认值。**带约束的容器不展平**——不展平是落格的必要条件，不是充分条件：容器还要有可发射的内容才落到产物（展平等于放弃承载物，所以不展平是前提）。
    **豁免的只有 `constraintExempt` 三类**：页面根（画布本身不是页面里的控件）、不可见节点、落在框架固定区（顶部栏 / 底部栏）的节点——由 `layout` 登记进产物的 `constraintExempt`（含原因），门禁按它登记提示、不失败。其余带约束节点在产物里没有格子即失败（门禁报 `R12`），不许静默丢；常见成因与处置（不封闭枚举）：容器子树里没有可发射的控件（补可发射内容，或由设计侧确认这个盒子是否真的要在页面里存在）、待确认类型 / 无尺寸等不进格子的节点（先按门禁第 1 / 9 条修类型判定与映射）、产物与本次输入不同步（先重跑 `layout`）。
-5. **发射**：`View.xaml` 上落 `MinWidth / MaxWidth / MinHeight / MaxHeight`（控件与容器 Grid 都写）；`TextBlock` 在设了最大宽时补 `TextWrapping="Wrap"`。
+5. **发射**：A 的 `View.xaml` 落 `MinWidth / MaxWidth / MinHeight / MaxHeight`（控件与容器 Grid 都写），B 的 IOContorl XML 在 `TextBlock` 上落 `MinWidth / MaxWidth`。两条路线的 `TextBlock` 都不写常规 `Width`；A 在设了最大宽时补 `TextWrapping="Wrap"`。
 6. **门禁**：第 4 节第 11 / 12 / 13 条。
 
-**官方 DSL 支持这四个字段之后**：删掉 `apply-constraints.js` 这一步与 `run-all.ps1` 的 `-Constraints` / `-RequireConstraints` 入口，改由下游直接读 DSL 节点自带的同名字段。键名一致时，布局推导、XAML 发射、门禁三处一行都不用改——要动的只有"约束来源"这一处适配。
+**官方 DSL 支持这四个字段之后**：删掉 `apply-constraints.js` 这一步与 `run-all.ps1` 的 `-Constraints` / `-RequireConstraints` 入口，改由下游直接读 DSL 节点自带的同名字段。键名一致时，A 的布局/XAML/门禁与 B 的 mapping/XML/校验都不用改——要动的只有"约束来源"这一处适配。

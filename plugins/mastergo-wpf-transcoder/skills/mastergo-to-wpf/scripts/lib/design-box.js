@@ -51,13 +51,15 @@ function axisPlan(nodeSize, cellSize, offset) {
 
 // 返回要写在控件（或容器 Grid）上的属性，顺序固定：Width/Height → 对齐 → Margin。
 // 格子尺寸缺失（undefined）时返回空对象：调用方保持 Stretch，不猜。
-function designBoxAttrs(cell) {
+// TextBlock 的宽度不作为常规 Width 发射；调用方用 omitWidth 保留 MinWidth/MaxWidth 约束。
+function designBoxAttrs(cell, options) {
   const attrs = {};
   if (!cell) return attrs;
+  const omitWidth = Boolean(options && options.omitWidth);
   const horizontal = axisPlan(cell.nodeWidth, cell.width, cell.offsetX);
   const vertical = axisPlan(cell.nodeHeight, cell.height, cell.offsetY);
   if (!horizontal && !vertical) return attrs;
-  if (horizontal) attrs.Width = String(horizontal.size);
+  if (horizontal && !omitWidth) attrs.Width = String(horizontal.size);
   if (vertical) attrs.Height = String(vertical.size);
   const aligns = [
     [horizontal, "HorizontalAlignment", { start: "Left", end: "Right", center: "Center" }],

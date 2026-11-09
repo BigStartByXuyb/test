@@ -993,6 +993,9 @@ function main() {
   // DSL 采集输入路径提前解析：既给映射生成器用，也给统一文件登记表用（登记为 audit 来源证据）。
   const dslInputPath = manifest.dslPath
     ? resolveInput(manifestDir, projectRoot, manifest.dslPath, "dslPath") : null;
+  // 最终 mapping 必须从与布局相同的约束 DSL 生成；dslPath 仍是登记表绑定的原始采集产物。
+  const mappingDslInputPath = manifest.mappingDslPath
+    ? resolveInput(manifestDir, projectRoot, manifest.mappingDslPath, "mappingDslPath") : dslInputPath;
   const visibilityInputPath = manifest.visibilityPath
     ? resolveInput(manifestDir, projectRoot, manifest.visibilityPath, "visibilityPath") : null;
   const iconMapPath = resolveInput(manifestDir, projectRoot, manifest.iconMapPath, "iconMapPath");
@@ -1011,7 +1014,7 @@ function main() {
   });
   if (manifest.dslPath || manifest.visibilityPath) {
     if (!manifest.dslPath || !manifest.visibilityPath) fail("启用 DSL 自动映射时必须同时提供 dslPath 和 visibilityPath");
-    const dslPath = dslInputPath;
+    const dslPath = mappingDslInputPath;
     const visibilityPath = visibilityInputPath;
     if (!fs.existsSync(dslPath) || !fs.existsSync(visibilityPath)) fail("dslPath/visibilityPath 输入文件不存在");
     run(MAPPING_SCRIPT, [
@@ -1343,7 +1346,7 @@ function main() {
     const auditBackup = fs.existsSync(bundleAudit) ? backupFile(bundleAudit) : null;
     if (auditBackup) backups.push(auditBackup);
     const fileRegistry = bundleFileRegistry(bundleInfo, {
-      sourceFiles: [dslInputPath, visibilityInputPath, svgPath].filter(Boolean),
+      sourceFiles: [dslInputPath, mappingDslInputPath, visibilityInputPath, svgPath].filter(Boolean),
       generatedFiles: scanGeneratedFiles(generatedDir),
       workFiles: workFiles,
       // 本次运行新产生的副本 = Bundle 自己记录的 ∪ 运行前后差集（差集覆盖子脚本产生的那些）。

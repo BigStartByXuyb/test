@@ -41,18 +41,19 @@
 
 ### TextBlock 尺寸（高度与宽度）
 
-`TextBlock` 的高度与宽度都是固定布局边界，不是字号：
+`TextBlock` 的高度是固定布局边界，宽度只接受设计稿约束，不是字号：
 
 ```text
 MTSLG TextBlock Height = 40
-MTSLG TextBlock Width  = NaN（自适应，不用文本 bbox 宽度）
+MTSLG TextBlock Width  = 不发射常规 Width
+MTSLG TextBlock 约束宽 = MinWidth / MaxWidth（取自设计稿 constraints，有才发射）
 FontSize 独立取对应 MasterGo DSL 字体事实
-文本 bbox、文本 bbox 宽度、外层组件高度和行高不得改写 TextBlock Height/Width
+文本 bbox、文本 bbox 宽度、外层组件高度和行高不得改写 TextBlock Height/MinWidth/MaxWidth
 文本 bbox 宽度只作为 dslWidth 记入 mapping 溯源
 输入框/选择框等非 TextBlock 控件按正式变体模板取自身宽高
 ```
 
-`FontSize`、`LineHeight` 和文本内容不能反推出控件尺寸。MTSLG IOContorl `TextBlock` 的 Height 必须固定为 `40`、Width 必须固定为 `NaN`；WPF 的宽度/高度与布局行高仍由对应 WPF 容器和项目事实决定。
+`FontSize`、`LineHeight` 和文本内容不能反推出控件尺寸。MTSLG IOContorl 与 WPF `TextBlock` 的 Height/布局行高仍按各自路线发射，宽度只发射设计稿给出的 `MinWidth` / `MaxWidth`，不发射常规 `Width`。
 
 ### 顶部示例标题
 

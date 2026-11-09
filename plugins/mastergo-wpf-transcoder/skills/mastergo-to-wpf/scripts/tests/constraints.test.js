@@ -158,6 +158,7 @@ assert.strictEqual(cells.find(function (cell) { return cell.ref === "t2"; }).con
   assert.ok(/MinWidth="80"/.test(xaml), "必须发射 MinWidth");
   assert.ok(/MaxWidth="194"/.test(xaml), "必须发射 MaxWidth");
   assert.ok(/TextWrapping="Wrap"/.test(xaml), "TextBlock 有最大宽时必须补 TextWrapping");
+  assert.ok(!/(?:^|\s)Width="120"/.test(xaml), "TextBlock 不得发射常规 Width");
   assert.strictEqual((xaml.match(/MinWidth="/g) || []).length, 1, "没有约束的控件不得被补约束");
 }
 

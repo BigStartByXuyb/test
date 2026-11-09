@@ -247,7 +247,7 @@ function renderControl(node, cell, ctx, depth) {
 
   // 尺寸与对齐照设计稿：格子尺寸取自布局产物（含跨格与自适应带（星号带）分到的剩余），控件写自身设计稿尺寸，
   // 两者的差就是间距；差值落在哪一侧由格子上的 offsetX/offsetY 决定（唯一实现在 lib/design-box.js）。
-  const boxAttrLines = designBoxAttrs(cell);
+  const boxAttrLines = designBoxAttrs(cell, { omitWidth: spec.element === "TextBlock" });
   Object.keys(boxAttrLines).forEach(function (name) { attr(name, boxAttrLines[name]); });
   ctx.report.designBox.push({ ref: node.ref, container: false, attrs: boxAttrLines });
 

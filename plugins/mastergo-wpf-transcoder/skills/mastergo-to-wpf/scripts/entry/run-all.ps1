@@ -123,7 +123,7 @@ $Steps = @(
     },
     [pscustomobject]@{
         Id = 5; Name = 'mapping'; Title = 'mapping 草稿（按当前台账）'
-        Inputs   = @('dsl.snapshot.json + visibility.json', '正式映射表 mtslg-iocontrol-map.json', '图标台账（尚无台账时用空 candidates 占位）')
+        Inputs   = @('dsl.snapshot.json + visibility.json', '正式映射表 mtslg-iocontrol-map.json', '图标台账（尚无台账时用空 candidates 占位）', '尺寸约束 JSON（可选；先合并进 DSL，供 A/B 的 TextBlock MinWidth/MaxWidth 使用）')
         Outputs  = @('Generated/runs/<Target>/mapping 草稿与映射审计（unmappedComponents / pending / templateConflicts）')
         Failures = @('组件与固定模板冲突', '结构签名部分命中')
         Recovery = @('只补输入（用 manifest.excludeInstances 隔离该实例、把偏差写进待确认），不改 mapping 产物；重跑：-Progress mapping')
@@ -157,7 +157,7 @@ $Steps = @(
     },
     [pscustomobject]@{
         Id = 9; Name = 'inputs'; Title = '校验译文并生成 Bundle 清单'
-        Inputs   = @('Layout 清单', '运行登记表 run.json（采集输入只按它取）', '译文清单 Generated/_inputs/<Target>.lang-translations.json（术语表可选）')
+        Inputs   = @('Layout 清单', '运行登记表 run.json（采集输入只按它取）', '尺寸约束 JSON（可选；有约束时同时登记合并后的 DSL 作为 Bundle 映射输入）', '译文清单 Generated/_inputs/<Target>.lang-translations.json（术语表可选）')
         Outputs  = @('Bundle 清单 Generated/_inputs/<Target>.bundle.json（含 runRegistry 指纹）')
         Failures = @('缺区域前缀 area', '缺 --run-json 或译文清单', '发现未登记的旧同名采集文件', '登记表 sha256 与文件不符')
         Recovery = @('补齐输入后重跑：-Progress inputs（采集输入只按登记表取，未登记的旧同名文件一律拒绝）')
@@ -690,6 +690,9 @@ foreach ($step in $Steps) {
             'mapping' {
                 # 图标台账在 mapping 步之前可能还没产出（首次运行没有命名表）：草稿输入按"台账 → 候选 → 空清单"降级，
                 # 两条路线共用这一处口径（A 的类型判定同样要读图标槽位）。
+                # 尺寸约束也必须在这里并入：B 的 TextBlock 宽约束随映射进入 XML；
+                # A 的类型判定同样读同一份已合并快照，后续 layout 再按同一入口重算。
+                $MappingDslJson = Resolve-LayoutDslSnapshot -LogFile $log
                 $ledgerForDraft = if (Test-Path -LiteralPath $LedgerJson) { $LedgerJson } else { $CandidateJson }
                 if (-not (Test-Path -LiteralPath $ledgerForDraft)) {
                     New-Item -ItemType Directory -Force -Path $Inputs | Out-Null
@@ -700,7 +703,7 @@ foreach ($step in $Steps) {
                     # 作业A：类型判定只读共享类型表（设计稿组件集/变体 → ControlType + 槽位），
                     # 不掺 IOContorl 的写入规则；属性怎么写由 `bundle` 那一步按 mw-wpf-map.json 决定。
                     Invoke-StepCommand -Label 'component types' -LogFile $log -File 'node' -Arguments @(
-                        (Get-AdapterScript 'mapping'), '--dsl', $SnapshotJson,
+                        (Get-AdapterScript 'mapping'), '--dsl', $MappingDslJson,
                         '--visibility', $VisibilityJson, '--template-map', $TypeMap,
                         '--icon-map', $ledgerForDraft,
                         '--out', $TypeAuditJson) | Out-Null
@@ -709,7 +712,7 @@ foreach ($step in $Steps) {
                     break
                 }
                 Invoke-StepCommand -Label 'mapping draft' -LogFile $log -File 'node' -Arguments @(
-                    (Get-AdapterScript 'mapping'), '--dsl', $SnapshotJson,
+                    (Get-AdapterScript 'mapping'), '--dsl', $MappingDslJson,
                     '--visibility', $VisibilityJson, '--template-map', $TemplateMap,
                     '--icon-map', $ledgerForDraft, '--out', $DraftMappingJson) | Out-Null
             }
@@ -811,10 +814,14 @@ foreach ($step in $Steps) {
             }
             'inputs' {
                 # 所有 skill 自带脚本一律用 Join-Path $ScriptsFolder 分桶定位。
+                # Bundle 会从 DSL 重新生成最终 mapping：约束必须先合进这份输入，
+                # 否则 B 的 TextBlock 宽度会在草稿之后丢失。
+                $BundleDslJson = Resolve-LayoutDslSnapshot -LogFile $log
                 $args = @((Join-Path $ScriptsFolder 'adapters/mtslg-iocontrol/build-bundle-manifest.mjs'), $LayoutManifestJson, $BundleJson, $ProjectRoot, $Ui)
                 # 采集输入只从运行登记表取（并写进清单让 Bundle 复校），不再让清单自己拼顶层路径。
                 # 路线随清单一起给出：空项目会在这里落脚手架，framework.config.json 的 mode 必须是本次路线。
                 $args += @('--run-json', $RunJson, '--mode', $Mode)
+                if ($BundleDslJson -ne $SnapshotJson) { $args += @('--mapping-dsl', $BundleDslJson) }
                 if ($PageTitleText) { $args += @('--page-title', $PageTitleText) }
                 if ($Overwrite) { $args += '--replace-existing' }
                 Invoke-StepCommand -Label 'bundle manifest' -LogFile $log -File 'node' -Arguments $args | Out-Null

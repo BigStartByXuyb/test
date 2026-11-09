@@ -98,7 +98,7 @@ const mapping = {
     expectedTop: 10,
     expectedWidth: "NaN",
     expectedHeight: 40,
-    widthSource: "mtslg.textblock.fixed-nan",
+    widthSource: "mtslg.textblock.omit-width",
     heightSource: "mtslg.textblock.fixed-40",
     dslWidth: 75,
     id: "MG_0001",
