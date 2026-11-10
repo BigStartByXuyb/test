@@ -123,7 +123,7 @@ $Steps = @(
     },
     [pscustomobject]@{
         Id = 5; Name = 'mapping'; Title = 'mapping 草稿（按当前台账）'
-        Inputs   = @('dsl.snapshot.json + visibility.json', '正式映射表 mtslg-iocontrol-map.json', '图标台账（尚无台账时用空 candidates 占位）', '尺寸约束 JSON（可选；先合并进 DSL；A 的控件与容器 Grid 使用 Min/MaxWidth/Height，B 的 TextBlock 使用 Min/MaxWidth）')
+        Inputs   = @('dsl.snapshot.json + visibility.json', '正式映射表 mtslg-iocontrol-map.json', '图标台账（尚无台账时用空 candidates 占位）', '尺寸约束 JSON（可选；先合并进 DSL；A 的控件与容器 Grid 使用 MinWidth / MaxWidth / MinHeight / MaxHeight，B 的 TextBlock 使用 MinWidth / MaxWidth）')
         Outputs  = @('Generated/runs/<Target>/mapping 草稿与映射审计（unmappedComponents / pending / templateConflicts）')
         Failures = @('组件与固定模板冲突', '结构签名部分命中')
         Recovery = @('只补输入（用 manifest.excludeInstances 隔离该实例、把偏差写进待确认），不改 mapping 产物；重跑：-Progress mapping')

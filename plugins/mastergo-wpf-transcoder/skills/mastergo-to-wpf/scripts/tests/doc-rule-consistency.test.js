@@ -1169,8 +1169,8 @@ console.log("PASS TextBlock Align 口径（映射表 textBlockAlign ↔ 生成�
     assert.match(text, /不发射(?: TextBlock 的)?常规 `?Width`?/,
       name + " 必须写明 TextBlock 不发射常规 Width");
   }
-  assert.match(docFormat, /通用模板里的 `Width` \/ `Height` 只适用于非 TextBlock 控件/,
-    "文档格式规范必须明确通用 Width/Height 字段的 TextBlock 例外");
+  assert.match(docFormat, /通用模板里的 `Width` 只适用于非 TextBlock 控件，非 TextBlock 的 `Height` 取自身 bbox/,
+    "文档格式规范必须分别说明 Width 与 Height 的 TextBlock 例外");
   assert.match(docFormat, /`Width` 只适用于非 TextBlock 控件/,
     "XML 字段清单必须把 Width 限定在非 TextBlock 控件");
   assert.match(docFormat, /`Width→Width` 只适用于非 TextBlock 控件/,
@@ -1190,10 +1190,10 @@ console.log("PASS TextBlock Align 口径（映射表 textBlockAlign ↔ 生成�
   assert.ok(!/改写这两个值/.test(feishuMapping),
     "TextBlock 高度与宽度约束不得再用模糊指代");
   assert.match(runAll,
-    /A 的控件与容器 Grid 使用 Min\/MaxWidth\/Height，B 的 TextBlock 使用 Min\/MaxWidth/,
+    /A 的控件与容器 Grid 使用 MinWidth \/ MaxWidth \/ MinHeight \/ MaxHeight，B 的 TextBlock 使用 MinWidth \/ MaxWidth/,
     "mapping 步骤说明必须保留 A/B 各自完整的约束作用域");
   assert.match(pipelineContract,
-    /A 的控件与容器 Grid 使用 Min\/MaxWidth\/Height，B 的 TextBlock 使用 Min\/MaxWidth/,
+    /A 的控件与容器 Grid 使用 MinWidth \/ MaxWidth \/ MinHeight \/ MaxHeight，B 的 TextBlock 使用 MinWidth \/ MaxWidth/,
     "流水线契约必须与 A/B 的实际约束发射范围一致");
   assert.match(runAll,
     /if \(\$BundleDslJson -ne \$SnapshotJson\) \{\s*Register-RunArtifact -Key 'mappingDsl'/,

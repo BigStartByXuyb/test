@@ -63,7 +63,7 @@ def normalize_text(s):
 
 
 
-def transform_source(src_path, row_map):
+def transform_source(src_path, row_map, title):
     """把一个源表转成参考样张格式，返回 Workbook（单 Sheet）。"""
     wb = load_workbook(src_path)
     ws = wb.worksheets[0]
@@ -169,7 +169,7 @@ def transform_source(src_path, row_map):
     for col, w in WIDTHS.items():
         ws.column_dimensions[col].width = w
     ws.freeze_panes = 'A3'
-    ws.title = os.path.splitext(os.path.basename(src_path))[0][:31]
+    ws.title = title
     return wb, unclassified
 
 
@@ -266,9 +266,9 @@ def main():
                     trunk_hits += 1
                 # 源表行号 -> 转换后行号（减标题行数）
                 row_map[row['src'] - n_title] = (main, sub)
-            wb, unclassified = transform_source(path, row_map)
+            title = safe_name(os.path.splitext(os.path.basename(path))[0], used)
+            wb, unclassified = transform_source(path, row_map, title)
             ws = wb.worksheets[0]
-            title = safe_name(ws.title, used)
             dst = copy_sheet(out_wb, ws, title)
             total += max(0, dst.max_row - 1)
             total_unclassified += len(unclassified)
