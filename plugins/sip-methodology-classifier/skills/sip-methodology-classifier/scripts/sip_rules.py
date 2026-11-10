@@ -92,6 +92,7 @@ def _classify_raw(stage, item, sub, std, method, family='trunk'):
         result = exact_result(key, std) or exact[key]
         return result, ('branch' if _branch_has(family, stage, item) else 'trunk')
 
+    # 分支规则先于主干行级硬编码；否则新增同名分支规则会被下面的 if 链静默绕过。
     branch_result = _branch_override(family, stage, std)
     if branch_result is not None:
         return branch_result, 'branch'

@@ -146,7 +146,7 @@ $Steps = @(
     },
     [pscustomobject]@{
         Id = 8; Name = 'layout'; Title = 'Layout 清单机械推导（底部栏 MenuItem）'
-        Inputs   = @('dsl.snapshot.json + 图标台账 + 正式映射表', '（作业A）分组表 Generated/_inputs/<Target>.layout-groups.json——可选，但有设计稿位图时必须先产出它')
+        Inputs   = @('dsl.snapshot.json + 图标台账 + 正式映射表', '（作业A）尺寸约束 JSON：<Inputs>/<Target>.constraints.json——可选；存在时合并进布局与门禁共用的 DSL 快照', '（作业A）分组表 Generated/_inputs/<Target>.layout-groups.json——可选，但有设计稿位图时必须先产出它')
         Outputs  = @('Layout 清单与推导报告 Generated/_inputs/<Target>.layout-manifest.json(.report.json)',
                      '（作业A）分组表可引用的条目清单 Generated/_inputs/<Target>.layout-group-candidates.json——写表前先看它（表里写别的 ref 会被推导入口拒）；登记进运行登记表（键 layoutGroupCandidates：带本次运行身份与哈希，同名旧件不得冒充）')
         # layoutStatus 的合法终态有两个：complete 与 none。none 的触发条件是推导脚本的
@@ -171,14 +171,14 @@ $Steps = @(
     },
     [pscustomobject]@{
         Id = 11; Name = 'gates'; Title = '严格门禁（审计逐条断言）'
-        Inputs   = @('Bundle 审计 + mapping 审计 + coverage-report.json')
+        Inputs   = @('Bundle 审计 + mapping 审计 + coverage-report.json', '（作业A）尺寸约束 JSON：<Inputs>/<Target>.constraints.json——可选；门禁按与 layout 同一入口重算合并后的 DSL')
         Outputs  = @('门禁结论（失败即停；通过时列出必须写进交付说明的警告）')
         Failures = @('临时语言键', '待翻译条目', '容器嵌套冲突', '底部栏未命中变体', 'Bundle 静态校验未通过')
         Recovery = @('回到产出该字段的步骤补输入（译文/命名表/隔离清单），重跑：-Progress gates')
     },
     [pscustomobject]@{
         Id = 12; Name = 'verify'; Title = '四项独立验证（provenance / 坐标 / Icon / 结构）'
-        Inputs   = @('页面 XML + 本页 Icon/语言字典 + 项目 Layout + 审计文件')
+        Inputs   = @('页面 XML + 本页 Icon/语言字典 + 项目 Layout + 审计文件', '（作业A）尺寸约束 JSON：<Inputs>/<Target>.constraints.json——可选；verify 按与 layout 同一入口重算合并后的 DSL')
         Outputs  = @('Generated/_work/verification/<页面>/ 的 provenance/坐标/Icon/结构报告')
         Failures = @('provenance 与设计文本不符', '坐标与 DSL bbox 不符', 'Icon 引用闭环缺失', '页面结构校验失败')
         Recovery = @('修输入或生成器后重跑：-Progress verify（不要改报告）')
