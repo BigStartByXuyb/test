@@ -393,6 +393,8 @@
         "Foreground",
         "FontSize",
         "FontWeight",
+        "MinWidth",
+        "MaxWidth",
         "LangName"
       ]
     },

@@ -1149,6 +1149,12 @@ console.log("PASS TextBlock Align 口径（映射表 textBlockAlign ↔ 生成�
     "坐标门禁只能在 TextBlock 分支内核对 MinWidth/MaxWidth");
   assert.match(coordChecker, /constraintAttributes\(src\.constraints\)/,
     "坐标门禁必须消费 constraints.js 的归一化与键名映射");
+  for (const attr of ["MinWidth", "MaxWidth"]) {
+    assert.ok((mapData.controlTypes.TextBlock.attrs || []).includes(attr),
+      "TextBlock 条件发射的 " + attr + " 必须登记在 controlTypes.TextBlock.attrs 允许集里");
+    assert.ok(!(mapData.controlTypeRequiredAttrs.TextBlock || []).includes(attr),
+      attr + " 只在 DSL constraints 提供时发射，不得进入 TextBlock 恒写字段集");
+  }
   assert.match(coordChecker, /TextBlock 的 w 固定为 NaN[\s\S]*dslWidth/,
     "坐标核对器头注释必须与 coord-nodes.js 的 TextBlock 输出一致");
   assert.ok(!/Width 仍是 NaN|Width 固定 NaN/.test(
