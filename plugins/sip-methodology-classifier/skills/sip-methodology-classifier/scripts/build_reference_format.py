@@ -237,6 +237,8 @@ def main():
     used = set()
     total = 0
     total_unclassified = 0
+    total_branch_hits = 0
+    total_trunk_hits = 0
     total_rule_inferred = 0
 
     for pname, pdir, files in projects:
@@ -270,16 +272,13 @@ def main():
             dst = copy_sheet(out_wb, ws, title)
             total += max(0, dst.max_row - 1)
             total_unclassified += len(unclassified)
+            total_branch_hits += branch_hits
+            total_trunk_hits += trunk_hits
             total_rule_inferred += rule_inferred
             extra = f' [分支 {family_label(family)}]'
-            if unclassified:
-                extra += f'（未解析/跳过行 {len(unclassified)}，M/N 留空）'
-            if branch_hits:
-                extra += f'（分支规则 {branch_hits}）'
-            if trunk_hits:
-                extra += f'（主干规则 {trunk_hits}）'
-            if rule_inferred:
-                extra += f'（规则推断 {rule_inferred}，建议复核）'
+            extra += f'（未解析/跳过行 {len(unclassified)}，M/N 留空）'
+            extra += f'（分支规则 {branch_hits}；主干规则 {trunk_hits}；'
+            extra += f'规则推断 {rule_inferred}{"，建议复核" if rule_inferred else ""}）'
             print(f'  {title}: {max(0, dst.max_row - 1)} 行{extra}')
 
     if not out_wb.sheetnames:
@@ -288,12 +287,12 @@ def main():
     out_wb.save(args.output)
     print(f'\n已生成: {os.path.abspath(args.output)}')
     print(f'总数据行: {total}')
-    if total_unclassified:
-        print(f'未解析/跳过行: {total_unclassified}（M/N 留空，请复核）')
-    if total_rule_inferred:
-        print(f'规则推断行: {total_rule_inferred}'
-              '（关键字推断，只会落在主顺序 2–9、子顺序 1–5 级；'
-              '完全无法推断时用 (3. 通电检验, 5级)，建议复核）')
+    print(f'未解析/跳过行: {total_unclassified}（M/N 留空，请复核）')
+    print(f'分支规则行: {total_branch_hits}')
+    print(f'主干规则行: {total_trunk_hits}')
+    print(f'规则推断行: {total_rule_inferred}'
+          '（关键字推断，只会落在主顺序 2–9、子顺序 1–5 级；'
+          '完全无法推断时用 (3. 通电检验, 5级)，建议复核）')
     if ref:
         for line in format_results(verify_file(args.output, ref)):
             print(line)

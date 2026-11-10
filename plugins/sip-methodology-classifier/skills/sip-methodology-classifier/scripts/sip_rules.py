@@ -59,12 +59,42 @@ def _branch_has(family, stage, item):
     return any(stage.startswith(p) for p, _, _ in getattr(mod, 'STAGE_PREFIX_RULES', []))
 
 
+def _bom_result(std):
+    if BOM_RE.match(std):
+        return M, '2级'
+    if any(k in std for k in ('外观', '安装', '完好', '牢固', '无损伤')):
+        return W, '1级'
+    return D, '5级'
+
+
+def _branch_override(family, stage, std):
+    mod = _FAMILY_MODULES.get(family)
+    if not mod:
+        return None
+    stage_rules = getattr(mod, 'STAGE_RULES', {})
+    if stage in stage_rules:
+        return stage_rules[stage]
+    for prefix, main, sub in getattr(mod, 'STAGE_PREFIX_RULES', []):
+        if stage.startswith(prefix):
+            return main, sub
+    if stage in getattr(mod, 'BOM_STAGES', set()):
+        return _bom_result(std)
+    for keywords, result in getattr(mod, 'KEYWORD_RULES', []):
+        if any(keyword in stage for keyword in keywords):
+            return result
+    return None
+
+
 def _classify_raw(stage, item, sub, std, method, family='trunk'):
     stage_rules, exact, prefix_rules, bom_stages, keyword_rules = _merged(family)
     key = (stage, item)
     if key in exact:
         result = exact_result(key, std) or exact[key]
         return result, ('branch' if _branch_has(family, stage, item) else 'trunk')
+
+    branch_result = _branch_override(family, stage, std)
+    if branch_result is not None:
+        return branch_result, 'branch'
 
     if stage.startswith('流量、压力及位置检查') or stage.startswith('流量及压力'):
         if stage == '流量及压力表头设定默认值':
@@ -147,13 +177,7 @@ def _classify_raw(stage, item, sub, std, method, family='trunk'):
             return (main, sub), 'branch'
 
     if stage in bom_stages:
-        if BOM_RE.match(std):
-            return (M, '2级'), ('branch' if stage in getattr(
-                _FAMILY_MODULES.get(family), 'BOM_STAGES', set()) else 'trunk')
-        if any(k in std for k in ('外观', '安装', '完好', '牢固', '无损伤')):
-            return (W, '1级'), ('branch' if stage in getattr(
-                _FAMILY_MODULES.get(family), 'BOM_STAGES', set()) else 'trunk')
-        return (D, '5级'), ('branch' if stage in getattr(
+        return _bom_result(std), ('branch' if stage in getattr(
             _FAMILY_MODULES.get(family), 'BOM_STAGES', set()) else 'trunk')
 
     for kws, result in keyword_rules:

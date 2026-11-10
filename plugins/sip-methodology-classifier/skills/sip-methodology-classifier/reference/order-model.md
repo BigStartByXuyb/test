@@ -1,6 +1,6 @@
 # SIP 方法论两层顺序模型
 
-> 本文件是归类口径的唯一人类可读说明。具体机器规则见 `scripts/sip_rules_trunk.py`（主干）和各 `scripts/sip_family_*.py`（设备族分支）；`scripts/sip_rules.py` 只负责合并规则与决定优先级。
+> 本文件是归类口径的详细人类可读说明；机器规则以 `scripts/sip_rules_trunk.py`（主干）和各 `scripts/sip_family_*.py`（设备族分支）为准，`scripts/sip_rules.py` 只负责按分支优先、主干兜底合并规则。
 
 ## 主顺序（9 个环节）
 
