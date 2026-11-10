@@ -64,8 +64,11 @@ test("Sheet 名清洗在两个生成器中共用同一实现", () => {
   const analysis = fs.readFileSync(path.join(scriptsDir, "build_sip_mapping.py"), "utf8");
   assert.match(reference, /title = safe_name\(os\.path\.splitext\(os\.path\.basename\(path\)\)\[0\], used\)\s*wb, unclassified = transform_source\(path, row_map, title\)/);
   assert.doesNotMatch(reference, /ws\.title = os\.path\.splitext/);
+  assert.match(reference, /from sip_sheet_name import RESERVED_SHEET_NAMES, safe_name/);
+  assert.match(reference, /used = set\(RESERVED_SHEET_NAMES\)/);
   assert.match(analysis, /from sip_sheet_name import \(EXPLANATION_SHEET, PENDING_SHEET,/);
   assert.match(analysis, /safe_name\(pname, used, fallback='项目'\)/);
+  assert.match(analysis, /used = set\(RESERVED_SHEET_NAMES\)/);
   assert.doesNotMatch(analysis, /def safe_sheet_name/);
   const verify = fs.readFileSync(path.join(scriptsDir, "sip_verify.py"), "utf8");
   assert.match(verify, /from sip_sheet_name import EXPLANATION_SHEET, PENDING_SHEET/);
