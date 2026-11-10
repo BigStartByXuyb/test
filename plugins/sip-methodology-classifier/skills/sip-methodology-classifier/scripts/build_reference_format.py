@@ -35,7 +35,7 @@ from sip_rules import classify, load_reference, header_key, family_label  # noqa
 from sip_source import parse_sheet, discover_projects, find_header_row  # noqa: E402
 from sip_family_detect import detect_family_from_rows  # noqa: E402
 from sip_verify import verify_file, format_results  # noqa: E402
-from sip_sheet_name import RESERVED_SHEET_NAMES, safe_name  # noqa: E402
+from sip_sheet_name import safe_name  # noqa: E402
 from sip_seq import parse_seq  # noqa: E402
 from extract_gbk_zip import extract as extract_zip  # noqa: E402
 
@@ -222,7 +222,7 @@ def main():
 
     out_wb = Workbook()
     out_wb.remove(out_wb.active)
-    used = set(RESERVED_SHEET_NAMES)
+    used = set()
     total = 0
     total_unclassified = 0
     total_branch_hits = 0

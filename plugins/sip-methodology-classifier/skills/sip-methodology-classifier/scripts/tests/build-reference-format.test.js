@@ -64,15 +64,34 @@ test("Sheet 名清洗在两个生成器中共用同一实现", () => {
   const analysis = fs.readFileSync(path.join(scriptsDir, "build_sip_mapping.py"), "utf8");
   assert.match(reference, /title = safe_name\(os\.path\.splitext\(os\.path\.basename\(path\)\)\[0\], used\)\s*wb, unclassified = transform_source\(path, row_map, title\)/);
   assert.doesNotMatch(reference, /ws\.title = os\.path\.splitext/);
-  assert.match(reference, /from sip_sheet_name import RESERVED_SHEET_NAMES, safe_name/);
-  assert.match(reference, /used = set\(RESERVED_SHEET_NAMES\)/);
+  assert.match(reference, /from sip_sheet_name import safe_name/);
+  assert.match(reference, /used = set\(\)/);
   assert.match(analysis, /from sip_sheet_name import \(EXPLANATION_SHEET, PENDING_SHEET,/);
   assert.match(analysis, /safe_name\(pname, used, fallback='项目'\)/);
   assert.match(analysis, /used = set\(RESERVED_SHEET_NAMES\)/);
   assert.doesNotMatch(analysis, /def safe_sheet_name/);
   const verify = fs.readFileSync(path.join(scriptsDir, "sip_verify.py"), "utf8");
-  assert.match(verify, /from sip_sheet_name import EXPLANATION_SHEET, PENDING_SHEET/);
+  assert.doesNotMatch(verify, /ws\.title in \(EXPLANATION_SHEET, PENDING_SHEET\)/);
   assert.doesNotMatch(verify, /startswith\('待确认'\)/);
+});
+
+test("数据 Sheet 叫说明时仍按表头参与校验", () => {
+  const result = JSON.parse(runPython([
+    "import json, os, sys, tempfile",
+    "from openpyxl import Workbook",
+    "sys.path.insert(0, os.getcwd())",
+    "from sip_verify import read_output_records",
+    "path = os.path.join(tempfile.mkdtemp(prefix='sip-sheet-'), 'out.xlsx')",
+    "wb = Workbook()",
+    "ws = wb.active",
+    "ws.title = '\\u8bf4\\u660e'",
+    "ws.append(['\\u5e8f\\u53f7', '\\u68c0\\u9a8c\\u5de5\\u5e8f', '\\u68c0\\u9a8c\\u9879\\u76ee', '\\u4e3b\\u987a\\u5e8f', '\\u5b50\\u987a\\u5e8f'])",
+    "ws.append([1, 'stage', 'item', 'main1', 'sub1'])",
+    "wb.save(path)",
+    "records = read_output_records(path)",
+    "print(json.dumps({'ok': len(records) == 1 and records[0]['seq'] == 1 and records[0]['main'] == 'main1'}))"
+  ].join("\n")));
+  assert.deepEqual(result, { ok: true });
 });
 
 test("序号判定只接受整数数值或纯数字文本", () => {
