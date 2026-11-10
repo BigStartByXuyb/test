@@ -64,7 +64,7 @@
 5. **落格**：控件写 `Grid.Row` / `Grid.Column`，跨格再写 `Grid.RowSpan` / `Grid.ColumnSpan`。**同一锚点（起始）格只放一个控件**：推导用占用表 + 撞格下移保证锚点格唯一，门禁 R5 也按锚点判重，出现重复即产物被改坏。覆盖邻格见第 4 条。
 6. **单行/单列**：只有一行或一列时不写 `Grid.RowDefinitions` / `Grid.ColumnDefinitions`，也不写 `Grid.Row` / `Grid.Column`。
 7. **行列尺寸写法**：像素尺寸写 `Height="<值>"` / `Width="<值>"`；纯子 Grid 容器的内容带写 `Auto`，容器间的设计间距写固定 Pixel 带或 `Margin`；内容区剩余空间及明确的弹性空档写星号。控件槽位里的固定尺寸与间距照设计稿像素。相机 + 右栏重建布局见第 1 条，声明主轴布局的固定与弹性判据见第 3 条；多个弹性容器的加权星号写为设计宽度加 `*`（如 `Width="1016*"`）。
-8. **尺寸约束**：设计稿用「宽度 / 高度」栏设置的最小/最大宽高走 DSL 节点的 `constraints` 字段（来源、合并与官方支持后的切换点见 `page-build-rules.md` 第 5 节）。布局推导只把它透传进格子，发射器在控件与容器 Grid 上写 `MinWidth / MaxWidth / MinHeight / MaxHeight`；`TextBlock` 不写常规 `Width`，只保留约束宽，并在设了最大宽时补 `TextWrapping="Wrap"`。
+8. **尺寸约束**：设计稿用「宽度 / 高度」栏设置的最小/最大宽高走 DSL 节点的 `constraints` 字段（来源、合并与官方支持后的切换点见 `page-build-rules.md` 第 5 节）。布局推导只把它透传进格子，发射器在控件与容器 Grid 上写 `MinWidth / MaxWidth / MinHeight / MaxHeight`。A 的 `TextBlock` 仍发射四项约束，只不写常规 `Width`，并在设了最大宽时补 `TextWrapping="Wrap"`；B 的 `TextBlock` 只发射 `MinWidth / MaxWidth`，同样不写常规 `Width`。
 
 ## 3. 外观与协议
 

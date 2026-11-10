@@ -53,7 +53,7 @@ FontSize 独立取对应 MasterGo DSL 字体事实
 输入框/选择框等非 TextBlock 控件按正式变体模板取自身宽高
 ```
 
-`FontSize`、`LineHeight` 和文本内容不能反推出控件尺寸。MTSLG IOContorl 与 WPF `TextBlock` 的 Height/布局行高仍按各自路线发射，宽度只发射设计稿给出的 `MinWidth` / `MaxWidth`，不发射常规 `Width`。
+`FontSize`、`LineHeight` 和文本内容不能反推出控件尺寸。MTSLG IOContorl 的 `TextBlock` Height 固定为 `40`，只发射设计稿给出的 `MinWidth` / `MaxWidth`；WPF 路线的 `TextBlock` 按布局发射 Height，并发射 `MinWidth` / `MaxWidth` / `MinHeight` / `MaxHeight`。两条路线都不发射常规 `Width`。
 
 ### 顶部示例标题
 
