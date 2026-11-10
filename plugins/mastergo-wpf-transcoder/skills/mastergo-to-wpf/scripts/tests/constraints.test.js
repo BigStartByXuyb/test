@@ -198,6 +198,52 @@ assert.strictEqual(cells.find(function (cell) { return cell.ref === "t2"; }).con
   assert.ok(orphanReport.findings.some(function (item) { return item.rule === "R12" && item.ref === "t3"; }), "R12 必须报出未落格的约束节点");
 }
 
+// ── ⑤之二：传了 --dsl 但约束已全部删除，旧布局 / 旧 XAML 里的约束必须被抓到 ─────────────
+{
+  const emptyDsl = JSON.parse(JSON.stringify(layoutInput));
+  delete emptyDsl.dsl.nodes[0].children[0].children[0].constraints;
+  const emptyDslPath = writeJson("gate-dsl-empty-constraints.json", emptyDsl);
+  const layoutPath = writeJson("gate-layout-stale-constraints.json", layout);
+  const typesPath = writeJson("gate-types-stale-constraints.json", TYPES_FILE);
+  const xamlPath = path.join(tmp, "stale-constraints-view.xaml");
+  const rendered = spawnSync(process.execPath, [
+    path.join(SCRIPT_DIR, "adapters", "mw-wpf", "gen-mw-wpf-xaml.js"),
+    "--layout", layoutPath, "--types", typesPath, "--map", ROUTE_MAP,
+    "--page", "P", "--x-class", "X.P", "--assembly", "X",
+    "--icon-page", "Resources/Pages/P/PIcons.xaml", "--out", xamlPath, "--overwrite"
+  ], { encoding: "utf8" });
+  assert.strictEqual(rendered.status, 0, "旧约束 XAML 夹具应能发射: " + rendered.stderr);
+
+  const reportPath = path.join(tmp, "gate-report-empty-constraints.json");
+  const stale = spawnSync(process.execPath, [
+    CHECK, "--layout", layoutPath, "--types", typesPath, "--map", ROUTE_MAP,
+    "--dsl", emptyDslPath, "--xaml", xamlPath, "--json", reportPath
+  ], { encoding: "utf8" });
+  assert.strictEqual(stale.status, 2, "DSL 已删除约束但布局或 XAML 仍有时必须失败");
+  const staleReport = JSON.parse(fs.readFileSync(reportPath, "utf8"));
+  assert.ok(staleReport.findings.some(function (item) { return item.rule === "R11" && item.ref === "t1"; }),
+    "R11 必须报出布局格子里的旧约束");
+
+  const cleanLayout = JSON.parse(JSON.stringify(layout));
+  (function removeConstraint(grid) {
+    if (!grid || !Array.isArray(grid.cells)) return;
+    grid.cells.forEach(function (cell) {
+      if (cell.ref === "t1") delete cell.constraints;
+      if (cell.children) removeConstraint(cell.children);
+    });
+  })(cleanLayout.regions.find(function (region) { return region.emit !== false; }).grid);
+  const cleanLayoutPath = writeJson("gate-layout-clean-constraints.json", cleanLayout);
+  const cleanReportPath = path.join(tmp, "gate-report-stale-xaml.json");
+  const staleXaml = spawnSync(process.execPath, [
+    CHECK, "--layout", cleanLayoutPath, "--types", typesPath, "--map", ROUTE_MAP,
+    "--dsl", emptyDslPath, "--xaml", xamlPath, "--json", cleanReportPath
+  ], { encoding: "utf8" });
+  assert.strictEqual(staleXaml.status, 2, "布局已清空约束但 XAML 仍发射旧约束时必须失败");
+  const staleXamlReport = JSON.parse(fs.readFileSync(cleanReportPath, "utf8"));
+  assert.ok(staleXamlReport.findings.some(function (item) { return item.rule === "R13" && item.ref === "t1"; }),
+    "R13 必须报出 XAML 里已删除的旧约束");
+}
+
 // ── ⑤之一：R13 必须按格子自己的 XAML 元素核对，不能被另一个同值控件“借”通过 ───────────────
 {
   const duplicateDsl = {

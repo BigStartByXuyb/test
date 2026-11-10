@@ -165,7 +165,7 @@ pwsh -NoProfile -File <skill>\scripts\entry\run-all.ps1 -ProjectRoot <项目> -T
 - **输入**：
   - Layout 清单
   - 运行登记表 run.json（采集输入只按它取）
-  - 尺寸约束 JSON（可选；重新解析并登记合并后的 DSL 作为 Bundle 映射输入；新增或修改约束后可直接从 inputs 续跑）
+  - 尺寸约束 JSON（可选；重新解析并登记合并后的 DSL 作为 Bundle 映射输入。B 改约束后可从 inputs 续跑；A 的约束由 layout 落到格子，改约束后从 layout 续跑）
   - 译文清单 Generated/_inputs/<Target>.lang-translations.json（术语表可选）
 - **产物**：
   - Bundle 清单 Generated/_inputs/<Target>.bundle.json（含 runRegistry 指纹）

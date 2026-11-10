@@ -1199,7 +1199,7 @@ console.log("PASS TextBlock Align 口径（映射表 textBlockAlign ↔ 生成�
     /if \(\$BundleDslJson -ne \$SnapshotJson\) \{\s*Register-RunArtifact -Key 'mappingDsl'/,
     "inputs 重算约束 DSL 时必须同步登记 mappingDsl");
   assert.match(pipelineContract,
-    /重新解析并登记合并后的 DSL 作为 Bundle 映射输入；新增或修改约束后可直接从 inputs 续跑/,
+    /重新解析并登记合并后的 DSL 作为 Bundle 映射输入。B 改约束后可从 inputs 续跑；A 的约束由 layout 落到格子，改约束后从 layout 续跑/,
     "流水线契约必须说明 inputs 的约束登记与续跑边界");
   assert.match(architecture, /B：`adapters\/mtslg-iocontrol\/gen-mtslg-mapping-from-dsl\.js`/,
     "架构文档必须登记 B 路线对 constraints 共享模块的消费");

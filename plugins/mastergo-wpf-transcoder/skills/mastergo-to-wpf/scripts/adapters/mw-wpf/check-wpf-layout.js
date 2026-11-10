@@ -569,7 +569,8 @@ function main() {
     const roots = (snapshot.dsl && snapshot.dsl.nodes) || snapshot.nodes || [];
     dslConstraints = collectConstraints(roots);
   }
-  checkConstraints(layout, Object.keys(dslConstraints || {}).length ? dslConstraints : null, xamlText, map);
+  // 传了 --dsl 就以它为准：空集合也代表“本页没有约束”，必须能发现布局或 XAML 里遗留的旧约束。
+  checkConstraints(layout, args.dslPath ? dslConstraints : null, xamlText, map);
 
   // R14：格子尺寸与尺寸/对齐发射。--xaml-report 传的是发射器的报告（gen-mw-wpf-xaml.js --report）；
   // 没传就整体跳过（旧流水线行为不变）。

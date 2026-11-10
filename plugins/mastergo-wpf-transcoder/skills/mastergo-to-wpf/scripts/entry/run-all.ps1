@@ -157,7 +157,7 @@ $Steps = @(
     },
     [pscustomobject]@{
         Id = 9; Name = 'inputs'; Title = '校验译文并生成 Bundle 清单'
-        Inputs   = @('Layout 清单', '运行登记表 run.json（采集输入只按它取）', '尺寸约束 JSON（可选；重新解析并登记合并后的 DSL 作为 Bundle 映射输入；新增或修改约束后可直接从 inputs 续跑）', '译文清单 Generated/_inputs/<Target>.lang-translations.json（术语表可选）')
+        Inputs   = @('Layout 清单', '运行登记表 run.json（采集输入只按它取）', '尺寸约束 JSON（可选；重新解析并登记合并后的 DSL 作为 Bundle 映射输入。B 改约束后可从 inputs 续跑；A 的约束由 layout 落到格子，改约束后从 layout 续跑）', '译文清单 Generated/_inputs/<Target>.lang-translations.json（术语表可选）')
         Outputs  = @('Bundle 清单 Generated/_inputs/<Target>.bundle.json（含 runRegistry 指纹）')
         Failures = @('缺区域前缀 area', '缺 --run-json 或译文清单', '发现未登记的旧同名采集文件', '登记表 sha256 与文件不符')
         Recovery = @('补齐输入后重跑：-Progress inputs（采集输入只按登记表取，未登记的旧同名文件一律拒绝）')
