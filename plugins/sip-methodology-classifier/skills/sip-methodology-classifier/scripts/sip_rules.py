@@ -12,7 +12,7 @@
 from sip_rules_trunk import (  # noqa: F401
     M, W, D, Q, S, L, G, U, B,
     MAIN_ORDER, SUB_ORDER, MAIN_IDX, SUB_IDX,
-    norm, header_key, BOM_RE, load_reference,
+    norm, header_key, BOM_RE, load_reference, exact_result,
     STAGE_RULES as TRUNK_STAGE_RULES,
     EXACT as TRUNK_EXACT,
     BOM_STAGES as TRUNK_BOM_STAGES,
@@ -63,11 +63,7 @@ def _classify_raw(stage, item, sub, std, method, family='trunk'):
     stage_rules, exact, prefix_rules, bom_stages, keyword_rules = _merged(family)
     key = (stage, item)
     if key in exact:
-        if item == '接触式测高位置及刀刃外观确认':
-            # 项目名同时包含测高与刀刃外观，行级区分只读检验标准。
-            result = (D, '6级') if '刀刃外观' in std else (D, '5级')
-        else:
-            result = exact[key]
+        result = exact_result(key, std) or exact[key]
         return result, ('branch' if _branch_has(family, stage, item) else 'trunk')
 
     if stage.startswith('流量、压力及位置检查') or stage.startswith('流量及压力'):
