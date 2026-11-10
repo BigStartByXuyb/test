@@ -56,7 +56,7 @@ test("BOM 外观关键词在说明与实现中一致", () => {
 test("分支阶段、前缀和关键字规则都由调度器单次命中", () => {
   const actual = classify([
     { key: "stage", stage: "随机拆解的配件核对", family: "slg" },
-    { key: "prefix", stage: "搬运手臂99(试制)", family: "slg" },
+    { key: "prefix", stage: "夹料机械手99(试制)", family: "slg" },
     { key: "keyword", stage: "激光器温控", family: "slg" }
   ]);
   assert.deepEqual(actual.stage, { result: ["1. 铭牌核对", "2级"], reason: "分支规则" });
@@ -73,6 +73,50 @@ test("SLG 风扇关键字不覆盖主干离子风扇行级规则", () => {
   assert.deepEqual(actual.install, { result: ["2. 外观检验", "1级"], reason: "主干规则" });
   assert.deepEqual(actual.function, { result: ["3. 通电检验", "9级"], reason: "主干规则" });
   assert.deepEqual(actual.bom, { result: ["1. 铭牌核对", "2级"], reason: "分支规则" });
+});
+
+test("设备族分支不复制主干同值规则", () => {
+  const code = [
+    "import json, os, sys",
+    "sys.path.insert(0, os.getcwd())",
+    "from sip_rules_trunk import STAGE_RULES as trunk",
+    "out = {}",
+    "for family in ('sdc', 'exp', 'slg'):",
+    "  mod = __import__('sip_family_' + family)",
+    "  out[family] = {",
+    "    'stage': sorted(k for k, v in getattr(mod, 'STAGE_RULES', {}).items() if trunk.get(k) == v),",
+    "    'prefix': sorted(p for p, main, sub in getattr(mod, 'STAGE_PREFIX_RULES', []) if trunk.get(p) == (main, sub)),",
+    "    'exact': sorted(k for k, v in getattr(mod, 'EXACT', {}).items() if trunk.get(k) == v)",
+    "  }",
+    "print(json.dumps(out, ensure_ascii=False))"
+  ].join("\n");
+  const result = spawnSync(python, ["-I", "-c", code], {
+    cwd: scriptsDir,
+    encoding: "utf8",
+    env: { ...process.env, PYTHONIOENCODING: "utf-8" },
+    windowsHide: true
+  });
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.deepEqual(JSON.parse(result.stdout), {
+    sdc: { stage: [], prefix: [], exact: [] },
+    exp: { stage: [], prefix: [], exact: [] },
+    slg: { stage: [], prefix: [], exact: [] }
+  });
+});
+
+test("SLG 的通用工序回到主干规则兜底", () => {
+  const actual = classify([
+    { key: "row", stage: "流量及压力表头设定默认值", family: "slg" },
+    { key: "vision", stage: "视觉对位及标定", family: "slg" },
+    { key: "arm", stage: "搬运手臂", family: "slg" },
+    { key: "air", stage: "空气过滤组合", family: "slg" },
+    { key: "slg-vision", stage: "视觉对位及标定(第六工位)", family: "slg" }
+  ]);
+  assert.equal(actual.row.reason, "主干规则");
+  assert.equal(actual.vision.reason, "主干规则");
+  assert.equal(actual.arm.reason, "主干规则");
+  assert.equal(actual.air.reason, "主干规则");
+  assert.equal(actual["slg-vision"].reason, "分支规则");
 });
 
 test("合并优先级文档不再声明不存在的主干前缀规则层", () => {

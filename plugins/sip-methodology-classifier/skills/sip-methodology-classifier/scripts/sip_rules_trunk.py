@@ -8,6 +8,8 @@
 """
 import re
 
+from sip_seq import parse_seq
+
 M = '1. 铭牌核对'
 W = '2. 外观检验'
 D = '3. 通电检验'
@@ -258,11 +260,8 @@ def load_reference(path):
     st = it = ''
     for r in range(header_row + 1, ws.max_row + 1):
         a = ws.cell(r, c_seq).value
-        if isinstance(a, (int, float)):
-            seq_no = int(a)
-        elif isinstance(a, str) and a.strip().isdigit():
-            seq_no = int(a.strip())
-        else:
+        seq_no = parse_seq(a)
+        if seq_no is None:
             continue
         b = ws.cell(r, c_stage).value
         if b is not None and str(b).strip():

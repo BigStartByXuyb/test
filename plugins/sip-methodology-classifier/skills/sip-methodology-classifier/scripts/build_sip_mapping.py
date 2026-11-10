@@ -36,6 +36,7 @@ from sip_rules import (MAIN_ORDER, SUB_ORDER, MAIN_IDX, SUB_IDX,
 from extract_gbk_zip import extract as extract_zip
 from sip_source import parse_sheet, discover_projects
 from sip_family_detect import detect_family_from_rows
+from sip_sheet_name import safe_name
 from sip_verify import verify_records, format_results
 
 try:
@@ -73,20 +74,6 @@ SUB_MEANING = {
 
 
 # ---------------------------------------------------------------- 输出
-def safe_sheet_name(name, used):
-    for ch in '\\/*?:[]':
-        name = name.replace(ch, '_')
-    name = (name or '项目')[:31]
-    base = name
-    i = 2
-    while name in used:
-        suffix = f'_{i}'
-        name = (base[:31 - len(suffix)] + suffix)
-        i += 1
-    used.add(name)
-    return name
-
-
 def write_workbook(all_rows, projects, out_path, ref=None, verify=None,
                    skipped_yellow=0):
     wb = Workbook()
@@ -111,7 +98,7 @@ def write_workbook(all_rows, projects, out_path, ref=None, verify=None,
     used = set()
     project_order = [p[0] for p in projects]
     for pname, _, files in projects:
-        ws = wb.create_sheet(safe_sheet_name(pname, used))
+        ws = wb.create_sheet(safe_name(pname, used, fallback='项目'))
         ws.sheet_view.showGridLines = False
         for i, w in enumerate(widths, 1):
             ws.column_dimensions[get_column_letter(i)].width = w

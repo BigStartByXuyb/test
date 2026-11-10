@@ -5,6 +5,7 @@ import os
 from openpyxl import load_workbook
 
 from sip_rules import norm, header_key
+from sip_seq import parse_seq
 
 
 def is_yellow(cell):
@@ -79,11 +80,8 @@ def parse_sheet(path, project):
     skipped_yellow = 0
     for r in range(hr + 1, ws.max_row + 1):
         seqv = ws.cell(r, c_seq).value
-        if isinstance(seqv, (int, float)):
-            seq = int(seqv)
-        elif isinstance(seqv, str) and seqv.strip().isdigit():
-            seq = int(seqv.strip())
-        else:
+        seq = parse_seq(seqv)
+        if seq is None:
             continue
         if is_yellow(ws.cell(r, c_seq)):
             skipped_yellow += 1

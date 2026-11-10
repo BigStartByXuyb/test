@@ -21,14 +21,7 @@ if HERE not in sys.path:
 from openpyxl import load_workbook
 
 from sip_rules import header_key
-
-
-def parse_seq(v):
-    if isinstance(v, (int, float)):
-        return int(v)
-    if isinstance(v, str) and v.strip().isdigit():
-        return int(v.strip())
-    return None
+from sip_seq import parse_seq
 
 
 def read_output_records(path):

@@ -2,10 +2,10 @@
 """Excel Sheet 名清洗与去重。"""
 
 
-def safe_name(name, used):
+def safe_name(name, used, fallback='Sheet'):
     for ch in '\\/*?:[]':
         name = name.replace(ch, '_')
-    name = (name or 'Sheet')[:31]
+    name = (name or fallback)[:31]
     base, i = name, 2
     while name in used:
         suffix = f'_{i}'

@@ -36,6 +36,7 @@ from sip_source import parse_sheet, discover_projects, find_header_row  # noqa: 
 from sip_family_detect import detect_family_from_rows  # noqa: E402
 from sip_verify import verify_file, format_results  # noqa: E402
 from sip_sheet_name import safe_name  # noqa: E402
+from sip_seq import parse_seq  # noqa: E402
 from extract_gbk_zip import extract as extract_zip  # noqa: E402
 
 try:
@@ -90,8 +91,7 @@ def transform_source(src_path, row_map, title):
 
     last_seq_row = 1
     for r in range(2, ws.max_row + 1):
-        v = ws.cell(r, col_seq).value
-        if isinstance(v, (int, float)) or (isinstance(v, str) and v.strip().isdigit()):
+        if parse_seq(ws.cell(r, col_seq).value) is not None:
             last_seq_row = r
     if last_seq_row < ws.max_row:
         ws.delete_rows(last_seq_row + 1, ws.max_row - last_seq_row)
