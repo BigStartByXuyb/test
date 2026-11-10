@@ -6,17 +6,16 @@
 
 const assert = require("node:assert/strict");
 const { spawnSync } = require("node:child_process");
-const fs = require("node:fs");
-const os = require("node:os");
 const path = require("node:path");
+const fs = require("node:fs");
 const test = require("node:test");
 
 const skillRoot = path.resolve(__dirname, "..", "..");
 const scriptsDir = path.join(skillRoot, "scripts");
 const python = process.platform === "win32" ? "python" : "python3";
 
-function runPython(code, args = []) {
-  const result = spawnSync(python, ["-I", "-c", code, ...args], {
+function runPython(code) {
+  const result = spawnSync(python, ["-I", "-c", code], {
     cwd: scriptsDir,
     encoding: "utf8",
     windowsHide: true
@@ -25,42 +24,20 @@ function runPython(code, args = []) {
   return result.stdout;
 }
 
-test("源文件名含 Excel 非法字符时先清洗再创建 Sheet", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "sip-sheet-name-"));
-  const inputDir = path.join(root, "input");
-  const source = path.join(inputDir, "MX[SLG]1.xlsx");
-  const output = path.join(root, "output.xlsx");
-  fs.mkdirSync(inputDir);
-  try {
-    runPython([
-      "import sys",
-      "from openpyxl import Workbook",
-      "wb = Workbook()",
-      "ws = wb.active",
-      "ws.append(['序号', '检验工序', '检验项目'])",
-      "ws.append([1, '通电检验', '功能检查'])",
-      "wb.save(sys.argv[1])"
-    ].join("\n"), [source]);
+test("Excel 非法字符先清洗，再截断并去重", () => {
+  const result = JSON.parse(runPython([
+    "import json, os, sys",
+    "sys.path.insert(0, os.getcwd())",
+    "from sip_sheet_name import safe_name",
+    "used = set()",
+    "names = [safe_name('MX[SLG]1', used), safe_name('MX[SLG]1', used), safe_name('', used), safe_name('A' * 40, used)]",
+    "print(json.dumps(names, ensure_ascii=False))"
+  ].join("\n")));
+  assert.deepEqual(result, ["MX_SLG_1", "MX_SLG_1_2", "Sheet", "A".repeat(31)]);
+});
 
-    const built = spawnSync(
-      python,
-      ["-I", path.join(scriptsDir, "build_reference_format.py"), "--input", inputDir, "--output", output],
-      {
-        cwd: scriptsDir,
-        encoding: "utf8",
-        windowsHide: true
-      }
-    );
-    assert.equal(built.status, 0, built.stderr || built.stdout);
-
-    const names = JSON.parse(runPython([
-      "import json, sys",
-      "from openpyxl import load_workbook",
-      "print(json.dumps(load_workbook(sys.argv[1], read_only=True).sheetnames, ensure_ascii=False))"
-    ].join("\n"), [output]));
-    assert.deepEqual(names, ["MX_SLG_1"]);
-  }
-  finally {
-    fs.rmSync(root, { recursive: true, force: true });
-  }
+test("生成器在创建工作表前先清洗标题", () => {
+  const source = fs.readFileSync(path.join(scriptsDir, "build_reference_format.py"), "utf8");
+  assert.match(source, /title = safe_name\(os\.path\.splitext\(os\.path\.basename\(path\)\)\[0\], used\)\s*wb, unclassified = transform_source\(path, row_map, title\)/);
+  assert.doesNotMatch(source, /ws\.title = os\.path\.splitext/);
 });

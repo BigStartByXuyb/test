@@ -35,6 +35,7 @@ from sip_rules import classify, load_reference, header_key, family_label  # noqa
 from sip_source import parse_sheet, discover_projects, find_header_row  # noqa: E402
 from sip_family_detect import detect_family_from_rows  # noqa: E402
 from sip_verify import verify_file, format_results  # noqa: E402
+from sip_sheet_name import safe_name  # noqa: E402
 from extract_gbk_zip import extract as extract_zip  # noqa: E402
 
 try:
@@ -196,19 +197,6 @@ def copy_sheet(dst_wb, src_ws, title):
     dst.freeze_panes = src_ws.freeze_panes
     dst.sheet_view.showGridLines = src_ws.sheet_view.showGridLines
     return dst
-
-
-def safe_name(name, used):
-    for ch in '\\/*?:[]':
-        name = name.replace(ch, '_')
-    name = (name or 'Sheet')[:31]
-    base, i = name, 2
-    while name in used:
-        suffix = f'_{i}'
-        name = base[:31 - len(suffix)] + suffix
-        i += 1
-    used.add(name)
-    return name
 
 
 def main():
