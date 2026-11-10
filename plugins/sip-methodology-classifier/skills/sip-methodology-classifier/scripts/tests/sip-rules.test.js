@@ -104,6 +104,28 @@ test("设备族分支不复制主干同值规则", () => {
   });
 });
 
+test("设备族分支的精确规则不与前缀规则重复", () => {
+  const code = [
+    "import json, os, sys",
+    "sys.path.insert(0, os.getcwd())",
+    "out = {}",
+    "for family in ('sdc', 'exp', 'slg'):",
+    "  mod = __import__('sip_family_' + family)",
+    "  stage = set(getattr(mod, 'STAGE_RULES', {}))",
+    "  prefix = {p for p, main, sub in getattr(mod, 'STAGE_PREFIX_RULES', [])}",
+    "  out[family] = sorted(stage & prefix)",
+    "print(json.dumps(out, ensure_ascii=False))"
+  ].join("\n");
+  const result = spawnSync(python, ["-I", "-c", code], {
+    cwd: scriptsDir,
+    encoding: "utf8",
+    env: { ...process.env, PYTHONIOENCODING: "utf-8" },
+    windowsHide: true
+  });
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.deepEqual(JSON.parse(result.stdout), { sdc: [], exp: [], slg: [] });
+});
+
 test("SLG 的通用工序回到主干规则兜底", () => {
   const actual = classify([
     { key: "row", stage: "流量及压力表头设定默认值", family: "slg" },
