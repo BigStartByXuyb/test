@@ -30,33 +30,12 @@ def family_label(family):
     return _FAMILY_NAMES.get(family, family or '主干')
 
 
-def _merged(family):
-    mod = _FAMILY_MODULES.get(family)
-    stage = dict(TRUNK_STAGE_RULES)
+def _exact_rules(family):
     exact = dict(TRUNK_EXACT)
-    prefix = []
-    bom = set(TRUNK_BOM_STAGES)
-    keywords = []
-    if mod:
-        stage.update(getattr(mod, 'STAGE_RULES', {}))
-        exact.update(getattr(mod, 'EXACT', {}))
-        prefix = list(getattr(mod, 'STAGE_PREFIX_RULES', []))
-        bom |= set(getattr(mod, 'BOM_STAGES', set()))
-        keywords = list(getattr(mod, 'KEYWORD_RULES', []))
-    return stage, exact, prefix, bom, keywords
-
-
-def _branch_has(family, stage, item):
     mod = _FAMILY_MODULES.get(family)
-    if not mod:
-        return False
-    if (stage, item) in getattr(mod, 'EXACT', {}):
-        return True
-    if stage in getattr(mod, 'STAGE_RULES', {}):
-        return True
-    if stage in getattr(mod, 'BOM_STAGES', set()):
-        return True
-    return any(stage.startswith(p) for p, _, _ in getattr(mod, 'STAGE_PREFIX_RULES', []))
+    if mod:
+        exact.update(getattr(mod, 'EXACT', {}))
+    return exact
 
 
 def _bom_result(std):
@@ -86,20 +65,21 @@ def _branch_override(family, stage, std):
 
 
 def _classify_raw(stage, item, sub, std, method, family='trunk'):
-    stage_rules, exact, prefix_rules, bom_stages, keyword_rules = _merged(family)
+    exact = _exact_rules(family)
     key = (stage, item)
     if key in exact:
         result = exact_result(key, std) or exact[key]
-        return result, ('branch' if _branch_has(family, stage, item) else 'trunk')
+        mod = _FAMILY_MODULES.get(family)
+        return result, ('branch' if mod and key in getattr(mod, 'EXACT', {}) else 'trunk')
 
-    # 分支规则先于主干行级硬编码；否则新增同名分支规则会被下面的 if 链静默绕过。
+    # 分支规则先于主干行级规则；每类分支规则只在 _branch_override 这一处求值。
     branch_result = _branch_override(family, stage, std)
     if branch_result is not None:
         return branch_result, 'branch'
 
     if stage.startswith('流量、压力及位置检查') or stage.startswith('流量及压力'):
         if stage == '流量及压力表头设定默认值':
-            return (D, '1级'), ('branch' if _branch_has(family, stage, item) else 'trunk')
+            return (D, '1级'), 'trunk'
         if 'NCS检查' in item:
             return ((S, '1级') if ('水柱' in std or '冲洗' in std) else (Q, '2级')), 'trunk'
         if '排风' in item or '风量' in item:
@@ -127,20 +107,18 @@ def _classify_raw(stage, item, sub, std, method, family='trunk'):
 
     if stage in ('工控机', '核对工控机'):
         text = item + std
-        layer = 'branch' if _branch_has(family, stage, item) else 'trunk'
         if '断电' in text:
-            return (U, '2级'), layer
+            return (U, '2级'), 'trunk'
         if ('序列号' in text or 'S/N' in text or '核对规格' in item
                 or BOM_RE.match(std)):
-            return (M, '2级'), layer
-        return (D, '12级'), layer
+            return (M, '2级'), 'trunk'
+        return (D, '12级'), 'trunk'
 
     if stage == '加密狗':
         text = item + std
-        layer = 'branch' if _branch_has(family, stage, item) else 'trunk'
         if '永久版本' in text or '序列号' in text:
-            return (B, '1级'), layer
-        return (M, '2级'), layer
+            return (B, '1级'), 'trunk'
+        return (M, '2级'), 'trunk'
 
     if stage == '料库检料传感器确认':
         return (D, '6级'), 'trunk'
@@ -150,14 +128,14 @@ def _classify_raw(stage, item, sub, std, method, family='trunk'):
 
     if stage in ('离子棒', '离子风扇', '静电消除棒'):
         result = (W, '1级') if ('安装位置' in std or '安装在' in std) else (D, '9级')
-        return result, ('branch' if _branch_has(family, stage, item) else 'trunk')
+        return result, 'trunk'
 
     if stage == 'NCS光纤':
         return ((W, '1级') if ('外观' in std or '无挤压' in std) else (W, '2级')), 'trunk'
 
     if stage in ('安全防护检查', '安全防护确认'):
         result = (S, '3级') if ('漏水' in std or '漏水' in item) else (D, '12级')
-        return result, ('branch' if _branch_has(family, stage, item) else 'trunk')
+        return result, 'trunk'
 
     if stage == '陶瓷手臂':
         return ((W, '1级') if '拆解打包' in (item + std) else (D, '9级')), 'trunk'
@@ -170,20 +148,11 @@ def _classify_raw(stage, item, sub, std, method, family='trunk'):
             return (G, '2级'), 'trunk'
         return (G, '1级'), 'trunk'
 
-    if stage in stage_rules:
-        return stage_rules[stage], ('branch' if _branch_has(family, stage, item) else 'trunk')
+    if stage in TRUNK_STAGE_RULES:
+        return TRUNK_STAGE_RULES[stage], 'trunk'
 
-    for pfx, main, sub in prefix_rules:
-        if stage.startswith(pfx):
-            return (main, sub), 'branch'
-
-    if stage in bom_stages:
-        return _bom_result(std), ('branch' if stage in getattr(
-            _FAMILY_MODULES.get(family), 'BOM_STAGES', set()) else 'trunk')
-
-    for kws, result in keyword_rules:
-        if any(k in stage for k in kws):
-            return result, 'branch'
+    if stage in TRUNK_BOM_STAGES:
+        return _bom_result(std), 'trunk'
 
     if any(k in stage for k in ('精度', '补偿')):
         return (D, '4级'), 'keyword'
