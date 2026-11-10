@@ -19,9 +19,9 @@
 //   R2 协议属性名：--types 产物节点的 attrs 里，凡属协议属性名集合（由写法表 protocols 派生）的键，
 //                  必须在该类型的 protocols 里登记过（不校验取值形状；布局格子不承载协议属性）
 //   R3 格子越界：row/column/rowSpan/columnSpan 必须落在本 region 的行列范围内
-//   R4 空行空列：没有格子覆盖、也不是被星号撑开的收尾行/列
+//   R4 空行空列：没有格子覆盖的非 Star 行/列提示；Star 可承载弹性容器或保留空档
 //   R5 锚点格冲突：同一锚点格（Grid.Row/Column 起点）只允许一个控件（推导用占用表 + 行下移保证唯一）
-//   R10 待人工确认（提示）：页面用到写法表 manual-only 类型（证据不全，如 Camera 只有用户确认）
+//   R10 待人工确认（提示）：页面用到写法表 manual-only 类型（真实页面或目标程序集证据不完整）
 //   R11 尺寸约束一致性：格子带的 min/max 宽高必须与 DSL 节点上的 constraints 逐个一致（多/少/改值都失败）
 //   R12 尺寸约束未落格：DSL 里带尺寸约束的节点在布局产物里没有对应格子、也不在该产物登记的
 //       constraintExempt 里即失败。豁免的节点只有 constraintExempt 里登记的三类（页面根 / 不可见 /
@@ -29,8 +29,8 @@
 //       容器子树里没有可发射的控件（补内容或交设计确认）、待确认类型 / 无尺寸等不进格子的节点
 //       （先按 R1 / R9 修类型判定与映射）、产物与本次输入不同步（先重跑第 8 步）
 //   R13 尺寸约束未发射：带约束的格子必须在 View.xaml 里出现对应的 MinWidth/MaxWidth/MinHeight/MaxHeight
-//   R14 格子尺寸与尺寸/对齐发射：每个格子必须登记格子尺寸与承载物设计尺寸（含跨格累加与星号带），
-//       且发射报告里该格子的 Width/Height/对齐/Margin 必须与 lib/design-box.js 的同一实现一致
+//   R14 格子尺寸与尺寸/对齐发射：每个格子必须登记格子尺寸与承载物设计尺寸（含 Auto / 星号带与跨格累加），
+//       容器 sizingMode 必须与直接子项一致，发射报告里的 Width/Height/对齐/Margin 必须与 lib/design-box.js 一致
 //       （shifted / unsized 两类例外按类、按维，见 page-build-rules.md 第 4 节第 14 条）
 //   R6 资源键闭环：{StaticResource <键>} 必须来自写法表样式族、本页 Icon 台账或 Icon 字典合并点
 //   R7 文本：发射区不得出现字面中文；发射区每个有设计文本的控件必须挂语言键
@@ -45,9 +45,9 @@ const fs = require("fs");
 const path = require("path");
 const { readJson } = require(path.join(__dirname, "..", "..", "lib", "script-helpers.js"));
 const {
-  CONSTRAINT_KEYS, CONSTRAINT_ATTRS, normalizeConstraints, collectConstraints
+  CONSTRAINT_KEYS, CONSTRAINT_ATTRS, normalizeConstraints, constraintAttributes, collectConstraints
 } = require(path.join(__dirname, "..", "..", "lib", "constraints.js"));
-const { designBoxAttrs, containerBoxAttrs } = require(path.join(__dirname, "..", "..", "lib", "design-box.js"));
+const { designBoxAttrs, containerBoxAttrs, containerSizingMode } = require(path.join(__dirname, "..", "..", "lib", "design-box.js"));
 const {
   bandExtents, extentOf, contentSizeOf
 } = require(path.join(__dirname, "gen-mw-wpf-layout.js"));
@@ -57,8 +57,6 @@ const counts = {};
 const manualOnlyTypes = new Set();
 
 // 提示（notice）：不失败、不进 findings，只在报告里登记事实。
-// 目标框架允许 Grid 出现空行空列（框架自身控件模板里就有空列），保留空列还能让后续控件保持设计稿坐标，
-// 因此"空行空列"只作为提示登记。
 const notices = [];
 
 function report(rule, ref, message) {
@@ -98,9 +96,137 @@ function parseArgs(argv) {
 
 // 尺寸约束（min/max 宽高）：来源是 core/apply-constraints.js 合并进 DSL 的 node.constraints。
 // 布局推导只透传，因此这里逐格比对：格子的约束必须与 DSL 完全一致，且必须真的发射进 XAML。
-function checkConstraints(layout, dslConstraints, xamlText) {
+function nextXamlTag(text, position) {
+  const pattern = /<\/?([A-Za-z_][\w:.-]*)\b[^<>]*?(\/?)>/g;
+  pattern.lastIndex = position;
+  const match = pattern.exec(text);
+  if (!match) return null;
+  const attrs = {};
+  const attrPattern = /([A-Za-z][\w:.-]*)\s*=\s*"([^"]*)"/g;
+  let attr;
+  while ((attr = attrPattern.exec(match[0])) !== null) attrs[attr[1]] = attr[2];
+  return {
+    name: match[1],
+    closing: match[0].startsWith("</"),
+    selfClosing: match[2] === "/",
+    attrs: attrs,
+    start: match.index,
+    end: pattern.lastIndex
+  };
+}
+
+function skipPropertyElement(text, tag) {
+  if (!tag || tag.closing || tag.name.indexOf(".") < 0) return tag;
+  if (tag.selfClosing) return nextXamlTag(text, tag.end);
+  let depth = 1;
+  let position = tag.end;
+  while (depth > 0) {
+    const next = nextXamlTag(text, position);
+    if (!next) return null;
+    if (next.name === tag.name) depth += next.closing ? -1 : (next.selfClosing ? 0 : 1);
+    position = next.end;
+  }
+  return nextXamlTag(text, position);
+}
+
+function nextXamlContentTag(text, position) {
+  let tag = nextXamlTag(text, position);
+  while (tag && !tag.closing && tag.name.indexOf(".") >= 0) tag = skipPropertyElement(text, tag);
+  return tag;
+}
+
+// 只按布局格子的发射顺序读取对应元素的起始标签。这样同名约束值不会互相“借”通过：
+// 每个格子核对的是它自己那只控件 / 容器 Grid，而不是在整份 XAML 里搜一个值。
+function emittedConstraintAttrsByRef(xamlText, layout, map) {
+  if (!xamlText) return new Map();
+  const resourcesEnd = xamlText.lastIndexOf("</UserControl.Resources>");
+  const firstEmitRegion = (layout.regions || []).find(function (region) {
+    return region.emit !== false && region.grid;
+  });
+  if (!firstEmitRegion) return new Map();
+  const out = new Map();
+
+  const readGrid = function (position, grid) {
+    const start = nextXamlContentTag(xamlText, position);
+    if (!start || start.closing || start.name !== "Grid") {
+      throw new Error("找不到布局根 Grid");
+    }
+    let cursor = start.end;
+    for (const cell of grid.cells || []) {
+      const tag = nextXamlContentTag(xamlText, cursor);
+      if (!tag || tag.closing) throw new Error("找不到格子 " + cell.ref + " 对应的 XAML 元素");
+      if (cell.container) {
+        if (tag.name !== "Grid") throw new Error("容器格子 " + cell.ref + " 必须对应 Grid，实际是 " + tag.name);
+        out.set(cell.ref, tag.attrs);
+        const nested = readGrid(cursor, cell.children);
+        cursor = nested.cursor;
+        continue;
+      }
+      const spec = (map.controlTypes || {})[cell.controlType];
+      if (!spec || !spec.element) throw new Error("写法表没有格子 " + cell.ref + " 的发射元素");
+      if (tag.name !== spec.element) {
+        throw new Error("格子 " + cell.ref + " 应发射 " + spec.element + "，实际是 " + tag.name);
+      }
+      out.set(cell.ref, tag.attrs);
+      cursor = tag.end;
+      if (cell.children) {
+        const nested = readGrid(cursor, cell.children);
+        cursor = nested.cursor;
+        const close = nextXamlContentTag(xamlText, cursor);
+        if (!close || !close.closing || close.name !== spec.element) {
+          throw new Error("容器控件 " + cell.ref + " 缺少结束标签 " + spec.element);
+        }
+        cursor = close.end;
+      } else if (!tag.selfClosing) {
+        const close = nextXamlContentTag(xamlText, cursor);
+        if (!close || !close.closing || close.name !== spec.element) {
+          throw new Error("控件 " + cell.ref + " 缺少结束标签 " + spec.element);
+        }
+        cursor = close.end;
+      }
+    }
+    const close = nextXamlContentTag(xamlText, cursor);
+    if (!close || !close.closing || close.name !== "Grid") {
+      throw new Error("Grid 缺少结束标签");
+    }
+    return { cursor: close.end };
+  };
+
+  readGrid(resourcesEnd < 0 ? 0 : resourcesEnd + "</UserControl.Resources>".length, firstEmitRegion.grid);
+  return out;
+}
+
+function checkConstraintAttrs(cell, attrs) {
+  const expected = constraintAttributes(cell.constraints);
+  Object.values(CONSTRAINT_ATTRS).forEach(function (attr) {
+    const value = expected[attr];
+    const actual = attrs ? attrs[attr] : undefined;
+    if (value === undefined) {
+      if (actual !== undefined) report("R13", cell.ref, "未登记尺寸约束却已发射：" + attr + '="' + actual + '"');
+      return;
+    }
+    if (actual === undefined) {
+      report("R13", cell.ref, "尺寸约束未发射到 XAML：缺少 " + attr + '="' + value + '"');
+      return;
+    }
+    if (String(actual) !== value) {
+      report("R13", cell.ref, "尺寸约束发射值不一致：" + attr + " 期望 " + value + "，实际 " + actual);
+    }
+  });
+}
+
+function checkConstraints(layout, dslConstraints, xamlText, map) {
   if (!dslConstraints) return;
   const placedRefs = new Set();
+  let emitted = new Map();
+  if (xamlText) {
+    try {
+      emitted = emittedConstraintAttrsByRef(xamlText, layout, map);
+    }
+    catch (error) {
+      report("R13", null, "无法按布局格子定位 XAML 元素：" + error.message);
+    }
+  }
   const visit = function (grid) {
     if (!grid || !Array.isArray(grid.cells)) return;
     grid.cells.forEach(function (cell) {
@@ -113,10 +239,8 @@ function checkConstraints(layout, dslConstraints, xamlText) {
             (expected[key] === undefined ? "未设置" : expected[key]) + "，布局产物为 " +
             (actual[key] === undefined ? "未设置" : actual[key]));
         }
-        if (xamlText && actual[key] && xamlText.indexOf(CONSTRAINT_ATTRS[key] + '="' + Math.round(actual[key]) + '"') < 0) {
-          report("R13", cell.ref, "尺寸约束未发射到 XAML：缺少 " + CONSTRAINT_ATTRS[key] + '="' + Math.round(actual[key]) + '"');
-        }
       });
+      if (xamlText) checkConstraintAttrs(cell, emitted.get(cell.ref));
       if (cell.children) visit(cell.children);
     });
   };
@@ -146,11 +270,19 @@ function checkDesignBoxes(layout, emission) {
     emitted.set(item.ref, item.attrs || {});
   });
   const seen = new Set();
-  const visitGrid = function (grid, size) {
+  const visitGrid = function (grid, size, isRegionRoot) {
     const columnExtents = bandExtents(grid.columns || [], size.w);
     const rowExtents = bandExtents(grid.rows || [], size.h);
     (grid.cells || []).forEach(function (cell) {
       seen.add(cell.ref);
+      if (cell.container) {
+        const childCells = cell.children && Array.isArray(cell.children.cells) ? cell.children.cells : [];
+        const expectedSizingMode = containerSizingMode(childCells, isRegionRoot);
+        if (cell.sizingMode !== expectedSizingMode) {
+          report("R14", cell.ref, "容器 sizingMode 与页面根/直接子项不一致：期望 " +
+            expectedSizingMode + "，产物为 " + (cell.sizingMode || "未登记"));
+        }
+      }
       const width = extentOf(columnExtents, cell.column, cell.columnSpan);
       const height = extentOf(rowExtents, cell.row, cell.rowSpan);
       // 撞格下移的格子没有设计稿偏移真值：期望值仍是 designBoxAttrs(cell)（有格子尺寸就写控件自身尺寸、
@@ -186,8 +318,10 @@ function checkDesignBoxes(layout, emission) {
       if (!(cell.nodeWidth > 0) || !(cell.nodeHeight > 0)) {
         report("R14", cell.ref, "布局产物没有登记承载物设计尺寸（nodeWidth / nodeHeight）");
       }
-      // 容器格子与控件格子共用 lib/design-box.js 的实现（容器还要按主轴撑满 / 交叉轴锚点，同一实现）。
-      const expected = cell.container ? containerBoxAttrs(cell) : designBoxAttrs(cell);
+      // 容器格子与控件格子共用 lib/design-box.js 的尺寸策略实现。
+      const expected = cell.container
+        ? containerBoxAttrs(cell)
+        : designBoxAttrs(cell, { omitWidth: cell.controlType === "TextBlock" });
       const actual = emitted.get(cell.ref);
       if (!actual) {
         report("R14", cell.ref, "发射报告里没有这个格子的尺寸/对齐记录");
@@ -201,12 +335,12 @@ function checkDesignBoxes(layout, emission) {
           }
         });
       }
-      if (cell.children) visitGrid(cell.children, contentSizeOf(cell));
+      if (cell.children) visitGrid(cell.children, contentSizeOf(cell), false);
     });
   };
   (layout.regions || []).forEach(function (region) {
     if (region.emit === false || !region.grid) return;
-    visitGrid(region.grid, { w: region.w, h: region.h });
+    visitGrid(region.grid, { w: region.w, h: region.h }, true);
   });
   emitted.forEach(function (attrs, ref) {
     if (!seen.has(ref)) report("R14", ref, "发射报告里有布局产物中不存在的格子");
@@ -223,15 +357,14 @@ function checkCells(region, map, layout) {
       report("R8", region.id, "行列尺寸缺少 source");
       return;
     }
-    // 星号带（原语）：口径 A 下每层最多一条（结构优先；散条目按相对判据），其余带一律照设计稿像素。
-    if (size.size === "Star") return;
+    // Star 可表示弹性空档、收尾余量或承载容器的加权轨道；来源校验与其他设计轨道一致。
     // 框架固定区只在**被框架钉住的那一维**上用 Token（顶部栏 / 底部栏都钉在高度上）；
     // 另一维是自由伸展的星号，来源仍是设计稿。
     if (isFramework && size.size === "Pixel" && size.source.indexOf("framework:") !== 0) {
       report("R8", region.id, "框架固定区的固定尺寸必须用 framework:<Token>，当前: " + size.source);
     }
-    if (!isFramework && size.source !== "design") {
-      report("R8", region.id, "发射区尺寸必须取设计稿（source=design），当前: " + size.source);
+    if (!(isFramework && size.size === "Pixel") && size.source !== "design") {
+      report("R8", region.id, "非框架固定尺寸必须取设计稿（source=design），当前: " + size.source);
     }
   });
   const seen = new Map();
@@ -257,7 +390,7 @@ function checkCells(region, map, layout) {
   });
   if (region.emit === false) return;
 
-  // R4：空行空列 → 提示，不失败（框架允许；收尾的星号行/列本来就是用来吃掉剩余空间的）。
+  // R4：非 Star 空行空列只提示；Star 可承载弹性容器或保留余量/空档，空置时不提示。
   const coveredRows = new Set();
   const coveredColumns = new Set();
   region.grid.cells.forEach(function (cell) {
@@ -265,7 +398,6 @@ function checkCells(region, map, layout) {
     for (let c = cell.column; c < cell.column + (cell.columnSpan || 1); c += 1) coveredColumns.add(c);
   });
   region.grid.rows.forEach(function (size, index) {
-    // 口径 A 的星号带本来就不承载控件，不给提示。
     if (!coveredRows.has(index) && size.size !== "Star") {
       notice("R4", region.id, "第 " + (index + 1) + " 行没有控件覆盖（也不是星号带）");
     }
@@ -421,10 +553,10 @@ function main() {
     };
     walkProtocols(region.grid);
   });
-  // R10：manual-only 类型（证据不全：有手册条目但真实页面未出现，或只有用户确认）不阻断，
-  // 但必须登记成提示，让"首次生成需人工确认、事后补齐缺的证据"有可观测落点。
+  // R10：manual-only 类型（真实页面或目标程序集证据不完整）不阻断，
+  // 但每次页面使用都登记提示，直到映射证据补齐并更新为 ready。
   manualOnlyTypes.forEach(function (type) {
-    notice("R10", null, "写法表把 " + type + " 记为 manual-only（证据不全）：发射前需人工确认，事后补齐缺的证据（真实页面或手册条目）");
+    notice("R10", null, "写法表把 " + type + " 记为 manual-only（证据不全）：发射前需人工确认，事后补齐真实页面或目标程序集证据");
   });
   checkStyleKeys(layout, map, iconNames, xamlText);
   checkHardcodedText(xamlText, layout, typesByRef);
@@ -437,7 +569,8 @@ function main() {
     const roots = (snapshot.dsl && snapshot.dsl.nodes) || snapshot.nodes || [];
     dslConstraints = collectConstraints(roots);
   }
-  checkConstraints(layout, Object.keys(dslConstraints || {}).length ? dslConstraints : null, xamlText);
+  // 传了 --dsl 就以它为准：空集合也代表“本页没有约束”，必须能发现布局或 XAML 里遗留的旧约束。
+  checkConstraints(layout, args.dslPath ? dslConstraints : null, xamlText, map);
 
   // R14：格子尺寸与尺寸/对齐发射。--xaml-report 传的是发射器的报告（gen-mw-wpf-xaml.js --report）；
   // 没传就整体跳过（旧流水线行为不变）。

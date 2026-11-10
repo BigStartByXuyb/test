@@ -5,9 +5,8 @@
 // 锁定六件事（口径 A）：
 //   1) 一条带 = 条目 + 它后面的间距（= 到下一带起始边的距离），不发射任何间距元素；
 //   2) 哪一段间距落成星号带只看设计稿自身（分组结构优先，散条目按相对判据，真值见 gen-mw-wpf-layout.js），每层最多一条；
-//      没有大空档时最后一条带吃剩余（星号），有大空档时最后一条按条目自身尺寸写死；
-//   3) 主轴 row 且没有大空档时：固定项（相机链 / 区域根网格最末条目＝常驻右栏）照设计稿像素、
-//      容器条目自适应（单个裸星号、多个按设计稿比例加权）、叶子控件照设计稿像素；
+//      普通成带没有大空档时末条吃剩余，有大空档时末条按自身尺寸；无大空档 row 主轴另按固定项/弹性容器分配；
+//   3) 页面根与控件槽位按设计尺寸和星号余量布局；直接子项全是 Grid 的容器按 Auto 内容尺寸；
 //   4) 没有 flex 声明的层级仍按 x 区间重叠 / y 起始边聚类，同一套口径 A 成带；
 //   5) 设计稿没打组的地方由代码补组：区域根网格里同一条列带（x 区间重叠）里 ≥2 个条目 → 合成一个栏容器（栏内再成行）；
 //   6) 落格按「起始边」判定，横跨多行的控件不会把整页算进第一行。
@@ -463,6 +462,156 @@ function sizes(bands) {
     assert.throws(function () { readLayoutGroups(tmp); }, /至少 2 个 ref/, "分组至少要有 2 个成员");
   } finally {
     fs.unlinkSync(tmp);
+  }
+}
+
+// ---------- 12. 纯子 Grid 的自适应尺寸保留普通间距 ----------
+{
+  const group = function (id, y) {
+    return node(id, "FRAME", { width: 300, height: 40, relativeX: 0, relativeY: y }, [
+      node(id + "A", "INSTANCE", { width: 100, height: 20, relativeX: 0, relativeY: 0 }),
+      node(id + "B", "INSTANCE", { width: 100, height: 20, relativeX: 160, relativeY: 0 })
+    ], { flexContainerInfo: { flexDirection: "row" } });
+  };
+  const inner = node("inner", "FRAME", { width: 300, height: 86, relativeX: 0, relativeY: 0 }, [
+    group("groupA", 0), group("groupB", 46)
+  ], { flexContainerInfo: { flexDirection: "column" } });
+  const section = node("section", "FRAME", { width: 500, height: 86, relativeX: 100, relativeY: 115 }, [
+    inner,
+    node("sectionLabel", "TEXT", { width: 100, height: 20, relativeX: 320, relativeY: 0 })
+  ], { flexContainerInfo: { flexDirection: "row" } });
+  const layout = derive(snapshot([], [
+    section,
+    node("outside", "TEXT", { width: 100, height: 20, relativeX: 700, relativeY: 115 })
+  ]), typesOf([
+    { ref: "groupAA", controlType: "IconButton", absX: 100, absY: 200, w: 100, h: 20 },
+    { ref: "groupAB", controlType: "IconButton", absX: 260, absY: 200, w: 100, h: 20 },
+    { ref: "groupBA", controlType: "IconButton", absX: 100, absY: 246, w: 100, h: 20 },
+    { ref: "groupBB", controlType: "IconButton", absX: 260, absY: 246, w: 100, h: 20 },
+    { ref: "sectionLabel", controlType: "TextBlock", absX: 420, absY: 200, w: 100, h: 20 },
+    { ref: "outside", controlType: "TextBlock", absX: 700, absY: 200, w: 100, h: 20 }
+  ]));
+  const region = workArea(layout);
+  const sectionCell = cellOf(region, "section");
+  const innerCell = cellOf({ grid: sectionCell.children }, "inner");
+  assert.strictEqual(innerCell.sizingMode, "auto-content");
+  assert.strictEqual(innerCell.children.owner.direction, "column", "fixture uses column as the declared main axis");
+  assert.deepStrictEqual(sizes(innerCell.children.rows), ["Auto(40)", "Auto(40)"],
+    "column 主轴的 auto-content 容器仍按子项内容高度 Auto 自适应");
+  const nextGroup = cellOf({ grid: innerCell.children }, "groupB");
+  assert.strictEqual(nextGroup.offsetY, 6, "普通设计间距从前一条 Auto 内容轨道之后计算");
+}
+
+// ---------- 13. 相机 + 右栏布局只在 owner 为空时启用 ----------
+{
+  const pageChildren = function (nestedSidebar) {
+    const sidebarItems = nestedSidebar ? [
+      node("sidebarRowA", "FRAME", { width: 170, height: 70, relativeX: 0, relativeY: 0 }, [
+        node("rightA", "INSTANCE", { width: 80, height: 30, relativeX: 0, relativeY: 0 }),
+        node("rightB", "INSTANCE", { width: 80, height: 30, relativeX: 90, relativeY: 0 })
+      ], { flexContainerInfo: { flexDirection: "row" } }),
+      node("sidebarRowB", "FRAME", { width: 170, height: 70, relativeX: 0, relativeY: 100 }, [
+        node("rightC", "INSTANCE", { width: 80, height: 30, relativeX: 0, relativeY: 0 }),
+        node("rightD", "INSTANCE", { width: 80, height: 30, relativeX: 90, relativeY: 0 })
+      ], { flexContainerInfo: { flexDirection: "row" } })
+    ] : [
+      node("rightA", "INSTANCE", { width: 170, height: 70, relativeX: 0, relativeY: 0 }),
+      node("rightB", "INSTANCE", { width: 170, height: 70, relativeX: 0, relativeY: 100 })
+    ];
+    return [
+      node("camera", "INSTANCE", { width: 600, height: 600, relativeX: 20, relativeY: 115 }),
+      node("middle", "FRAME", { width: 400, height: 240, relativeX: 650, relativeY: 117 }, [
+        node("middleA", "TEXT", { width: 120, height: 20, relativeX: 0, relativeY: 0 }),
+        node("middleB", "TEXT", { width: 120, height: 20, relativeX: 0, relativeY: 40 })
+      ], { flexContainerInfo: { flexDirection: "column" } }),
+      node("sidebar", "FRAME", { width: 170, height: 200, relativeX: 1100, relativeY: 97 }, [
+        ...sidebarItems
+      ], { flexContainerInfo: { flexDirection: "column" } }),
+      node("divider", "RECTANGLE", { width: 1, height: 600, relativeX: 1075, relativeY: 97 }),
+      node("middleLabelA", "TEXT", { width: 20, height: 20, relativeX: 630, relativeY: 250 }),
+      node("middleLabelB", "TEXT", { width: 20, height: 20, relativeX: 1050, relativeY: 290 })
+    ];
+  };
+  const types = typesOf([
+    { ref: "camera", controlType: "Camera", absX: 20, absY: 200, w: 600, h: 600 },
+    { ref: "middleA", controlType: "TextBlock", absX: 650, absY: 202, w: 120, h: 20 },
+    { ref: "middleB", controlType: "TextBlock", absX: 650, absY: 242, w: 120, h: 20 },
+    { ref: "middleLabelA", controlType: "TextBlock", absX: 630, absY: 335, w: 20, h: 20 },
+    { ref: "middleLabelB", controlType: "TextBlock", absX: 1050, absY: 375, w: 20, h: 20 },
+    { ref: "rightA", controlType: "IconButton", absX: 1100, absY: 182, w: 170, h: 70 },
+    { ref: "rightB", controlType: "IconButton", absX: 1100, absY: 282, w: 170, h: 70 }
+  ]);
+  const plain = workArea(derive(snapshot([], pageChildren(false)), types));
+  assert.strictEqual(cellOf(plain, "synth:content-area").row, 0,
+    "无设计稿根 owner 时启用相机 + 右栏两列根布局");
+  assert.strictEqual(cellOf(plain, "synth:right-sidebar").row, 0);
+  assert.strictEqual(cellOf({ grid: cellOf(plain, "synth:content-area").children }, "camera").row, 0,
+    "相机在内容区局部 Grid 的首行");
+  assert.deepStrictEqual(sizes(plain.grid.columns), ["Star", 205],
+    "多个中间条目不应阻止先生成内容区 + 固定右栏两列");
+  const plainContent = cellOf(plain, "synth:content-area");
+  const middleArea = cellOf({ grid: plainContent.children }, "synth:middle-content");
+  const middleRefs = middleArea.children.cells.map(function (cell) { return cell.ref; });
+  assert.ok(middleRefs.includes("middleLabelA") && middleRefs.includes("middleLabelB"),
+    "多个独立中间条目必须全部收纳进内容区中间容器");
+
+  const multipleSidebarTypes = typesOf(Array.from(types.byRef.values()).map(function (item) {
+    return item.ref === "middleA" || item.ref === "middleB" ||
+      item.ref === "middleLabelA" || item.ref === "middleLabelB"
+      ? Object.assign({}, item, { controlType: "IconButton" }) : item;
+  }));
+  const multipleSidebars = workArea(derive(snapshot([], pageChildren(false)), multipleSidebarTypes));
+  assert.strictEqual(cellOf(multipleSidebars, "synth:right-sidebar").column, 1,
+    "中间区同样全是按钮时仍选择最靠右的右栏候选");
+
+  const nestedSidebarTypes = typesOf([
+    { ref: "camera", controlType: "Camera", absX: 20, absY: 200, w: 600, h: 600 },
+    { ref: "middleA", controlType: "TextBlock", absX: 650, absY: 202, w: 120, h: 20 },
+    { ref: "middleB", controlType: "TextBlock", absX: 650, absY: 242, w: 120, h: 20 },
+    { ref: "rightA", controlType: "IconButton", absX: 1100, absY: 182, w: 80, h: 30 },
+    { ref: "rightB", controlType: "IconButton", absX: 1190, absY: 182, w: 80, h: 30 },
+    { ref: "rightC", controlType: "IconButton", absX: 1100, absY: 282, w: 80, h: 30 },
+    { ref: "rightD", controlType: "IconButton", absX: 1190, absY: 282, w: 80, h: 30 }
+  ]);
+  const nested = workArea(derive(snapshot([], pageChildren(true)), nestedSidebarTypes));
+  const nestedSidebar = cellOf(nested, "synth:right-sidebar").children.cells[0];
+  assert.strictEqual(nestedSidebar.sizingMode, "auto-content",
+    "相机 + 右栏特例按 sidebarCell.children.cells 判定直接子容器");
+
+  const ownedRoot = node("ownedRoot", "FRAME", { width: 1280, height: 759, relativeX: 0, relativeY: 0 },
+    pageChildren(false), { flexContainerInfo: { flexDirection: "row" } });
+  const owned = workArea(derive(snapshot([], [ownedRoot]), types));
+  assert.strictEqual(owned.grid.cells.some(function (cell) { return cell.ref === "synth:content-area"; }), false,
+    "设计稿根 owner 存在时回退到原有层级网格");
+}
+
+// ---------- 14. 根横向布局的普通末端容器保持弹性，已识别右栏才固定 ----------
+{
+  const rootWithTail = function (tailType, leafFirst) {
+    const tail = node("tail", "FRAME", { width: 680, height: 500, relativeX: 600, relativeY: 0 }, [
+        node("tailA", "INSTANCE", { width: 120, height: 20, relativeX: 0, relativeY: 0 }),
+        node("tailB", "INSTANCE", { width: 120, height: 20, relativeX: 0, relativeY: 40 })
+      ], { flexContainerInfo: { flexDirection: "column" } });
+    const label = node("tailLabel", "TEXT", { width: 100, height: 20, relativeX: 600, relativeY: 80 });
+    const trailing = typeof leafFirst === "boolean" ? (leafFirst ? [label, tail] : [tail, label]) : [tail];
+    const root = node("rootRow", "FRAME", { width: 1280, height: 759, relativeX: 0, relativeY: 0 }, [
+      node("camera", "INSTANCE", { width: 600, height: 500, relativeX: 0, relativeY: 0 })
+    ].concat(trailing), { flexContainerInfo: { flexDirection: "row" } });
+    const types = [
+      { ref: "camera", controlType: "Camera", absX: 0, absY: 85, w: 600, h: 500 },
+      { ref: "tailA", controlType: tailType, absX: 600, absY: 85, w: 120, h: 20 },
+      { ref: "tailB", controlType: tailType, absX: 600, absY: 125, w: 120, h: 20 }
+    ];
+    if (typeof leafFirst === "boolean") types.push({ ref: "tailLabel", controlType: "TextBlock", absX: 600, absY: 165, w: 100, h: 20 });
+    return workArea(derive(snapshot([], [root]), typesOf(types)));
+  };
+  assert.deepStrictEqual(sizes(rootWithTail("TextBlock").grid.columns), [600, "Star"],
+    "普通主内容容器即使是根层贴边末项也不按右栏固定");
+  assert.deepStrictEqual(sizes(rootWithTail("IconButton").grid.columns), [600, 680],
+    "独占根层贴边末带且符合右栏结构的容器保持设计宽度");
+  for (const leafFirst of [false, true]) {
+    assert.deepStrictEqual(sizes(rootWithTail("TextBlock", leafFirst).grid.columns), [600, "Star"],
+      "同起点混合容器与叶子控件共享弹性轨道，不受条目顺序影响");
   }
 }
 

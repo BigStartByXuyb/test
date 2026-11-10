@@ -123,7 +123,7 @@ $Steps = @(
     },
     [pscustomobject]@{
         Id = 5; Name = 'mapping'; Title = 'mapping 草稿（按当前台账）'
-        Inputs   = @('dsl.snapshot.json + visibility.json', '正式映射表 mtslg-iocontrol-map.json', '图标台账（尚无台账时用空 candidates 占位）')
+        Inputs   = @('dsl.snapshot.json + visibility.json', '正式映射表 mtslg-iocontrol-map.json', '图标台账（尚无台账时用空 candidates 占位）', '尺寸约束 JSON（可选；先合并进 DSL；A 的控件与容器 Grid 使用 Min/MaxWidth/Height，B 的 TextBlock 使用 Min/MaxWidth）')
         Outputs  = @('Generated/runs/<Target>/mapping 草稿与映射审计（unmappedComponents / pending / templateConflicts）')
         Failures = @('组件与固定模板冲突', '结构签名部分命中')
         Recovery = @('只补输入（用 manifest.excludeInstances 隔离该实例、把偏差写进待确认），不改 mapping 产物；重跑：-Progress mapping')
@@ -146,7 +146,7 @@ $Steps = @(
     },
     [pscustomobject]@{
         Id = 8; Name = 'layout'; Title = 'Layout 清单机械推导（底部栏 MenuItem）'
-        Inputs   = @('dsl.snapshot.json + 图标台账 + 正式映射表', '（作业A）分组表 Generated/_inputs/<Target>.layout-groups.json——可选，但有设计稿位图时必须先产出它')
+        Inputs   = @('dsl.snapshot.json + 图标台账 + 正式映射表', '（作业A）尺寸约束 JSON：<Inputs>/<Target>.constraints.json——可选；存在时合并进布局与门禁共用的 DSL 快照', '（作业A）分组表 Generated/_inputs/<Target>.layout-groups.json——可选，但有设计稿位图时必须先产出它')
         Outputs  = @('Layout 清单与推导报告 Generated/_inputs/<Target>.layout-manifest.json(.report.json)',
                      '（作业A）分组表可引用的条目清单 Generated/_inputs/<Target>.layout-group-candidates.json——写表前先看它（表里写别的 ref 会被推导入口拒）；登记进运行登记表（键 layoutGroupCandidates：带本次运行身份与哈希，同名旧件不得冒充）')
         # layoutStatus 的合法终态有两个：complete 与 none。none 的触发条件是推导脚本的
@@ -157,28 +157,28 @@ $Steps = @(
     },
     [pscustomobject]@{
         Id = 9; Name = 'inputs'; Title = '校验译文并生成 Bundle 清单'
-        Inputs   = @('Layout 清单', '运行登记表 run.json（采集输入只按它取）', '译文清单 Generated/_inputs/<Target>.lang-translations.json（术语表可选）')
+        Inputs   = @('Layout 清单', '运行登记表 run.json（采集输入只按它取）', '尺寸约束 JSON（可选；重新解析并登记合并后的 DSL 作为 Bundle 映射输入。B 改约束后可从 inputs 续跑；A 的约束由 layout 落到格子，改约束后从 layout 续跑）', '译文清单 Generated/_inputs/<Target>.lang-translations.json（术语表可选）')
         Outputs  = @('Bundle 清单 Generated/_inputs/<Target>.bundle.json（含 runRegistry 指纹）')
         Failures = @('缺区域前缀 area', '缺 --run-json 或译文清单', '发现未登记的旧同名采集文件', '登记表 sha256 与文件不符')
         Recovery = @('补齐输入后重跑：-Progress inputs（采集输入只按登记表取，未登记的旧同名文件一律拒绝）')
     },
     [pscustomobject]@{
         Id = 10; Name = 'bundle'; Title = 'Bundle 生成页面 XML / Icon / Layout / 宿主壳'
-        Inputs   = @('Bundle 清单', '复校通过的采集输入（getDsl/snapshot/extractSvg，按登记表取）')
+        Inputs   = @('Bundle 清单（含 mappingDslPath 时由清单内嵌传递合并后的约束 DSL）', '复校通过的采集输入（getDsl/snapshot/extractSvg，按登记表取）')
         Outputs  = @('页面 XML、本页 Icons.xaml、CN/EN 语言字典、Layout 增量注册、View + code-behind + ViewModel、宿主壳', 'Bundle 审计与其 files[] 统一登记')
         Failures = @('同名目标文件已存在且未 -Overwrite', 'area/路径不合法', '语言键引用闭环失败', '清单指纹与登记表不符')
         Recovery = @('确认要替换时用 operation=replace-existing + -Overwrite（覆盖前逐个备份，保留最近 2 份），否则改名或先确认；重跑：-Progress bundle')
     },
     [pscustomobject]@{
         Id = 11; Name = 'gates'; Title = '严格门禁（审计逐条断言）'
-        Inputs   = @('Bundle 审计 + mapping 审计 + coverage-report.json')
+        Inputs   = @('Bundle 审计 + mapping 审计 + coverage-report.json', '（作业A）尺寸约束 JSON：<Inputs>/<Target>.constraints.json——可选；门禁按与 layout 同一入口重算合并后的 DSL')
         Outputs  = @('门禁结论（失败即停；通过时列出必须写进交付说明的警告）')
         Failures = @('临时语言键', '待翻译条目', '容器嵌套冲突', '底部栏未命中变体', 'Bundle 静态校验未通过')
         Recovery = @('回到产出该字段的步骤补输入（译文/命名表/隔离清单），重跑：-Progress gates')
     },
     [pscustomobject]@{
         Id = 12; Name = 'verify'; Title = '四项独立验证（provenance / 坐标 / Icon / 结构）'
-        Inputs   = @('页面 XML + 本页 Icon/语言字典 + 项目 Layout + 审计文件')
+        Inputs   = @('页面 XML + 本页 Icon/语言字典 + 项目 Layout + 审计文件', '（作业A）尺寸约束 JSON：<Inputs>/<Target>.constraints.json——可选；verify 按与 layout 同一入口重算合并后的 DSL')
         Outputs  = @('Generated/_work/verification/<页面>/ 的 provenance/坐标/Icon/结构报告')
         Failures = @('provenance 与设计文本不符', '坐标与 DSL bbox 不符', 'Icon 引用闭环缺失', '页面结构校验失败')
         Recovery = @('修输入或生成器后重跑：-Progress verify（不要改报告）')
@@ -349,6 +349,13 @@ function Assert-RegisteredInput {
 }
 
 # 本步产出的文件 → 登记表键（键名是消费端唯一认的入口，见 lib/run-registry.js 的 ARTIFACT_KEYS）
+function Register-RunArtifact {
+    param([string] $Key, [string] $Path, [int] $StepId)
+    if (Test-Path -LiteralPath $Path) {
+        Invoke-Registry @('artifact', '--run', $RunJson, '--key', $Key, '--path', $Path, '--step', "$StepId") | Out-Null
+    }
+}
+
 function Register-StepArtifacts {
     param([string] $StepName, [int] $StepId)
     $pairs = @()
@@ -363,6 +370,9 @@ function Register-StepArtifacts {
         'svg'        { $pairs += , @('extractSvg', $SvgJson) }
         'visibility' { $pairs += , @('visibility', $VisibilityJson) }
         'mapping'    {
+            if ($MappingDslJson -and $MappingDslJson -eq $ConstrainedDslJson -and (Test-Path -LiteralPath $MappingDslJson)) {
+                $pairs += , @('mappingDsl', $MappingDslJson)
+            }
             if ($Mode -eq 'mw-wpf') { $pairs += , @('componentTypes', $TypeAuditJson) }
             else { $pairs += , @('mappingDraft', $DraftMappingJson) }
         }
@@ -381,9 +391,7 @@ function Register-StepArtifacts {
         'inputs'     { $pairs += , @('bundleManifest', $BundleJson) }
     }
     foreach ($pair in $pairs) {
-        if (Test-Path -LiteralPath $pair[1]) {
-            Invoke-Registry @('artifact', '--run', $RunJson, '--key', $pair[0], '--path', $pair[1], '--step', "$StepId") | Out-Null
-        }
+        Register-RunArtifact -Key $pair[0] -Path $pair[1] -StepId $StepId
     }
 }
 
@@ -690,6 +698,9 @@ foreach ($step in $Steps) {
             'mapping' {
                 # 图标台账在 mapping 步之前可能还没产出（首次运行没有命名表）：草稿输入按"台账 → 候选 → 空清单"降级，
                 # 两条路线共用这一处口径（A 的类型判定同样要读图标槽位）。
+                # 尺寸约束也必须在这里并入：B 的 TextBlock 宽约束随映射进入 XML；
+                # A 的类型判定同样读同一份已合并快照，后续 layout 再按同一入口重算。
+                $MappingDslJson = Resolve-LayoutDslSnapshot -LogFile $log
                 $ledgerForDraft = if (Test-Path -LiteralPath $LedgerJson) { $LedgerJson } else { $CandidateJson }
                 if (-not (Test-Path -LiteralPath $ledgerForDraft)) {
                     New-Item -ItemType Directory -Force -Path $Inputs | Out-Null
@@ -700,7 +711,7 @@ foreach ($step in $Steps) {
                     # 作业A：类型判定只读共享类型表（设计稿组件集/变体 → ControlType + 槽位），
                     # 不掺 IOContorl 的写入规则；属性怎么写由 `bundle` 那一步按 mw-wpf-map.json 决定。
                     Invoke-StepCommand -Label 'component types' -LogFile $log -File 'node' -Arguments @(
-                        (Get-AdapterScript 'mapping'), '--dsl', $SnapshotJson,
+                        (Get-AdapterScript 'mapping'), '--dsl', $MappingDslJson,
                         '--visibility', $VisibilityJson, '--template-map', $TypeMap,
                         '--icon-map', $ledgerForDraft,
                         '--out', $TypeAuditJson) | Out-Null
@@ -709,7 +720,7 @@ foreach ($step in $Steps) {
                     break
                 }
                 Invoke-StepCommand -Label 'mapping draft' -LogFile $log -File 'node' -Arguments @(
-                    (Get-AdapterScript 'mapping'), '--dsl', $SnapshotJson,
+                    (Get-AdapterScript 'mapping'), '--dsl', $MappingDslJson,
                     '--visibility', $VisibilityJson, '--template-map', $TemplateMap,
                     '--icon-map', $ledgerForDraft, '--out', $DraftMappingJson) | Out-Null
             }
@@ -811,10 +822,19 @@ foreach ($step in $Steps) {
             }
             'inputs' {
                 # 所有 skill 自带脚本一律用 Join-Path $ScriptsFolder 分桶定位。
+                # Bundle 会从 DSL 重新生成最终 mapping：约束必须先合进这份输入，
+                # 否则 B 的 TextBlock 宽度会在草稿之后丢失。
+                $BundleDslJson = Resolve-LayoutDslSnapshot -LogFile $log
+                # 约束可在 mapping 之后才落盘；inputs 重算的这份 DSL 必须同步成为当前登记产物，
+                # 否则 Bundle 清单会去解析 mapping 步留下的旧哈希。
+                if ($BundleDslJson -ne $SnapshotJson) {
+                    Register-RunArtifact -Key 'mappingDsl' -Path $BundleDslJson -StepId $step.Id
+                }
                 $args = @((Join-Path $ScriptsFolder 'adapters/mtslg-iocontrol/build-bundle-manifest.mjs'), $LayoutManifestJson, $BundleJson, $ProjectRoot, $Ui)
                 # 采集输入只从运行登记表取（并写进清单让 Bundle 复校），不再让清单自己拼顶层路径。
                 # 路线随清单一起给出：空项目会在这里落脚手架，framework.config.json 的 mode 必须是本次路线。
                 $args += @('--run-json', $RunJson, '--mode', $Mode)
+                if ($BundleDslJson -ne $SnapshotJson) { $args += @('--mapping-dsl', $BundleDslJson) }
                 if ($PageTitleText) { $args += @('--page-title', $PageTitleText) }
                 if ($Overwrite) { $args += '--replace-existing' }
                 Invoke-StepCommand -Label 'bundle manifest' -LogFile $log -File 'node' -Arguments $args | Out-Null

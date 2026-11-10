@@ -10,7 +10,7 @@ const dir = tmpDir('iocontrol-coords-');
 const xmlPath = path.join(dir, 'page.xml');
 const nodesPath = path.join(dir, 'nodes.json');
 
-fs.writeFileSync(xmlPath, '<IOContorl ID="label" ControlType="TextBlock" Left="658" Top="476" Width="63" Height="40" FontSize="16" />');
+fs.writeFileSync(xmlPath, '<IOContorl ID="label" ControlType="TextBlock" Left="658" Top="476" Height="40" FontSize="16" />');
 fs.writeFileSync(nodesPath, JSON.stringify([{
   id: 'label', x: 658, y: 668, w: 63, h: 40, fontSize: 16,
   contentOriginX: 0, contentOriginY: 192
@@ -31,7 +31,7 @@ const nestedNodesPath = path.join(dir, 'nested-nodes.json');
 fs.writeFileSync(nestedXmlPath, [
   '<IOContorl ID="" Left="NaN" Top="NaN" Width="NaN" Height="NaN">',
   '  <IOContorl ID="panel" ControlType="Border" Left="600" Top="200" Width="200" Height="120">',
-  '    <IOContorl ID="label2" ControlType="TextBlock" Left="10" Top="20" Width="NaN" Height="40" FontSize="16" />',
+  '    <IOContorl ID="label2" ControlType="TextBlock" Left="10" Top="20" Height="40" FontSize="16" />',
   '  </IOContorl>',
   '</IOContorl>'
 ].join('\n'));
@@ -49,11 +49,62 @@ if (!/OK id="panel"/.test(nestedResult.stdout) || !/OK id="label2"/.test(nestedR
 }
 console.log('PASS nested (parent-relative) coordinate regression test');
 
+// TextBlock 只核对约束宽，不要求常规 Width。
+const constrainedTextPath = path.join(dir, 'constrained-text.xml');
+const constrainedTextNodesPath = path.join(dir, 'constrained-text-nodes.json');
+fs.writeFileSync(constrainedTextPath,
+  '<IOContorl ID="label" ControlType="TextBlock" Left="10" Top="10" MinWidth="80" MaxWidth="194" Height="40" />');
+fs.writeFileSync(constrainedTextNodesPath, JSON.stringify([
+  { id: 'label', x: 10, y: 202, w: 'NaN', h: 40, contentOriginX: 0, contentOriginY: 192,
+    constraints: { minWidth: 80, maxWidth: 194 } }
+]));
+const constrainedTextResult = spawnSync(process.execPath,
+  [path.join(__dirname, '..', 'adapters/mtslg-iocontrol', 'check-iocontrol-coords.js'),
+    '--xml', constrainedTextPath, '--nodes', constrainedTextNodesPath], { encoding: 'utf8' });
+if (constrainedTextResult.status !== 0 || !/OK id="label"/.test(constrainedTextResult.stdout)) {
+  throw new Error(`TextBlock 约束宽必须按 MinWidth/MaxWidth 核对:\n${constrainedTextResult.stdout}`);
+}
+console.log('PASS TextBlock width constraints regression test');
+
+// 约束归一化复用 constraints.js：0 / 非正数等于未设置，不能被坐标门禁当成期望值再报 MISMATCH。
+const normalizedTextPath = path.join(dir, 'normalized-text.xml');
+const normalizedTextNodesPath = path.join(dir, 'normalized-text-nodes.json');
+fs.writeFileSync(normalizedTextPath,
+  '<IOContorl ID="label" ControlType="TextBlock" Left="10" Top="10" Height="40" />');
+fs.writeFileSync(normalizedTextNodesPath, JSON.stringify([
+  { id: 'label', x: 10, y: 202, w: 'NaN', h: 40, contentOriginX: 0, contentOriginY: 192,
+    constraints: { minWidth: 0, maxWidth: -1 } }
+]));
+const normalizedTextResult = spawnSync(process.execPath,
+  [path.join(__dirname, '..', 'adapters/mtslg-iocontrol', 'check-iocontrol-coords.js'),
+    '--xml', normalizedTextPath, '--nodes', normalizedTextNodesPath], { encoding: 'utf8' });
+if (normalizedTextResult.status !== 0 || !/OK id="label"/.test(normalizedTextResult.stdout)) {
+  throw new Error(`非正数约束必须按未设置处理:\n${normalizedTextResult.stdout}`);
+}
+console.log('PASS constraint normalization is shared with constraints.js');
+
+// 非 TextBlock 不消费 constraints：即使节点表带了约束，也不得要求 XML 发射 MinWidth/MaxWidth。
+const nonTextConstrainedPath = path.join(dir, 'non-text-constrained.xml');
+const nonTextConstrainedNodesPath = path.join(dir, 'non-text-constrained-nodes.json');
+fs.writeFileSync(nonTextConstrainedPath,
+  '<IOContorl ID="panel" ControlType="Border" Left="10" Top="10" Width="100" Height="40" />');
+fs.writeFileSync(nonTextConstrainedNodesPath, JSON.stringify([
+  { id: 'panel', x: 10, y: 202, w: 100, h: 40, contentOriginX: 0, contentOriginY: 192,
+    constraints: { minWidth: 80, maxWidth: 194 } }
+]));
+const nonTextConstrainedResult = spawnSync(process.execPath,
+  [path.join(__dirname, '..', 'adapters/mtslg-iocontrol', 'check-iocontrol-coords.js'),
+    '--xml', nonTextConstrainedPath, '--nodes', nonTextConstrainedNodesPath], { encoding: 'utf8' });
+if (nonTextConstrainedResult.status !== 0 || !/OK id="panel"/.test(nonTextConstrainedResult.stdout)) {
+  throw new Error(`非 TextBlock 不得核对宽度约束:\n${nonTextConstrainedResult.stdout}`);
+}
+console.log('PASS non-TextBlock constraints are ignored');
+
 // ---- 度量归一化与缺度量报错：数值字符串算数值；缺度量必须点名 MISMATCH（不允许静默跳过）----
 // 与 provenance / bundle 坐标门禁同口径：Number("292") 视为数值，缺字段必须失败。
-// 独立夹具：TextBlock 的 Width 按规则必须是 NaN，因此不复用上面 Width="63" 的旧夹具。
+// 独立夹具：TextBlock 不发射常规 Width。
 const metricXmlPath = path.join(dir, 'metric-page.xml');
-fs.writeFileSync(metricXmlPath, '<IOContorl ID="label" ControlType="TextBlock" Left="658" Top="476" Width="NaN" Height="40" FontSize="16" />');
+fs.writeFileSync(metricXmlPath, '<IOContorl ID="label" ControlType="TextBlock" Left="658" Top="476" Height="40" FontSize="16" />');
 const stringMetricNodesPath = path.join(dir, 'string-metric-nodes.json');
 fs.writeFileSync(stringMetricNodesPath, JSON.stringify([
   { id: 'label', x: '658', y: '668', w: 'NaN', h: '40', contentOriginX: '0', contentOriginY: '192' }
@@ -101,7 +152,7 @@ console.log('PASS coordinate metric normalization + missing-metric reporting');
 // 以 expectedLeft 传给核对器。这里验证核对器 honored expectedLeft（并验证没给时仍按 x − 原点算）。
 const alignRightXmlPath = path.join(dir, 'align-right-page.xml');
 const alignRightNodesPath = path.join(dir, 'align-right-nodes.json');
-fs.writeFileSync(alignRightXmlPath, '<IOContorl ID="r1" ControlType="TextBlock" Left="530" Top="10" Width="NaN" Height="40" FontSize="16" Align="Right" />');
+fs.writeFileSync(alignRightXmlPath, '<IOContorl ID="r1" ControlType="TextBlock" Left="530" Top="10" Height="40" FontSize="16" Align="Right" />');
 fs.writeFileSync(alignRightNodesPath, JSON.stringify([
   { id: 'r1', x: 708, y: 202, w: 'NaN', h: 40, contentOriginX: 0, contentOriginY: 192, expectedLeft: 530 }
 ]));

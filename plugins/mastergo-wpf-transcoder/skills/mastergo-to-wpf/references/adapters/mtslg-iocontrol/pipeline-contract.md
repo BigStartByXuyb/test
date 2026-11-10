@@ -99,6 +99,7 @@ pwsh -NoProfile -File <skill>\scripts\entry\run-all.ps1 -ProjectRoot <项目> -T
   - dsl.snapshot.json + visibility.json
   - 正式映射表 mtslg-iocontrol-map.json
   - 图标台账（尚无台账时用空 candidates 占位）
+  - 尺寸约束 JSON（可选；先合并进 DSL；A 的控件与容器 Grid 使用 Min/MaxWidth/Height，B 的 TextBlock 使用 Min/MaxWidth）
 - **产物**：
   - Generated/runs/<Target>/mapping 草稿与映射审计（unmappedComponents / pending / templateConflicts）
 - **失败语义**：
@@ -143,6 +144,7 @@ pwsh -NoProfile -File <skill>\scripts\entry\run-all.ps1 -ProjectRoot <项目> -T
 
 - **输入**：
   - dsl.snapshot.json + 图标台账 + 正式映射表
+  - （作业A）尺寸约束 JSON：<Inputs>/<Target>.constraints.json——可选；存在时合并进布局与门禁共用的 DSL 快照
   - （作业A）分组表 Generated/_inputs/<Target>.layout-groups.json——可选，但有设计稿位图时必须先产出它
 - **产物**：
   - Layout 清单与推导报告 Generated/_inputs/<Target>.layout-manifest.json(.report.json)
@@ -164,6 +166,7 @@ pwsh -NoProfile -File <skill>\scripts\entry\run-all.ps1 -ProjectRoot <项目> -T
 - **输入**：
   - Layout 清单
   - 运行登记表 run.json（采集输入只按它取）
+  - 尺寸约束 JSON（可选；重新解析并登记合并后的 DSL 作为 Bundle 映射输入。B 改约束后可从 inputs 续跑；A 的约束由 layout 落到格子，改约束后从 layout 续跑）
   - 译文清单 Generated/_inputs/<Target>.lang-translations.json（术语表可选）
 - **产物**：
   - Bundle 清单 Generated/_inputs/<Target>.bundle.json（含 runRegistry 指纹）
@@ -178,7 +181,7 @@ pwsh -NoProfile -File <skill>\scripts\entry\run-all.ps1 -ProjectRoot <项目> -T
 ### 10. `bundle` —— Bundle 生成页面 XML / Icon / Layout / 宿主壳
 
 - **输入**：
-  - Bundle 清单
+  - Bundle 清单（含 mappingDslPath 时由清单内嵌传递合并后的约束 DSL）
   - 复校通过的采集输入（getDsl/snapshot/extractSvg，按登记表取）
 - **产物**：
   - 页面 XML、本页 Icons.xaml、CN/EN 语言字典、Layout 增量注册、View + code-behind + ViewModel、宿主壳
@@ -195,6 +198,7 @@ pwsh -NoProfile -File <skill>\scripts\entry\run-all.ps1 -ProjectRoot <项目> -T
 
 - **输入**：
   - Bundle 审计 + mapping 审计 + coverage-report.json
+  - （作业A）尺寸约束 JSON：<Inputs>/<Target>.constraints.json——可选；门禁按与 layout 同一入口重算合并后的 DSL
 - **产物**：
   - 门禁结论（失败即停；通过时列出必须写进交付说明的警告）
 - **失败语义**：
@@ -210,6 +214,7 @@ pwsh -NoProfile -File <skill>\scripts\entry\run-all.ps1 -ProjectRoot <项目> -T
 
 - **输入**：
   - 页面 XML + 本页 Icon/语言字典 + 项目 Layout + 审计文件
+  - （作业A）尺寸约束 JSON：<Inputs>/<Target>.constraints.json——可选；verify 按与 layout 同一入口重算合并后的 DSL
 - **产物**：
   - Generated/_work/verification/<页面>/ 的 provenance/坐标/Icon/结构报告
 - **失败语义**：

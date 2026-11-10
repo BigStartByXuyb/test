@@ -79,6 +79,8 @@ const dsl = {
   }],
   components: []
 };
+dsl.nodes[0].children[0].children[4].children[0].constraints = { minWidth: 40, maxWidth: 120 };
+dsl.nodes[0].children[0].children[0].constraints = { minWidth: 10, maxWidth: 20 };
 
 fs.writeFileSync(dslPath, JSON.stringify({
   schemaVersion: 'mastergo-dsl-capture/1',
@@ -119,10 +121,19 @@ assert.deepStrictEqual(
 assert.deepStrictEqual(mapping.pending, []);
 for (const textNode of mapping.nodes.filter(node => node.controlType === 'TextBlock')) {
   assert.strictEqual(textNode.expectedWidth, 'NaN', 'TextBlock 的 expectedWidth 必须固定为 NaN');
-  assert.strictEqual(textNode.widthSource, 'mtslg.textblock.fixed-nan', 'TextBlock 必须记录 widthSource');
+  assert.strictEqual(textNode.widthSource, 'mtslg.textblock.omit-width', 'TextBlock 必须记录省略常规 Width');
   const source = mapping.sourceNodes.find(item => item.ref === textNode.sourceRef);
   assert.ok(source && textNode.dslWidth === source.width, 'TextBlock 必须保留 dslWidth 作为 bbox 来源');
 }
+const constrainedText = mapping.nodes.find(node => node.sourceRef === innerRef + '/value-group/value');
+assert.deepStrictEqual(constrainedText.constraints, { minWidth: 40, maxWidth: 120 },
+  'TextBlock 必须把 DSL 尺寸约束带进映射');
+assert.deepStrictEqual(mapping.sourceNodes.find(node => node.ref === constrainedText.sourceRef).constraints,
+  { minWidth: 40, maxWidth: 120 }, 'sourceNodes 必须保留同一份尺寸约束');
+const nonTextConstrained = mapping.nodes.find(node => node.sourceRef === innerRef + '/plus5');
+assert.strictEqual(nonTextConstrained.controlType, 'IconButton');
+assert.strictEqual(nonTextConstrained.constraints, undefined,
+  '非 TextBlock 节点上的 constraints 不得进入映射输出节点');
 
 // ---- 右栏族：componentSet 命中、iconSize 机械取值 ----
 function rightSidebarDsl(rootName, properties, innerName, buttonType) {
@@ -167,7 +178,7 @@ function rightSidebarDsl(rootName, properties, innerName, buttonType) {
   };
 }
 
-function runMappingCase(name, dsl, icons, extraArgs) {
+function runMappingCase(name, dsl, icons, extraArgs, mapPath) {
   const caseDir = path.join(dir, name);
   fs.mkdirSync(caseDir, { recursive: true });
   const caseDsl = path.join(caseDir, 'dsl.snapshot.json');
@@ -181,7 +192,7 @@ function runMappingCase(name, dsl, icons, extraArgs) {
   fs.writeFileSync(caseVisibility, JSON.stringify({ nodes: [] }, null, 2));
   fs.writeFileSync(caseIconMap, JSON.stringify({ icons }, null, 2));
   const caseResult = spawnSync(process.execPath, [script,
-    '--dsl', caseDsl, '--visibility', caseVisibility, '--template-map', templateMap,
+    '--dsl', caseDsl, '--visibility', caseVisibility, '--template-map', mapPath || templateMap,
     '--icon-map', caseIconMap, '--out', caseOutput
   ].concat(extraArgs || []), { encoding: 'utf8' });
   assert.strictEqual(caseResult.status, 0, caseResult.stderr || caseResult.stdout);
@@ -659,6 +670,18 @@ for (const ref of ['al:root/left', 'al:root/center', 'al:root/justify', 'al:root
 console.log('PASS MTSLG DSL-to-mapping TextBlock Align regression test');
 
 // ---- 相机视口（cameraTemplates）：ControlType=Camera、不写 Style、DesignPanelID/Value 空串占位 ----
+const cameraTemplateFacts = loadTemplateMap(templateMap).cameraTemplates;
+assert.deepStrictEqual(cameraTemplateFacts.mtslgAlwaysWrittenAttrs, ["DesignPanelID", "Value"],
+  "相机空串占位字段必须只从 MTSLG 写法表 familyOverlay 读取");
+assert.match(cameraTemplateFacts.mtslgComponentSetPolicy, /作业B（MTSLG IOContorl）/,
+  "相机空串占位口径必须在 MTSLG 路线策略中限定到作业 B");
+const sharedCameraFacts = JSON.parse(fs.readFileSync(
+  path.join(__dirname, "..", "..", "references", "component-types.json"), "utf8"
+)).cameraTemplates;
+assert.ok(!Object.prototype.hasOwnProperty.call(sharedCameraFacts, "mtslgAlwaysWrittenAttrs"),
+  "共享相机类型不得携带 MTSLG 恒写属性");
+assert.ok(!Object.prototype.hasOwnProperty.call(sharedCameraFacts, "alwaysWrittenAttrs"),
+  "共享相机类型不得声明跨路线恒写空串属性");
 const cameraDsl = {
   styles: {},
   nodes: [{
@@ -694,6 +717,15 @@ const innerAudit = cameraMapping.textAudit.find(item => item.sourceRef === 'cam:
 assert.ok(innerAudit, '相机视口内部文本必须进入 textAudit（显式登记处置）');
 assert.strictEqual(innerAudit.decision, 'omit', '相机内部文本必须 decision=omit');
 assert.strictEqual(innerAudit.role, 'camera-viewport-internal', '相机内部文本必须用专用 omit 角色');
+
+const sharedTypeMap = path.join(__dirname, '..', '..', 'references', 'component-types.json');
+const wpfCameraTypes = runMappingCase('camera-wpf-types', cameraDsl, [], [], sharedTypeMap);
+const wpfCameraNode = wpfCameraTypes.nodes.find(node => node.controlType === 'Camera');
+assert.ok(wpfCameraNode, '作业A 共享类型判定仍命中 Camera');
+assert.strictEqual(wpfCameraNode.attrs.DesignPanelID, undefined,
+  '作业A 共享类型判定不得注入 MTSLG 的 DesignPanelID 空占位');
+assert.strictEqual(wpfCameraNode.attrs.Value, undefined,
+  '作业A 共享类型判定不得注入 MTSLG 的 Value 空占位');
 
 console.log('PASS MTSLG DSL-to-mapping camera viewport regression test');
 

@@ -158,6 +158,7 @@ assert.strictEqual(cells.find(function (cell) { return cell.ref === "t2"; }).con
   assert.ok(/MinWidth="80"/.test(xaml), "必须发射 MinWidth");
   assert.ok(/MaxWidth="194"/.test(xaml), "必须发射 MaxWidth");
   assert.ok(/TextWrapping="Wrap"/.test(xaml), "TextBlock 有最大宽时必须补 TextWrapping");
+  assert.ok(!/(?:^|\s)Width="120"/.test(xaml), "TextBlock 不得发射常规 Width");
   assert.strictEqual((xaml.match(/MinWidth="/g) || []).length, 1, "没有约束的控件不得被补约束");
 }
 
@@ -195,6 +196,124 @@ assert.strictEqual(cells.find(function (cell) { return cell.ref === "t2"; }).con
   assert.strictEqual(orphan.status, 2, "有约束没落格必须失败");
   const orphanReport = JSON.parse(fs.readFileSync(reportPath, "utf8"));
   assert.ok(orphanReport.findings.some(function (item) { return item.rule === "R12" && item.ref === "t3"; }), "R12 必须报出未落格的约束节点");
+}
+
+// ── ⑤之二：传了 --dsl 但约束已全部删除，旧布局 / 旧 XAML 里的约束必须被抓到 ─────────────
+{
+  const emptyDsl = JSON.parse(JSON.stringify(layoutInput));
+  delete emptyDsl.dsl.nodes[0].children[0].children[0].constraints;
+  const emptyDslPath = writeJson("gate-dsl-empty-constraints.json", emptyDsl);
+  const layoutPath = writeJson("gate-layout-stale-constraints.json", layout);
+  const typesPath = writeJson("gate-types-stale-constraints.json", TYPES_FILE);
+  const xamlPath = path.join(tmp, "stale-constraints-view.xaml");
+  const rendered = spawnSync(process.execPath, [
+    path.join(SCRIPT_DIR, "adapters", "mw-wpf", "gen-mw-wpf-xaml.js"),
+    "--layout", layoutPath, "--types", typesPath, "--map", ROUTE_MAP,
+    "--page", "P", "--x-class", "X.P", "--assembly", "X",
+    "--icon-page", "Resources/Pages/P/PIcons.xaml", "--out", xamlPath, "--overwrite"
+  ], { encoding: "utf8" });
+  assert.strictEqual(rendered.status, 0, "旧约束 XAML 夹具应能发射: " + rendered.stderr);
+
+  const reportPath = path.join(tmp, "gate-report-empty-constraints.json");
+  const stale = spawnSync(process.execPath, [
+    CHECK, "--layout", layoutPath, "--types", typesPath, "--map", ROUTE_MAP,
+    "--dsl", emptyDslPath, "--xaml", xamlPath, "--json", reportPath
+  ], { encoding: "utf8" });
+  assert.strictEqual(stale.status, 2, "DSL 已删除约束但布局或 XAML 仍有时必须失败");
+  const staleReport = JSON.parse(fs.readFileSync(reportPath, "utf8"));
+  assert.ok(staleReport.findings.some(function (item) { return item.rule === "R11" && item.ref === "t1"; }),
+    "R11 必须报出布局格子里的旧约束");
+
+  const cleanLayout = JSON.parse(JSON.stringify(layout));
+  (function removeConstraint(grid) {
+    if (!grid || !Array.isArray(grid.cells)) return;
+    grid.cells.forEach(function (cell) {
+      if (cell.ref === "t1") delete cell.constraints;
+      if (cell.children) removeConstraint(cell.children);
+    });
+  })(cleanLayout.regions.find(function (region) { return region.emit !== false; }).grid);
+  const cleanLayoutPath = writeJson("gate-layout-clean-constraints.json", cleanLayout);
+  const cleanReportPath = path.join(tmp, "gate-report-stale-xaml.json");
+  const staleXaml = spawnSync(process.execPath, [
+    CHECK, "--layout", cleanLayoutPath, "--types", typesPath, "--map", ROUTE_MAP,
+    "--dsl", emptyDslPath, "--xaml", xamlPath, "--json", cleanReportPath
+  ], { encoding: "utf8" });
+  assert.strictEqual(staleXaml.status, 2, "布局已清空约束但 XAML 仍发射旧约束时必须失败");
+  const staleXamlReport = JSON.parse(fs.readFileSync(cleanReportPath, "utf8"));
+  assert.ok(staleXamlReport.findings.some(function (item) { return item.rule === "R13" && item.ref === "t1"; }),
+    "R13 必须报出 XAML 里已删除的旧约束");
+}
+
+// ── ⑤之一：R13 必须按格子自己的 XAML 元素核对，不能被另一个同值控件“借”通过 ───────────────
+{
+  const duplicateDsl = {
+    dsl: {
+      nodes: [node("root", "FRAME", { width: 1280, height: 1024, relativeX: 0, relativeY: 0 }, [
+        node("body", "FRAME", { width: 1280, height: 902, relativeX: 0, relativeY: 85 }, [
+          node("t1", "TEXT", { width: 80, height: 16, relativeX: 0, relativeY: 0 }, [], {
+            name: "A", constraints: { minWidth: 80, maxWidth: 194 }
+          }),
+          node("t2", "TEXT", { width: 80, height: 16, relativeX: 0, relativeY: 32 }, [], {
+            name: "B", constraints: { minWidth: 80, maxWidth: 194 }
+          })
+        ])
+      ])]
+    }
+  };
+  const duplicateTypes = {
+    schemaVersion: 1,
+    nodes: [
+      { ref: "t1", controlType: "TextBlock", absX: 0, absY: 85, w: 80, h: 16, langName: "PA" },
+      { ref: "t2", controlType: "TextBlock", absX: 0, absY: 117, w: 80, h: 16, langName: "PB" }
+    ],
+    pending: [],
+    unmappedComponents: []
+  };
+  const duplicateLayout = deriveLayout({
+    dsl: duplicateDsl,
+    types: { byRef: new Map(duplicateTypes.nodes.map(function (item) { return [item.ref, item]; })) },
+    map: MAP,
+    containers: new Set(["IOGroupBox"]),
+    tokens: { headerHeight: 85, bottomHeight: 180 },
+    pageTarget: "PD",
+    visibility: null
+  });
+  const duplicateLayoutPath = writeJson("duplicate-layout.json", duplicateLayout);
+  const duplicateTypesPath = writeJson("duplicate-types.json", duplicateTypes);
+  const duplicateDslPath = writeJson("duplicate-dsl.json", duplicateDsl);
+  const duplicateXamlPath = path.join(tmp, "duplicate-view.xaml");
+  const emitted = spawnSync(process.execPath, [
+    path.join(SCRIPT_DIR, "adapters", "mw-wpf", "gen-mw-wpf-xaml.js"),
+    "--layout", duplicateLayoutPath, "--types", duplicateTypesPath, "--map", ROUTE_MAP,
+    "--page", "PD", "--x-class", "X.PD", "--assembly", "X",
+    "--icon-page", "Resources/Pages/PD/PDIcons.xaml", "--out", duplicateXamlPath, "--overwrite"
+  ], { encoding: "utf8" });
+  assert.strictEqual(emitted.status, 0, "双约束控件 XAML 发射应成功: " + emitted.stderr);
+  const duplicateXaml = fs.readFileSync(duplicateXamlPath, "utf8");
+  assert.strictEqual((duplicateXaml.match(/MinWidth="80"/g) || []).length, 2, "两格都要发射同一个约束值");
+
+  const duplicatePassReportPath = path.join(tmp, "duplicate-pass-report.json");
+  const duplicatePass = spawnSync(process.execPath, [
+    CHECK, "--layout", duplicateLayoutPath, "--types", duplicateTypesPath, "--map", ROUTE_MAP,
+    "--dsl", duplicateDslPath, "--xaml", duplicateXamlPath, "--json", duplicatePassReportPath
+  ], { encoding: "utf8" });
+  assert.strictEqual(duplicatePass.status, 0, "约束完整发射时 R13 必须通过: " + duplicatePass.stdout + duplicatePass.stderr);
+  const duplicatePassReport = JSON.parse(fs.readFileSync(duplicatePassReportPath, "utf8"));
+  assert.ok(!duplicatePassReport.findings.some(function (item) { return item.rule === "R13"; }),
+    "约束完整发射时 R13 不得产生 finding");
+
+  fs.writeFileSync(duplicateXamlPath, duplicateXaml.replace(' MinWidth="80"', ""), "utf8");
+
+  const duplicateReportPath = path.join(tmp, "duplicate-report.json");
+  const duplicateCheck = spawnSync(process.execPath, [
+    CHECK, "--layout", duplicateLayoutPath, "--types", duplicateTypesPath, "--map", ROUTE_MAP,
+    "--dsl", duplicateDslPath, "--xaml", duplicateXamlPath, "--json", duplicateReportPath
+  ], { encoding: "utf8" });
+  assert.strictEqual(duplicateCheck.status, 2, "有一个同值控件漏发约束时 R13 必须失败");
+  const duplicateReport = JSON.parse(fs.readFileSync(duplicateReportPath, "utf8"));
+  assert.ok(duplicateReport.findings.some(function (item) {
+    return item.rule === "R13" && (item.ref === "t1" || item.ref === "t2") && /缺少 MinWidth/.test(item.message);
+  }), "R13 必须点名漏发约束的那一格");
 }
 
 // ── ⑥ 带约束的单条目容器不展平（约束必须有承载物）────────────────────────────────

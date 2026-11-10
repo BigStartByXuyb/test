@@ -981,7 +981,20 @@ function main() {
       manifest[field] = RUN_REGISTRY.projectRelative(projectRoot, abs);
       bound[field] = manifest[field];
     }
+    if (manifest.mappingDslPath) {
+      const abs = RUN_REGISTRY.resolveArtifact(runRegistryData, "mappingDsl", { projectRoot });
+      const entry = runRegistryData.artifacts.mappingDsl;
+      if (expectedDigests.mappingDsl && expectedDigests.mappingDsl !== entry.sha256) {
+        fail("Bundle 清单登记的 mappingDsl sha256 与运行登记表不一致：清单=" + expectedDigests.mappingDsl +
+          "，登记表=" + entry.sha256 + "（清单被改写，或与登记表不是同一次运行）");
+      }
+      manifest.mappingDslPath = RUN_REGISTRY.projectRelative(projectRoot, abs);
+      bound.mappingDslPath = manifest.mappingDslPath;
+    }
     console.log("运行登记表: runId=" + runRegistryData.runId + "，采集输入按登记表绑定：" + JSON.stringify(bound));
+  }
+  if (manifest.mappingDslPath && !runRegistryData) {
+    fail("mappingDslPath 必须由运行登记表绑定：请用 run-all.ps1 生成清单，或补齐 runRegistry");
   }
   // 审计产物路径（与下方 generatedDir/mappingAudit 同口径，定义提前以便在这里前置校验）。
   const mappingAuditPath = path.join(projectRoot, "Generated", manifest.pageName + ".mapping.json");
@@ -993,6 +1006,9 @@ function main() {
   // DSL 采集输入路径提前解析：既给映射生成器用，也给统一文件登记表用（登记为 audit 来源证据）。
   const dslInputPath = manifest.dslPath
     ? resolveInput(manifestDir, projectRoot, manifest.dslPath, "dslPath") : null;
+  // 最终 mapping 必须从与布局相同的约束 DSL 生成；dslPath 仍是登记表绑定的原始采集产物。
+  const mappingDslInputPath = manifest.mappingDslPath
+    ? resolveInput(manifestDir, projectRoot, manifest.mappingDslPath, "mappingDslPath") : dslInputPath;
   const visibilityInputPath = manifest.visibilityPath
     ? resolveInput(manifestDir, projectRoot, manifest.visibilityPath, "visibilityPath") : null;
   const iconMapPath = resolveInput(manifestDir, projectRoot, manifest.iconMapPath, "iconMapPath");
@@ -1011,7 +1027,7 @@ function main() {
   });
   if (manifest.dslPath || manifest.visibilityPath) {
     if (!manifest.dslPath || !manifest.visibilityPath) fail("启用 DSL 自动映射时必须同时提供 dslPath 和 visibilityPath");
-    const dslPath = dslInputPath;
+    const dslPath = mappingDslInputPath;
     const visibilityPath = visibilityInputPath;
     if (!fs.existsSync(dslPath) || !fs.existsSync(visibilityPath)) fail("dslPath/visibilityPath 输入文件不存在");
     run(MAPPING_SCRIPT, [
@@ -1343,7 +1359,7 @@ function main() {
     const auditBackup = fs.existsSync(bundleAudit) ? backupFile(bundleAudit) : null;
     if (auditBackup) backups.push(auditBackup);
     const fileRegistry = bundleFileRegistry(bundleInfo, {
-      sourceFiles: [dslInputPath, visibilityInputPath, svgPath].filter(Boolean),
+      sourceFiles: [dslInputPath, mappingDslInputPath, visibilityInputPath, svgPath].filter(Boolean),
       generatedFiles: scanGeneratedFiles(generatedDir),
       workFiles: workFiles,
       // 本次运行新产生的副本 = Bundle 自己记录的 ∪ 运行前后差集（差集覆盖子脚本产生的那些）。

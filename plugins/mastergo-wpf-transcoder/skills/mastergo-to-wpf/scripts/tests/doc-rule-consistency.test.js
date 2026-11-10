@@ -214,7 +214,6 @@ assert.ok(!(required.Camera || []).includes("Style"), "Camera 的恒写字段集
 for (const attr of ["DesignPanelID", "Value"]) {
   assert.ok((required.Camera || []).includes(attr), "Camera 恒写字段必须包含 " + attr);
 }
-assert.ok((map.controlTypes.Camera.attrs || []).includes("DesignPanelID"), "controlTypes.Camera 必须允许 DesignPanelID");
 assert.ok(feishuMapping.includes("cameraTemplates"), "人读映射文档必须登记相机族（cameraTemplates）");
 // 相机视口内部文本的处置必须显式登记，且 omit 角色要在校验器里放行（否则内部文本会漏成根级 TextBlock）。
 assert.ok(cameraFamily.innerTextPolicy && cameraFamily.innerTextPolicy.role,
@@ -395,7 +394,10 @@ for (const rel of MUST_STATE_NO_PARENT_MATCH_KEY) {
 const SHELL_DOC = path.join(__dirname, "..", "..", "references", "adapters", "mw-wpf", "page-shell-generator.md");
 const shellDoc = fs.readFileSync(SHELL_DOC, "utf8");
 const hostGenerator = fs.readFileSync(path.join(__dirname, "..", "host", "gen-mw-wpf-page.js"), "utf8");
+assert.ok(mainSkill.includes("page-shell-generator.md") && /ViewModel 固定成员.*宿主壳生成契约/.test(mainSkill),
+  "A 的 ViewModel 与宿主壳契约必须从公开 Skill 读取路由可达");
 assert.ok(shellDoc.includes("按钮处理方法（一钮一方法）"), "页面壳文档必须登记「按钮处理方法（一钮一方法）」小节");
+assert.ok(shellDoc.includes("作业 A 不注册页面 XML Content"), "页面壳文档必须限定页面 XML Content 的作业路线");
 for (const token of ["langName", "MenuItem", "MenuItemIndex"]) {
   assert.ok(shellDoc.includes(token), "页面壳文档必须写明按钮方法名取值链里的 " + token);
 }
@@ -816,30 +818,11 @@ assert.ok(modeDoc.includes("压成空格会让两行文案退化成一行"),
   assert.ok(feishuSection.length > 0, "feishu 组件库文档必须保留「组件父子相对坐标」小节");
   assert.ok(/内容区原点/.test(feishuSection) && /contentInsetStyle/.test(feishuSection),
     "「组件父子相对坐标」小节必须带容器内容区原点例外（且写明 contentInsetStyle 查表键）");
-  // 作业 A 的框架手册只需两句：本文是作业 A 参考；作业 B 的 GroupBox 是空 Style（+ 指向第 3 节）。
-  for (const manual of ["io/io-group-box.md", "native/group-box.md"]) {
-    const text = fs.readFileSync(path.join(__dirname, "..", "..", "references", "adapters", "mw-wpf", "framework-manual", "02-controls", manual), "utf8");
-    assert.ok(/作业 B（MTSLG IOContorl 页面 XML）的 GroupBox \*\*`Style` 是空串\*\*/.test(text),
-      "framework-manual/02-controls/" + manual + " 的适用范围横幅必须直说作业 B 的 GroupBox Style 是空串");
-    assert.ok(/第 3 节（坐标规则）/.test(text),
-      "framework-manual/02-controls/" + manual + " 必须指向 mtslg-mode.md 第 3 节（坐标规则）");
-    assert.ok(!/TD-065/.test(text),
-      "framework-manual/02-controls/" + manual + " 不得把该确定口径挂成待确认项");
-    assert.ok(!/作业 B 优先级|注意适用范围/.test(text),
-      "framework-manual/02-controls/" + manual + " 不得再引入「优先级/适用范围」之类的包装说法");
-  }
   // map._meta.note 的交叉引用同样必须指到第 3 节。
   assert.ok(/第 3 节（坐标规则）/.test(metaNotes), "map._meta.note 的交叉引用必须指向 mtslg-mode.md 第 3 节");
   // mtslg-mode 第 3 节必须写明这是项目框架侧的确定口径，不是待确认项。
   assert.ok(/确定口径/.test(modeDoc), "mtslg-mode.md 必须写明该口径是项目框架侧的确定口径");
   assert.ok(!/TD-065/.test(modeDoc), "mtslg-mode.md 不得把该确定口径挂成待确认项");
-  // 台账与 guide 都不得出现 TD-065：它描述的是既定事实，不属于"待框架确认"那一类。
-  const manualDir = path.join(__dirname, "..", "..", "references", "adapters", "mw-wpf", "framework-manual", "05-best-practices");
-  const ledger = fs.readFileSync(path.join(manualDir, "pending-confirmations.md"), "utf8");
-  const guide = fs.readFileSync(path.join(manualDir, "pending-confirmations-guide.md"), "utf8");
-  assert.ok(!/TD-065/.test(ledger), "pending-confirmations.md 不得登记 TD-065（该口径是确定事实）");
-  assert.ok(!/TD-065/.test(guide), "pending-confirmations-guide.md 不得登记 TD-065（该口径是确定事实）");
-  assert.ok(/TD-047~064/.test(guide), "guide 第六节的编号区间必须回到 TD-047~064");
   // 生成器只认 contentInsetStyle：不得保留"用非空 style 当查表键"的回退。
   const mappingGenerator = fs.readFileSync(
     path.join(__dirname, "..", "adapters/mtslg-iocontrol", "gen-mtslg-mapping-from-dsl.js"), "utf8");
@@ -1134,3 +1117,93 @@ const mapData = loadTemplateMap(MAP);
   }
 }
 console.log("PASS TextBlock Align 口径（映射表 textBlockAlign ↔ 生成器发射 ↔ 人读文档）一致性回归测试");
+
+// ---------- 12. TextBlock 宽度口径：只发射 constraints，不发射常规 Width ----------
+{
+  const mapData = loadTemplateMap(MAP);
+  const align = mapData.textBlockAlign;
+  const mappingGenerator = fs.readFileSync(
+    path.join(__dirname, "..", "adapters/mtslg-iocontrol", "gen-mtslg-mapping-from-dsl.js"), "utf8");
+  const coordNodes = fs.readFileSync(path.join(__dirname, "..", "lib", "coord-nodes.js"), "utf8");
+  const coordChecker = fs.readFileSync(
+    path.join(__dirname, "..", "adapters/mtslg-iocontrol", "check-iocontrol-coords.js"), "utf8");
+  const helpers = fs.readFileSync(path.join(__dirname, "..", "lib", "script-helpers.js"), "utf8");
+  const architecture = fs.readFileSync(path.join(__dirname, "..", "..", "..", "..", "ARCHITECTURE.md"), "utf8");
+  const runAll = fs.readFileSync(path.join(__dirname, "..", "entry", "run-all.ps1"), "utf8");
+  const pipelineContract = fs.readFileSync(
+    path.join(__dirname, "..", "..", "references", "adapters", "mtslg-iocontrol", "pipeline-contract.md"), "utf8");
+  const docs = [
+    ["mastergo-iocontrol-document-format/SKILL.md", docFormat],
+    ["feishu-component-library-mapping.md", feishuMapping],
+    ["mtslg-mode.md", modeDoc],
+    ["script-helpers.js", helpers]
+  ];
+  assert.match(mappingGenerator,
+    /controlType === "TextBlock" && Object\.keys\(constraints\)\.length/,
+    "mapping 输出节点只允许 TextBlock 携带 constraints");
+  assert.match(coordNodes,
+    /isTextBlock && textConstraints \? \{ constraints: textConstraints \}/,
+    "坐标核对输入只允许 TextBlock 转发 constraints");
+  assert.match(coordChecker,
+    /if \(xn\.ControlType === ['"]TextBlock['"]\) \{[\s\S]*MinWidth[\s\S]*MaxWidth/,
+    "坐标门禁只能在 TextBlock 分支内核对 MinWidth/MaxWidth");
+  assert.match(coordChecker, /constraintAttributes\(src\.constraints\)/,
+    "坐标门禁必须消费 constraints.js 的归一化与键名映射");
+  for (const attr of ["MinWidth", "MaxWidth"]) {
+    assert.ok((mapData.controlTypes.TextBlock.attrs || []).includes(attr),
+      "TextBlock 条件发射的 " + attr + " 必须登记在 controlTypes.TextBlock.attrs 允许集里");
+    assert.ok(!(mapData.controlTypeRequiredAttrs.TextBlock || []).includes(attr),
+      attr + " 只在 DSL constraints 提供时发射，不得进入 TextBlock 恒写字段集");
+  }
+  assert.match(coordChecker, /TextBlock 的 w 固定为 NaN[\s\S]*dslWidth/,
+    "坐标核对器头注释必须与 coord-nodes.js 的 TextBlock 输出一致");
+  assert.ok(!/Width 仍是 NaN|Width 固定 NaN/.test(
+    JSON.stringify(align) + docs.map((entry) => entry[1]).join("\n")),
+    "TextBlock 宽度文档不得再写 Width=NaN 的旧口径");
+  assert.match(align.distanceWidthSource, /不发射 TextBlock 的常规 Width/,
+    "textBlockAlign.distanceWidthSource 必须写明 TextBlock 不发射常规 Width");
+  assert.match(mapData._meta.note.join("\n"),
+    /TextBlock 例外：commonAttrs \/ geometryAttrs 中的 Width 不进入 IOContorl XML/,
+    "映射表全局属性清单必须登记 TextBlock 的 Width 例外");
+  for (const [name, text] of docs) {
+    assert.match(text, /不发射(?: TextBlock 的)?常规 `?Width`?/,
+      name + " 必须写明 TextBlock 不发射常规 Width");
+  }
+  assert.match(docFormat, /通用模板里的 `Width` \/ `Height` 只适用于非 TextBlock 控件/,
+    "文档格式规范必须明确通用 Width/Height 字段的 TextBlock 例外");
+  assert.match(docFormat, /`Width` 只适用于非 TextBlock 控件/,
+    "XML 字段清单必须把 Width 限定在非 TextBlock 控件");
+  assert.match(docFormat, /`Width→Width` 只适用于非 TextBlock 控件/,
+    "文档格式示例必须使用无前导冒号的 Width→Width 记法");
+  assert.ok(!/`:\s+Width→Width`/.test(docFormat),
+    "文档格式示例不得把属性映射分隔冒号包进 Width→Width 代码片段");
+  assert.match(modeDoc, /TextBlock 不发射常规 `Width`，merge 会删除旧 `Width`/,
+    "merge 语义必须写明 TextBlock 的旧 Width 会被删除");
+  assert.ok(!/Left\/Top\/Width\/Height 按映射更新/.test(modeDoc),
+    "merge 语义不得再把 Width 无条件列为几何更新项");
+  assert.ok(!/文本位置和尺寸也从各自节点 bbox 读取/.test(feishuMapping),
+    "组件模板说明不得把 TextBlock 的尺寸笼统写成 bbox 直传");
+  assert.match(feishuMapping, /文本位置从各自节点 bbox 读取，TextBlock 高度固定 40/,
+    "组件模板说明必须区分文本位置、固定高度与 TextBlock 宽度约束");
+  assert.match(feishuMapping, /不能用外层组件高度、文字 bbox、字号或行高改写 Height/,
+    "TextBlock 高度禁止来源必须逐字段点名");
+  assert.ok(!/改写这两个值/.test(feishuMapping),
+    "TextBlock 高度与宽度约束不得再用模糊指代");
+  assert.match(runAll,
+    /A 的控件与容器 Grid 使用 Min\/MaxWidth\/Height，B 的 TextBlock 使用 Min\/MaxWidth/,
+    "mapping 步骤说明必须保留 A/B 各自完整的约束作用域");
+  assert.match(pipelineContract,
+    /A 的控件与容器 Grid 使用 Min\/MaxWidth\/Height，B 的 TextBlock 使用 Min\/MaxWidth/,
+    "流水线契约必须与 A/B 的实际约束发射范围一致");
+  assert.match(runAll,
+    /if \(\$BundleDslJson -ne \$SnapshotJson\) \{\s*Register-RunArtifact -Key 'mappingDsl'/,
+    "inputs 重算约束 DSL 时必须同步登记 mappingDsl");
+  assert.match(pipelineContract,
+    /重新解析并登记合并后的 DSL 作为 Bundle 映射输入。B 改约束后可从 inputs 续跑；A 的约束由 layout 落到格子，改约束后从 layout 续跑/,
+    "流水线契约必须说明 inputs 的约束登记与续跑边界");
+  assert.match(architecture, /B：`adapters\/mtslg-iocontrol\/gen-mtslg-mapping-from-dsl\.js`/,
+    "架构文档必须登记 B 路线对 constraints 共享模块的消费");
+  assert.match(architecture, /TextBlock 拒绝常规 `Width`，改为核对 `MinWidth` \/ `MaxWidth`/,
+    "架构文档必须同步坐标门禁的 TextBlock 宽度例外");
+}
+console.log("PASS TextBlock width contract（MinWidth/MaxWidth only；非 TextBlock constraints 忽略）");

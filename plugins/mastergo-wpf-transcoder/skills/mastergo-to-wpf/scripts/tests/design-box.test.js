@@ -3,10 +3,10 @@
 
 // 格子尺寸与「尺寸/对齐」回归：布局推导登记 → XAML 发射 → 门禁 R14。
 // 锁定的口径（page-build-rules.md 第 4 节第 14 条 / mw-wpf-mode.md 第 2 节第 3 条）：
-//   1) 格子尺寸照设计稿：像素带 = 到下一带起点的距离，唯一收尾星号带 = 可用尺寸 − 其余像素带之和；
+//   1) 格子尺寸照设计稿：像素带取设计跨度，Star 按权重分配剩余尺寸，Auto 按设计期望尺寸复核；
 //   2) 控件写自身设计稿尺寸，格子尺寸 − 控件尺寸 = 间距，差值落在哪一侧由格内偏移决定
 //      （贴起始边 / 贴末端 / 居中 / 非对称内缩用对齐 + Margin 精确复现）；
-//   3) 格子尺寸与控件尺寸相等 → 不写尺寸也不写对齐；跨格按 span 累加；
+//   3) designBoxAttrs 等尺寸时不写尺寸/对齐；control-slot 容器等尺寸但偏移大于 0 时用尺寸/起始对齐/Margin 保留偏移；跨格按 span 累加；
 //   4) 门禁 R14 逐格复核：格子尺寸必须与行列定义重算一致，发射报告的尺寸/对齐必须与同一实现一致。
 
 const assert = require("assert");
@@ -60,6 +60,9 @@ function node(id, type, style, children, extra) {
   assert.deepStrictEqual(designBoxAttrs(box(80, 16, 80, 16, 0, 0)), {}, "格子与控件同尺寸：不写任何属性");
   assert.deepStrictEqual(designBoxAttrs(box(140, 40, 144, 40, undefined, undefined)),
     { Width: "140" }, "没有偏移来源：只写尺寸，不猜对齐");
+  assert.deepStrictEqual(designBoxAttrs(box(120, 30, 300, 100, 90, 35), { omitWidth: true }),
+    { Height: "30", HorizontalAlignment: "Center", VerticalAlignment: "Center" },
+    "TextBlock 不写常规 Width，只保留高度与对齐");
 }
 
 // ── ② 布局推导：口径 A 成带（带 = 条目 + 间距；大空档成星号带；无间隙元素）/ 交叉轴聚类 ──
@@ -134,21 +137,30 @@ function node(id, type, style, children, extra) {
   assert.ok(cells.get("b3").height > 0, "末条带吃剩余，尺寸为正");
 }
 
-// ── ③ 容器格子：主轴撑满（不写主轴尺寸/对齐），交叉轴照设计稿 ─────────────────────
+// ── ③ 页面根槽位：根 Grid 管理星号尺寸，右栏与内容区交叉轴照设计稿 ─────────────────
 {
   const columnOwner = { owner: { direction: "column" }, rows: [{ size: "Pixel", value: 120 }, { size: "Star", source: "design" }], columns: [{ size: "Star", source: "design" }] };
   const rowOwner = { owner: { direction: "row" }, rows: [{ size: "Star", source: "design" }], columns: [{ size: "Pixel", value: 638 }, { size: "Star", source: "design" }] };
-  // 右栏：主轴 column → 高度不写（撑满格子，星号带吸收），位置偏移改用 Margin。
+  // 右栏根槽位：高度由页面根行填充，位置偏移由 Margin 保留。
   assert.deepStrictEqual(containerBoxAttrs({
-    ref: "rail", container: true, children: columnOwner,
+    ref: "rail", container: true, sizingMode: "page-slot", children: columnOwner,
     width: 210, height: 759, nodeWidth: 210, nodeHeight: 608, offsetX: 1, offsetY: 157
   }), { Margin: "0,157,0,0" }, "主轴那一维不写尺寸/对齐，偏移落成 Margin；交叉轴同尺寸也不写");
-  // 左中区：主轴 row → 宽度不写；交叉轴照设计稿写尺寸，越过格子末端时锚点按上边。
+  // 左中区根槽位：越过格子末端时锚点按上边，设计稿偏移由 Margin 保留。
   assert.deepStrictEqual(containerBoxAttrs({
-    ref: "left", container: true, children: rowOwner,
+    ref: "left", container: true, sizingMode: "page-slot", children: rowOwner,
     width: 1070, height: 759, nodeWidth: 1026, nodeHeight: 600, offsetX: 0, offsetY: 161
   }), { Height: "600", VerticalAlignment: "Top", Margin: "0,161,0,0" },
-  "主轴撑满、交叉轴照设计稿；设计稿越过格子末端 → 锚点按上边 + Margin（窗口变化时不漂）");
+  "根槽位按设计稿尺寸与偏移；设计稿越过格子末端 → 锚点按上边 + Margin（窗口变化时不漂）");
+  assert.deepStrictEqual(containerBoxAttrs({
+    ref: "auto-content", container: true, sizingMode: "auto-content", offsetX: 16, offsetY: 24
+  }), { HorizontalAlignment: "Left", VerticalAlignment: "Top", Margin: "16,24,0,0" },
+  "纯子 Grid 的普通间距由下一个 Auto 容器的 Margin 保留");
+  assert.deepStrictEqual(containerBoxAttrs({
+    ref: "control-slot", container: true, sizingMode: "control-slot",
+    width: 300, height: 40, nodeWidth: 300, nodeHeight: 40, offsetX: 0, offsetY: 6
+  }), { Height: "40", VerticalAlignment: "Top", Margin: "0,6,0,0" },
+  "等尺寸 control-slot 容器仍将 auto-content 父层的普通行间距发射为 Margin");
 }
 
 // ── ④ 发射器：属性落到 XAML，并逐格进发射报告 ────────────────────────────────────
@@ -177,10 +189,12 @@ function node(id, type, style, children, extra) {
     }]])
   };
   const result = renderXaml({ iconPage: null, assembly: null }, layout, types, MAP);
-  assert.match(result.xaml, /Width="120"\n\s+Height="30"\n\s+HorizontalAlignment="Center"\n\s+VerticalAlignment="Center"/,
-    "尺寸与居中对齐必须落到 XAML");
+  assert.match(result.xaml, /Height="30"\n\s+HorizontalAlignment="Center"\n\s+VerticalAlignment="Center"/,
+    "TextBlock 的高度与居中对齐必须落到 XAML");
+  assert.ok(!/Width="120"/.test(result.xaml), "TextBlock 不得发射常规 Width");
   assert.strictEqual(result.report.designBox.length, 1, "发射报告必须逐格登记尺寸/对齐");
-  assert.deepStrictEqual(result.report.designBox[0].attrs, designBoxAttrs(layout.regions[0].grid.cells[0]),
+  assert.deepStrictEqual(result.report.designBox[0].attrs,
+    designBoxAttrs(layout.regions[0].grid.cells[0], { omitWidth: true }),
     "发射报告与共享实现同结果");
   // 缺格子尺寸（旧产物）→ fail-closed，不静默发射一个尺寸丢失的页面。
   const legacy = JSON.parse(JSON.stringify(layout));
@@ -222,6 +236,14 @@ function node(id, type, style, children, extra) {
   };
   assert.strictEqual(run(layoutPath, reportPath).status, 0, "产物自洽时 R14 必须通过");
 
+  const wrongStarSource = JSON.parse(JSON.stringify(layout));
+  wrongStarSource.regions[0].grid.columns[0].source = "invented";
+  assert.strictEqual(run(writeJson("gate-star-source.json", wrongStarSource), reportPath).status, 2,
+    "承载格子的 Star 轨道同样必须校验设计来源");
+  const sourceReport = JSON.parse(fs.readFileSync(outPath, "utf8"));
+  assert.ok(sourceReport.findings.some(function (item) { return item.rule === "R8"; }),
+    "Star 来源错误必须由 R8 报告");
+
   const tampered = JSON.parse(JSON.stringify(layout));
   tampered.regions[0].grid.cells[0].height = 200;
   const tamperedPath = writeJson("gate-layout-tampered.json", tampered);
@@ -239,8 +261,7 @@ function node(id, type, style, children, extra) {
 }
 
 // ── ⑤ 格子算不出正数尺寸（内容溢出承载物）→ unsized：不写尺寸/对齐，门禁按提示登记 ─────
-// 口径 A 下星号带只承载"大空档"，正常推导不会出现载体落进零尺寸星号带；这一节按格子级
-// （手写布局 JSON）验证门禁对 unsized 的判别强度，形态与"溢出"一致。
+// Star 可承载弹性容器或表示空档；此处用手写布局 JSON 验证余量非正时的 unsized 判别强度。
 {
   const types = {
     byRef: new Map([
@@ -259,7 +280,7 @@ function node(id, type, style, children, extra) {
         rows: [{ size: "Star", source: "design" }],
         columns: [{ size: "Star", source: "design" }],
         cells: [{
-          ref: "box", container: true, row: 0, column: 0, rowSpan: 1, columnSpan: 1,
+          ref: "box", container: true, sizingMode: "page-slot", row: 0, column: 0, rowSpan: 1, columnSpan: 1,
           width: 1280, height: 759, nodeWidth: 100, nodeHeight: 60, offsetX: 0, offsetY: 0,
           children: {
             rows: [{ size: "Pixel", value: 20, source: "design" }, { size: "Star", source: "design" }],
@@ -294,7 +315,8 @@ function node(id, type, style, children, extra) {
   const typesPath = writeJson("unsized-types.json", { schemaVersion: 1, nodes: Array.from(types.byRef.values()), pending: [], unmappedComponents: [] });
   const reportPath = writeJson("unsized-report.json", {
     designBox: Array.from(cells.values()).filter(function (cell) { return !cell.spacer; }).map(function (cell) {
-      return { ref: cell.ref, container: !!cell.container, attrs: designBoxAttrs(cell) };
+      return { ref: cell.ref, container: !!cell.container,
+        attrs: designBoxAttrs(cell, { omitWidth: cell.controlType === "TextBlock" }) };
     })
   });
   const outPath = path.join(tmp, "unsized-gate.json");

@@ -11,7 +11,7 @@
 
 两条路线都启用，用 `run-all.ps1 -Mode <路线>` 选择（缺省 `mtslg-iocontrol`）。两者共用采集链路（第 1–4 步）、类型判定（共享类型表）、图标、多语言、Layout 注册与宿主壳，差别只在「同一类型怎么写」与页面发射物：
 
-- `Adapter: mw-wpf`（作业A）：生成真控件 `View.xaml`（框架 `s:` 控件 + Grid 布局）、C# 宿主、本页 Icon/语言字典、Layout 注册与布局门禁；不发射 IOContorl 页面 XML。
+- `Adapter: mw-wpf`（作业A）：生成真控件 `View.xaml`（框架 `s:` 控件与 `camera:` CameraControl + Grid 布局）、C# 宿主、本页 Icon/语言字典、Layout 注册与布局门禁；不发射 IOContorl 页面 XML。
 - `Adapter: mtslg-iocontrol`：生成完整 MTSLG IOContorl 项目结构，包括页面 XML、页面 Icon、Layout、mapping/provenance、项目配置以及目标项目要求的宿主壳；它不是 WPF 路线的降级结果，也不是附属中间产物。
 
 `mtslg-iocontrol` 支持真实目标项目接入、正式输出目录和运行时验证；没有目标项目时生成完整项目脚手架，只跳过编译和运行时加载验证。作业A 同口径：没有目标项目时出静态脚手架，编译与加载验证等目标项目接入后再做。

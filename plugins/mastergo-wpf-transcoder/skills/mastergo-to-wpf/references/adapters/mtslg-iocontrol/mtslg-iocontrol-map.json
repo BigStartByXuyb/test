@@ -3,9 +3,9 @@
     "source": "{source_root}/docs/Windows_setting/MT3.0 界面设计器.xml（目标项目提供的权威文档）",
     "note": [
       "官方标签拼写为 IOContorl（无字母 e），全部控件统一用该标签，由 ControlType 属性区分。",
-      "通用属性对所有控件有效：ID / ControlType / IOEnable / IOVisible / Height / Width / Margin / Left / Top / Style。",
+      "通用属性对所有控件有效：ID / ControlType / IOEnable / IOVisible / Height / Width / Margin / Left / Top / Style。TextBlock 例外：commonAttrs / geometryAttrs 中的 Width 不进入 IOContorl XML；设计稿 bbox 宽度只留在 mapping 的 dslWidth，宽度约束由 constraints 的 MinWidth / MaxWidth 表达。",
       "LangName 几乎所有控件可用（多语言键，CN/EN 成对，须命中键白名单）。",
-      "geometryAttrs 由生成器按 DSL bbox 计算直传，禁止从映射输入覆盖；businessAttrs 从映射 JSON 逐节点透传，生成器不校验内容（键校验交给 mtslg-keys.json 白名单）。",
+      "geometryAttrs 由生成器按 DSL bbox 计算直传，禁止从映射输入覆盖；TextBlock 例外：Width 不直传、Height 固定 40，宽度只由 constraints 的 MinWidth / MaxWidth 表达。businessAttrs 从映射 JSON 逐节点透传，生成器不校验内容（键校验交给 mtslg-keys.json 白名单）。",
       "容器类控件（nested=true）可包含子 IOContorl。子控件坐标一般相对父容器左上角；**例外**：`ControlType=\"GroupBox\"` 等两段式容器不是——原点 = 父容器左上角 + 内容区边框 + 标题条高度（即 `infoGroupTemplates.styleInsets`，按容器变体的 `contentInsetStyle` 查表），详见 infoGroupTemplates.styleInsetsNote 与 mtslg-mode.md 第 3 节（坐标规则）。"
     ]
   },
@@ -97,13 +97,13 @@
     "distanceLeftBasis": "Left = 控件**左边缘**到输出父容器**内容区左边缘**的距离 = pageAbsX − 内容区原点X（与既有的 Left 完全一致）",
     "distanceRightBasis": "Left = 以控件**右上角**为原点，量到输出父容器**外框右边缘**的距离 = 父外框右边缘 − (pageAbsX + 设计稿 bbox 宽度)",
     "distanceCenterPolicy": "center 与左对齐同口径（center 归 defaultValue 那一侧）",
-    "distanceWidthSource": "设计稿 bbox 宽度（mapping nodes[].dslWidth / sourceNodes[].width）；产物 XML 的 Width 仍是 NaN（自适应），宽度只参与这里的 Left 计算",
+    "distanceWidthSource": "设计稿 bbox 宽度（mapping nodes[].dslWidth / sourceNodes[].width）；产物 XML 不发射 TextBlock 的常规 Width，宽度只参与这里的 Left 计算与约束溯源",
     "distanceParentRightEdge": "页面根 = 根节点宽度（页面宽度）；容器 = 容器 pageAbsX + 容器宽度（**外框**右边缘，不是内容区右边缘）",
     "distanceImplementation": "scripts/lib/script-helpers.js 的 isRightAlignedTextBlock（分支判据）/ parentOuterRightEdge / textBlockLeftValue（唯一实现）；坐标核对输入的唯一实现是 scripts/lib/coord-nodes.js",
     "note": "TextBlock 的 Align 恒写、必写（进 controlTypeRequiredAttrs，且只有 TextBlock 有这个属性）：textAlign 归一成小写后命中 rightMatch 就发射 rightValue，其余（left / center / 字段缺失 / 其它取值）一律发射 defaultValue——**默认左对齐**。目标框架只认 Left / Right 两种取值，因此 Align **不适用必写字段的「取不到来源写空字符串」通用口径**：映射缺失 / 空串 / 第三种值由渲染层与校验层直接判失败（fail-closed）。**Align=Right 会同时改变 Left 的口径**（不再是\"到左边缘\"，而是按 distanceRightBasis 算出的\"到右边缘\"距离）。分支判据与计算都只有一处实现：`scripts/lib/script-helpers.js` 的 `isRightAlignedTextBlock`（判据）/ `textBlockLeftValue`（两条口径），映射生成器 / 容器重挂 / XML 渲染 / provenance 校验直接调用；坐标核对输入的唯一实现是 `scripts/lib/coord-nodes.js`（Bundle 与 check-coords.mjs 共用，右对齐节点在那里算出 `expectedLeft`）。本块的 distance* 字段是**登记点（人读 + 回归断言比对真值），不是脚本的运行期输入**（角色与 textNewlinePolicy.mapRole 相同）。"
   },
   "controlTypeRequiredAttrs": {
-    "_note": "每个 ControlType 的固定必写字段集（属性恒写，取不到来源时写空字符串）。ID/ControlType 恒由节点身份发射，Left/Top/Width/Height 恒由 DSL bbox 发射（TextBlock 为 Width=NaN、Height=40），因此不重复登记在这里。LangName 是另一个例外：只在多语言绑定层给出真实 key 时发射——全量多语言下每个设计文本 Value 都产键挂 LangName，只有槽位登记 langRefPolicy=none 的值（当前只有选择框 Value，运行时由数据决定）与空文本节点（Value=\"\"，没有可翻译的文案）不产键、不写空占位。TextBlock 的 Align 是第二个例外：目标框架只认 Left / Right，映射缺失/空串/第三种值一律 fail-closed（见 textBlockAlign.note），不写空占位。真值来源：设计方给定的 IOContorl 字段模板。",
+    "_note": "每个 ControlType 的固定必写字段集（属性恒写，取不到来源时写空字符串）。ID/ControlType 恒由节点身份发射；Left/Top/Height 由 DSL bbox 与路线规则发射；TextBlock 不发射常规 Width，Height 固定 40，MinWidth/MaxWidth 只在 DSL constraints 提供时发射。LangName 是另一个例外：只在多语言绑定层给出真实 key 时发射——全量多语言下每个设计文本 Value 都产键挂 LangName，只有槽位登记 langRefPolicy=none 的值（当前只有选择框 Value，运行时由数据决定）与空文本节点（Value=\"\"，没有可翻译的文案）不产键、不写空占位。TextBlock 的 Align 是第二个例外：目标框架只认 Left / Right，映射缺失/空串/第三种值一律 fail-closed（见 textBlockAlign.note），不写空占位。真值来源：设计方给定的 IOContorl 字段模板。",
     "GroupBox": [
       "Style",
       "Header",
@@ -381,7 +381,7 @@
       ]
     },
     "TextBlock": {
-      "description": "文本标签；Value=标签文本，IOName=从 IO 读标签名，IOState=状态文本驱动颜色，IsAutoRead 默认 false；Height 固定 40、Width 固定 NaN（宽度自适应，不用文本 bbox 宽度）；FontWeight 是「命中才写」的条件属性（设计稿字重非 normal 时发射，值取 `styles[...].value.style` 的 `fontStyle`，见本文件 textBlockFontWeight），不属于 controlTypeRequiredAttrs 恒写集合；Align 是恒写、必写属性，**只有 TextBlock 有**（设计稿 TEXT 节点 textAlign=right → \"Right\"，其余含缺失 → \"Left\" 默认左对齐，见本文件 textBlockAlign）",
+      "description": "文本标签；Value=标签文本，IOName=从 IO 读标签名，IOState=状态文本驱动颜色，IsAutoRead 默认 false；Height 固定 40，不发射常规 Width，只在 DSL constraints 提供时发射 MinWidth/MaxWidth（不用文本 bbox 宽度）；FontWeight 是「命中才写」的条件属性（设计稿字重非 normal 时发射，值取 `styles[...].value.style` 的 `fontStyle`，见本文件 textBlockFontWeight），不属于 controlTypeRequiredAttrs 恒写集合；Align 是恒写、必写属性，**只有 TextBlock 有**（设计稿 TEXT 节点 textAlign=right → \"Right\"，其余含缺失 → \"Left\" 默认左对齐，见本文件 textBlockAlign）",
       "nested": false,
       "attrs": [
         "Value",
@@ -393,6 +393,8 @@
         "Foreground",
         "FontSize",
         "FontWeight",
+        "MinWidth",
+        "MaxWidth",
         "LangName"
       ]
     },
@@ -685,6 +687,13 @@
   },
   "extends": "../../component-types.json",
   "familyOverlays": {
+    "cameraTemplates": {
+      "mtslgAlwaysWrittenAttrs": [
+        "DesignPanelID",
+        "Value"
+      ],
+      "mtslgComponentSetPolicy": "作业B（MTSLG IOContorl）相机视口只发射 DesignPanelID / Value / Width / Height，不发射 Style。DesignPanelID 与 Value 在设计稿里没有可靠来源时按作业B固定模板写空串占位，由工程师或运行时绑定填写；Width/Height 取实例自身 bbox，坐标按作业B页面规则计算。IOName 空占位由 controlTypeRequiredAttrs.Camera 单独要求。"
+    },
     "infoGroupTemplates": {
       "styleInsets": {
         "IOGroupBoxBaseStyle": {

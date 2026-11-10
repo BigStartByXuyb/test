@@ -65,6 +65,7 @@ Bundle 的页面 XML 步骤恒为 `--fresh`，因此**没有合并语义**：`op
 |---|---|---|
 | `svgPath` | **必填** | `extractSvg` 落盘的 JSON；没有运行时 Icon 时也必须给合法的 `{ "svgs": [] }` 文件（`main()` → `[svgPath, iconMapPath, templateMapPath]` 逐个做存在性检查，`fail("输入文件不存在: ")`） |
 | `dslPath` + `visibilityPath` | **新建页面必填** | 同时提供且文件存在；mapping 由本次生成创建（`main()` → `fail("新建页面必须提供当前页面的 dslPath 和 visibilityPath；mapping 将在本次生成中创建")`、`fail("dslPath/visibilityPath 输入文件不存在")`） |
+| `mappingDslPath` | 可选 | 已完成尺寸约束合并的 DSL；提供时最终 mapping 从这份 DSL 生成。路径必须是运行登记表 `mappingDsl` 产物的登记路径；该产物在 `mapping` 或 `inputs` 重新解析约束时登记。清单同时写 `runRegistry.digests.mappingDsl`，Bundle 按登记表解析并复校；`dslPath` 仍绑定原始采集快照。 |
 | `mappingPath` | **必填（所有模式）** | mapping 的**工作落盘路径**：新建页面时由本次生成写入（随后会被重新生成覆盖，不是输入真值）；已有页面在未提供 `dslPath`/`visibilityPath` 时作为已有 mapping 读入。**不要指向 `Generated/<页面名>.mapping.json`（审计产物）**——新建模式下会因"目标文件已存在"失败（`main()` → `fail("必须提供 mappingPath：…")`、`fail("mappingPath 不能与审计产物同路径: ")`）。 |
 | `iconMapPath` | **必填（文件始终必填）** | 图标台账输入；脚本无条件做存在性检查，**没有图标槽位的页面也必须给一份合法的空 `icons[]` 文件** |
 | `templateMapPath` | 可选 | 缺省 = 插件内 `mtslg-iocontrol-map.json`（脚本常量 `DEFAULT_TEMPLATE_MAP`）；它是**脚本在生成期读取**的运行期输入，只是不需要模型预读进上下文 |
@@ -128,7 +129,7 @@ Bundle **不会**把新页面的文件写进 `.csproj`（实测 `csprojChanged=F
 | `runId` | 本次运行的身份；清单 `runRegistry.runId` 与它不一致直接失败 |
 | `identity` | `{ fileId, layerId, ui, designPageName }`（来自命令行或 `docs/page-registry.json`） |
 | `inputs` | 页面级语义输入 + 指纹：`pageTitleText`、`translations{path,sha256,size}`、`glossary`、`iconNaming` |
-| `artifacts` | 本次运行产出的中间产物：`getDsl / snapshot / coverage / dslManifest / timing / visibility / extractSvg / mappingDraft / iconCandidates / iconMap / layoutManifest / bundleManifest`，每条 `{path, sha256, size, mtime, step}` |
+| `artifacts` | 本次运行产出的中间产物：`getDsl / snapshot / coverage / dslManifest / timing / visibility / extractSvg / mappingDsl / mappingDraft / iconCandidates / iconMap / layoutManifest / bundleManifest`，每条 `{path, sha256, size, mtime, step}` |
 | `steps` | 每一步 `{id, name, status, seconds, note, log, at}`（失败步骤也登记） |
 | `outputs` | Bundle 审计的 `files[]` 并回：每条 `{kind, dependsOn, exists, sha256}`——输入登记与输出登记共用同一个 `runId` |
 
@@ -137,7 +138,7 @@ Bundle **不会**把新页面的文件写进 `.csproj`（实测 `csprojChanged=F
 **本页现状摘要**（`Generated/<Target>.summary.json`）：上面这条契约的机器可读投影，由 `run-all.ps1` 每步成功后刷新（`scripts/core/build-run-summary.mjs`）。需要了解本页现状时读它，不要为了盘点现状再手写探针去数产物——它给身份、控件构成、`todos`（需人工/AI 动作）、`notices`（状态说明）、图标候选与台账、布局、产出清单，并在 `sources` 里逐项写明来源路径与产出步骤。它是**派生视图**：内容随每次刷新变化，因此不写回登记表，任何条目都与登记表同源同规则——未登记的一律不取，条目在消费时按登记 sha256 复校（不符即整次失败），而**本次尝试读取**的条目（登记产物或页面产出）取不到时一并记进 `unavailable`（带 `layer` 区分），而不是记 0。
 
 1. **产出即登记**：`run-all.ps1` 每一步成功后就登记该步产物（`run-registry.mjs artifact`）；中途失败也把该步状态写进 `steps`。
-2. **消费只按登记**：`build-bundle-manifest.mjs <…> <area> --run-json <run.json>` 从登记表取 `snapshot` / `visibility` / `extractSvg`，并把 `sha256` 写进清单 `runRegistry.digests`；Bundle 读清单时**复校**：路径按登记表解析、`sha256` 与 `digests` 一致、`runId` 一致。**`--run-json` 是必填**——缺了直接报错，不再回落到顶层 `Generated/*.json`（`area` 同理必填，推导只在 run-all.ps1 里做一次）。
+2. **消费只按登记**：`build-bundle-manifest.mjs <…> <area> --run-json <run.json>` 从登记表取 `snapshot` / `visibility` / `extractSvg`，并在提供 `--mapping-dsl` 时取 `mappingDsl`；每个输入的 `sha256` 都写进清单 `runRegistry.digests`。Bundle 读清单时**复校**：路径按登记表解析、`sha256` 与 `digests` 一致、`runId` 一致。**`--run-json` 是必填**——缺了直接报错，不再回落到顶层 `Generated/*.json`（`area` 同理必填，推导只在 run-all.ps1 里做一次）。
 3. **未登记的旧同名文件一律拒绝**：Bundle 直接失败并点名它**实际消费的三个采集输入**——`Generated/dsl.snapshot.json`、`Generated/visibility.json`、`Generated/extractSvg.json`（内容与本次登记恰好一致时只提示可清理）。其余同层文件（`Generated/coverage-report.json`、`Generated/manifest.json`、`Generated/timing.json`、`Generated/getDsl.json`）不参与输入解析，由 `run-registry.mjs check` 按同一张 `LEGACY_SHADOWS` 表列出。
 4. **断点续跑（身份不可变）**：`run-all.ps1 -Progress <步骤>` 且步骤号大于 1 时才用 `run-registry.mjs init --keep`。续跑**优先回放首次运行冻结的身份**：`fileId` / `layerId` / `ui` / `designPageName` 取 `run.json` 的 `identity`，命令行显式值必须与它一致——所以项目登记表里**改了值**不影响续跑（回放赢）。身份解析顺序仍是「命令行 → 项目登记表」，因此**删掉登记表条目**时取不到值会先报「缺少…」；此时显式传回 `-FileId` / `-LayerId` / `-Ui` / `-DesignPageName` 即可续跑（**步骤循环内**失败时脚本会打印带全参数的续跑命令；这条例出的身份解析段失败发生在循环之前，不会打印，需自行带上这四个参数）。`-Progress fetch`（第 1 步）不带 `--keep`，一律新开一次运行：新 `runId`、产物登记清空，登记表不存在时直接新建；步骤号大于 1 而运行登记表缺失时直接报错，提示从 `fetch` 新开。`target` / 归一化后的 `projectRoot` / schema 由守卫直接校验，失败发生在保存之前、原登记表逐字节不变；不得通过编辑 `run.json` 绕过。
    - **省略 → 用冻结值**：冻结值非空时 capture 拿到的就是首次那份身份（不会退回 DSL 根节点名）。冻结值为空时分两种：本次解析**仍为空** → 按既有口径兜底；本次解析出**非空** → 按「不得补写」失败。

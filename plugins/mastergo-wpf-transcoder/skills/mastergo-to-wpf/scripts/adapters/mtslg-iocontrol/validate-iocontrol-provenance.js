@@ -9,8 +9,11 @@
 'use strict';
 
 const fs = require('fs');
+const path = require('path');
 // 模板表规则块的解析唯一实现（见 scripts/adapters/mtslg-iocontrol/lib/iocontrol-map-rules.js；禁止在本脚本再抄一份）。
 const MAP_RULES = require('./lib/iocontrol-map-rules');
+const { normalizeConstraints, constraintAttributes } =
+  require(path.join(__dirname, '..', '..', 'lib', 'constraints.js'));
 // 数值解析的唯一实现（见 scripts/lib/script-helpers.js；本校验器与坐标核对器共用同一口径）。
 // 文案比对归一（解码字符引用 + 换行归一成 LF）的唯一实现，见 scripts/lib/script-helpers.js。
 const { numberOrNull: num, normalizeForCompare, omittedAttrs,
@@ -333,16 +336,29 @@ function validate(xmlPath, manifestPath, options) {
       if (fixedTextBlockHeight && x.ControlType !== 'TextBlock') {
         errors.push('[' + n.xmlId + '] fixed-40 高度规则只能用于 TextBlock');
       }
-      // TextBlock：Width 固定 NaN（自适应），bbox 宽度只作为 dslWidth 来源保留。
+      // TextBlock：常规 Width 不发射；bbox 宽度只作为 dslWidth 来源保留。
       if (x.ControlType === 'TextBlock') {
-        if (!isNanValue(n.expectedWidth)) {
-          errors.push('[' + n.xmlId + '] TextBlock 的 expectedWidth 必须固定为 NaN');
+        if (x.Width !== undefined) {
+          errors.push('[' + n.xmlId + '] TextBlock 不得发射常规 Width');
         }
-        if (n.widthSource !== undefined && n.widthSource !== 'mtslg.textblock.fixed-nan') {
-          errors.push('[' + n.xmlId + '] TextBlock 的 widthSource 必须是 mtslg.textblock.fixed-nan');
+        if (!isNanValue(n.expectedWidth)) {
+          errors.push('[' + n.xmlId + '] TextBlock 的 expectedWidth 必须是省略宽度的 NaN 哨兵');
+        }
+        if (n.widthSource !== undefined && n.widthSource !== 'mtslg.textblock.omit-width') {
+          errors.push('[' + n.xmlId + '] TextBlock 的 widthSource 必须是 mtslg.textblock.omit-width');
         }
         if (n.dslWidth !== undefined && !sameNumber(n.dslWidth, src.width)) {
           errors.push('[' + n.xmlId + '] TextBlock 的 dslWidth 与 sourceNodes bbox 不一致');
+        }
+        const widthConstraints = constraintAttributes(normalizeConstraints(n.constraints || src.constraints));
+        for (const attr of ['MinWidth', 'MaxWidth']) {
+          const expected = widthConstraints[attr];
+          if (expected === undefined) {
+            if (x[attr] !== undefined) errors.push('[' + n.xmlId + '] TextBlock 未登记的 ' + attr + ' 不得发射');
+          } else if (String(x[attr]) !== String(expected)) {
+            errors.push('[' + n.xmlId + '] TextBlock 的 ' + attr + ' 期望 ' + expected +
+              '，实际 ' + (x[attr] === undefined ? '未发射' : x[attr]));
+          }
         }
       } else if (!sameNumber(n.expectedWidth, src.width)) {
         errors.push('[' + n.xmlId + '] expectedWidth 不是同一 sourceRef 的 bbox');
@@ -376,7 +392,7 @@ function validate(xmlPath, manifestPath, options) {
       // 表格列定义已在上面按 columnTemplate 校验过几何（含「不写 Width」），这里不重复判。
       if (isTableColumn) continue;
       if (attr === 'Width' && x.ControlType === 'TextBlock') {
-        if (!isNanValue(x[attr])) errors.push('[' + n.xmlId + '] TextBlock 的 Width 必须固定为 NaN');
+        if (x.Width !== undefined) errors.push('[' + n.xmlId + '] TextBlock 不得发射常规 Width');
         continue;
       }
       if (!sameNumber(x[attr], n[field])) errors.push('[' + n.xmlId + '] ' + attr + '=' + (x[attr] || '') + ' != expected=' + n[field]);

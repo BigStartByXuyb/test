@@ -17,6 +17,7 @@ const { readJson, normalizeToken: normalize, normalizeNewlines,
   parentOuterRightEdge, textBlockLeftValue
 } = require(path.join(__dirname, "..", "..", "lib", "script-helpers.js"));
 const { isHostShellName } = require(path.join(__dirname, "..", "..", "lib", "mastergo-rules.js"));
+const { normalizeConstraints } = require(path.join(__dirname, "..", "..", "lib", "constraints.js"));
 // 图标归属判据的唯一实现（见 scripts/adapters/mtslg-iocontrol/lib/icon-ownership.js；禁止在本脚本再抄一份）。
 const ICON_OWNERSHIP = require(path.join(__dirname, "lib", "icon-ownership.js"));
 // 模板表规则块的解析唯一实现（见 scripts/adapters/mtslg-iocontrol/lib/iocontrol-map-rules.js；禁止在本脚本再抄一份）。
@@ -207,6 +208,7 @@ function walk(node, parentRef, pageAbsX, pageAbsY) {
   const ry = typeof ls.relativeY === "number" ? ls.relativeY : null;
   const x = rx === null ? null : pageAbsX + rx;
   const y = ry === null ? null : pageAbsY + ry;
+  const constraints = normalizeConstraints(node.constraints);
   const source = {
     ref: node.id,
     parentRef: parentRef || null,
@@ -221,6 +223,7 @@ function walk(node, parentRef, pageAbsX, pageAbsY) {
     width: typeof ls.width === "number" ? ls.width : null,
     height: typeof ls.height === "number" ? ls.height : null
   };
+  if (Object.keys(constraints).length) source.constraints = constraints;
   const text = textOf(node);
   if (typeof text === "string") source.text = text;
   // 文本对齐：设计稿把左/右/居中对齐放在 TEXT 节点级 textAlign 字段（取值 left / right / center）。
@@ -624,6 +627,7 @@ function addNode(sourceRef, controlType, attrs, options = {}) {
   const xmlId = options.xmlId || allocateId(sourceRef);
   const parentRef = options.layoutParent || null;
   const parentSource = parentRef ? source(parentRef) : null;
+  const constraints = normalizeConstraints(s.constraints);
   // 几何覆盖：登记在映射表模板里的固定几何（目前只有 DataGrid 的列定义节点走这条路）。
   // 覆盖值必须来自映射表（tableTemplates.columnTemplate），节点的真实 DSL bbox 仍按 dsl* 字段保留溯源。
   const geometry = options.geometryOverride || null;
@@ -663,10 +667,11 @@ function addNode(sourceRef, controlType, attrs, options = {}) {
     expectedWidth: geometry ? "NaN" : (controlType === "TextBlock" ? "NaN" : s.width),
     expectedHeight: geometry ? Number(geometry.height) : (controlType === "TextBlock" ? 40 : s.height),
     widthSource: geometry ? "table.column-template"
-      : (controlType === "TextBlock" ? "mtslg.textblock.fixed-nan" : "dsl.bbox"),
+      : (controlType === "TextBlock" ? "mtslg.textblock.omit-width" : "dsl.bbox"),
     heightSource: geometry ? "table.column-template"
       : (controlType === "TextBlock" ? "mtslg.textblock.fixed-40" : "dsl.bbox"),
     ...(controlType === "TextBlock" ? { dslWidth: s.width } : {}),
+    ...(controlType === "TextBlock" && Object.keys(constraints).length ? { constraints } : {}),
     ...(geometry ? {
       nodeKind: options.nodeKind || "table-column",
       geometrySource: "table.column-template",
@@ -1012,7 +1017,8 @@ for (const { item: inst, match } of matched) {
       throw new Error("cameraTemplates.stylePolicy 必须是 none：相机视口用运行时默认控件外观，不发射 Style");
     }
     const attrs = {};
-    for (const attr of cameraSpec.alwaysWrittenAttrs) attrs[attr] = "";
+    // 作业B的 familyOverlay 才登记 MTSLG 空占位；作业A直读共享类型表，不生成这些属性。
+    for (const attr of cameraSpec.mtslgAlwaysWrittenAttrs || []) attrs[attr] = "";
     addNode(inst.ref, spec.controlType, attrs, { variant });
         addInstance(match, inst.ref, []);
     // 内部 TEXT 显式 consume + omit：既不发射成页面 TextBlock，也不让它们漏进通用文本循环。
