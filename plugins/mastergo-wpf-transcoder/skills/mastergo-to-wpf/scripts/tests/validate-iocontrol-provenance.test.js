@@ -94,6 +94,14 @@ fs.writeFileSync(constrainedManifestPath, JSON.stringify({ contentOriginY: 192, 
 }] }));
 const constrainedResult = validate(constrainedXmlPath, constrainedManifestPath);
 if (!constrainedResult.ok) throw new Error('TextBlock 只发射 MinWidth/MaxWidth 时应通过 provenance 校验: ' + constrainedResult.errors.join('; '));
+const badHeightXmlPath = path.join(dir, 'textblock-height-constraints.xml');
+fs.writeFileSync(badHeightXmlPath, '<IOContorl ID="" Left="NaN" Top="NaN" Width="NaN" Height="NaN"><IOContorl ID="ConstrainedText" ControlType="TextBlock" Value="标题" Left="10" Top="20" MinWidth="80" MaxWidth="194" MinHeight="12" MaxHeight="80" Height="40" /></IOContorl>');
+const badHeightResult = validate(badHeightXmlPath, constrainedManifestPath);
+if (badHeightResult.ok ||
+    !badHeightResult.errors.some(x => /TextBlock 不得发射 MinHeight/.test(x)) ||
+    !badHeightResult.errors.some(x => /TextBlock 不得发射 MaxHeight/.test(x))) {
+  throw new Error('TextBlock 高度约束必须被 provenance 校验拒绝: ' + badHeightResult.errors.join('; '));
+}
 const fixedManifestPath = path.join(dir, 'wrong-origin.json');
 const fixedManifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 fixedManifest.contentOriginY = 191;

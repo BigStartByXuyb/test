@@ -36,7 +36,8 @@ from sip_rules import (MAIN_ORDER, SUB_ORDER, MAIN_IDX, SUB_IDX,
 from extract_gbk_zip import extract as extract_zip
 from sip_source import parse_sheet, discover_projects
 from sip_family_detect import detect_family_from_rows
-from sip_sheet_name import safe_name
+from sip_sheet_name import (EXPLANATION_SHEET, PENDING_SHEET,
+                            RESERVED_SHEET_NAMES, safe_name)
 from sip_verify import verify_records, format_results
 
 try:
@@ -95,7 +96,7 @@ def write_workbook(all_rows, projects, out_path, ref=None, verify=None,
                '归类依据', '设备族']
     widths = [15, 8, 10, 24, 15, 8, 16, 30, 16, 46, 12, 13, 10, 10]
 
-    used = set()
+    used = set(RESERVED_SHEET_NAMES)
     project_order = [p[0] for p in projects]
     for pname, _, files in projects:
         ws = wb.create_sheet(safe_name(pname, used, fallback='项目'))
@@ -166,7 +167,7 @@ def write_workbook(all_rows, projects, out_path, ref=None, verify=None,
         ws.auto_filter.ref = f'A3:N{r - 1}'
 
     # --------------------------- 说明
-    ws = wb.create_sheet('说明', 0)
+    ws = wb.create_sheet(EXPLANATION_SHEET, 0)
     ws.sheet_view.showGridLines = False
     ws.column_dimensions['A'].width = 20
     ws.column_dimensions['B'].width = 16
@@ -311,7 +312,7 @@ def write_workbook(all_rows, projects, out_path, ref=None, verify=None,
                 r += 1
 
     # --------------------------- 待确认项
-    ws2 = wb.create_sheet('待确认项（规则推断）')
+    ws2 = wb.create_sheet(PENDING_SHEET)
     ws2.sheet_view.showGridLines = False
     for col, w in zip('ABCDE', [10, 22, 32, 16, 10]):
         ws2.column_dimensions[col].width = w

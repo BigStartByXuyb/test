@@ -135,6 +135,9 @@ for (const xn of xmlNodes) {
   if (!close(xt, st, tolerance)) problems.push(`Top xml=${xt} dsl=${st}`);
   if (xn.ControlType === 'TextBlock') {
     if (xn.Width !== undefined) problems.push('TextBlock 不得发射常规 Width');
+    for (const attr of ['MinHeight', 'MaxHeight']) {
+      if (xn[attr] !== undefined) problems.push(`TextBlock 不得发射 ${attr}`);
+    }
     const expected = constraintAttributes(src.constraints);
     for (const attr of ['MinWidth', 'MaxWidth']) {
       const value = expected[attr];

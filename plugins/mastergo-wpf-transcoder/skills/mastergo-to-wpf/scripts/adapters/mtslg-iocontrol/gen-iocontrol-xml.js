@@ -41,11 +41,12 @@
  *
  * TextBlock 固定属性：Height 固定 40；不发射常规 Width，
  * 只发射设计稿 constraints 里的 MinWidth / MaxWidth（不用设计稿文本 bbox 宽度），
+ * 旧页面里的 MinHeight / MaxHeight 也删除。
  * FontSize 仍取 DSL 字体事实；Align 恒写且只有 TextBlock 有（DSL 节点 textAlign=right → "Right"，
  * 其余含缺失 → "Left" 默认左对齐）。
  *
  * merge 语义（改现有页面的强制模式）：
- *   1. 几何（Left/Top/Height；TextBlock 的 MinWidth/MaxWidth）按映射更新，TextBlock 旧 Width 删除；
+ *   1. 几何（Left/Top/Height；TextBlock 的 MinWidth/MaxWidth）按映射更新，TextBlock 旧 Width/MinHeight/MaxHeight 删除；
  *   2. ControlType 按映射更新（变化时写冲突报告）；
  *   3. 业务属性：现有 XML 已有同名的 → 一律保留现有值（值不同写冲突报告，不覆盖）；
  *      现有 XML 没有的 → 按映射新增（写新增报告）；
@@ -827,10 +828,12 @@ function mergeMode() {
     const t = tokens[tokenIdx];
     const finalAttrs = new Map();
     for (const a of t.attrs) finalAttrs.set(a.name, a.value);
-    // TextBlock 的约束宽和按钮族的 IconWidth/IconHeight 都属于生成器计算的布局属性：
-    // 映射有值就更新，映射没有就删除，不能把旧常规 Width 留在现有页面里。
-    const widthConstraintKeys = type === 'TextBlock' ? ['MinWidth', 'MaxWidth'] : [];
-    const geometryKeys = GEOM_ATTRS.concat(widthConstraintKeys, buttonFamilyIconSizeAttrNames(n));
+    // TextBlock 的宽度约束和按钮族的 IconWidth/IconHeight 都属于生成器计算的布局属性：
+    // 映射有值就更新，映射没有就删除；旧常规 Width / MinHeight / MaxHeight 不得残留。
+    const textBlockConstraintKeys = type === 'TextBlock'
+      ? ['MinWidth', 'MaxWidth', 'MinHeight', 'MaxHeight']
+      : [];
+    const geometryKeys = GEOM_ATTRS.concat(textBlockConstraintKeys, buttonFamilyIconSizeAttrNames(n));
     for (const k of geometryKeys) {
       if (attrMap[k] !== undefined && attrMap[k] !== null) {
         if (!finalAttrs.has(k)) {

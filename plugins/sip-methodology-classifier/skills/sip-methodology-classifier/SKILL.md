@@ -36,9 +36,10 @@ description: 把 MAXWELL《成品检验指导书》Excel 按 SIP 方法论归类
 
 ## 设备族分支（主干 + 分支）
 
-规则按“主干 + 设备族分支”组织：
+规则由主干数据、共享行级规则执行和设备族分支共同决定：
 
-- **主干 `scripts/sip_rules_trunk.py`**：9 个主顺序、1–12 子顺序、通用规则（BOM 规格三分法、流量压力行级拆分、气管水管、离子棒、安全防护、老化、通断电、备份杀毒等）。
+- **主干数据 `scripts/sip_rules_trunk.py`**：9 个主顺序、1–12 子顺序及主干查询表。
+- **共享行级规则与调度 `scripts/sip_rules.py`**：执行 BOM 规格三分法、流量压力行级拆分、气管水管、离子棒、安全防护、老化、通断电、备份杀毒等主干行级规则，并合并设备族分支。
 - **分支**：
   - `scripts/sip_family_sdc.py`：刀轮/晶圆切割机（当前规则继承主干，分支文件预留扩展）
   - `scripts/sip_family_exp.py`：扩片机（当前规则继承主干，分支文件预留扩展）
@@ -74,11 +75,12 @@ python -I <skill-dir>/scripts/build_reference_format.py --input "<zip或目录>"
 
 ## 规则维护
 
-规则分两层，`scripts/sip_rules.py` 只做调度（合并主干与分支、决定优先级和归类依据），不再存放具体规则：
+规则按职责分开维护，机器规则只有一处：
 
-- **主干 `scripts/sip_rules_trunk.py`**：
+- **主干数据 `scripts/sip_rules_trunk.py`**：
   - `STAGE_RULES`：工序名 → `(主顺序, 子顺序)`。
   - `EXACT`：工序内个别项目的例外。
+- **共享行级规则与调度 `scripts/sip_rules.py`**：执行主干行级规则，并按分支优先、主干兜底合并，决定优先级和归类依据。
   - 行级拆分：流量压力表、气管水管、离子棒、NCS 检查、安全防护检查、接触式测高/刀刃外观、工控机、加密狗、杀毒软件。
   - BOM 三分法：标准匹配 `Npcs：型号` → 铭牌 2 级；外观/安装/完好/牢固/无损伤 → 外观 1 级；其余 → 通电 5 级。
 - **设备族分支 `scripts/sip_family_<族>.py`**：只写本设备族特有的 `STAGE_RULES`、`EXACT`、`STAGE_PREFIX_RULES`、`BOM_STAGES`、`KEYWORD_RULES`，同名键覆盖主干。

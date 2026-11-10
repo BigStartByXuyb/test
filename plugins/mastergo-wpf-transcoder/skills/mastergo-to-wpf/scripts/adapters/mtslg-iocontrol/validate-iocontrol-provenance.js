@@ -341,6 +341,9 @@ function validate(xmlPath, manifestPath, options) {
         if (x.Width !== undefined) {
           errors.push('[' + n.xmlId + '] TextBlock 不得发射常规 Width');
         }
+        for (const attr of ['MinHeight', 'MaxHeight']) {
+          if (x[attr] !== undefined) errors.push('[' + n.xmlId + '] TextBlock 不得发射 ' + attr);
+        }
         if (!isNanValue(n.expectedWidth)) {
           errors.push('[' + n.xmlId + '] TextBlock 的 expectedWidth 必须是省略宽度的 NaN 哨兵');
         }

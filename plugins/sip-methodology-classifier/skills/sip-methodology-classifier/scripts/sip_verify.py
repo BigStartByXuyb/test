@@ -22,6 +22,7 @@ from openpyxl import load_workbook
 
 from sip_rules import header_key
 from sip_seq import parse_seq
+from sip_sheet_name import EXPLANATION_SHEET, PENDING_SHEET
 
 
 def read_output_records(path):
@@ -29,7 +30,7 @@ def read_output_records(path):
     wb = load_workbook(path, data_only=True)
     records = []
     for ws in wb.worksheets:
-        if ws.title == '说明' or ws.title.startswith('待确认'):
+        if ws.title in (EXPLANATION_SHEET, PENDING_SHEET):
             continue
         hr = None
         for r in range(1, min(ws.max_row, 15) + 1):

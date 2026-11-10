@@ -66,6 +66,19 @@ if (constrainedTextResult.status !== 0 || !/OK id="label"/.test(constrainedTextR
 }
 console.log('PASS TextBlock width constraints regression test');
 
+const badHeightTextPath = path.join(dir, 'bad-height-text.xml');
+fs.writeFileSync(badHeightTextPath,
+  '<IOContorl ID="label" ControlType="TextBlock" Left="10" Top="10" MinHeight="12" MaxHeight="80" Height="40" />');
+const badHeightTextResult = spawnSync(process.execPath,
+  [path.join(__dirname, '..', 'adapters/mtslg-iocontrol', 'check-iocontrol-coords.js'),
+    '--xml', badHeightTextPath, '--nodes', constrainedTextNodesPath], { encoding: 'utf8' });
+if (badHeightTextResult.status === 0 ||
+    !/TextBlock 不得发射 MinHeight/.test(badHeightTextResult.stdout) ||
+    !/TextBlock 不得发射 MaxHeight/.test(badHeightTextResult.stdout)) {
+  throw new Error(`TextBlock 高度约束必须被坐标门禁拒绝:\n${badHeightTextResult.stdout}`);
+}
+console.log('PASS TextBlock rejects height constraints');
+
 // 约束归一化复用 constraints.js：0 / 非正数等于未设置，不能被坐标门禁当成期望值再报 MISMATCH。
 const normalizedTextPath = path.join(dir, 'normalized-text.xml');
 const normalizedTextNodesPath = path.join(dir, 'normalized-text-nodes.json');

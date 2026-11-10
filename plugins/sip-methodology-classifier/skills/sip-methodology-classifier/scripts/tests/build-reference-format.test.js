@@ -47,14 +47,29 @@ test("Sheet 名空值默认值可由调用方显式指定", () => {
   assert.deepEqual(result, ["项目"]);
 });
 
+test("固定 Sheet 名与 Excel 大小写重名口径共用", () => {
+  const result = JSON.parse(runPython([
+    "import json, os, sys",
+    "sys.path.insert(0, os.getcwd())",
+    "from sip_sheet_name import RESERVED_SHEET_NAMES, safe_name",
+    "used = set(RESERVED_SHEET_NAMES)",
+    "names = [safe_name(RESERVED_SHEET_NAMES[0], used, fallback='项目'), safe_name(RESERVED_SHEET_NAMES[1], used, fallback='项目'), safe_name('ABC', {'abc'})]",
+    "print(json.dumps({'reserved': names[:2] == [name + '_2' for name in RESERVED_SHEET_NAMES], 'case': names[2]}))"
+  ].join("\n")));
+  assert.deepEqual(result, { reserved: true, case: "ABC_2" });
+});
+
 test("Sheet 名清洗在两个生成器中共用同一实现", () => {
   const reference = fs.readFileSync(path.join(scriptsDir, "build_reference_format.py"), "utf8");
   const analysis = fs.readFileSync(path.join(scriptsDir, "build_sip_mapping.py"), "utf8");
   assert.match(reference, /title = safe_name\(os\.path\.splitext\(os\.path\.basename\(path\)\)\[0\], used\)\s*wb, unclassified = transform_source\(path, row_map, title\)/);
   assert.doesNotMatch(reference, /ws\.title = os\.path\.splitext/);
-  assert.match(analysis, /from sip_sheet_name import safe_name/);
+  assert.match(analysis, /from sip_sheet_name import \(EXPLANATION_SHEET, PENDING_SHEET,/);
   assert.match(analysis, /safe_name\(pname, used, fallback='项目'\)/);
   assert.doesNotMatch(analysis, /def safe_sheet_name/);
+  const verify = fs.readFileSync(path.join(scriptsDir, "sip_verify.py"), "utf8");
+  assert.match(verify, /from sip_sheet_name import EXPLANATION_SHEET, PENDING_SHEET/);
+  assert.doesNotMatch(verify, /startswith\('待确认'\)/);
 });
 
 test("序号判定只接受整数数值或纯数字文本", () => {
