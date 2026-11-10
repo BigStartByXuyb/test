@@ -245,6 +245,17 @@ assert.strictEqual(cells.find(function (cell) { return cell.ref === "t2"; }).con
   assert.strictEqual(emitted.status, 0, "双约束控件 XAML 发射应成功: " + emitted.stderr);
   const duplicateXaml = fs.readFileSync(duplicateXamlPath, "utf8");
   assert.strictEqual((duplicateXaml.match(/MinWidth="80"/g) || []).length, 2, "两格都要发射同一个约束值");
+
+  const duplicatePassReportPath = path.join(tmp, "duplicate-pass-report.json");
+  const duplicatePass = spawnSync(process.execPath, [
+    CHECK, "--layout", duplicateLayoutPath, "--types", duplicateTypesPath, "--map", ROUTE_MAP,
+    "--dsl", duplicateDslPath, "--xaml", duplicateXamlPath, "--json", duplicatePassReportPath
+  ], { encoding: "utf8" });
+  assert.strictEqual(duplicatePass.status, 0, "约束完整发射时 R13 必须通过: " + duplicatePass.stdout + duplicatePass.stderr);
+  const duplicatePassReport = JSON.parse(fs.readFileSync(duplicatePassReportPath, "utf8"));
+  assert.ok(!duplicatePassReport.findings.some(function (item) { return item.rule === "R13"; }),
+    "约束完整发射时 R13 不得产生 finding");
+
   fs.writeFileSync(duplicateXamlPath, duplicateXaml.replace(' MinWidth="80"', ""), "utf8");
 
   const duplicateReportPath = path.join(tmp, "duplicate-report.json");

@@ -162,7 +162,7 @@ function emittedConstraintAttrsByRef(xamlText, layout, map) {
         cursor = nested.cursor;
         continue;
       }
-      const spec = specOf(map, cell.controlType);
+      const spec = (map.controlTypes || {})[cell.controlType];
       if (!spec || !spec.element) throw new Error("写法表没有格子 " + cell.ref + " 的发射元素");
       if (tag.name !== spec.element) {
         throw new Error("格子 " + cell.ref + " 应发射 " + spec.element + "，实际是 " + tag.name);
