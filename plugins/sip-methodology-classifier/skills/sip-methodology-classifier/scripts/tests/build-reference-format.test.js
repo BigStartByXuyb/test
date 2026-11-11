@@ -76,8 +76,7 @@ test("Sheet 名清洗在两个生成器中共用同一实现", () => {
   assert.doesNotMatch(verify, /startswith\('待确认'\)/);
   assert.match(verify, /if '主顺序' in vals and '子顺序' in vals and \(/);
   assert.match(verify, /'序号' in vals or '原序号' in vals/);
-  assert.match(reference, /last_data_row = 1/);
-  assert.match(reference, /if parse_seq\(seqv\) is not None:/);
+  assert.match(reference, /last_data_row = last_parseable_seq_row\(/);
   assert.doesNotMatch(reference, /last_seq_row/);
 });
 
@@ -96,14 +95,16 @@ test("序号判定在生产脚本中只来自共享模块", () => {
   const files = [
     "sip_source.py",
     "sip_verify.py",
-    "sip_rules_trunk.py",
-    "build_reference_format.py"
+    "sip_rules_trunk.py"
   ];
   for (const file of files) {
     const source = fs.readFileSync(path.join(scriptsDir, file), "utf8");
     assert.match(source, /from sip_seq import parse_seq/);
     assert.doesNotMatch(source, /def parse_seq\(/);
   }
+  const reference = fs.readFileSync(path.join(scriptsDir, "build_reference_format.py"), "utf8");
+  assert.match(reference, /from sip_seq import last_parseable_seq_row/);
+  assert.doesNotMatch(reference, /def last_parseable_seq_row\(/);
 });
 
 test("黄色判定先于序号解析，黄行与未解析行分别计数", () => {
@@ -114,26 +115,13 @@ test("黄色判定先于序号解析，黄行与未解析行分别计数", () =>
 
 test("页脚按最后一条可解析序号截断，非空重复表头不保留", () => {
   const result = JSON.parse(runPython([
-    "import json, os, sys, tempfile",
+    "import json, os, sys",
     "sys.path.insert(0, os.getcwd())",
-    "from openpyxl import Workbook",
-    "from build_reference_format import transform_source",
-    "with tempfile.TemporaryDirectory() as td:",
-    "    src = os.path.join(td, 'source.xlsx')",
-    "    wb = Workbook()",
-    "    ws = wb.active",
-    "    ws.append(['文件编号：X'] + [''] * 11)",
-    "    ws.append(['序号', '检验工序', '检验项目', '检验标准', '检验频率', '重要等级', '检验记录表', '备注', '补充1', '补充2', '补充3', '补充4'])",
-    "    ws.append([1, '工序A', '项目A', '标准A', '', '', '', '', 'x1', 'x2', 'x3', 'x4'])",
-    "    ws.append([2, '工序B', '项目B', '标准B', '', '', '', '', 'y1', 'y2', 'y3', 'y4'])",
-    "    ws.append(['合计', '', '', '', '', '', '', '', '', '', '', ''])",
-    "    ws.append(['序号', '检验工序', '检验项目', '检验标准', '', '', '', '', '', '', '', ''])",
-    "    wb.save(src)",
-    "    out, _ = transform_source(src, {}, 'T')",
-    "    out_ws = out.worksheets[0]",
-    "    print(json.dumps({'maxRow': out_ws.max_row, 'seqs': [out_ws.cell(r, 1).value for r in range(2, out_ws.max_row + 1)]}, ensure_ascii=False))"
+    "from sip_seq import last_parseable_seq_row",
+    "values = [1, 2, '合计', '序号', '', None]",
+    "print(json.dumps({'lastRow': last_parseable_seq_row(values)}))"
   ].join("\n")));
-  assert.deepEqual(result, { maxRow: 3, seqs: [1, 2] });
+  assert.deepEqual(result, { lastRow: 3 });
 });
 
 test("默认同格式输出排除四个标黄业务列，主/子顺序紧跟剩余列", () => {

@@ -34,7 +34,7 @@ if HERE not in sys.path:
 
 from sip_rules import classify, load_reference, header_key, family_label  # noqa: E402
 from sip_source import parse_sheet, discover_projects, find_header_row  # noqa: E402
-from sip_seq import parse_seq  # noqa: E402
+from sip_seq import last_parseable_seq_row  # noqa: E402
 from sip_family_detect import detect_family_from_rows  # noqa: E402
 from sip_verify import verify_file, format_results  # noqa: E402
 from sip_sheet_name import safe_name  # noqa: E402
@@ -113,11 +113,8 @@ def transform_source(src_path, row_map, title):
     main_col = last_data_col + 1
     sub_col = last_data_col + 2
 
-    last_data_row = 1
-    for r in range(2, ws.max_row + 1):
-        seqv = ws.cell(r, col_seq).value
-        if parse_seq(seqv) is not None:
-            last_data_row = r
+    last_data_row = last_parseable_seq_row(
+        ws.cell(r, col_seq).value for r in range(2, ws.max_row + 1))
     if last_data_row < ws.max_row:
         ws.delete_rows(last_data_row + 1, ws.max_row - last_data_row)
     if max_col0 > 12:
