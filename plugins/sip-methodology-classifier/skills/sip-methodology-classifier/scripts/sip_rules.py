@@ -56,7 +56,8 @@ def _branch_override(family, stage, std):
     for prefix, main, sub in getattr(mod, 'STAGE_PREFIX_RULES', []):
         if stage.startswith(prefix):
             return main, sub
-    if stage in getattr(mod, 'BOM_STAGES', set()):
+    bom_stages = getattr(mod, 'BOM_STAGES', set())
+    if any(stage == bom or stage.startswith(bom) for bom in bom_stages):
         return _bom_result(std)
     for keywords, result in getattr(mod, 'KEYWORD_RULES', []):
         if any(keyword in stage for keyword in keywords):

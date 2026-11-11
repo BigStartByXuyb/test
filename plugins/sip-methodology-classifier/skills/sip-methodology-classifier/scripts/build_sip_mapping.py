@@ -76,7 +76,7 @@ SUB_MEANING = {
 
 # ---------------------------------------------------------------- 输出
 def write_workbook(all_rows, projects, out_path, ref=None, verify=None,
-                   skipped_yellow=0):
+                   skipped_yellow=0, skipped_invalid=0):
     wb = Workbook()
     wb.remove(wb.active)
     thin = Side(style='thin', color='BFBFBF')
@@ -199,6 +199,7 @@ def write_workbook(all_rows, projects, out_path, ref=None, verify=None,
         ('设备族', '每条记录最后一列：SDC/EXP/SLG 为识别到的设备族；'
                 '“未知类型（按主干，需复核）”表示未识别出设备族，当前按主干规则归类。'),
         ('标黄跳过行', f'解析时跳过序号单元格为黄色的行：{skipped_yellow} 行。'),
+        ('序号未解析行', f'解析时跳过序号不是正整数的行：{skipped_invalid} 行。'),
     ]
     for k, v in intro:
         ws.cell(row=r, column=1, value=k).font = Font(name='微软雅黑', size=10, bold=True)
@@ -371,12 +372,14 @@ def main():
         print(f'  {pname}: {len(files)} 个文件 ({pdir})')
 
     all_rows = []
-    skipped_total = 0
+    skipped_yellow_total = 0
+    skipped_invalid_total = 0
     for pname, pdir, files in projects:
         for f in files:
             path = os.path.join(pdir, f)
             rows, skipped = parse_sheet(path, pname)
-            skipped_total += skipped
+            skipped_yellow_total += skipped['yellow']
+            skipped_invalid_total += skipped['invalid']
             family = detect_family_from_rows(rows, file_name=f)
             for row in rows:
                 (main, sub), source = classify(
@@ -390,7 +393,8 @@ def main():
                 row['family'] = family
             all_rows.extend(rows)
             print(f'  {f}: {len(rows)} 行 [分支 {family_label(family)}]'
-                  + (f'（跳过黄行 {skipped}）' if skipped else ''))
+                  + (f'（跳过黄行 {skipped["yellow"]}；序号未解析 {skipped["invalid"]}）'
+                     if skipped['yellow'] or skipped['invalid'] else ''))
 
     if not all_rows:
         raise SystemExit('没有解析到任何有效数据行')
@@ -404,7 +408,8 @@ def main():
         for line in format_results(verify):
             print('  ' + line)
 
-    write_workbook(all_rows, projects, args.output, ref, verify, skipped_total)
+    write_workbook(all_rows, projects, args.output, ref, verify,
+                   skipped_yellow_total, skipped_invalid_total)
     print(f'\n已生成: {os.path.abspath(args.output)}')
     print(f'总行数: {len(all_rows)}')
     from collections import Counter

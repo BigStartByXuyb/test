@@ -82,7 +82,7 @@ python -I <skill-dir>/scripts/build_reference_format.py --input "<zip或目录>"
   - `EXACT`：工序内个别项目的例外。
 - **共享行级规则与调度 `scripts/sip_rules.py`**：执行主干行级规则，并按分支优先、主干兜底合并，决定优先级和归类依据。
   - 行级拆分：流量压力表、气管水管、离子棒、NCS 检查、安全防护检查、接触式测高/刀刃外观、工控机、加密狗、杀毒软件。
-  - BOM 三分法：标准匹配 `Npcs：型号` → 铭牌 2 级；外观/安装/完好/牢固/无损伤 → 外观 1 级；其余 → 通电 5 级。
+  - BOM 三分法：标准以“数量 + `pcs`”开头（如 `2 pcs`）→ 铭牌 2 级；外观/安装/完好/牢固/无损伤 → 外观 1 级；其余 → 通电 5 级。
 - **设备族分支 `scripts/sip_family_<族>.py`**：只写本设备族特有的 `STAGE_RULES`、`EXACT`、`STAGE_PREFIX_RULES`、`BOM_STAGES`、`KEYWORD_RULES`，同名键覆盖主干。
   - 新增设备品类：复制一个分支文件（例如 `sip_family_xxx.py`），在 `sip_rules.py` 的 `_FAMILY_MODULES` 注册，并在 `sip_family_detect.py` 加识别条件；不改格式引擎和校验逻辑。
 - 遇到新机型的新工序：先判断是通用工序（加主干）还是设备族特有（加分支），再重跑；加了 `--reference` 时，脚本按标准答案的工作表名或机型代码匹配输入文件并逐行校验，匹配不到时不做比对。

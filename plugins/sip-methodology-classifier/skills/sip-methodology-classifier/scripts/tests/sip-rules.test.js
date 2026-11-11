@@ -141,6 +141,17 @@ test("SLG 的通用工序回到主干规则兜底", () => {
   assert.equal(actual["slg-vision"].reason, "分支规则");
 });
 
+test("SLG BOM 设备名带后缀时仍走同一套三分法", () => {
+  const actual = classify([
+    { key: "exact", stage: "冷水机", std: "2 pcs", family: "slg" },
+    { key: "suffix", stage: "冷水机检查", std: "2 pcs", family: "slg" },
+    { key: "laser", stage: "激光器外观", std: "安装牢固", family: "slg" }
+  ]);
+  assert.deepEqual(actual.exact, { result: ["1. 铭牌核对", "2级"], reason: "分支规则" });
+  assert.deepEqual(actual.suffix, actual.exact);
+  assert.deepEqual(actual.laser, { result: ["2. 外观检验", "1级"], reason: "分支规则" });
+});
+
 test("合并优先级文档不再声明不存在的主干前缀规则层", () => {
   const orderModel = fs.readFileSync(path.join(skillRoot, "reference", "order-model.md"), "utf8");
   assert.doesNotMatch(orderModel, /主干前缀\s*\/\s*BOM\s*\/\s*关键字/);

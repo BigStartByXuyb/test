@@ -225,6 +225,8 @@ def main():
     used = set()
     total = 0
     total_unclassified = 0
+    total_skipped_yellow = 0
+    total_skipped_invalid = 0
     total_branch_hits = 0
     total_trunk_hits = 0
     total_rule_inferred = 0
@@ -232,7 +234,9 @@ def main():
     for pname, pdir, files in projects:
         for f in files:
             path = os.path.join(pdir, f)
-            rows, _ = parse_sheet(path, pname)
+            rows, skipped = parse_sheet(path, pname)
+            total_skipped_yellow += skipped['yellow']
+            total_skipped_invalid += skipped['invalid']
             probe = load_workbook(path, data_only=True)
             n_title = find_header_row(probe.worksheets[0]) - 1
             family = detect_family_from_rows(rows, file_name=f)
@@ -264,7 +268,7 @@ def main():
             total_trunk_hits += trunk_hits
             total_rule_inferred += rule_inferred
             extra = f' [分支 {family_label(family)}]'
-            extra += f'（未解析/跳过行 {len(unclassified)}，M/N 留空）'
+            extra += f'（跳过黄行 {skipped["yellow"]}；序号未解析 {skipped["invalid"]}；M/N 空行 {len(unclassified)}）'
             extra += f'（分支规则 {branch_hits}；主干规则 {trunk_hits}；'
             extra += f'规则推断 {rule_inferred}{"，建议复核" if rule_inferred else ""}）'
             print(f'  {title}: {max(0, dst.max_row - 1)} 行{extra}')
@@ -275,7 +279,7 @@ def main():
     out_wb.save(args.output)
     print(f'\n已生成: {os.path.abspath(args.output)}')
     print(f'总数据行: {total}')
-    print(f'未解析/跳过行: {total_unclassified}（M/N 留空，请复核）')
+    print(f'未解析/跳过行: 跳过黄行 {total_skipped_yellow}；序号未解析 {total_skipped_invalid}；M/N 空行 {total_unclassified}（请复核）')
     print(f'分支规则行: {total_branch_hits}')
     print(f'主干规则行: {total_trunk_hits}')
     print(f'规则推断行: {total_rule_inferred}'

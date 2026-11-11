@@ -101,3 +101,9 @@ test("序号判定在生产脚本中只来自共享模块", () => {
     assert.doesNotMatch(source, /def parse_seq\(/);
   }
 });
+
+test("黄色判定先于序号解析，黄行与未解析行分别计数", () => {
+  const source = fs.readFileSync(path.join(scriptsDir, "sip_source.py"), "utf8");
+  assert.ok(source.indexOf("yellow = is_yellow(seq_cell)") < source.indexOf("seq = parse_seq(seq_cell.value)"));
+  assert.match(source, /if yellow:[\s\S]*skipped\['yellow'\] \+= 1[\s\S]*if seq is None:[\s\S]*skipped\['invalid'\] \+= 1/);
+});

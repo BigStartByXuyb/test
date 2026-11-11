@@ -77,14 +77,16 @@ def parse_sheet(path, project):
 
     rows = []
     stage = item = ''
-    skipped_yellow = 0
+    skipped = {'yellow': 0, 'invalid': 0}
     for r in range(hr + 1, ws.max_row + 1):
-        seqv = ws.cell(r, c_seq).value
-        seq = parse_seq(seqv)
-        if seq is None:
+        seq_cell = ws.cell(r, c_seq)
+        yellow = is_yellow(seq_cell)
+        seq = parse_seq(seq_cell.value)
+        if yellow:
+            skipped['yellow'] += 1
             continue
-        if is_yellow(ws.cell(r, c_seq)):
-            skipped_yellow += 1
+        if seq is None:
+            skipped['invalid'] += 1
             continue
         b = cell_text(ws, r, c_stage)
         if b:
@@ -108,7 +110,7 @@ def parse_sheet(path, project):
             tool=cell_text(ws, r, c_tool),
             src=r,
         ))
-    return rows, skipped_yellow
+    return rows, skipped
 
 
 def _xlsx_files(d):
