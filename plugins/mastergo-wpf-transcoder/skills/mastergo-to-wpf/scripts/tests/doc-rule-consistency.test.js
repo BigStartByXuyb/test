@@ -337,6 +337,12 @@ for (const [label, text] of [["mtslg-mode.md", modeDoc], ["feishu-component-libr
 for (const phrase of ["Style 属性省略", "省略 Style", "刻意不写 Style", "null（不写 Style）", "没有真实 Value 或可选字段时删除对应属性"]) {
   assert.ok(!feishuMapping.includes(phrase), "飞书组件库映射不得保留与必写字段空字符串占位冲突的表述: " + phrase);
 }
+assert.ok(
+  feishuMapping.includes('Style 的非空值只有 MasterGo 明确提供且代码库存在对应资源键时才填写；必写字段集合登记 Style 时，取不到非空值仍发射 `Style=""` 空字符串占位，空字符串占位不属于资源键填写。'),
+  "飞书组件库映射必须区分 Style 非空资源键值与必写字段空字符串占位"
+);
+assert.ok(!feishuMapping.includes("Style 只有 MasterGo 明确提供且代码库存在对应资源键时才填写。"),
+  "飞书组件库映射不得把空字符串占位误写成对 Style 整体填写条件的限制");
 for (const line of skillLines(feishuMapping).filter((item) => item.includes("<IOContorl") && item.includes('ControlType="IconButton"'))) {
   assert.match(line, /\sStyle="/, "IconButton 示例必须发射 Style（无专用样式时为空字符串占位）");
 }
