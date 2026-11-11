@@ -2,7 +2,7 @@
 """按参考样张格式生成对应表（每个机型一个 Sheet）。
 
 与参考样张一致：
-  - 删除源表顶部标题行与页脚，表头位于第 1 行
+  - 删除源表顶部标题行；数据区截断到最后一条可解析正整数序号所在行，后续页脚整行删除
   - 从前 12 列排除检验频率、重要等级、检验记录表、备注，保留其余列与合并单元格（整体上移）
   - 在剩余列之后追加主顺序 / 子顺序（按原表行位置填值）
   - 统一列宽、表头字体/填充、数据字体、边框、冻结窗格
@@ -34,6 +34,7 @@ if HERE not in sys.path:
 
 from sip_rules import classify, load_reference, header_key, family_label  # noqa: E402
 from sip_source import parse_sheet, discover_projects, find_header_row  # noqa: E402
+from sip_seq import parse_seq  # noqa: E402
 from sip_family_detect import detect_family_from_rows  # noqa: E402
 from sip_verify import verify_file, format_results  # noqa: E402
 from sip_sheet_name import safe_name  # noqa: E402
@@ -115,7 +116,7 @@ def transform_source(src_path, row_map, title):
     last_data_row = 1
     for r in range(2, ws.max_row + 1):
         seqv = ws.cell(r, col_seq).value
-        if seqv is not None and str(seqv).strip():
+        if parse_seq(seqv) is not None:
             last_data_row = r
     if last_data_row < ws.max_row:
         ws.delete_rows(last_data_row + 1, ws.max_row - last_data_row)

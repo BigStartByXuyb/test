@@ -829,7 +829,8 @@ function mergeMode() {
     const finalAttrs = new Map();
     for (const a of t.attrs) finalAttrs.set(a.name, a.value);
     // TextBlock 的宽度约束和按钮族的 IconWidth/IconHeight 都属于生成器计算的布局属性：
-    // 映射有值就更新，映射没有就删除；旧常规 Width / MinHeight / MaxHeight 不得残留。
+    // 映射有值就更新，映射没有就删除；旧常规 Width 和 TextBlock 的
+    // MinWidth / MaxWidth / MinHeight / MaxHeight 都不得残留。
     const textBlockConstraintKeys = type === 'TextBlock'
       ? ['MinWidth', 'MaxWidth', 'MinHeight', 'MaxHeight']
       : [];

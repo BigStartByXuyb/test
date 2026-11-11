@@ -97,7 +97,6 @@ def write_workbook(all_rows, projects, out_path, ref=None, verify=None,
     widths = [15, 8, 10, 24, 15, 8, 16, 30, 16, 46, 12, 13, 10, 10]
 
     used = set(RESERVED_SHEET_NAMES)
-    project_order = [p[0] for p in projects]
     for pname, _, files in projects:
         ws = wb.create_sheet(safe_name(pname, used, fallback='项目'))
         ws.sheet_view.showGridLines = False

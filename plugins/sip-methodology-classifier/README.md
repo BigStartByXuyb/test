@@ -29,6 +29,7 @@
 
 - 每个机型一个 Sheet，表头在第 1 行。
 - 保留源表前 12 列中的业务列并保持原列顺序；检验频率、重要等级、检验记录表、备注四列不输出，因此实际源列数可能少于 12。主顺序、子顺序追加在剩余列之后。
+- 数据区截止到最后一条可解析正整数序号所在行；其后的页脚、合计行或重复表头整行删除。
 - 保留剩余源列的单元格值与合并区域；文件编号、版本等表头以上元数据随标题行删除；列宽、字体、表头填充、数据区边框按参考样张统一，冻结窗格固定为 `A3`；行顺序保持原表顺序。
 - 标点规范化为全角括号/冒号，折叠连续空格，`l/min` → `L/min`。
 
@@ -137,7 +138,10 @@ sip-methodology-classifier/
         ├── build_reference_format.py     # 默认：同格式输出（每机型一个 Sheet）
         ├── build_sip_mapping.py          # 可选：按环节分组的分析视图
         ├── extract_gbk_zip.py            # GBK zip 解压
-        └── verify_against_reference.py   # 标准答案校验命令
+        ├── verify_against_reference.py   # 标准答案校验命令
+        └── tests/
+            ├── build-reference-format.test.js
+            └── sip-rules.test.js
 ```
 
 ## 注意
