@@ -547,7 +547,7 @@ $StartStep = Get-Step $Progress
 $EndStep = if ($StopAfter) { Get-Step $StopAfter } else { $Steps[-1] }
 if ($EndStep.Id -lt $StartStep.Id) { throw "-StopAfter 不能早于 -Progress" }
 
-# 断点续跑：身份四项一律回放首次运行冻结在 run.json 里的值——续跑是"沿用同一次运行的身份"，
+# 断点续跑：身份五项一律回放首次运行冻结在 run.json 里的值——续跑是"沿用同一次运行的身份"，
 # 不是"重新做一次身份判定"。这样 capture 拿到的一定是首次那份身份（不会退回 DSL 根节点名），
 # 项目登记表 `docs/page-registry.json` 之后的增删改也不会再影响正在续跑的这一次。
 # 省略 → 用冻结值；显式传不同的值、或给首次运行时缺失的身份补值 → fail-closed，改身份只能新开运行。

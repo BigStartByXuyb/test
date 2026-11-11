@@ -95,18 +95,52 @@ test("序号判定在生产脚本中只来自共享模块", () => {
   const files = [
     "sip_source.py",
     "sip_verify.py",
-    "sip_rules_trunk.py",
-    "build_reference_format.py"
+    "sip_rules_trunk.py"
   ];
   for (const file of files) {
     const source = fs.readFileSync(path.join(scriptsDir, file), "utf8");
     assert.match(source, /from sip_seq import parse_seq/);
     assert.doesNotMatch(source, /def parse_seq\(/);
   }
+  const reference = fs.readFileSync(path.join(scriptsDir, "build_reference_format.py"), "utf8");
+  assert.doesNotMatch(reference, /from sip_seq import parse_seq/);
 });
 
 test("黄色判定先于序号解析，黄行与未解析行分别计数", () => {
   const source = fs.readFileSync(path.join(scriptsDir, "sip_source.py"), "utf8");
   assert.ok(source.indexOf("yellow = is_yellow(seq_cell)") < source.indexOf("seq = parse_seq(seq_cell.value)"));
   assert.match(source, /if yellow:[\s\S]*skipped\['yellow'\] \+= 1[\s\S]*if seq is None:[\s\S]*skipped\['invalid'\] \+= 1/);
+});
+
+test("默认同格式输出排除四个标黄业务列，M/N 紧跟剩余列", () => {
+  const result = JSON.parse(runPython([
+    "import json, os, sys, tempfile",
+    "sys.path.insert(0, os.getcwd())",
+    "from openpyxl import Workbook, load_workbook",
+    "from openpyxl.styles import PatternFill",
+    "from build_reference_format import transform_source",
+    "with tempfile.TemporaryDirectory() as d:",
+    "    src = os.path.join(d, 'source.xlsx')",
+    "    out = os.path.join(d, 'output.xlsx')",
+    "    wb = Workbook()",
+    "    ws = wb.active",
+    "    ws.append(['文件编号：A', '版本：V1'])",
+    "    ws.append(['序号', '检验工序', '检验项目', '检验标准', '检验频率', '重要等级', '检验记录表', '备注', '检验方法', '检验工具'])",
+    "    ws.append([1, '工序A', '项目A', '标准A', '每批', 'A', '记录A', '备注A', '方法A', '工具A'])",
+    "    yellow = PatternFill(fill_type='solid', start_color='FFFFFF00', end_color='FFFFFF00')",
+    "    for cell in (ws['A1'], ws['B1'], *ws[2][4:8]):",
+    "        cell.fill = yellow",
+    "    wb.save(src)",
+    "    output, unclassified = transform_source(src, {2: ('2. 外观检验', '1级')}, 'Demo')",
+    "    output.save(out)",
+    "    check = load_workbook(out).worksheets[0]",
+    "    headers = [check.cell(1, c).value for c in range(1, check.max_column + 1)]",
+    "    values = [check.cell(2, c).value for c in range(1, check.max_column + 1)]",
+    "    print(json.dumps({'headers': headers, 'values': values, 'unclassified': unclassified}, ensure_ascii=False))"
+  ].join("\n")));
+  assert.deepEqual(result, {
+    headers: ["序号", "检验工序", "检验项目", "检验标准", "检验方法", "检验工具", "主顺序", "子顺序（1级优先进行，12级最后进行）"],
+    values: [1, "工序A", "项目A", "标准A", "方法A", "工具A", "2. 外观检验", "1级"],
+    unclassified: []
+  });
 });

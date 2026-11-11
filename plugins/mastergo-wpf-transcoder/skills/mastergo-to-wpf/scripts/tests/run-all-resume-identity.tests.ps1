@@ -16,6 +16,7 @@ function New-Fixture {
         [string] $Name,
         [string] $FrozenUi = 'F8',
         [string] $RegistryUi = 'F8',
+        [string] $FrozenMode = 'mtslg-iocontrol',
         [string] $FrozenDesignPageName = '设计页 A',
         [string] $RegistryDesignPageName = '设计页 A',
         [switch] $DropRegistryPage
@@ -44,6 +45,7 @@ function New-Fixture {
         target = 'Demo'
         projectRoot = $project
         identity = [ordered]@{
+            mode = $FrozenMode
             fileId = 'file-A'
             layerId = 'layer-A'
             ui = $FrozenUi
@@ -121,6 +123,30 @@ $out1" )
     $out8 = Invoke-Resume -Project $case8 -Extra @('-LayerId', 'layer-B')
     Assert-True ($out8 -match '不属于同一页') '混合身份（-Target 与 -LayerId 来自不同页）必须被拒绝'
     Assert-True ($out8 -notmatch '缺少 Bundle 审计') '混合身份必须在消费前置检查之前就拦下'
+
+    # 8.1) 路线是采集身份的一部分：显式改 -Mode 必须被拒绝并提示从 fetch 新开。
+    $case81 = New-Fixture -Name 'mode-changed'
+    $out81 = Invoke-Resume -Project $case81 -Extra @('-Mode', 'mw-wpf')
+    Assert-True ($out81 -match '续跑不能更改 identity.mode') '显式改路线必须被身份守卫拒绝'
+    Assert-True ($out81 -match '新开一次运行') '拒绝改路线时必须给出新开运行的处置'
+
+    # 8.2) 未登记 mode 的登记表：不带显式路线可续跑；显式 -Mode 视为补写身份。
+    $case82 = New-Fixture -Name 'mode-omitted'
+    $runFile82 = Join-Path $case82 'Generated\runs\Demo\run.json'
+    $doc82 = Get-Content -LiteralPath $runFile82 -Raw | ConvertFrom-Json
+    $doc82.identity.PSObject.Properties.Remove('mode')
+    ($doc82 | ConvertTo-Json -Depth 10) | Set-Content -LiteralPath $runFile82 -Encoding UTF8
+    $out82 = Invoke-Resume -Project $case82
+    Assert-True ($out82 -match '缺少 Bundle 审计') '未登记 mode 且未显式传路线时应允许续跑'
+    Assert-True ($out82 -notmatch '续跑不能') '未登记 mode 且未显式传路线时不应触发身份守卫'
+
+    $case83 = New-Fixture -Name 'mode-backfill'
+    $runFile83 = Join-Path $case83 'Generated\runs\Demo\run.json'
+    $doc83 = Get-Content -LiteralPath $runFile83 -Raw | ConvertFrom-Json
+    $doc83.identity.PSObject.Properties.Remove('mode')
+    ($doc83 | ConvertTo-Json -Depth 10) | Set-Content -LiteralPath $runFile83 -Encoding UTF8
+    $out83 = Invoke-Resume -Project $case83 -Extra @('-Mode', 'mtslg-iocontrol')
+    Assert-True ($out83 -match '补值') '未登记 mode 时显式传路线必须按补写身份拒绝'
 
     # 9) 逐阶段输入复校：已登记的采集产物被改过 → 续跑当场拒绝（不再静默消费）
     $case9 = New-Fixture -Name 'tampered-input'

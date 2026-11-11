@@ -26,6 +26,7 @@ from copy import copy
 
 from openpyxl import load_workbook, Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 if HERE not in sys.path:
@@ -36,7 +37,7 @@ from sip_source import parse_sheet, discover_projects, find_header_row  # noqa: 
 from sip_family_detect import detect_family_from_rows  # noqa: E402
 from sip_verify import verify_file, format_results  # noqa: E402
 from sip_sheet_name import safe_name  # noqa: E402
-from sip_seq import parse_seq  # noqa: E402
+from sip_rules_trunk import EXCLUDED_COLUMN_HEADERS  # noqa: E402
 from extract_gbk_zip import extract as extract_zip  # noqa: E402
 
 try:
@@ -61,6 +62,20 @@ def normalize_text(s):
     s = s.replace('(', '（').replace(')', '）').replace(':', '：')
     s = re.sub(r'[ \t]+', ' ', s).strip(' \t')
     return s.replace('l/min', 'L/min')
+
+
+def excluded_source_columns(ws, header_row, source_columns):
+    return [
+        col for col in source_columns
+        if header_key(ws.cell(header_row, col).value) in EXCLUDED_COLUMN_HEADERS
+    ]
+
+
+def remap_merge_columns(start, end, column_map):
+    mapped = [column_map[col] for col in range(start, end + 1) if col in column_map]
+    if not mapped:
+        return None
+    return min(mapped), max(mapped)
 
 
 
@@ -89,6 +104,14 @@ def transform_source(src_path, row_map, title):
     if col_seq is None:
         raise ValueError('找不到序号列')
 
+    source_columns = list(range(1, min(max_col0, 12) + 1))
+    dropped_columns = excluded_source_columns(ws, 1, source_columns)
+    kept_columns = [col for col in source_columns if col not in dropped_columns]
+    column_map = {source: target for target, source in enumerate(kept_columns, start=1)}
+    last_data_col = len(kept_columns)
+    main_col = last_data_col + 1
+    sub_col = last_data_col + 2
+
     last_data_row = 1
     for r in range(2, ws.max_row + 1):
         seqv = ws.cell(r, col_seq).value
@@ -97,23 +120,29 @@ def transform_source(src_path, row_map, title):
     if last_data_row < ws.max_row:
         ws.delete_rows(last_data_row + 1, ws.max_row - last_data_row)
     if max_col0 > 12:
-        ws.delete_cols(13, ws.max_column - 12)
+        ws.delete_cols(13, max_col0 - 12)
+    for col in sorted(dropped_columns, reverse=True):
+        ws.delete_cols(col, 1)
 
     # 标点规范化（在重建合并区域之前）
-    for row in ws.iter_rows(min_row=2, max_row=last_data_row, min_col=1, max_col=12):
+    for row in ws.iter_rows(min_row=2, max_row=last_data_row, min_col=1, max_col=last_data_col):
         for cell in row:
             cell.value = normalize_text(cell.value)
 
     # 重建合并区域
     for c1, r1, c2, r2 in orig_merges:
-        if c2 > 12:
+        if c1 not in column_map or c2 not in column_map:
             continue
+        mapped = remap_merge_columns(c1, c2, column_map)
+        if mapped is None:
+            continue
+        nc1, nc2 = mapped
         nr1, nr2 = r1 - n_title, r2 - n_title
         if nr2 < 1 or nr1 > last_data_row:
             continue
         nr1, nr2 = max(1, nr1), min(last_data_row, nr2)
         if nr2 >= nr1:
-            ws.merge_cells(start_row=nr1, start_column=c1, end_row=nr2, end_column=c2)
+            ws.merge_cells(start_row=nr1, start_column=nc1, end_row=nr2, end_column=nc2)
 
     # 边框：普通单元格细框；合并区域只画外框；A 列左边 medium；末行下边 medium
     merge_map = {}
@@ -122,7 +151,7 @@ def transform_source(src_path, row_map, title):
             for cc in range(m.min_col, m.max_col + 1):
                 merge_map[(rr, cc)] = m
     for r in range(2, last_data_row + 1):
-        for c in range(1, 13):
+        for c in range(1, last_data_col + 1):
             m = merge_map.get((r, c))
             if m is None:
                 left, right, top, bottom = ('medium' if c == 1 else 'thin'), 'thin', 'thin', 'thin'
@@ -141,35 +170,37 @@ def transform_source(src_path, row_map, title):
 
     # M/N（未解析/跳过行留空，不填分类值）
     unclassified = []
-    ws.cell(1, 13, '主顺序')
-    ws.cell(1, 14, '子顺序（1级优先进行，12级最后进行）')
+    ws.cell(1, main_col, '主顺序')
+    ws.cell(1, sub_col, '子顺序（1级优先进行，12级最后进行）')
     for r in range(2, last_data_row + 1):
         if r in row_map:
             main, sub = row_map[r]
-            ws.cell(r, 13, main)
-            ws.cell(r, 14, sub)
+            ws.cell(r, main_col, main)
+            ws.cell(r, sub_col, sub)
         else:
             unclassified.append(r)
 
     # 样式
-    for c in range(1, 15):
+    for c in range(1, sub_col + 1):
         cell = ws.cell(1, c)
         cell.font = copy(HEADER_FONT)
         cell.fill = copy(HEADER_FILL)
         cell.alignment = copy(CENTER)
-        if c in (13, 14):
+        if c in (main_col, sub_col):
             cell.border = Border(left=THIN, right=THIN, top=THIN, bottom=THIN)
     ws.row_dimensions[1].height = HEADER_ROW_HEIGHT
     for r in range(2, last_data_row + 1):
-        for c in range(1, 15):
+        for c in range(1, sub_col + 1):
             cell = ws.cell(r, c)
             cell.font = copy(DATA_FONT)
-            if c in (13, 14):
+            if c in (main_col, sub_col):
                 cell.alignment = copy(CENTER)
                 cell.border = Border(left=THIN, right=THIN, top=THIN, bottom=THIN)
         ws.row_dimensions[r].height = None
-    for col, w in WIDTHS.items():
-        ws.column_dimensions[col].width = w
+    for source_col, target_col in column_map.items():
+        ws.column_dimensions[get_column_letter(target_col)].width = WIDTHS[get_column_letter(source_col)]
+    ws.column_dimensions[get_column_letter(main_col)].width = WIDTHS['M']
+    ws.column_dimensions[get_column_letter(sub_col)].width = WIDTHS['N']
     ws.freeze_panes = 'A3'
     ws.title = title
     return wb, unclassified

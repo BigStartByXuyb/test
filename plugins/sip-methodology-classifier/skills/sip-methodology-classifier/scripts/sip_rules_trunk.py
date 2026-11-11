@@ -34,10 +34,11 @@ def norm(s):
             .replace('　', '').replace('（', '(').replace('）', ')'))
 
 
+EXCLUDED_COLUMN_HEADERS = ('检验频率', '重要等级', '检验记录表', '备注')
 HEADER_BASES = (
     '序号', '检验工序', '检验项目', '检验标准', '检验方法', '检验工具',
-    '主顺序', '子顺序', '检验频率', '重要等级', '检验记录表', '备注',
-)
+    '主顺序', '子顺序',
+) + EXCLUDED_COLUMN_HEADERS
 
 
 def header_key(v):
