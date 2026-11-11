@@ -141,8 +141,8 @@ test("默认同格式输出排除四个标黄业务列，主/子顺序紧跟剩�
   ]) {
     assert.doesNotMatch(
       fs.readFileSync(file, "utf8"),
-      /M\/N|M 主顺序|N 子顺序|A[–-]L/,
-      file + " 不得保留已废弃的固定 M/N 或 A-L 口径"
+      /M\/N|M 主顺序|N 子顺序|\b[A-Z]\s*[–—−-]\s*[A-Z]\b/,
+      file + " 不得保留已废弃的固定 M/N 或固定 Excel 列范围口径"
     );
   }
 });
