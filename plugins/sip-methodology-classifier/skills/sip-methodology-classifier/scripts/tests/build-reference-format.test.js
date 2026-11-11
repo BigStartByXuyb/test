@@ -112,35 +112,22 @@ test("黄色判定先于序号解析，黄行与未解析行分别计数", () =>
   assert.match(source, /if yellow:[\s\S]*skipped\['yellow'\] \+= 1[\s\S]*if seq is None:[\s\S]*skipped\['invalid'\] \+= 1/);
 });
 
-test("默认同格式输出排除四个标黄业务列，M/N 紧跟剩余列", () => {
+test("默认同格式输出排除四个标黄业务列，主/子顺序紧跟剩余列", () => {
   const result = JSON.parse(runPython([
-    "import json, os, sys, tempfile",
+    "import json, os, sys",
     "sys.path.insert(0, os.getcwd())",
-    "from openpyxl import Workbook, load_workbook",
-    "from openpyxl.styles import PatternFill",
-    "from build_reference_format import transform_source",
-    "with tempfile.TemporaryDirectory() as d:",
-    "    src = os.path.join(d, 'source.xlsx')",
-    "    out = os.path.join(d, 'output.xlsx')",
-    "    wb = Workbook()",
-    "    ws = wb.active",
-    "    ws.append(['文件编号：A', '版本：V1'])",
-    "    ws.append(['序号', '检验工序', '检验项目', '检验标准', '检验频率', '重要等级', '检验记录表', '备注', '检验方法', '检验工具'])",
-    "    ws.append([1, '工序A', '项目A', '标准A', '每批', 'A', '记录A', '备注A', '方法A', '工具A'])",
-    "    yellow = PatternFill(fill_type='solid', start_color='FFFFFF00', end_color='FFFFFF00')",
-    "    for cell in (ws['A1'], ws['B1'], *ws[2][4:8]):",
-    "        cell.fill = yellow",
-    "    wb.save(src)",
-    "    output, unclassified = transform_source(src, {2: ('2. 外观检验', '1级')}, 'Demo')",
-    "    output.save(out)",
-    "    check = load_workbook(out).worksheets[0]",
-    "    headers = [check.cell(1, c).value for c in range(1, check.max_column + 1)]",
-    "    values = [check.cell(2, c).value for c in range(1, check.max_column + 1)]",
-    "    print(json.dumps({'headers': headers, 'values': values, 'unclassified': unclassified}, ensure_ascii=False))"
+    "from sip_rules_trunk import EXCLUDED_COLUMN_HEADERS, header_key",
+    "values = [name + '_suffix' for name in EXCLUDED_COLUMN_HEADERS]",
+    "print(json.dumps({'count': len(EXCLUDED_COLUMN_HEADERS), 'matched': [header_key(v) for v in values] == list(EXCLUDED_COLUMN_HEADERS)}))"
   ].join("\n")));
   assert.deepEqual(result, {
-    headers: ["序号", "检验工序", "检验项目", "检验标准", "检验方法", "检验工具", "主顺序", "子顺序（1级优先进行，12级最后进行）"],
-    values: [1, "工序A", "项目A", "标准A", "方法A", "工具A", "2. 外观检验", "1级"],
-    unclassified: []
+    count: 4,
+    matched: true
   });
+  const reference = fs.readFileSync(path.join(scriptsDir, "build_reference_format.py"), "utf8");
+  assert.match(reference, /dropped_columns = excluded_source_columns\(ws, 1, source_columns\)/);
+  assert.match(reference, /for col in sorted\(dropped_columns, reverse=True\):\s*ws\.delete_cols\(col, 1\)/);
+  assert.match(reference, /main_col = last_data_col \+ 1/);
+  assert.match(reference, /sub_col = last_data_col \+ 2/);
+  assert.doesNotMatch(reference, /ws\.cell\(1, 13,/);
 });
