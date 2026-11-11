@@ -145,4 +145,11 @@ test("默认同格式输出排除四个标黄业务列，主/子顺序紧跟剩�
       file + " 不得保留已废弃的固定 M/N 或固定 Excel 列范围口径"
     );
   }
+  for (const file of [path.join(pluginRoot, "README.md"), path.join(skillRoot, "SKILL.md")]) {
+    const source = fs.readFileSync(file, "utf8");
+    assert.match(source, /从 A 列到子顺序列/,
+      file + " 必须按动态输出范围描述参考样张比对");
+    assert.match(source, /实际保留源列数 \+ 2/,
+      file + " 必须写明输出列数 = 实际保留源列数 + 2");
+  }
 });
