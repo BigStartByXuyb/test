@@ -106,14 +106,14 @@ MasterGo 变体：单选-选中、单选-未选择、多选-选中、多选-未�
 固定节点：一个选择控件 IOContorl，无 TextBlock 子节点。
 
 ```
-<!-- 属性1=单选-选中/未选择：使用默认 RadioButtonBaseStyle，除非 MasterGo 明确提供已登记 Style -->
-<IOContorl ID="{id}" ControlType="RadioButton" IOState="{io_state}" Value="{value}" IOParam="{io_param}" IOName="{io_name}" IOCommand="{io_command}" IOEnable="{io_enable}" Left="{left}" Top="{top}" Width="{width}" Height="{height}" />
+<!-- 属性1=单选-选中/未选择：Style 是必写字段；无专用资源键时发空字符串占位 -->
+<IOContorl ID="{id}" ControlType="RadioButton" Style="" IOState="{io_state}" Value="{value}" IOParam="{io_param}" IOName="{io_name}" IOCommand="{io_command}" IOEnable="{io_enable}" Left="{left}" Top="{top}" Width="{width}" Height="{height}" />
 
-<!-- 属性1=多选-选中/未选择：使用默认 CheckBox 样式，除非 MasterGo 明确提供已登记 Style -->
+<!-- 属性1=多选-选中/未选择：CheckBox 不登记 Style，不发射该属性 -->
 <IOContorl ID="{id}" ControlType="CheckBox" IOState="{io_state}" Value="{value}" IOParam="{io_param}" IOName="{io_name}" IOCommand="{io_command}" IOEnable="{io_enable}" Left="{left}" Top="{top}" Width="{width}" Height="{height}" />
 ```
 
-属性1=选中/未选中→状态字段；由控件默认状态样式决定圆点/勾选颜色和显示状态。固定模板默认不写 Style：独立 RadioButton 使用隐式 RadioButtonBaseStyle，CheckBox 使用默认 CheckBox 样式；只有 MasterGo 明确提供并且代码库已登记对应样式时，才增加 Style 属性。
+属性1=选中/未选中→状态字段；由控件默认状态样式决定圆点/勾选颜色和显示状态。RadioButton 的 `Style` 属于必写字段：非空值只有 MasterGo 明确提供且代码库已登记对应资源键时才填写，否则发射 `Style=""` 空字符串占位，由运行时隐式 `RadioButtonBaseStyle` 提供默认外观。CheckBox 的 `controlTypeRequiredAttrs` 不包含 `Style`，不发射该属性。
 
 节点文案/业务值→Value；业务字段/动作→IOName/IOCommand。
 

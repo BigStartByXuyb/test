@@ -276,9 +276,11 @@ function summarize(registry) {
   return {
     runId: registry.runId,
     target: registry.target,
+    mode: registry.identity && registry.identity.mode,
     fileId: registry.identity && registry.identity.fileId,
     layerId: registry.identity && registry.identity.layerId,
     ui: registry.identity && registry.identity.ui,
+    designPageName: registry.identity && registry.identity.designPageName,
     artifactCount: artifacts.length,
     artifacts,
     outputCount: outputs.length,

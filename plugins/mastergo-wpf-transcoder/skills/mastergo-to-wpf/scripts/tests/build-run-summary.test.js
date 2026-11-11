@@ -59,7 +59,8 @@ function newProject() {
 
   const init = runNode(registryCli, [
     "init", "--project-root", root, "--target", "Demo",
-    "--file-id", "123", "--layer-id", "4:4", "--ui", "F2", "--design-page", "示例（1.2）"
+    "--file-id", "123", "--layer-id", "4:4", "--ui", "F2", "--design-page", "示例（1.2）",
+    "--mode", "mtslg-iocontrol"
   ]);
   assert.strictEqual(init.status, 0, init.stderr);
 
@@ -109,6 +110,11 @@ const summarize = (root, extra = []) => runNode(summaryCli, ["--project-root", r
   assert.strictEqual(summary.schemaVersion, "mastergo-run-summary/1");
   assert.strictEqual(summary.run.target, "Demo");
   assert.strictEqual(summary.run.runId.length > 0, true);
+  assert.strictEqual(summary.run.mode, "mtslg-iocontrol");
+  assert.strictEqual(summary.run.fileId, "123");
+  assert.strictEqual(summary.run.layerId, "4:4");
+  assert.strictEqual(summary.run.ui, "F2");
+  assert.strictEqual(summary.run.designPageName, "示例（1.2）");
   assert.strictEqual(summary.page.capturedNodes, 12);
   assert.deepStrictEqual(summary.page.controlTypes, { TextBlock: 1, IconButton: 1 });
   assert.strictEqual(summary.page.icons.extractSvgEntries, 3);

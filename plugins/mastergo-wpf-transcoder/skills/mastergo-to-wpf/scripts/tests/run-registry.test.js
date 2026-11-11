@@ -34,13 +34,16 @@ write("Generated/_inputs/Demo.lang-translations.json", { "标题": "Title" });
 // 1) init：写入身份、页面标题与输入指纹；默认落在 Generated/runs/<Target>/run.json
 let result = runCli(["init", "--project-root", root, "--target", "Demo", "--file-id", "123",
   "--layer-id", "4:4", "--ui", "F2", "--design-page", "示例（1.2）", "--page-title", "示例",
-  "--translations", "Generated/_inputs/Demo.lang-translations.json"]);
+  "--translations", "Generated/_inputs/Demo.lang-translations.json", "--mode", "mtslg-iocontrol"]);
 assert.strictEqual(result.status, 0, result.stderr);
 const registryFile = path.join(root, runDir, "run.json");
 assert.ok(fs.existsSync(registryFile), "init 必须创建 Generated/runs/<Target>/run.json");
 let run = JSON.parse(fs.readFileSync(registryFile, "utf8"));
 assert.strictEqual(run.target, "Demo");
+assert.strictEqual(run.identity.mode, "mtslg-iocontrol");
+assert.strictEqual(run.identity.fileId, "123");
 assert.strictEqual(run.identity.layerId, "4:4");
+assert.strictEqual(run.identity.ui, "F2");
 assert.strictEqual(run.identity.designPageName, "示例（1.2）");
 assert.strictEqual(run.inputs.pageTitleText, "示例");
 assert.ok(run.inputs.translations && run.inputs.translations.sha256, "译文清单必须登记指纹");
@@ -98,6 +101,14 @@ write("Resources/Pages/Demo/DemoPage.xml", "<IOContorl ID=\"\" />");
 write("Generated/Demo.mapping.json", { nodes: [] });
 result = runCli(["outputs", "--run", registryFile, "--manifest", "Generated/Demo.bundle.manifest.json"]);
 assert.strictEqual(result.status, 0, result.stderr);
+result = runCli(["show", "--run", registryFile]);
+assert.strictEqual(result.status, 0, result.stderr);
+const shown = JSON.parse(result.stdout);
+assert.strictEqual(shown.mode, "mtslg-iocontrol");
+assert.strictEqual(shown.fileId, "123");
+assert.strictEqual(shown.layerId, "4:4");
+assert.strictEqual(shown.ui, "F2");
+assert.strictEqual(shown.designPageName, "示例（1.2）");
 run = JSON.parse(fs.readFileSync(registryFile, "utf8"));
 assert.strictEqual(run.steps.length, 2);
 assert.strictEqual(run.steps[1].status, "failed");

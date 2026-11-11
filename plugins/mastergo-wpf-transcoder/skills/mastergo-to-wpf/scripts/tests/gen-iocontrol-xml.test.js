@@ -213,6 +213,8 @@ for (const [id, expected] of Object.entries(REQUIRED_BY_TYPE)) {
   }
   assertAttrOrder(tag, PAGE_ATTR_ORDER, id);
 }
+assert.ok(!/\sStyle=/.test(tagOf(typedXml, 'CHK_1')),
+  'CheckBox 的必写字段集不含 Style，不得发射该属性');
 
 // 门禁：按钮带 Icon 却没有 iconSize 必须直接失败
 const badMapping = path.join(dir, 'button-missing-iconsize.json');
