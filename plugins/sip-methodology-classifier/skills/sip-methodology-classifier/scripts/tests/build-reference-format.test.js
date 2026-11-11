@@ -12,6 +12,7 @@ const test = require("node:test");
 
 const skillRoot = path.resolve(__dirname, "..", "..");
 const scriptsDir = path.join(skillRoot, "scripts");
+const pluginRoot = path.resolve(skillRoot, "..", "..");
 const python = process.platform === "win32" ? "python" : "python3";
 
 function runPython(code) {
@@ -130,4 +131,18 @@ test("默认同格式输出排除四个标黄业务列，主/子顺序紧跟剩�
   assert.match(reference, /main_col = last_data_col \+ 1/);
   assert.match(reference, /sub_col = last_data_col \+ 2/);
   assert.doesNotMatch(reference, /ws\.cell\(1, 13,/);
+  for (const file of [
+    path.join(pluginRoot, "README.md"),
+    path.join(pluginRoot, "commands", "sip-classify.md"),
+    path.join(skillRoot, "SKILL.md"),
+    path.join(scriptsDir, "build_reference_format.py"),
+    path.join(scriptsDir, "verify_against_reference.py"),
+    path.join(scriptsDir, "sip_verify.py")
+  ]) {
+    assert.doesNotMatch(
+      fs.readFileSync(file, "utf8"),
+      /M\/N|M 主顺序|N 子顺序|A[–-]L/,
+      file + " 不得保留已废弃的固定 M/N 或 A-L 口径"
+    );
+  }
 });

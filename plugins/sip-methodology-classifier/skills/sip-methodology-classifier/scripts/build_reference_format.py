@@ -3,8 +3,8 @@
 
 与参考样张一致：
   - 删除源表顶部标题行与页脚，表头位于第 1 行
-  - 保留原 A-L 列与合并单元格（整体上移）
-  - 新增 M 主顺序 / N 子顺序（按原表行位置填值）
+  - 从前 12 列排除检验频率、重要等级、检验记录表、备注，保留其余列与合并单元格（整体上移）
+  - 在剩余列之后追加主顺序 / 子顺序（按原表行位置填值）
   - 统一列宽、表头字体/填充、数据字体、边框、冻结窗格
   - 标点规范化：半角括号/冒号转全角，连续空格折叠，l/min -> L/min
 
@@ -168,7 +168,7 @@ def transform_source(src_path, row_map, title):
                 left=Side(style=left), right=Side(style=right),
                 top=Side(style=top), bottom=Side(style=bottom))
 
-    # M/N（未解析/跳过行留空，不填分类值）
+    # 主顺序/子顺序（未解析/跳过行留空，不填分类值）
     unclassified = []
     ws.cell(1, main_col, '主顺序')
     ws.cell(1, sub_col, '子顺序（1级优先进行，12级最后进行）')
@@ -300,7 +300,7 @@ def main():
             total_trunk_hits += trunk_hits
             total_rule_inferred += rule_inferred
             extra = f' [分支 {family_label(family)}]'
-            extra += f'（跳过黄行 {skipped["yellow"]}；序号未解析 {skipped["invalid"]}；M/N 空行 {len(unclassified)}）'
+            extra += f'（跳过黄行 {skipped["yellow"]}；序号未解析 {skipped["invalid"]}；主顺序/子顺序空行 {len(unclassified)}）'
             extra += f'（分支规则 {branch_hits}；主干规则 {trunk_hits}；'
             extra += f'规则推断 {rule_inferred}{"，建议复核" if rule_inferred else ""}）'
             print(f'  {title}: {max(0, dst.max_row - 1)} 行{extra}')
@@ -311,7 +311,7 @@ def main():
     out_wb.save(args.output)
     print(f'\n已生成: {os.path.abspath(args.output)}')
     print(f'总数据行: {total}')
-    print(f'未解析/跳过行: 跳过黄行 {total_skipped_yellow}；序号未解析 {total_skipped_invalid}；M/N 空行 {total_unclassified}（请复核）')
+    print(f'未解析/跳过行: 跳过黄行 {total_skipped_yellow}；序号未解析 {total_skipped_invalid}；主顺序/子顺序空行 {total_unclassified}（请复核）')
     print(f'分支规则行: {total_branch_hits}')
     print(f'主干规则行: {total_trunk_hits}')
     print(f'规则推断行: {total_rule_inferred}'
