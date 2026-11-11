@@ -212,11 +212,11 @@ Style 与内部组件对照（只对下表列出的真实值成立）：
 | 恢复切割 | RightButtonStyle | 待组件库登记 |
 | 上下结构-icon+文案 | UpDownRightButtonStyle | 右侧栏-上下结构-icon+文案 |
 | startstop | UpDownRightButtonStyle | 待组件库登记 |
-| F+文案 | null（不写 Style） | 待组件库登记 |
-| 文案 大button | null（不写 Style） | 待组件库登记 |
-| 删除料盒-1 | null（不写 Style） | 待组件库登记 |
-| 删除料盒-2 | null（不写 Style） | 待组件库登记 |
-| 文案-小button | null（不写 Style） | 待组件库登记 |
+| F+文案 | null（仍发射 `Style=""`） | 待组件库登记 |
+| 文案 大button | null（仍发射 `Style=""`） | 待组件库登记 |
+| 删除料盒-1 | null（仍发射 `Style=""`） | 待组件库登记 |
+| 删除料盒-2 | null（仍发射 `Style=""`） | 待组件库登记 |
+| 文案-小button | null（仍发射 `Style=""`） | 待组件库登记 |
 
 文案→Value；业务字段/动作→IOName/IOCommand；PageName/IOVisible/IOCommand 按“按钮族固定参数”一节恒写；图标→Icon，图标尺寸→IconWidth/IconHeight（取台账命中条目节点 bbox；`enter`/`exit` 两个组件级固定变体的例外口径见下两节）；独立组件没有 F 键槽位，不生成 TopLeftContent。Icon 键可使用目标项目已确认键或当前页面唯一的临时 Geometry 键。本节的「变体值只决定 Style」只对其余变体成立：`enter`/`exit` 的 Style 与固定属性由各自独立固定模板登记。
 
@@ -286,7 +286,7 @@ Style 与内部组件对照（只对下表列出的真实值成立）：
 <IOContorl ID="{direction_id}" ControlType="TextBlock" LangName="{direction_lang}" Value="{direction}" Left="{direction_left}" Top="{direction_top}" Height="40" />
 ```
 
-按钮文案（例如 +5、-5、+1、-1）分别从对应 TEXT 节点读取并填入 Value；数值和方向文本分别从真实 TEXT 节点读取并填入对应 TextBlock.Value。业务字段/动作、状态、位置和尺寸从对应 MasterGo 节点读取；文本位置从各自节点 bbox 读取，TextBlock 高度固定 40，TextBlock 宽度只从 DSL `constraints` 发射 `MinWidth` / `MaxWidth`。无图标槽位时 Icon、IconWidth、IconHeight 仍恒写并输出空字符串值；PageName、IOVisible、IOCommand、IOEnable 按“按钮族固定参数”一节恒写；MasterGo 未提供的其他必写字段缺失时保留对应 XML 属性并输出空字符串值。
+按钮文案（例如 +5、-5、+1、-1）分别从对应 TEXT 节点读取并填入 Value；数值和方向文本分别从真实 TEXT 节点读取并填入对应 TextBlock.Value。业务字段/动作、状态、位置和尺寸从对应 MasterGo 节点读取；文本位置从各自节点 bbox 读取，TextBlock 高度固定 40，TextBlock 宽度只从 DSL `constraints` 发射 `MinWidth` / `MaxWidth`。无图标槽位时 Icon、IconWidth、IconHeight 仍恒写并输出空字符串值；PageName、IOVisible、IOCommand、IOEnable 按“按钮族固定参数”一节恒写；MasterGo 未提供的其他必写字段缺失时保留对应 XML 属性并输出空字符串值，`TextBlock` 的 `Align` 例外：缺失或非法取值直接失败，不写空占位。
 
 ### 固定模板：属性 1=加减快捷键操作-2有标题
 

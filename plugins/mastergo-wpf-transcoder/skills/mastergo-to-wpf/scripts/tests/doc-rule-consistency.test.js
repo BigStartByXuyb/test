@@ -334,7 +334,7 @@ for (const [label, text] of [["mtslg-mode.md", modeDoc], ["feishu-component-libr
   assert.ok(text.includes("模板不含图标字段"), label + " 必须写明模板不含图标字段时不写这三项");
   assert.ok(text.includes("无图标槽位时"), label + " 必须写明模板含图标字段但无图标槽位时的空字符串占位");
 }
-for (const phrase of ["Style 属性省略", "省略 Style", "刻意不写 Style", "没有真实 Value 或可选字段时删除对应属性"]) {
+for (const phrase of ["Style 属性省略", "省略 Style", "刻意不写 Style", "null（不写 Style）", "没有真实 Value 或可选字段时删除对应属性"]) {
   assert.ok(!feishuMapping.includes(phrase), "飞书组件库映射不得保留与必写字段空字符串占位冲突的表述: " + phrase);
 }
 for (const line of skillLines(feishuMapping).filter((item) => item.includes("<IOContorl") && item.includes('ControlType="IconButton"'))) {

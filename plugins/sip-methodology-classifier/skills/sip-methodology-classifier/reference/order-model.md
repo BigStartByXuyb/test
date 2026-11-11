@@ -155,11 +155,11 @@
 精确例外（exact_result）> EXACT（同名键分支覆盖主干）
 > 分支工序规则（STAGE_RULES）
 > 分支前缀规则（STAGE_PREFIX_RULES）
-> 分支 BOM_STAGES
+> 分支 BOM_STAGES（精确名或前缀）
 > 分支 KEYWORD_RULES
 > 主干行级规则（流量压力、气管水管、离子棒、安全防护、工控机、加密狗等）
 > 主干工序规则
-> 主干 BOM_STAGES
+> 主干 BOM_STAGES（精确名）
 > 主干关键字推断
 > 默认 (3. 通电检验, 5级) + 规则推断
 ```

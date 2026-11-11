@@ -125,7 +125,7 @@ sip-methodology-classifier/
     ├── reference/order-model.md
     └── scripts/
         ├── sip_rules.py                  # 主干行级规则执行 + 分支调度
-        ├── sip_rules_trunk.py            # 主干数据（9 主顺序、1–12 级、查询表）
+        ├── sip_rules_trunk.py            # 主干数据与标准值判定（9 主顺序、1–12 级、查询表）
         ├── sip_family_sdc.py             # 分支：刀轮/晶圆切割机
         ├── sip_family_exp.py             # 分支：扩片机
         ├── sip_family_slg.py             # 分支：激光切割设备（草稿，待同事确认）

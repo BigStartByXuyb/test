@@ -89,17 +89,18 @@ def transform_source(src_path, row_map, title):
     if col_seq is None:
         raise ValueError('找不到序号列')
 
-    last_seq_row = 1
+    last_data_row = 1
     for r in range(2, ws.max_row + 1):
-        if parse_seq(ws.cell(r, col_seq).value) is not None:
-            last_seq_row = r
-    if last_seq_row < ws.max_row:
-        ws.delete_rows(last_seq_row + 1, ws.max_row - last_seq_row)
+        seqv = ws.cell(r, col_seq).value
+        if seqv is not None and str(seqv).strip():
+            last_data_row = r
+    if last_data_row < ws.max_row:
+        ws.delete_rows(last_data_row + 1, ws.max_row - last_data_row)
     if max_col0 > 12:
         ws.delete_cols(13, ws.max_column - 12)
 
     # 标点规范化（在重建合并区域之前）
-    for row in ws.iter_rows(min_row=2, max_row=last_seq_row, min_col=1, max_col=12):
+    for row in ws.iter_rows(min_row=2, max_row=last_data_row, min_col=1, max_col=12):
         for cell in row:
             cell.value = normalize_text(cell.value)
 
@@ -108,9 +109,9 @@ def transform_source(src_path, row_map, title):
         if c2 > 12:
             continue
         nr1, nr2 = r1 - n_title, r2 - n_title
-        if nr2 < 1 or nr1 > last_seq_row:
+        if nr2 < 1 or nr1 > last_data_row:
             continue
-        nr1, nr2 = max(1, nr1), min(last_seq_row, nr2)
+        nr1, nr2 = max(1, nr1), min(last_data_row, nr2)
         if nr2 >= nr1:
             ws.merge_cells(start_row=nr1, start_column=c1, end_row=nr2, end_column=c2)
 
@@ -120,7 +121,7 @@ def transform_source(src_path, row_map, title):
         for rr in range(m.min_row, m.max_row + 1):
             for cc in range(m.min_col, m.max_col + 1):
                 merge_map[(rr, cc)] = m
-    for r in range(2, last_seq_row + 1):
+    for r in range(2, last_data_row + 1):
         for c in range(1, 13):
             m = merge_map.get((r, c))
             if m is None:
@@ -132,7 +133,7 @@ def transform_source(src_path, row_map, title):
                 bottom = 'thin' if r == m.max_row else None
                 if c == 1 and left:
                     left = 'medium'
-            if r == last_seq_row and bottom:
+            if r == last_data_row and bottom:
                 bottom = 'medium'
             ws.cell(r, c).border = Border(
                 left=Side(style=left), right=Side(style=right),
@@ -142,7 +143,7 @@ def transform_source(src_path, row_map, title):
     unclassified = []
     ws.cell(1, 13, '主顺序')
     ws.cell(1, 14, '子顺序（1级优先进行，12级最后进行）')
-    for r in range(2, last_seq_row + 1):
+    for r in range(2, last_data_row + 1):
         if r in row_map:
             main, sub = row_map[r]
             ws.cell(r, 13, main)
@@ -159,7 +160,7 @@ def transform_source(src_path, row_map, title):
         if c in (13, 14):
             cell.border = Border(left=THIN, right=THIN, top=THIN, bottom=THIN)
     ws.row_dimensions[1].height = HEADER_ROW_HEIGHT
-    for r in range(2, last_seq_row + 1):
+    for r in range(2, last_data_row + 1):
         for c in range(1, 15):
             cell = ws.cell(r, c)
             cell.font = copy(DATA_FONT)

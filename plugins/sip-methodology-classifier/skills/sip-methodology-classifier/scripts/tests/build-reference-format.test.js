@@ -75,6 +75,9 @@ test("Sheet 名清洗在两个生成器中共用同一实现", () => {
   assert.doesNotMatch(verify, /startswith\('待确认'\)/);
   assert.match(verify, /if '主顺序' in vals and '子顺序' in vals and \(/);
   assert.match(verify, /'序号' in vals or '原序号' in vals/);
+  assert.match(reference, /last_data_row = 1/);
+  assert.match(reference, /if seqv is not None and str\(seqv\)\.strip\(\):/);
+  assert.doesNotMatch(reference, /last_seq_row/);
 });
 
 test("序号判定只接受整数数值或纯数字文本", () => {
