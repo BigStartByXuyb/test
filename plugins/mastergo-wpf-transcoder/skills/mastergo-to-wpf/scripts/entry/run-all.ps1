@@ -64,7 +64,7 @@ if (-not $ProjectRoot) { $ProjectRoot = (Get-Location).Path }
 if (-not (Test-Path -LiteralPath $ProjectRoot)) { New-Item -ItemType Directory -Force -Path $ProjectRoot | Out-Null }
 $ProjectRoot = (Resolve-Path -LiteralPath $ProjectRoot).Path
 $ScriptsFolder = Split-Path -Parent $PSScriptRoot
-$FailureCodes = Get-Content -LiteralPath (Join-Path $ScriptsFolder 'lib\failure-codes.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+$FailureCodes = Get-Content -LiteralPath (Join-Path $ScriptsFolder 'lib/failure-codes.json') -Raw -Encoding UTF8 | ConvertFrom-Json
 $LayoutGroupFailureCodes = @(
     [string] $FailureCodes.layoutGroups.missing,
     [string] $FailureCodes.layoutGroups.rejected

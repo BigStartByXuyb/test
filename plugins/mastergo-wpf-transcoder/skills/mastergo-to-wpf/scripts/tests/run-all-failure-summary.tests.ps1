@@ -9,9 +9,9 @@ function Assert-True {
 }
 
 try {
-    $runDir = Join-Path $root 'Generated\runs\Demo'
-    $inputs = Join-Path $root 'Generated\_inputs'
     $generated = Join-Path $root 'Generated'
+    $runDir = Join-Path (Join-Path $generated 'runs') 'Demo'
+    $inputs = Join-Path $generated '_inputs'
     New-Item -ItemType Directory -Force -Path $runDir, $inputs, $generated | Out-Null
 
     $dsl = [ordered]@{
@@ -57,7 +57,7 @@ try {
         -FileId file-A -LayerId layer-A -Ui F8 -DesignPageName '设计页 A' -Progress layout 2>&1 | Out-String
 
     Assert-True ($output -match '(?m)^!! 步骤 8\(layout\) 失败：\[LAYOUT_GROUPS_REJECTED\] 分组表 schemaVersion') `
-        "机器码必须进入失败摘要首行，GUI 才能识别恢复入口"
+        "机器码必须进入失败摘要首行，GUI 才能识别恢复入口。实际输出：`n$output"
     Assert-True ($output -notmatch '(?m)^!! 步骤 8\(layout\) 失败：wpf layout 失败') `
         "失败摘要首行不能只剩命令摘要"
 
