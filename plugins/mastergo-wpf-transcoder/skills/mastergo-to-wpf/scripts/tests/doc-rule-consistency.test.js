@@ -53,6 +53,11 @@ for (const [type, attrs] of Object.entries(required)) {
   assert.ok(flags.every(Boolean) || flags.every((hit) => !hit),
     `${type} 的图标字段必须全有或全无: ${JSON.stringify(attrs)}`);
 }
+assert.ok(required.ToggleButton, "B 映射表必须使用共享命名 ToggleButton");
+assert.ok((map.controlTypes || {}).ToggleButton, "B 写法表必须使用共享命名 ToggleButton");
+assert.ok(generator.includes("ToggleButton:"), "B 生成器默认必写字段必须使用 ToggleButton");
+assert.ok(!JSON.stringify(map).includes("Togglebutton") && !generator.includes("Togglebutton") &&
+  !modeDoc.includes("Togglebutton"), "插件不得保留 Togglebutton 旧拼写");
 assert.ok(!JSON.stringify(map).includes("无图标槽位时不发射"),
   "映射表描述不得保留「无图标槽位时不发射」——与 controlTypeRequiredAttrs 的空字符串占位口径相反");
 
@@ -1075,6 +1080,14 @@ const mapData = loadTemplateMap(MAP);
       file + " 必须写明 Align 的两种取值 Left / Right");
     assert.ok(text.includes("textAlign"), file + " 必须写明 Align 的真值源是设计稿 textAlign");
     assert.ok(text.includes("默认左对齐"), file + " 必须写明设计稿没有给出右对齐时按默认左对齐");
+  }
+  const fixedTextBlockTemplates = skillLines(feishuMapping)
+    .filter((line) => line.includes("<IOContorl") && line.includes('ControlType="TextBlock"'));
+  assert.ok(fixedTextBlockTemplates.length >= 10,
+    "组件库映射文档必须保留全部 TextBlock 固定模板（当前 " + fixedTextBlockTemplates.length + " 条）");
+  for (const line of fixedTextBlockTemplates) {
+    assert.match(line, / Align="(?:\{align\}|Left|Right)"/,
+      "每个固定模板的 TextBlock 都必须发射 Align，且只能是 textBlockAlign 的占位或两种合法值: " + line.trim());
   }
   assert.ok(mainSkill.includes("Align"),
     "mastergo-to-wpf/SKILL.md 的硬门禁索引必须点名 Align（否则执行者不知道它有条确定口径）");

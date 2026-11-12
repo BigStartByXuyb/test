@@ -184,7 +184,7 @@ const DEFAULT_CONTROL_TYPE_REQUIRED_ATTRS = {
   Button: ['Style', 'Value', 'LangName', 'PageName', 'IOCommand', 'IOEnable', 'IOVisible'],
   StatusButton: ['Style', 'Value', 'LangName', 'PageName', 'IOCommand', 'IOEnable', 'IOVisible'],
   IconButton: ['Style', 'Value', 'LangName', 'PageName', 'Icon', 'TopLeftContent', 'IsShowStatus', 'IsNeedRedMark', 'IOCommand', 'IOEnable', 'IOVisible', 'IconHeight', 'IconWidth'],
-  Togglebutton: ['Style', 'Value', 'IOName', 'IOState', 'IsAutoRefresh', 'IOEnable', 'IOVisible'],
+  ToggleButton: ['Style', 'Value', 'IOName', 'IOState', 'IsAutoRefresh', 'IOEnable', 'IOVisible'],
   RadioButton: ['Style', 'Value', 'IOName', 'IOState', 'IsAutoRefresh', 'IOEnable', 'IOVisible'],
   ComboBox: ['Style', 'Value', 'IOName', 'ItemsSourceFile', 'DisplayMemberPath', 'SelectedValuePath', 'IsAutoRead', 'IsAutoWrite', 'IsWriteIO', 'IOCommand', 'IOEnable', 'IOVisible'],
   CheckBox: ['Value', 'IOName', 'DefaultValue', 'IsWriteIO', 'IOEnable', 'IOVisible'],
