@@ -286,7 +286,7 @@ Style 与内部组件对照（只对下表列出的真实值成立）：
 <IOContorl ID="{direction_id}" ControlType="TextBlock" LangName="{direction_lang}" Value="{direction}" Left="{direction_left}" Top="{direction_top}" Height="40" Align="{align}" />
 ```
 
-按钮文案（例如 +5、-5、+1、-1）分别从对应 TEXT 节点读取并填入 Value；数值和方向文本分别从真实 TEXT 节点读取并填入对应 TextBlock.Value。业务字段/动作、状态、位置和尺寸从对应 MasterGo 节点读取；文本位置从各自节点 bbox 读取，TextBlock 高度固定 40，TextBlock 宽度只从 DSL `constraints` 发射 `MinWidth` / `MaxWidth`。无图标槽位时 Icon、IconWidth、IconHeight 仍恒写并输出空字符串值；PageName、IOVisible、IOCommand、IOEnable 按“按钮族固定参数”一节恒写；MasterGo 未提供的其他必写字段缺失时保留对应 XML 属性并输出空字符串值，`TextBlock` 的 `Align` 例外：缺失或非法取值直接失败，不写空占位。
+按钮文案（例如 +5、-5、+1、-1）分别从对应 TEXT 节点读取并填入 Value；数值和方向文本分别从真实 TEXT 节点读取并填入对应 TextBlock.Value。业务字段/动作、状态、位置和尺寸从对应 MasterGo 节点读取；文本位置从各自节点 bbox 读取，TextBlock 高度固定 40，TextBlock 宽度只从 DSL `constraints` 发射 `MinWidth` / `MaxWidth`。无图标槽位时 Icon、IconWidth、IconHeight 仍恒写并输出空字符串值；PageName、IOVisible、IOCommand、IOEnable 按“按钮族固定参数”一节恒写；MasterGo 未提供的其他必写字段缺失时保留对应 XML 属性并输出空字符串值。`TextBlock` 的 `Align` 不适用该空占位口径，只看下文「文本对齐」通用规则。
 
 ### 固定模板：属性 1=加减快捷键操作-2有标题
 
@@ -301,7 +301,7 @@ Style 与内部组件对照（只对下表列出的真实值成立）：
 <IOContorl ID="{value_id}" ControlType="TextBlock" LangName="{value_lang}" Value="{display_value}" Left="{value_left}" Top="{value_top}" Height="40" Align="{align}" />
 ```
 
-四个按钮文案（例如 +5、-5、+1、-1）分别从对应 TEXT 节点读取并填入 Value；标题和数值文本分别从真实 TEXT 节点读取并填入对应 TextBlock.Value。按钮业务字段/动作、状态、位置和尺寸从对应 MasterGo 节点读取；文本位置从各自节点 bbox 读取，TextBlock 高度固定 40，TextBlock 宽度只从 DSL `constraints` 发射 `MinWidth` / `MaxWidth`。无图标槽位时 Icon、IconWidth、IconHeight 仍恒写并输出空字符串值；PageName、IOVisible、IOCommand、IOEnable 按“按钮族固定参数”一节恒写；MasterGo 未提供的必写字段缺失时保留对应 XML 属性并输出空字符串值。
+四个按钮文案（例如 +5、-5、+1、-1）分别从对应 TEXT 节点读取并填入 Value；标题和数值文本分别从真实 TEXT 节点读取并填入对应 TextBlock.Value。按钮业务字段/动作、状态、位置和尺寸从对应 MasterGo 节点读取；文本位置从各自节点 bbox 读取，TextBlock 高度固定 40，TextBlock 宽度只从 DSL `constraints` 发射 `MinWidth` / `MaxWidth`。无图标槽位时 Icon、IconWidth、IconHeight 仍恒写并输出空字符串值；PageName、IOVisible、IOCommand、IOEnable 按“按钮族固定参数”一节恒写；MasterGo 未提供的必写字段缺失时保留对应 XML 属性并输出空字符串值。`TextBlock` 的 `Align` 不适用该空占位口径，只看下文「文本对齐」通用规则。
 
 ### 固定模板：属性 1=加减快捷操作-有标题
 
@@ -317,7 +317,7 @@ Style 与内部组件对照（只对下表列出的真实值成立）：
 <IOContorl ID="{direction_id}" ControlType="TextBlock" LangName="{direction_lang}" Value="{direction}" Left="{direction_left}" Top="{direction_top}" Height="40" Align="{align}" />
 ```
 
-四个按钮文案（例如 +5、-5、+1、-1）分别从对应 TEXT 节点读取并填入 Value；标题、数值和方向文本分别从真实 TEXT 节点读取并填入对应 TextBlock 的 Value。按钮业务字段/动作、状态、位置和尺寸从对应 MasterGo 节点读取；文本位置从各自节点 bbox 读取，TextBlock 高度固定 40，TextBlock 宽度只从 DSL `constraints` 发射 `MinWidth` / `MaxWidth`。无图标槽位时 Icon、IconWidth、IconHeight 仍恒写并输出空字符串值；PageName、IOVisible、IOCommand、IOEnable 按“按钮族固定参数”一节恒写；MasterGo 未提供的其他必写字段缺失时保留对应 XML 属性并输出空字符串值。
+四个按钮文案（例如 +5、-5、+1、-1）分别从对应 TEXT 节点读取并填入 Value；标题、数值和方向文本分别从真实 TEXT 节点读取并填入对应 TextBlock 的 Value。按钮业务字段/动作、状态、位置和尺寸从对应 MasterGo 节点读取；文本位置从各自节点 bbox 读取，TextBlock 高度固定 40，TextBlock 宽度只从 DSL `constraints` 发射 `MinWidth` / `MaxWidth`。无图标槽位时 Icon、IconWidth、IconHeight 仍恒写并输出空字符串值；PageName、IOVisible、IOCommand、IOEnable 按“按钮族固定参数”一节恒写；MasterGo 未提供的其他必写字段缺失时保留对应 XML 属性并输出空字符串值。`TextBlock` 的 `Align` 不适用该空占位口径，只看下文「文本对齐」通用规则。
 
 该规则的真实子节点关系为：四个按钮子节点名称均为 `按钮`，按父节点链和组件内顺序区分；按钮内部 TEXT 节点写入对应 IconButton.Value。与按钮平级的主标题 TEXT 节点生成独立 TextBlock；组 2525 内的 TEXT 节点也分别生成独立 TextBlock。主标题可见性由实例属性控制，不影响按钮 Value 文本或组内独立文本。
 
@@ -534,7 +534,7 @@ Style 与内部组件对照（只对下表列出的真实值成立）：
 
 # 固定字段与可选字段规则
 
-- **必写字段与按钮族固定参数（IconButton / Button / StatusButton）**：每个 ControlType 的固定必写字段集登记在 `mtslg-iocontrol-map.json` 的 `controlTypeRequiredAttrs`，生成器必须发射这些属性，取不到来源时写**空字符串占位**。按钮族在此基础上恒写 `PageName`、`IOVisible`、`IOCommand`、`IOEnable`（**变体登记 `omitRequiredAttrs` 时该变体做减法：登记的属性不发射，生成器与校验器共用 `omittedAttrs()` 判据（见飞书组件库映射规范「组件级固定变体的公共口径」）**）；`IconButton` 模板含 `Icon`/`IconWidth`/`IconHeight`：有图标槽位时机械取**台账命中条目节点的 bbox**（不是控件宽高，也不是图标容器尺寸）四舍五入取整，无图标槽位时这三项写空字符串；`Button`/`StatusButton` 模板不含图标字段，不发射 `Icon`/`IconWidth`/`IconHeight`。映射带 `Icon` 却缺少 `iconSize` 时生成器直接失败，禁止猜尺寸。`LangName` 是另一个例外：只在多语言绑定层给出真实 key 时发射——全量多语言下每个设计文本 `Value` 都产键挂 `LangName`，只有**槽位登记 `langRefPolicy=none` 的值**（当前只有选择框 `Value`，运行时由数据决定）与**空文本节点**（`Value=""`，没有可翻译的文案）不产键、不写空占位。`TextBlock` 的 `Align` 是第二个例外：**不适用空字符串口径**——取值只能是 `Left` / `Right`，映射缺失/空串/第三种值由渲染层与校验层直接判失败，且该属性**只有 `TextBlock` 有**（见映射表 `textBlockAlign`）。
+- **必写字段与按钮族固定参数（IconButton / Button / StatusButton）**：每个 ControlType 的固定必写字段集登记在 `mtslg-iocontrol-map.json` 的 `controlTypeRequiredAttrs`，生成器必须发射这些属性，取不到来源时写**空字符串占位**。按钮族在此基础上恒写 `PageName`、`IOVisible`、`IOCommand`、`IOEnable`（**变体登记 `omitRequiredAttrs` 时该变体做减法：登记的属性不发射，生成器与校验器共用 `omittedAttrs()` 判据（见飞书组件库映射规范「组件级固定变体的公共口径」）**）；`IconButton` 模板含 `Icon`/`IconWidth`/`IconHeight`：有图标槽位时机械取**台账命中条目节点的 bbox**（不是控件宽高，也不是图标容器尺寸）四舍五入取整，无图标槽位时这三项写空字符串；`Button`/`StatusButton` 模板不含图标字段，不发射 `Icon`/`IconWidth`/`IconHeight`。映射带 `Icon` 却缺少 `iconSize` 时生成器直接失败，禁止猜尺寸。`LangName` 是另一个例外：只在多语言绑定层给出真实 key 时发射——全量多语言下每个设计文本 `Value` 都产键挂 `LangName`，只有**槽位登记 `langRefPolicy=none` 的值**（当前只有选择框 `Value`，运行时由数据决定）与**空文本节点**（`Value=""`，没有可翻译的文案）不产键、不写空占位。`TextBlock` 的 `Align` 是第二个例外：**不适用空字符串口径**——取值只能是 `Left` / `Right`，映射层 `Align` 字段缺失/空串/第三种值由渲染层与校验层直接判失败，且该属性**只有 `TextBlock` 有**（见映射表 `textBlockAlign`）。
 - 固定：ControlType、节点数量、父子关系、槽位顺序。
 - 几何/显示字段：Value、Left、Top、Width、Height、MinWidth、MaxWidth、FontSize、FontWeight、Align、字体/颜色/Style；其中非 TextBlock 控件的 `Width` / `Height` 取自身 bbox，TextBlock 不发射常规 `Width`、Height 固定为 40，只在 DSL `constraints` 提供时发射 `MinWidth` / `MaxWidth`；DSL 提供字体样式时 FontSize 必填，Height 与 FontSize 独立取值；`FontWeight` 是**命中才写**的条件属性（设计稿字重非 normal 时发射，值取设计稿 `styles[...].value.style` 的 `fontStyle`，如 `Bold`；**判定顺序固定为两步：先看样式名，命中映射表 `textBlockFontWeight.normalStyleNames` 即判为 normal、不写；只有样式名取不到时才回退用 `normalValues` 按 `weight` 判定**），不参与 `controlTypeRequiredAttrs` 恒写集合，规则以 `mtslg-mode.md` 的 TextBlock 字体规则与映射表 `textBlockFontWeight` 为准；`Align` 相反，是**恒写**字段且**只有 `TextBlock` 有**（设计稿 TEXT 节点 `textAlign=right` → `"Right"`，其余含 `left`/`center`/缺失 → `"Left"` **默认左对齐**，规则见映射表 `textBlockAlign`）；输入框和选择框外框的 Height 按 MasterGo 的 40/36/32/28 变体处理；Height 与 FontSize 必须分别读取。一般显示型子节点缺少 Value 时控件仍会生成，但文字内容为空；**DataGrid 根节点例外：`Value` 恒写、当前阶段固定写空串 `Value=""`（数据源由工程师或运行时后续绑定，禁止编造文件名），并置 `valuePending=true` 作为待绑定提示（提示性审计字段，不是交付门禁；规则见 `mtslg-mode.md` 第 4.1 节「DataGrid 的命中口径与 Value 现阶段口径」与映射表 `valuePolicy`）**。列子节点是**列定义**不是页面控件：`Value` 一律等于该列表头文本（由表头机械展开，不是「可选字段」），列几何与字段集走 `tableTemplates.columnTemplate`，不套用本条页面控件字段集。Style 的非空值只有 MasterGo 明确提供且代码库存在对应资源键时才填写；必写字段集合登记 Style 时，取不到非空值仍发射 `Style=""` 空字符串占位，空字符串占位不属于资源键填写。只有当 MasterGo 层级明确存在父级容器并且该父级有样式选择器时，才由父级为子控件提供样式；不得根据外观或组件名称自行添加父级容器。
 - 运行时：IOName、IOCommand、PageName、IOEnable、IOState、LangName。

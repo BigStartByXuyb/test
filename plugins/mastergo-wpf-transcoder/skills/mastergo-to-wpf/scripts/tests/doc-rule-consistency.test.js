@@ -1089,6 +1089,13 @@ const mapData = loadTemplateMap(MAP);
     assert.match(line, / Align="(?:\{align\}|Left|Right)"/,
       "每个固定模板的 TextBlock 都必须发射 Align，且只能是 textBlockAlign 的占位或两种合法值: " + line.trim());
   }
+  const templateAlignRule = "`TextBlock` 的 `Align` 不适用该空占位口径，只看下文「文本对齐」通用规则。";
+  assert.strictEqual(feishuMapping.split(templateAlignRule).length - 1, 3,
+    "三个 TextBlock 固定模板说明段必须统一引用「文本对齐」通用规则，不能各自解释缺失或失败边界");
+  assert.ok(!feishuMapping.includes("`TextBlock` 的 `Align` 例外：缺失或非法取值直接失败"),
+    "固定模板说明段不得把设计稿 textAlign 缺失与映射层 Align 缺失混成同一条失败规则");
+  assert.ok(feishuMapping.includes("映射层 `Align` 字段缺失/空串/第三种值"),
+    "权威必写字段规则必须限定失败边界只属于映射层 Align");
   assert.ok(mainSkill.includes("Align"),
     "mastergo-to-wpf/SKILL.md 的硬门禁索引必须点名 Align（否则执行者不知道它有条确定口径）");
   // Left 口径（Align=Right 时"到右边缘"）：登记字段 + 唯一实现 + 全部消费方都必须指向同一处。
