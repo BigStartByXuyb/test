@@ -1096,6 +1096,18 @@ const mapData = loadTemplateMap(MAP);
     "固定模板说明段不得把设计稿 textAlign 缺失与映射层 Align 缺失混成同一条失败规则");
   assert.ok(feishuMapping.includes("映射层 `Align` 字段缺失/空串/第三种值"),
     "权威必写字段规则必须限定失败边界只属于映射层 Align");
+  const templateContract = "固定模板只展示本族的结构与差异字段，不是一整行可独立复制的 XML；`controlTypeRequiredAttrs` 是必写字段的唯一清单。";
+  assert.ok(feishuMapping.includes(templateContract),
+    "固定模板必须声明：模板只展示差异字段，必写字段按 controlTypeRequiredAttrs 补齐");
+  const genericTextBlockTemplate = skillLines(feishuMapping)
+    .find((line) => line.includes('ID="{id_text}"') && line.includes('ControlType="TextBlock"'));
+  assert.ok(genericTextBlockTemplate, "组件库映射文档必须保留通用 TextBlock 模板");
+  for (const attr of mapData.controlTypeRequiredAttrs.TextBlock) {
+    assert.match(genericTextBlockTemplate, new RegExp("\\b" + attr + "="),
+      "通用 TextBlock 模板必须展示必写属性 " + attr);
+  }
+  assert.ok(feishuMapping.includes("表格列定义是列结构，不套 `controlTypeRequiredAttrs`，因此不要求 `Align`"),
+    "Align 恒写规则必须明确排除表格列定义");
   assert.ok(mainSkill.includes("Align"),
     "mastergo-to-wpf/SKILL.md 的硬门禁索引必须点名 Align（否则执行者不知道它有条确定口径）");
   // Left 口径（Align=Right 时"到右边缘"）：登记字段 + 唯一实现 + 全部消费方都必须指向同一处。

@@ -129,8 +129,6 @@ def transform_source(src_path, row_map, title):
 
     # 重建合并区域
     for c1, r1, c2, r2 in orig_merges:
-        if c1 not in column_map or c2 not in column_map:
-            continue
         mapped = remap_merge_columns(c1, c2, column_map)
         if mapped is None:
             continue

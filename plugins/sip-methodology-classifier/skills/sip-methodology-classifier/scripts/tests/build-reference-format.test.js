@@ -141,6 +141,8 @@ test("默认同格式输出排除四个标黄业务列，主/子顺序紧跟剩�
   assert.match(reference, /for col in sorted\(dropped_columns, reverse=True\):\s*ws\.delete_cols\(col, 1\)/);
   assert.match(reference, /main_col = last_data_col \+ 1/);
   assert.match(reference, /sub_col = last_data_col \+ 2/);
+  assert.doesNotMatch(reference, /if c1 not in column_map or c2 not in column_map/);
+  assert.match(reference, /mapped = remap_merge_columns\(c1, c2, column_map\)/);
   assert.doesNotMatch(reference, /ws\.cell\(1, 13,/);
   for (const file of [
     path.join(pluginRoot, "README.md"),

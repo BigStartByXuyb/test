@@ -4,6 +4,8 @@
 
 坐标、父子层级和裁剪边界属于通用转码规则，详见下方“坐标与容器边界规则”。本段不重复展开实例公式。
 
+固定模板只展示本族的结构与差异字段，不是一整行可独立复制的 XML；`controlTypeRequiredAttrs` 是必写字段的唯一清单。模板未重复的必写字段在最终 XML 中必须按该清单补齐：缺来源时写空字符串占位，`LangName` 与 `Align` 按各自例外执行。
+
 # 组件层级身份规则
 
 优先识别独立组件集，再读取该组件的公开变体/属性和真实属性值；父节点语义不参与匹配（父节点链用于定位实例、读取证据与回溯，以及确认真实结构、裁剪边界与来源）。
@@ -545,10 +547,10 @@ Style 与内部组件对照（只对下表列出的真实值成立）：
 ## 文本属性固定映射
 
 ```
-<IOContorl ID="{id_text}" IOName="{io_name_text}" ControlType="TextBlock" IOState="{state_text}" IOEnable="{enable_text}" LangName="{lang_name_text}" Value="{text_value}" Left="{left}" Top="{top}" Height="40" FontSize="{font_size}" Align="{align}" />
+<IOContorl ID="{id_text}" ControlType="TextBlock" Style="" IOName="{io_name_text}" IOVisible="{visible_text}" IOEnable="{enable_text}" IsAutoRead="{auto_read_text}" Foreground="{foreground_text}" LangName="{lang_name_text}" Value="{text_value}" Left="{left}" Top="{top}" Height="40" FontSize="{font_size}" Align="{align}" />
 ```
 
-- 文本对齐：`Align` 是恒写字段（登记在 `controlTypeRequiredAttrs.TextBlock`），**只有 `TextBlock` 有这个属性**，取值只有 `Left` / `Right` —— 设计稿 TEXT 节点的 `textAlign=right` → `Right`，其余（`left` / `center` / 字段缺失）→ `Left`（**默认左对齐**）。规则真值源是映射表 `textBlockAlign`。
+- 文本对齐：`Align` 是页面控件 `TextBlock` 的恒写字段（登记在 `controlTypeRequiredAttrs.TextBlock`），**只有 `TextBlock` 有这个属性**，取值只有 `Left` / `Right` —— 设计稿 TEXT 节点的 `textAlign=right` → `Right`，其余（`left` / `center` / 字段缺失）→ `Left`（**默认左对齐**）。规则真值源是映射表 `textBlockAlign`。表格列定义是列结构，不套 `controlTypeRequiredAttrs`，因此不要求 `Align`。
 - `Align` 会同时决定 **`Left` 的口径**（同一个属性名、两个含义）：`Align=Left` 时 `Left` = 控件左边缘到父容器**内容区左边缘**的距离；`Align=Right` 时 `Left` = 以控件**右上角**为原点，量到父容器**外框右边缘**的距离 = `父外框右边缘 − (控件 pageAbsX + 设计稿 bbox 宽度)`（页面根用**页面宽度**，容器用**容器 left + width**）。产物不发射 TextBlock 的常规 `Width`；设计稿 bbox 宽度只用于这里的 `Left` 计算与约束溯源。口径真值源是映射表 `textBlockAlign.distance*`，实现在 `scripts/lib/script-helpers.js`。
 - 独立文本节点统一映射为 `TextBlock`，不因所在组件或变体改变 ControlType。
 - 如果文本是输入框、选择框等控件内部内容，则保留为所属控件内容，不额外拆分为 TextBlock。
