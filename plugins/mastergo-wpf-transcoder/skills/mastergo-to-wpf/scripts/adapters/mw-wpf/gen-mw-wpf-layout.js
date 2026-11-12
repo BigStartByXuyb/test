@@ -83,9 +83,7 @@ const LAYOUT_GROUPS_ERROR = FAILURE_CODES.layoutGroups.rejected;
 
 // 分组表输入错误的稳定标记：run-all 原样带到失败摘要首行，GUI 只按机器码决定恢复入口。
 function failGroups(message) {
-  const error = new Error("[" + LAYOUT_GROUPS_ERROR + "] " + message);
-  error.code = LAYOUT_GROUPS_ERROR;
-  throw error;
+  throw new Error("[" + LAYOUT_GROUPS_ERROR + "] " + message);
 }
 
 function parseArgs(argv) {

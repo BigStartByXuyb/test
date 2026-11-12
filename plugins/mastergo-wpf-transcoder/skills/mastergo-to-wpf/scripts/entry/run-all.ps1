@@ -151,14 +151,14 @@ $Steps = @(
     },
     [pscustomobject]@{
         Id = 8; Name = 'layout'; Title = 'Layout 清单机械推导（底部栏 MenuItem）'
-        Inputs   = @('dsl.snapshot.json + 图标台账 + 正式映射表', '（作业A）尺寸约束 JSON：<Inputs>/<Target>.constraints.json——可选；存在时合并进布局与门禁共用的 DSL 快照', '（作业A）分组表 Generated/_inputs/<Target>.layout-groups.json——可选，但有页面 PNG 时必须先产出它')
+        Inputs   = @('dsl.snapshot.json + 图标台账 + 正式映射表', '（作业A）尺寸约束 JSON：<Inputs>/<Target>.constraints.json——可选；存在时合并进布局与门禁共用的 DSL 快照', '（作业A）分组表 Generated/_inputs/<Target>.layout-groups.json——可选，但有页面位图（.png / .jpg / .jpeg）时必须先产出它')
         Outputs  = @('Layout 清单与推导报告 Generated/_inputs/<Target>.layout-manifest.json(.report.json)',
                      '（作业A）分组表可引用的条目清单 Generated/_inputs/<Target>.layout-group-candidates.json——写表前先看它（表里写别的 ref 会被推导入口拒）；登记进运行登记表（键 layoutGroupCandidates：带本次运行身份与哈希，同名旧件不得冒充）')
         # layoutStatus 的合法终态有两个：complete 与 none。none 的触发条件是推导脚本的
         # 「menuItems + residentGroupItems === 0」（本页既没有菜单项、也没有右下角常驻分组）；
         # 此时 Layout.xml 仍以空 <Menu> 注册本页——Bundle 与 verify 都要求本页有 <Page> 注册。
-        Failures = @('layoutStatus 不属于 complete/none', 'layoutEvidence.unresolvedBottomBarItems≠0', '（作业A）有页面 PNG 但没有分组表（LAYOUT_GROUPS_MISSING）', '（作业A）分组表校验失败（LAYOUT_GROUPS_REJECTED：pageTarget 与本次页面不一致 / 未知 ref / 一个 ref 进多个分组 / 组的地盘里夹着未归组条目）', '（作业A）分组表声明了组，但这一层不参与分组（LAYOUT_GROUPS_REJECTED：这一层条目不足 2 个 / 内容区没有条目 / 区域根网格已由设计稿成层）')
-        Recovery = @('补齐底部栏变体命中后重跑：-Progress layout（校验失败表示清单不完整，不是拒绝生成页面）；本页确实没有菜单项与常驻分组时 none 是合法终态（此时 menuItems 与两个计数必须全为 0）', '（作业A）有图无表：跑一次 layout 会把可引用的条目清单落成 Generated/_inputs/<Target>.layout-group-candidates.json，照着它按 mw-wpf-mode.md 第 2 节看图产出分组表后重跑：-Progress layout；清单为空就说明这一层不参与分组，这时表里不声明任何组（groups 写成空数组）', '（作业A）分组表里的 ref 不合格（pageTarget 与本次页面不一致 / 未知 ref / 一个 ref 进多个分组 / 组的地盘里夹着未归组条目）：同样先跑一次 layout 取最新清单，照清单把表改对后重跑：-Progress layout', '（作业A）这一层不参与分组（这一层条目不足 2 个 / 内容区没有条目 / 区域根网格已由设计稿成层）却还声明了组：表里不声明任何组（groups 写成空数组）后重跑：-Progress layout')
+        Failures = @('layoutStatus 不属于 complete/none', 'layoutEvidence.unresolvedBottomBarItems≠0', "（作业A）有页面位图（.png / .jpg / .jpeg）但没有分组表（$($FailureCodes.layoutGroups.missing)）", "（作业A）分组表校验失败（$($FailureCodes.layoutGroups.rejected)：pageTarget 与本次页面不一致 / 未知 ref / 一个 ref 进多个分组 / 组的地盘里夹着未归组条目）", "（作业A）分组表声明了组，但这一层不参与分组（$($FailureCodes.layoutGroups.rejected)：这一层条目不足 2 个 / 内容区没有条目 / 区域根网格已由设计稿成层）")
+        Recovery = @('补齐底部栏变体命中后重跑：-Progress layout（校验失败表示清单不完整，不是拒绝生成页面）；本页确实没有菜单项与常驻分组时 none 是合法终态（此时 menuItems 与两个计数必须全为 0）', '（作业A）有页面位图但没有分组表：跑一次 layout 会把可引用的条目清单落成 Generated/_inputs/<Target>.layout-group-candidates.json，照着它按 mw-wpf-mode.md 第 2 节看图产出分组表后重跑：-Progress layout；清单为空就说明这一层不参与分组，这时表里不声明任何组（groups 写成空数组）', '（作业A）分组表里的 ref 不合格（pageTarget 与本次页面不一致 / 未知 ref / 一个 ref 进多个分组 / 组的地盘里夹着未归组条目）：同样先跑一次 layout 取最新清单，照清单把表改对后重跑：-Progress layout', '（作业A）这一层不参与分组（这一层条目不足 2 个 / 内容区没有条目 / 区域根网格已由设计稿成层）却还声明了组：表里不声明任何组（groups 写成空数组）后重跑：-Progress layout')
     },
     [pscustomobject]@{
         Id = 9; Name = 'inputs'; Title = '校验译文并生成 Bundle 清单'
@@ -809,7 +809,7 @@ foreach ($step in $Steps) {
                     $LayoutDslJson = Resolve-LayoutDslSnapshot -LogFile $log
                     # 分组表：与约束同一套「固定路径自动找」口径——存在就消费，不存在就走机械判据。
                     # 表只写"哪些 ref 同属一组"，坐标尺寸仍以 DSL 为唯一真值（校验在推导入口 fail-closed）。
-                    # 读图开关：有页面 PNG 就必须先由图产出这张表（看图是模型那一步的产物）；
+                    # 读图开关：有页面位图（.png / .jpg / .jpeg）就必须先由图产出这张表（看图是模型那一步的产物）；
                     # 有图无表属于流程漏步——停下报告，不静默退化成纯机械推导。
                     $groupsAuto = Join-Path $Inputs "$Target.layout-groups.json"
                     # 整条管道包在 @() 里：一张都没有时 Results 是 $null，而 Set-StrictMode 下 $null.Count 直接抛
@@ -829,7 +829,7 @@ foreach ($step in $Steps) {
                         Invoke-StepCommand -Label 'wpf layout candidates' -LogFile $log -File 'node' -Arguments ($LayoutArgs + @(
                             '--out', (Join-Path $Work "$Target.wpf-layout.candidates-probe.json"),
                             '--report', (Join-Path $Work "$Target.wpf-layout.candidates-probe.report.json"))) | Out-Null
-                        throw "[$($FailureCodes.layoutGroups.missing)] 有页面 PNG 但没有分组表：先看图产出 $groupsAuto（图: $($designImages -join ', ')；表里可引用的条目见 $GroupCandidateJson——那一份为空就说明这一层不参与分组，这时表里不声明任何组（groups 写成空数组）；口径见 mw-wpf-mode.md 第 2 节）"
+                        throw "[$($FailureCodes.layoutGroups.missing)] 有页面位图（.png / .jpg / .jpeg）但没有分组表：先看图产出 $groupsAuto（图: $($designImages -join ', ')；表里可引用的条目见 $GroupCandidateJson——那一份为空就说明这一层不参与分组，这时表里不声明任何组（groups 写成空数组）；口径见 mw-wpf-mode.md 第 2 节）"
                     }
                     # 本页正式推导：有表就带上（存在就消费），没表（也没图）就走纯机械判据。
                     if (Test-Path -LiteralPath $groupsAuto) { $LayoutArgs += @('--groups', $groupsAuto) }

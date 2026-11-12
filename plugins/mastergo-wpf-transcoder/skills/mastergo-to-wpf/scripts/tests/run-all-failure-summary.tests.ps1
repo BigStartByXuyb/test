@@ -1,6 +1,9 @@
 $ErrorActionPreference = 'Stop'
 $runAll = Join-Path $PSScriptRoot '..\entry\run-all.ps1'
 $registry = Join-Path $PSScriptRoot '..\core\run-registry.mjs'
+$failureCodes = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\lib\failure-codes.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+$missingCode = [string] $failureCodes.layoutGroups.missing
+$rejectedCode = [string] $failureCodes.layoutGroups.rejected
 $root = Join-Path ([IO.Path]::GetTempPath()) "mastergo-failure-summary-$([guid]::NewGuid().ToString('N'))"
 
 function Assert-True {
@@ -59,17 +62,29 @@ try {
     $output = & pwsh -NoProfile -File $runAll -ProjectRoot $root -Target Demo -Mode mw-wpf `
         -FileId file-A -LayerId layer-A -Ui F8 -DesignPageName '设计页 A' -Progress layout 2>&1 | Out-String
 
-    Assert-True ($output -match '(?m)^!! 步骤 8\(layout\) 失败：\[LAYOUT_GROUPS_REJECTED\] 分组表 schemaVersion') `
+    $rejectedPattern = '(?m)^!! 步骤 8\(layout\) 失败：\[' + [regex]::Escape($rejectedCode) + '\] 分组表 schemaVersion'
+    Assert-True ($output -match $rejectedPattern) `
         "机器码必须进入失败摘要首行，GUI 才能识别恢复入口。实际输出：`n$output"
     Assert-True ($output -notmatch '(?m)^!! 步骤 8\(layout\) 失败：wpf layout 失败') `
         "失败摘要首行不能只剩命令摘要"
 
     $run = Get-Content -LiteralPath (Join-Path $runDir 'run.json') -Raw -Encoding UTF8 | ConvertFrom-Json
     $step = @($run.steps) | Where-Object { $_.id -eq 8 } | Select-Object -First 1
-    Assert-True ($step.note -match '^\[LAYOUT_GROUPS_REJECTED\]') `
+    Assert-True ($step.note -match ('^\[' + [regex]::Escape($rejectedCode) + '\]')) `
         "运行登记表失败摘要同样必须以机器码开头"
 
-    Write-Output 'PASS run-all 分组失败机器码进入摘要首行'
+    Remove-Item -LiteralPath (Join-Path $inputs 'Demo.layout-groups.json') -Force
+    [IO.File]::WriteAllBytes(
+        (Join-Path $inputs 'Demo.design.png'),
+        [Convert]::FromBase64String('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZQmcAAAAASUVORK5CYII=')
+    )
+    $missingOutput = & pwsh -NoProfile -File $runAll -ProjectRoot $root -Target Demo -Mode mw-wpf `
+        -FileId file-A -LayerId layer-A -Ui F8 -DesignPageName '设计页 A' -Progress layout 2>&1 | Out-String
+    $missingPattern = '(?m)^!! 步骤 8\(layout\) 失败：\[' + [regex]::Escape($missingCode) + '\] 有页面位图'
+    Assert-True ($missingOutput -match $missingPattern) `
+        "缺表机器码必须进入失败摘要首行。实际输出：`n$missingOutput"
+
+    Write-Output 'PASS run-all 分组缺失与拒收机器码进入摘要首行'
 }
 finally {
     if (Test-Path -LiteralPath $root) { Remove-Item -LiteralPath $root -Recurse -Force }

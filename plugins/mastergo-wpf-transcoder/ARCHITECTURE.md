@@ -99,7 +99,7 @@ flowchart LR
 | `scripts/adapters/mtslg-iocontrol/lib/icon-registration-policy.js` | 图标**登记判据**的唯一实现（「这个 PATH 要不要进本页台账」：模板族变体的 `iconPolicy`、布局族底部栏 MenuItem、常驻分组、宿主壳标记、装饰名；取值全部读映射表） | `discover-mtslg-page-icon-map.js` |
 | `scripts/lib/constraints.js` | 尺寸约束（min/max 宽高）的唯一实现：键集、`> 0 才算设置`的归一化、键名 → WPF 属性名、DSL 遍历与收集 | A：`core/apply-constraints.js`、`adapters/mw-wpf/gen-mw-wpf-layout.js`、`adapters/mw-wpf/gen-mw-wpf-xaml.js`、`adapters/mw-wpf/check-wpf-layout.js`；B：`adapters/mtslg-iocontrol/gen-mtslg-mapping-from-dsl.js`、`gen-iocontrol-xml.js`、`validate-iocontrol-provenance.js`、`check-iocontrol-coords.js` |
 | `scripts/lib/design-box.js` | 容器 `sizingMode` 分类与格内「尺寸 + 对齐」共享实现；`shifted` / `unsized` 例外见 `skills/mastergo-to-wpf/references/adapters/mw-wpf/page-build-rules.md` 第 4 节第 14 条 | `adapters/mw-wpf/gen-mw-wpf-layout.js`、`adapters/mw-wpf/gen-mw-wpf-xaml.js`、`adapters/mw-wpf/check-wpf-layout.js` |
-| `scripts/lib/failure-codes.json` | 跨脚本稳定失败机器码的唯一真值源；当前登记分组表缺表与被拒两码 | `entry/run-all.ps1`（失败摘要与步登记）、`adapters/mw-wpf/gen-mw-wpf-layout.js`（分组表校验）；GUI 作为协议消费方读取摘要首行 |
+| `scripts/lib/failure-codes.json` | 跨脚本稳定失败机器码的唯一真值源；当前登记分组表缺表与被拒两码 | `entry/run-all.ps1`（`$Steps`、失败摘要与步登记直接派生）、`adapters/mw-wpf/gen-mw-wpf-layout.js`（分组表校验）、契约生成与 PowerShell/JavaScript 用例；GUI 作为协议消费方读取摘要首行 |
 
 规则：**同一个功能要复用，不许反复造轮子**。新脚本需要已存在的工具就 `require` 共享模块；确实职责不同但同名的函数，登记到 `scripts/lib/script-reuse-registry.json` 并写清 `reason`（登记是显式决定，不是隐藏白名单）。发版前 `tests/script-duplication.test.js` 必须 PASS。
 
