@@ -1,0 +1,168 @@
+"use strict";
+
+/*
+ * 同格式输出：文件名中的 Excel 非法字符必须先清洗，再写成 Sheet 名。
+ */
+
+const assert = require("node:assert/strict");
+const { spawnSync } = require("node:child_process");
+const path = require("node:path");
+const fs = require("node:fs");
+const test = require("node:test");
+
+const skillRoot = path.resolve(__dirname, "..", "..");
+const scriptsDir = path.join(skillRoot, "scripts");
+const pluginRoot = path.resolve(skillRoot, "..", "..");
+const python = process.platform === "win32" ? "python" : "python3";
+
+function runPython(code) {
+  const result = spawnSync(python, ["-I", "-c", code], {
+    cwd: scriptsDir,
+    encoding: "utf8",
+    env: { ...process.env, PYTHONIOENCODING: "utf-8" },
+    windowsHide: true
+  });
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  return result.stdout;
+}
+
+test("Excel 非法字符先清洗，再截断并去重", () => {
+  const result = JSON.parse(runPython([
+    "import json, os, sys",
+    "sys.path.insert(0, os.getcwd())",
+    "from sip_sheet_name import safe_name",
+    "used = set()",
+    "names = [safe_name('MX[SLG]1', used), safe_name('MX[SLG]1', used), safe_name('', used), safe_name('A' * 40, used)]",
+    "print(json.dumps(names, ensure_ascii=False))"
+  ].join("\n")));
+  assert.deepEqual(result, ["MX_SLG_1", "MX_SLG_1_2", "Sheet", "A".repeat(31)]);
+});
+
+test("Sheet 名空值默认值可由调用方显式指定", () => {
+  const result = JSON.parse(runPython([
+    "import json, os, sys",
+    "sys.path.insert(0, os.getcwd())",
+    "from sip_sheet_name import safe_name",
+    "print(json.dumps([safe_name('', set(), fallback='\\u9879\\u76ee')]))"
+  ].join("\n")));
+  assert.deepEqual(result, ["项目"]);
+});
+
+test("固定 Sheet 名与 Excel 大小写重名口径共用", () => {
+  const result = JSON.parse(runPython([
+    "import json, os, sys",
+    "sys.path.insert(0, os.getcwd())",
+    "from sip_sheet_name import RESERVED_SHEET_NAMES, safe_name",
+    "used = set(RESERVED_SHEET_NAMES)",
+    "names = [safe_name(RESERVED_SHEET_NAMES[0], used, fallback='项目'), safe_name(RESERVED_SHEET_NAMES[1], used, fallback='项目'), safe_name('ABC', {'abc'})]",
+    "print(json.dumps({'reserved': names[:2] == [name + '_2' for name in RESERVED_SHEET_NAMES], 'case': names[2]}))"
+  ].join("\n")));
+  assert.deepEqual(result, { reserved: true, case: "ABC_2" });
+});
+
+test("Sheet 名清洗在两个生成器中共用同一实现", () => {
+  const reference = fs.readFileSync(path.join(scriptsDir, "build_reference_format.py"), "utf8");
+  const analysis = fs.readFileSync(path.join(scriptsDir, "build_sip_mapping.py"), "utf8");
+  assert.match(reference, /title = safe_name\(os\.path\.splitext\(os\.path\.basename\(path\)\)\[0\], used\)\s*wb, unclassified = transform_source\(path, row_map, title\)/);
+  assert.doesNotMatch(reference, /ws\.title = os\.path\.splitext/);
+  assert.match(reference, /from sip_sheet_name import safe_name/);
+  assert.match(reference, /used = set\(\)/);
+  assert.match(analysis, /from sip_sheet_name import \(EXPLANATION_SHEET, PENDING_SHEET,/);
+  assert.match(analysis, /safe_name\(pname, used, fallback='项目'\)/);
+  assert.match(analysis, /used = set\(RESERVED_SHEET_NAMES\)/);
+  assert.doesNotMatch(analysis, /def safe_sheet_name/);
+  const verify = fs.readFileSync(path.join(scriptsDir, "sip_verify.py"), "utf8");
+  assert.doesNotMatch(verify, /ws\.title in \(EXPLANATION_SHEET, PENDING_SHEET\)/);
+  assert.doesNotMatch(verify, /startswith\('待确认'\)/);
+  assert.match(verify, /if '主顺序' in vals and '子顺序' in vals and \(/);
+  assert.match(verify, /'序号' in vals or '原序号' in vals/);
+  assert.match(reference, /last_data_row = last_parseable_seq_row\(/);
+  assert.doesNotMatch(reference, /last_seq_row/);
+});
+
+test("序号判定只接受整数数值或纯数字文本", () => {
+  const result = JSON.parse(runPython([
+    "import json, os, sys",
+    "sys.path.insert(0, os.getcwd())",
+    "from sip_seq import parse_seq",
+    "values = [1, 1.0, ' 2 ', '2.5', -1, '', True, None]",
+    "print(json.dumps([parse_seq(v) for v in values]))"
+  ].join("\n")));
+  assert.deepEqual(result, [1, 1, 2, null, null, null, null, null]);
+});
+
+test("序号判定在生产脚本中只来自共享模块", () => {
+  const files = [
+    "sip_source.py",
+    "sip_verify.py",
+    "sip_rules_trunk.py"
+  ];
+  for (const file of files) {
+    const source = fs.readFileSync(path.join(scriptsDir, file), "utf8");
+    assert.match(source, /from sip_seq import parse_seq/);
+    assert.doesNotMatch(source, /def parse_seq\(/);
+  }
+  const reference = fs.readFileSync(path.join(scriptsDir, "build_reference_format.py"), "utf8");
+  assert.match(reference, /from sip_seq import last_parseable_seq_row/);
+  assert.doesNotMatch(reference, /def last_parseable_seq_row\(/);
+});
+
+test("黄色判定先于序号解析，黄行与未解析行分别计数", () => {
+  const source = fs.readFileSync(path.join(scriptsDir, "sip_source.py"), "utf8");
+  assert.ok(source.indexOf("yellow = is_yellow(seq_cell)") < source.indexOf("seq = parse_seq(seq_cell.value)"));
+  assert.match(source, /if yellow:[\s\S]*skipped\['yellow'\] \+= 1[\s\S]*if seq is None:[\s\S]*skipped\['invalid'\] \+= 1/);
+});
+
+test("页脚按最后一条可解析序号截断，非空重复表头不保留", () => {
+  const result = JSON.parse(runPython([
+    "import json, os, sys",
+    "sys.path.insert(0, os.getcwd())",
+    "from sip_seq import last_parseable_seq_row",
+    "values = [1, 2, '合计', '序号', '', None]",
+    "print(json.dumps({'lastRow': last_parseable_seq_row(values)}))"
+  ].join("\n")));
+  assert.deepEqual(result, { lastRow: 3 });
+});
+
+test("默认同格式输出排除四个标黄业务列，主/子顺序紧跟剩余列", () => {
+  const result = JSON.parse(runPython([
+    "import json, os, sys",
+    "sys.path.insert(0, os.getcwd())",
+    "from sip_rules_trunk import EXCLUDED_COLUMN_HEADERS, header_key",
+    "values = [name + '_suffix' for name in EXCLUDED_COLUMN_HEADERS]",
+    "print(json.dumps({'count': len(EXCLUDED_COLUMN_HEADERS), 'matched': [header_key(v) for v in values] == list(EXCLUDED_COLUMN_HEADERS)}))"
+  ].join("\n")));
+  assert.deepEqual(result, {
+    count: 4,
+    matched: true
+  });
+  const reference = fs.readFileSync(path.join(scriptsDir, "build_reference_format.py"), "utf8");
+  assert.match(reference, /dropped_columns = excluded_source_columns\(ws, 1, source_columns\)/);
+  assert.match(reference, /for col in sorted\(dropped_columns, reverse=True\):\s*ws\.delete_cols\(col, 1\)/);
+  assert.match(reference, /main_col = last_data_col \+ 1/);
+  assert.match(reference, /sub_col = last_data_col \+ 2/);
+  assert.doesNotMatch(reference, /if c1 not in column_map or c2 not in column_map/);
+  assert.match(reference, /mapped = remap_merge_columns\(c1, c2, column_map\)/);
+  assert.doesNotMatch(reference, /ws\.cell\(1, 13,/);
+  for (const file of [
+    path.join(pluginRoot, "README.md"),
+    path.join(pluginRoot, "commands", "sip-classify.md"),
+    path.join(skillRoot, "SKILL.md"),
+    path.join(scriptsDir, "build_reference_format.py"),
+    path.join(scriptsDir, "verify_against_reference.py"),
+    path.join(scriptsDir, "sip_verify.py")
+  ]) {
+    assert.doesNotMatch(
+      fs.readFileSync(file, "utf8"),
+      /M\/N|M 主顺序|N 子顺序|\b[A-Z]\s*[–—−-]\s*[A-Z]\b/,
+      file + " 不得保留已废弃的固定 M/N 或固定 Excel 列范围口径"
+    );
+  }
+  for (const file of [path.join(pluginRoot, "README.md"), path.join(skillRoot, "SKILL.md")]) {
+    const source = fs.readFileSync(file, "utf8");
+    assert.match(source, /从 A 列到子顺序列/,
+      file + " 必须按动态输出范围描述参考样张比对");
+    assert.match(source, /实际保留源列数 \+ 2/,
+      file + " 必须写明输出列数 = 实际保留源列数 + 2");
+  }
+});

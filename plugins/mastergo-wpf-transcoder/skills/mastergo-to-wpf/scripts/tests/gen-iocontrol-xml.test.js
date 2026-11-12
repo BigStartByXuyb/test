@@ -213,6 +213,8 @@ for (const [id, expected] of Object.entries(REQUIRED_BY_TYPE)) {
   }
   assertAttrOrder(tag, PAGE_ATTR_ORDER, id);
 }
+assert.ok(!/\sStyle=/.test(tagOf(typedXml, 'CHK_1')),
+  'CheckBox 的必写字段集不含 Style，不得发射该属性');
 
 // 门禁：按钮带 Icon 却没有 iconSize 必须直接失败
 const badMapping = path.join(dir, 'button-missing-iconsize.json');
@@ -265,6 +267,8 @@ fs.writeFileSync(existingXml, [
   '        Left="200"',
   '        Top="100"',
   '        Width="80"',
+  '        MinHeight="12"',
+  '        MaxHeight="80"',
   '        Height="40" />',
   '</IOContorl>',
   ''
@@ -282,6 +286,8 @@ assert.match(mergedIconButtonTag, /IconWidth="97"/, 'merge 必须把 IconWidth �
 assert.match(mergedIconButtonTag, /IconHeight="66"/, 'merge 必须把 IconHeight 覆盖为图标 bbox 高度');
 const mergedTextTag = (mergedXmlText.match(/<IOContorl[^>]*ID="TXT_1"[\s\S]*?\/>/) || [''])[0];
 assert.ok(!/(?:^|\s)Width="/.test(mergedTextTag), 'merge 必须移除 TextBlock 的常规 Width');
+assert.ok(!/(?:^|\s)MinHeight="/.test(mergedTextTag), 'merge 必须移除 TextBlock 的 MinHeight');
+assert.ok(!/(?:^|\s)MaxHeight="/.test(mergedTextTag), 'merge 必须移除 TextBlock 的 MaxHeight');
 assert.match(mergedTextTag, /Height="40"/, 'merge 必须保持 TextBlock 的 Height=40');
 assert.match(mergedTextTag, /Value="速度"/, 'merge 必须按 dsl.text 覆盖旧文本，保证 Value 与设计文本一致');
 

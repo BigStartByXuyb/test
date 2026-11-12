@@ -53,6 +53,11 @@ for (const [type, attrs] of Object.entries(required)) {
   assert.ok(flags.every(Boolean) || flags.every((hit) => !hit),
     `${type} 的图标字段必须全有或全无: ${JSON.stringify(attrs)}`);
 }
+assert.ok(required.ToggleButton, "B 映射表必须使用共享命名 ToggleButton");
+assert.ok((map.controlTypes || {}).ToggleButton, "B 写法表必须使用共享命名 ToggleButton");
+assert.ok(generator.includes("ToggleButton:"), "B 生成器默认必写字段必须使用 ToggleButton");
+assert.ok(!JSON.stringify(map).includes("Togglebutton") && !generator.includes("Togglebutton") &&
+  !modeDoc.includes("Togglebutton"), "插件不得保留 Togglebutton 旧拼写");
 assert.ok(!JSON.stringify(map).includes("无图标槽位时不发射"),
   "映射表描述不得保留「无图标槽位时不发射」——与 controlTypeRequiredAttrs 的空字符串占位口径相反");
 
@@ -333,6 +338,18 @@ assert.ok(!mainSkill.includes('不得写 `Icon=""`'), "SKILL.md 不得保留可�
 for (const [label, text] of [["mtslg-mode.md", modeDoc], ["feishu-component-library-mapping.md", feishuMapping]]) {
   assert.ok(text.includes("模板不含图标字段"), label + " 必须写明模板不含图标字段时不写这三项");
   assert.ok(text.includes("无图标槽位时"), label + " 必须写明模板含图标字段但无图标槽位时的空字符串占位");
+}
+for (const phrase of ["Style 属性省略", "省略 Style", "刻意不写 Style", "默认不写 Style", "null（不写 Style）", "没有真实 Value 或可选字段时删除对应属性"]) {
+  assert.ok(!feishuMapping.includes(phrase), "飞书组件库映射不得保留与必写字段空字符串占位冲突的表述: " + phrase);
+}
+assert.ok(
+  feishuMapping.includes('Style 的非空值只有 MasterGo 明确提供且代码库存在对应资源键时才填写；必写字段集合登记 Style 时，取不到非空值仍发射 `Style=""` 空字符串占位，空字符串占位不属于资源键填写。'),
+  "飞书组件库映射必须区分 Style 非空资源键值与必写字段空字符串占位"
+);
+assert.ok(!feishuMapping.includes("Style 只有 MasterGo 明确提供且代码库存在对应资源键时才填写。"),
+  "飞书组件库映射不得把空字符串占位误写成对 Style 整体填写条件的限制");
+for (const line of skillLines(feishuMapping).filter((item) => item.includes("<IOContorl") && item.includes('ControlType="IconButton"'))) {
+  assert.match(line, /\sStyle="/, "IconButton 示例必须发射 Style（无专用样式时为空字符串占位）");
 }
 assert.ok(!generator.includes("都不发射"), "生成器注释不得保留「无图标槽位时都不发射」的旧口径");
 
@@ -1064,6 +1081,33 @@ const mapData = loadTemplateMap(MAP);
     assert.ok(text.includes("textAlign"), file + " 必须写明 Align 的真值源是设计稿 textAlign");
     assert.ok(text.includes("默认左对齐"), file + " 必须写明设计稿没有给出右对齐时按默认左对齐");
   }
+  const fixedTextBlockTemplates = skillLines(feishuMapping)
+    .filter((line) => line.includes("<IOContorl") && line.includes('ControlType="TextBlock"'));
+  assert.ok(fixedTextBlockTemplates.length >= 10,
+    "组件库映射文档必须保留全部 TextBlock 固定模板（当前 " + fixedTextBlockTemplates.length + " 条）");
+  for (const line of fixedTextBlockTemplates) {
+    assert.match(line, / Align="(?:\{align\}|Left|Right)"/,
+      "每个固定模板的 TextBlock 都必须发射 Align，且只能是 textBlockAlign 的占位或两种合法值: " + line.trim());
+  }
+  const templateAlignRule = "`TextBlock` 的 `Align` 不适用该空占位口径，只看下文「文本对齐」通用规则。";
+  assert.strictEqual(feishuMapping.split(templateAlignRule).length - 1, 3,
+    "三个 TextBlock 固定模板说明段必须统一引用「文本对齐」通用规则，不能各自解释缺失或失败边界");
+  assert.ok(!feishuMapping.includes("`TextBlock` 的 `Align` 例外：缺失或非法取值直接失败"),
+    "固定模板说明段不得把设计稿 textAlign 缺失与映射层 Align 缺失混成同一条失败规则");
+  assert.ok(feishuMapping.includes("映射层 `Align` 字段缺失/空串/第三种值"),
+    "权威必写字段规则必须限定失败边界只属于映射层 Align");
+  const templateContract = "固定模板只展示本族的结构与差异字段，不是一整行可独立复制的 XML；`controlTypeRequiredAttrs` 是必写字段的唯一清单。";
+  assert.ok(feishuMapping.includes(templateContract),
+    "固定模板必须声明：模板只展示差异字段，必写字段按 controlTypeRequiredAttrs 补齐");
+  const genericTextBlockTemplate = skillLines(feishuMapping)
+    .find((line) => line.includes('ID="{id_text}"') && line.includes('ControlType="TextBlock"'));
+  assert.ok(genericTextBlockTemplate, "组件库映射文档必须保留通用 TextBlock 模板");
+  for (const attr of mapData.controlTypeRequiredAttrs.TextBlock) {
+    assert.match(genericTextBlockTemplate, new RegExp("\\b" + attr + "="),
+      "通用 TextBlock 模板必须展示必写属性 " + attr);
+  }
+  assert.ok(feishuMapping.includes("表格列定义是列结构，不套 `controlTypeRequiredAttrs`，因此不要求 `Align`"),
+    "Align 恒写规则必须明确排除表格列定义");
   assert.ok(mainSkill.includes("Align"),
     "mastergo-to-wpf/SKILL.md 的硬门禁索引必须点名 Align（否则执行者不知道它有条确定口径）");
   // Left 口径（Align=Right 时"到右边缘"）：登记字段 + 唯一实现 + 全部消费方都必须指向同一处。
@@ -1169,8 +1213,8 @@ console.log("PASS TextBlock Align 口径（映射表 textBlockAlign ↔ 生成�
     assert.match(text, /不发射(?: TextBlock 的)?常规 `?Width`?/,
       name + " 必须写明 TextBlock 不发射常规 Width");
   }
-  assert.match(docFormat, /通用模板里的 `Width` \/ `Height` 只适用于非 TextBlock 控件/,
-    "文档格式规范必须明确通用 Width/Height 字段的 TextBlock 例外");
+  assert.match(docFormat, /通用模板里的 `Width` 只适用于非 TextBlock 控件，非 TextBlock 的 `Height` 取自身 bbox/,
+    "文档格式规范必须分别说明 Width 与 Height 的 TextBlock 例外");
   assert.match(docFormat, /`Width` 只适用于非 TextBlock 控件/,
     "XML 字段清单必须把 Width 限定在非 TextBlock 控件");
   assert.match(docFormat, /`Width→Width` 只适用于非 TextBlock 控件/,
@@ -1179,6 +1223,8 @@ console.log("PASS TextBlock Align 口径（映射表 textBlockAlign ↔ 生成�
     "文档格式示例不得把属性映射分隔冒号包进 Width→Width 代码片段");
   assert.match(modeDoc, /TextBlock 不发射常规 `Width`，merge 会删除旧 `Width`/,
     "merge 语义必须写明 TextBlock 的旧 Width 会被删除");
+  assert.match(modeDoc, /merge 会删除旧 `Width`、`MinHeight`、`MaxHeight`/,
+    "merge 语义必须写明 TextBlock 的旧 MinHeight/MaxHeight 也会被删除");
   assert.ok(!/Left\/Top\/Width\/Height 按映射更新/.test(modeDoc),
     "merge 语义不得再把 Width 无条件列为几何更新项");
   assert.ok(!/文本位置和尺寸也从各自节点 bbox 读取/.test(feishuMapping),
@@ -1190,10 +1236,10 @@ console.log("PASS TextBlock Align 口径（映射表 textBlockAlign ↔ 生成�
   assert.ok(!/改写这两个值/.test(feishuMapping),
     "TextBlock 高度与宽度约束不得再用模糊指代");
   assert.match(runAll,
-    /A 的控件与容器 Grid 使用 Min\/MaxWidth\/Height，B 的 TextBlock 使用 Min\/MaxWidth/,
+    /A 的控件与容器 Grid 使用 MinWidth \/ MaxWidth \/ MinHeight \/ MaxHeight，B 的 TextBlock 使用 MinWidth \/ MaxWidth/,
     "mapping 步骤说明必须保留 A/B 各自完整的约束作用域");
   assert.match(pipelineContract,
-    /A 的控件与容器 Grid 使用 Min\/MaxWidth\/Height，B 的 TextBlock 使用 Min\/MaxWidth/,
+    /A 的控件与容器 Grid 使用 MinWidth \/ MaxWidth \/ MinHeight \/ MaxHeight，B 的 TextBlock 使用 MinWidth \/ MaxWidth/,
     "流水线契约必须与 A/B 的实际约束发射范围一致");
   assert.match(runAll,
     /if \(\$BundleDslJson -ne \$SnapshotJson\) \{\s*Register-RunArtifact -Key 'mappingDsl'/,

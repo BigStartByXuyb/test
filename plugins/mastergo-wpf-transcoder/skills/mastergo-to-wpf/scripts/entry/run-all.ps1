@@ -123,7 +123,7 @@ $Steps = @(
     },
     [pscustomobject]@{
         Id = 5; Name = 'mapping'; Title = 'mapping 草稿（按当前台账）'
-        Inputs   = @('dsl.snapshot.json + visibility.json', '正式映射表 mtslg-iocontrol-map.json', '图标台账（尚无台账时用空 candidates 占位）', '尺寸约束 JSON（可选；先合并进 DSL；A 的控件与容器 Grid 使用 Min/MaxWidth/Height，B 的 TextBlock 使用 Min/MaxWidth）')
+        Inputs   = @('dsl.snapshot.json + visibility.json', '正式映射表 mtslg-iocontrol-map.json', '图标台账（尚无台账时用空 candidates 占位）', '尺寸约束 JSON（可选；先合并进 DSL；A 的控件与容器 Grid 使用 MinWidth / MaxWidth / MinHeight / MaxHeight，B 的 TextBlock 使用 MinWidth / MaxWidth）')
         Outputs  = @('Generated/runs/<Target>/mapping 草稿与映射审计（unmappedComponents / pending / templateConflicts）')
         Failures = @('组件与固定模板冲突', '结构签名部分命中')
         Recovery = @('只补输入（用 manifest.excludeInstances 隔离该实例、把偏差写进待确认），不改 mapping 产物；重跑：-Progress mapping')
@@ -547,7 +547,7 @@ $StartStep = Get-Step $Progress
 $EndStep = if ($StopAfter) { Get-Step $StopAfter } else { $Steps[-1] }
 if ($EndStep.Id -lt $StartStep.Id) { throw "-StopAfter 不能早于 -Progress" }
 
-# 断点续跑：身份四项一律回放首次运行冻结在 run.json 里的值——续跑是"沿用同一次运行的身份"，
+# 断点续跑：身份五项一律回放首次运行冻结在 run.json 里的值——续跑是"沿用同一次运行的身份"，
 # 不是"重新做一次身份判定"。这样 capture 拿到的一定是首次那份身份（不会退回 DSL 根节点名），
 # 项目登记表 `docs/page-registry.json` 之后的增删改也不会再影响正在续跑的这一次。
 # 省略 → 用冻结值；显式传不同的值、或给首次运行时缺失的身份补值 → fail-closed，改身份只能新开运行。

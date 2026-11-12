@@ -473,7 +473,7 @@ assert.deepStrictEqual(
 );
 assert.strictEqual(axis.nodes.length, 8, '8 个方向键都必须发射为 IconButton');
 assert.ok(axis.nodes.every(node => node.controlType === 'IconButton' && node.attrs && node.attrs.Style === undefined),
-  '轴操作按钮使用默认 IconButton 且省略 Style');
+  '轴操作按钮在 mapping 中不登记专用 Style，最终 XML 必写字段补 Style=""');
 
 console.log('PASS MTSLG DSL-to-mapping text-slot regression test');
 console.log('PASS MTSLG DSL-to-mapping button-family regression test');

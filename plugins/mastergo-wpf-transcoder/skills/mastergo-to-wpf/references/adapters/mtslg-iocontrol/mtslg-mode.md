@@ -28,7 +28,7 @@
 - 内容区坐标：`contentOriginX`、固定 `contentOriginY=192`、设计稿标题处理与目标画布尺寸。
 - Target 映射：新建页面首次必须以运行时加载验证页面 Target 与文件的实际关联（属「项目运行时交付」门禁；只做静态结构映射时不执行，改为在待确认清单里登记该验证项）。
 
-（续跑身份提示：本表用于**新开运行**解析身份；续跑回放运行登记表 `Generated/runs/<Target>/run.json` 里冻结的 `identity`，因此**改本表的 `pages[].ui` / `pages[].designSource.*` 值不影响续跑**——但**删掉本表的页面条目**后身份会取不到值，需要显式传回 `-FileId` / `-LayerId` / `-Ui` / `-DesignPageName`（或新开一次运行）。口径见 `bundle-manifest.md` 第 7 节。）
+（续跑身份提示：本表用于**新开运行**解析身份；续跑回放运行登记表 `Generated/runs/<Target>/run.json` 里冻结的 `identity.mode` / `fileId` / `layerId` / `ui` / `designPageName`。项目登记表改值不影响续跑；显式传入与冻结值不同的 `-Mode` / `-FileId` / `-LayerId` / `-Ui` / `-DesignPageName` 必须 fail-closed。删掉项目登记表的页面条目后，需要显式传回五项身份（或新开一次运行）。口径见 `bundle-manifest.md` 第 7 节。）
 
 ## 1.1 MasterGo 组件库映射入口
 
@@ -115,7 +115,7 @@
 |---|---|
 | 容器 | View（页签，Value=标题/Index/Icon）、GroupBox（Header）、Border（Value=线宽）、ButtonGroup（内放 RadioButton 共用 IOName）、TabControl+TabItem |
 | 文本/输入 | TextBlock、TextBox（Keypad）、NumberBox（DecimalPlaces 默认 3）、IntNumberBox、CheckBox |
-| 按钮 | Button（PageName="Jump:X"/IOName/IOStyle）、IconButton（Icon=Geometry 键/TopLeftContent=F1..F12）、StatusButton（IOState 状态色）、Togglebutton、RadioButton |
+| 按钮 | Button（PageName="Jump:X"/IOName/IOStyle）、IconButton（Icon=Geometry 键/TopLeftContent=F1..F12）、StatusButton（IOState 状态色）、ToggleButton、RadioButton |
 
 按钮族（IconButton / Button / StatusButton）另有固定参数：`PageName`/`IOVisible`/`IOCommand`/`IOEnable` 恒写（取不到写空字符串值；**变体登记 `omitRequiredAttrs` 时该变体做减法：登记的属性不发射，生成器与校验器共用 `omittedAttrs()` 判据（见飞书组件库映射规范「组件级固定变体的公共口径」）**）；`IconButton` 的 `Icon`/`IconWidth`/`IconHeight` 同样恒写——有图标槽位时按台账命中条目节点 bbox 四舍五入发射（**例外：变体登记 `iconPolicy=runtime` 时本页台账没有也不该有该条目，尺寸取该实例子树里唯一 PATH 的 bbox，多个 PATH 直接失败并要求设计侧消歧（登记台账对该变体无效，Bundle 会剔除命中该 owner 的条目）**），无图标槽位时写空字符串，`Button`/`StatusButton` 不含图标字段、不发射这三项；详见飞书组件库映射规范的“固定字段与可选字段规则”。
 | 选择 | ComboBox（选项=子 TextBlock；ItemsSourceFile/DisplayMemberPath/SelectedValuePath） |
@@ -161,7 +161,7 @@
 `gen-iocontrol-xml.js --merge <现有XML> <mapping.json>` 的行为：
 
 1. **匹配**：映射节点 ↔ 现有节点，ID 优先；无 ID 时按 ControlType + Left/Top（容差 0.5）位置匹配。
-2. **几何更新**：`Left` / `Top` / `Height` 以及非 TextBlock 控件的 `Width` 按映射更新（这就是设计稿改动的落点）。TextBlock 不发射常规 `Width`，merge 会删除旧 `Width`；其宽度只按 DSL `constraints` 更新 `MinWidth` / `MaxWidth`。
+2. **几何更新**：`Left` / `Top` / `Height` 以及非 TextBlock 控件的 `Width` 按映射更新（这就是设计稿改动的落点）。TextBlock 不发射常规 `Width`，merge 会删除旧 `Width`、`MinHeight`、`MaxHeight`；其宽度只按 DSL `constraints` 更新 `MinWidth` / `MaxWidth`。
 3. **ControlType**：按映射更新，变化写冲突报告。
 4. **业务属性保护**：现有 XML 同名的属性一律保留现有值（值不同 → 冲突报告，不覆盖）；映射多出来的属性 → 追加（新增报告）。工程师手写的 IOName/IOCommand/IOState 等永远不会被设计稿冲掉。**例外**：映射节点的 `valueSource=dsl.text` 时，**文案承载属性**是设计文本，merge 强制按映射覆盖并写“设计文本覆盖（dsl.text）”报告——否则 provenance 校验会失败。文案承载属性与 `validate-iocontrol-provenance.js` 同口径：有 `Value` 比 `Value`；容器类控件（如 `GroupBox`）没有 `Value`，标题文案由 `Header` 承载，此时比 `Header`。
 5. **节点增删**：映射里的新节点渲染插入父容器闭合标签前；现有但映射未涉及的节点原样保留（报告列出）。

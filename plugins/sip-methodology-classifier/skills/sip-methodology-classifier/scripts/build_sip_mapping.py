@@ -36,6 +36,8 @@ from sip_rules import (MAIN_ORDER, SUB_ORDER, MAIN_IDX, SUB_IDX,
 from extract_gbk_zip import extract as extract_zip
 from sip_source import parse_sheet, discover_projects
 from sip_family_detect import detect_family_from_rows
+from sip_sheet_name import (EXPLANATION_SHEET, PENDING_SHEET,
+                            RESERVED_SHEET_NAMES, safe_name)
 from sip_verify import verify_records, format_results
 
 try:
@@ -73,22 +75,8 @@ SUB_MEANING = {
 
 
 # ---------------------------------------------------------------- 输出
-def safe_sheet_name(name, used):
-    for ch in '\\/*?:[]':
-        name = name.replace(ch, '_')
-    name = (name or '项目')[:31]
-    base = name
-    i = 2
-    while name in used:
-        suffix = f'_{i}'
-        name = (base[:31 - len(suffix)] + suffix)
-        i += 1
-    used.add(name)
-    return name
-
-
 def write_workbook(all_rows, projects, out_path, ref=None, verify=None,
-                   skipped_yellow=0):
+                   skipped_yellow=0, skipped_invalid=0):
     wb = Workbook()
     wb.remove(wb.active)
     thin = Side(style='thin', color='BFBFBF')
@@ -108,10 +96,9 @@ def write_workbook(all_rows, projects, out_path, ref=None, verify=None,
                '归类依据', '设备族']
     widths = [15, 8, 10, 24, 15, 8, 16, 30, 16, 46, 12, 13, 10, 10]
 
-    used = set()
-    project_order = [p[0] for p in projects]
+    used = set(RESERVED_SHEET_NAMES)
     for pname, _, files in projects:
-        ws = wb.create_sheet(safe_sheet_name(pname, used))
+        ws = wb.create_sheet(safe_name(pname, used, fallback='项目'))
         ws.sheet_view.showGridLines = False
         for i, w in enumerate(widths, 1):
             ws.column_dimensions[get_column_letter(i)].width = w
@@ -179,7 +166,7 @@ def write_workbook(all_rows, projects, out_path, ref=None, verify=None,
         ws.auto_filter.ref = f'A3:N{r - 1}'
 
     # --------------------------- 说明
-    ws = wb.create_sheet('说明', 0)
+    ws = wb.create_sheet(EXPLANATION_SHEET, 0)
     ws.sheet_view.showGridLines = False
     ws.column_dimensions['A'].width = 20
     ws.column_dimensions['B'].width = 16
@@ -200,7 +187,7 @@ def write_workbook(all_rows, projects, out_path, ref=None, verify=None,
         ('任务', '把《成品检验指导书》中的每条检验，按 SIP 方法论两层顺序模型归类：'
                  '主顺序（9 个环节）+ 子顺序（环节内部 1级→12级）。'),
         ('标准答案校验', verify_text),
-        ('标黄处理', '原表标黄的“检验频率、重要等级、检验记录表、备注”四列及黄色文件编号/版本不纳入输出；'
+        ('标黄处理', '原表标黄的“检验频率、重要等级、检验记录表、备注”四列按表头排除，表头以上的文件编号/版本随标题行删除；'
                    '浅蓝色版本更新标注保留。'),
         ('共用项处理', '团队标准答案没有单独的“共用”区：同一工序中既涉及水又涉及气的行，'
                     '按行内容拆分到“4.通气检验”或“5.通水检验”。'),
@@ -211,6 +198,7 @@ def write_workbook(all_rows, projects, out_path, ref=None, verify=None,
         ('设备族', '每条记录最后一列：SDC/EXP/SLG 为识别到的设备族；'
                 '“未知类型（按主干，需复核）”表示未识别出设备族，当前按主干规则归类。'),
         ('标黄跳过行', f'解析时跳过序号单元格为黄色的行：{skipped_yellow} 行。'),
+        ('序号未解析行', f'解析时跳过序号不是正整数的行：{skipped_invalid} 行。'),
     ]
     for k, v in intro:
         ws.cell(row=r, column=1, value=k).font = Font(name='微软雅黑', size=10, bold=True)
@@ -324,7 +312,7 @@ def write_workbook(all_rows, projects, out_path, ref=None, verify=None,
                 r += 1
 
     # --------------------------- 待确认项
-    ws2 = wb.create_sheet('待确认项（规则推断）')
+    ws2 = wb.create_sheet(PENDING_SHEET)
     ws2.sheet_view.showGridLines = False
     for col, w in zip('ABCDE', [10, 22, 32, 16, 10]):
         ws2.column_dimensions[col].width = w
@@ -383,12 +371,14 @@ def main():
         print(f'  {pname}: {len(files)} 个文件 ({pdir})')
 
     all_rows = []
-    skipped_total = 0
+    skipped_yellow_total = 0
+    skipped_invalid_total = 0
     for pname, pdir, files in projects:
         for f in files:
             path = os.path.join(pdir, f)
             rows, skipped = parse_sheet(path, pname)
-            skipped_total += skipped
+            skipped_yellow_total += skipped['yellow']
+            skipped_invalid_total += skipped['invalid']
             family = detect_family_from_rows(rows, file_name=f)
             for row in rows:
                 (main, sub), source = classify(
@@ -402,7 +392,8 @@ def main():
                 row['family'] = family
             all_rows.extend(rows)
             print(f'  {f}: {len(rows)} 行 [分支 {family_label(family)}]'
-                  + (f'（跳过黄行 {skipped}）' if skipped else ''))
+                  + (f'（跳过黄行 {skipped["yellow"]}；序号未解析 {skipped["invalid"]}）'
+                     if skipped['yellow'] or skipped['invalid'] else ''))
 
     if not all_rows:
         raise SystemExit('没有解析到任何有效数据行')
@@ -416,7 +407,8 @@ def main():
         for line in format_results(verify):
             print('  ' + line)
 
-    write_workbook(all_rows, projects, args.output, ref, verify, skipped_total)
+    write_workbook(all_rows, projects, args.output, ref, verify,
+                   skipped_yellow_total, skipped_invalid_total)
     print(f'\n已生成: {os.path.abspath(args.output)}')
     print(f'总行数: {len(all_rows)}')
     from collections import Counter

@@ -165,7 +165,7 @@
       "IconHeight",
       "IconWidth"
     ],
-    "Togglebutton": [
+    "ToggleButton": [
       "Style",
       "Value",
       "IOName",
@@ -449,7 +449,7 @@
         "IOVisible"
       ]
     },
-    "Togglebutton": {
+    "ToggleButton": {
       "description": "切换按钮；IOState 控制选中态",
       "nested": false,
       "attrs": [

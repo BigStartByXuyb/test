@@ -4,6 +4,8 @@
 
 坐标、父子层级和裁剪边界属于通用转码规则，详见下方“坐标与容器边界规则”。本段不重复展开实例公式。
 
+固定模板只展示本族的结构与差异字段，不是一整行可独立复制的 XML；`controlTypeRequiredAttrs` 是必写字段的唯一清单。模板未重复的必写字段在最终 XML 中必须按该清单补齐：缺来源时写空字符串占位，`LangName` 与 `Align` 按各自例外执行。
+
 # 组件层级身份规则
 
 优先识别独立组件集，再读取该组件的公开变体/属性和真实属性值；父节点语义不参与匹配（父节点链用于定位实例、读取证据与回溯，以及确认真实结构、裁剪边界与来源）。
@@ -106,14 +108,14 @@ MasterGo 变体：单选-选中、单选-未选择、多选-选中、多选-未�
 固定节点：一个选择控件 IOContorl，无 TextBlock 子节点。
 
 ```
-<!-- 属性1=单选-选中/未选择：使用默认 RadioButtonBaseStyle，除非 MasterGo 明确提供已登记 Style -->
-<IOContorl ID="{id}" ControlType="RadioButton" IOState="{io_state}" Value="{value}" IOParam="{io_param}" IOName="{io_name}" IOCommand="{io_command}" IOEnable="{io_enable}" Left="{left}" Top="{top}" Width="{width}" Height="{height}" />
+<!-- 属性1=单选-选中/未选择：Style 是必写字段；无专用资源键时发空字符串占位 -->
+<IOContorl ID="{id}" ControlType="RadioButton" Style="" IOState="{io_state}" Value="{value}" IOParam="{io_param}" IOName="{io_name}" IOCommand="{io_command}" IOEnable="{io_enable}" Left="{left}" Top="{top}" Width="{width}" Height="{height}" />
 
-<!-- 属性1=多选-选中/未选择：使用默认 CheckBox 样式，除非 MasterGo 明确提供已登记 Style -->
+<!-- 属性1=多选-选中/未选择：CheckBox 不登记 Style，不发射该属性 -->
 <IOContorl ID="{id}" ControlType="CheckBox" IOState="{io_state}" Value="{value}" IOParam="{io_param}" IOName="{io_name}" IOCommand="{io_command}" IOEnable="{io_enable}" Left="{left}" Top="{top}" Width="{width}" Height="{height}" />
 ```
 
-属性1=选中/未选中→状态字段；由控件默认状态样式决定圆点/勾选颜色和显示状态。固定模板默认不写 Style：独立 RadioButton 使用隐式 RadioButtonBaseStyle，CheckBox 使用默认 CheckBox 样式；只有 MasterGo 明确提供并且代码库已登记对应样式时，才增加 Style 属性。
+属性1=选中/未选中→状态字段；由控件默认状态样式决定圆点/勾选颜色和显示状态。RadioButton 的 `Style` 属于必写字段：非空值只有 MasterGo 明确提供且代码库已登记对应资源键时才填写，否则发射 `Style=""` 空字符串占位，由运行时隐式 `RadioButtonBaseStyle` 提供默认外观。CheckBox 的 `controlTypeRequiredAttrs` 不包含 `Style`，不发射该属性。
 
 节点文案/业务值→Value；业务字段/动作→IOName/IOCommand。
 
@@ -190,7 +192,7 @@ MasterGo 变体：单选-选中、单选-未选择、多选-选中、多选-未�
 - 匹配键为“聚合集合名（右侧栏） + 公开属性名（按钮类型） + 真实属性值”，不使用图层名称，也没有“父节点语义”这一层；变体内部引用的独立组件是组件库中的真实组件，名称必须写全（`右侧栏-左右结构-icon+文案` / `右侧栏-上下结构-icon+文案`，与下一节对照表和映射表 `componentSet` 逐字一致），`右侧栏-左右结构` / `右侧栏-上下结构` 只是口头简写、不是匹配键、也不构成父节点语义。
 - 真实属性值即团队组件库中该集合的变体值：F+文案、文案 大button、上下结构-icon+文案、左右结构-icon+文案、stop、start、恢复切割、删除料盒-1、删除料盒-2、文案-小button、enter、exit、startstop。
 - 每个变体内部实例指向的独立组件名登记在映射表的 `componentSet` 上；解析时先用属性值命中变体，再用内部组件名交叉核对，两者不一致**直接失败并要求重新核对**（不静默选边，`resolve-mtslg-template-mapping.js` 按此实现），避免用错模板的槽位结构生成页面。
-- Style 由变体值决定（见下方对照表）；`null` 表示该变体刻意不写 Style，使用框架默认样式。
+- Style 由变体值决定（见下方对照表）；表中 `null` 表示该变体没有专用样式值，生成时仍发射 `Style=""` 空字符串占位。
 
 ### 固定模板：聚合集合=右侧栏（全部按钮类型变体）
 
@@ -212,11 +214,11 @@ Style 与内部组件对照（只对下表列出的真实值成立）：
 | 恢复切割 | RightButtonStyle | 待组件库登记 |
 | 上下结构-icon+文案 | UpDownRightButtonStyle | 右侧栏-上下结构-icon+文案 |
 | startstop | UpDownRightButtonStyle | 待组件库登记 |
-| F+文案 | null（不写 Style） | 待组件库登记 |
-| 文案 大button | null（不写 Style） | 待组件库登记 |
-| 删除料盒-1 | null（不写 Style） | 待组件库登记 |
-| 删除料盒-2 | null（不写 Style） | 待组件库登记 |
-| 文案-小button | null（不写 Style） | 待组件库登记 |
+| F+文案 | null（仍发射 `Style=""`） | 待组件库登记 |
+| 文案 大button | null（仍发射 `Style=""`） | 待组件库登记 |
+| 删除料盒-1 | null（仍发射 `Style=""`） | 待组件库登记 |
+| 删除料盒-2 | null（仍发射 `Style=""`） | 待组件库登记 |
+| 文案-小button | null（仍发射 `Style=""`） | 待组件库登记 |
 
 文案→Value；业务字段/动作→IOName/IOCommand；PageName/IOVisible/IOCommand 按“按钮族固定参数”一节恒写；图标→Icon，图标尺寸→IconWidth/IconHeight（取台账命中条目节点 bbox；`enter`/`exit` 两个组件级固定变体的例外口径见下两节）；独立组件没有 F 键槽位，不生成 TopLeftContent。Icon 键可使用目标项目已确认键或当前页面唯一的临时 Geometry 键。本节的「变体值只决定 Style」只对其余变体成立：`enter`/`exit` 的 Style 与固定属性由各自独立固定模板登记。
 
@@ -271,7 +273,7 @@ Style 与内部组件对照（只对下表列出的真实值成立）：
 - 匹配键使用组件实例公开属性“属性 1”及其真实属性值，不使用节点名称或外观语义推断。
 - 属性 1=加减快捷键-无标题、加减快捷键操作-2有标题、加减快捷操作-有标题时，按钮固定使用 ControlType=IconButton、Style=SmallButton。
 - 上述三个属性值对应的按钮均无图标槽位：Icon、IconWidth、IconHeight 仍按 ControlType 固定字段恒写、值写空字符串（见 `mtslg-iocontrol-map.json` 的 `controlTypeRequiredAttrs`）；PageName、IOVisible、IOCommand 仍按“按钮族固定参数”一节恒写。
-- 其余真实属性值按各自固定模板命中：轴操作、轴操作-快慢、方向、图像移动-单侧、图像移动-双侧、缺口位置、拟合数据-双侧上下、拟合数据-前后、拟合数据-单侧上下、扫描；不得使用未定义的“其他”兜底模板。除三个加减快捷属性值外，其余按钮均使用默认 IconButton 并省略 Style；图标属性仅由对应 MasterGo 节点的真实图标槽位决定。
+- 其余真实属性值按各自固定模板命中：轴操作、轴操作-快慢、方向、图像移动-单侧、图像移动-双侧、缺口位置、拟合数据-双侧上下、拟合数据-前后、拟合数据-单侧上下、扫描；不得使用未定义的“其他”兜底模板。除三个加减快捷属性值外，其余按钮均使用默认 IconButton 并发射 `Style=""` 空字符串占位；图标属性仅由对应 MasterGo 节点的真实图标槽位决定。
 
 ### 固定模板：属性 1=加减快捷键-无标题
 
@@ -282,11 +284,11 @@ Style 与内部组件对照（只对下表列出的真实值成立）：
 <IOContorl ID="{button_minus_5_id}" IOName="{button_minus_5_io_name}" IOCommand="{button_minus_5_io_command}" ControlType="IconButton" Style="SmallButton" IOEnable="{button_minus_5_enable}" IOState="{button_minus_5_state}" LangName="{button_minus_5_lang}" Value="{button_minus_5_value}" Left="{button_minus_5_left}" Top="{button_minus_5_top}" Width="{button_minus_5_width}" Height="{button_minus_5_height}" />
 <IOContorl ID="{button_plus_1_id}" IOName="{button_plus_1_io_name}" IOCommand="{button_plus_1_io_command}" ControlType="IconButton" Style="SmallButton" IOEnable="{button_plus_1_enable}" IOState="{button_plus_1_state}" LangName="{button_plus_1_lang}" Value="{button_plus_1_value}" Left="{button_plus_1_left}" Top="{button_plus_1_top}" Width="{button_plus_1_width}" Height="{button_plus_1_height}" />
 <IOContorl ID="{button_minus_1_id}" IOName="{button_minus_1_io_name}" IOCommand="{button_minus_1_io_command}" ControlType="IconButton" Style="SmallButton" IOEnable="{button_minus_1_enable}" IOState="{button_minus_1_state}" LangName="{button_minus_1_lang}" Value="{button_minus_1_value}" Left="{button_minus_1_left}" Top="{button_minus_1_top}" Width="{button_minus_1_width}" Height="{button_minus_1_height}" />
-<IOContorl ID="{value_id}" ControlType="TextBlock" LangName="{value_lang}" Value="{display_value}" Left="{value_left}" Top="{value_top}" Height="40" />
-<IOContorl ID="{direction_id}" ControlType="TextBlock" LangName="{direction_lang}" Value="{direction}" Left="{direction_left}" Top="{direction_top}" Height="40" />
+<IOContorl ID="{value_id}" ControlType="TextBlock" LangName="{value_lang}" Value="{display_value}" Left="{value_left}" Top="{value_top}" Height="40" Align="{align}" />
+<IOContorl ID="{direction_id}" ControlType="TextBlock" LangName="{direction_lang}" Value="{direction}" Left="{direction_left}" Top="{direction_top}" Height="40" Align="{align}" />
 ```
 
-按钮文案（例如 +5、-5、+1、-1）分别从对应 TEXT 节点读取并填入 Value；数值和方向文本分别从真实 TEXT 节点读取并填入对应 TextBlock.Value。业务字段/动作、状态、位置和尺寸从对应 MasterGo 节点读取；文本位置从各自节点 bbox 读取，TextBlock 高度固定 40，TextBlock 宽度只从 DSL `constraints` 发射 `MinWidth` / `MaxWidth`。无图标槽位时 Icon、IconWidth、IconHeight 仍恒写并输出空字符串值；PageName、IOVisible、IOCommand、IOEnable 按“按钮族固定参数”一节恒写；MasterGo 未提供的其他必写字段缺失时保留对应 XML 属性并输出空字符串值。
+按钮文案（例如 +5、-5、+1、-1）分别从对应 TEXT 节点读取并填入 Value；数值和方向文本分别从真实 TEXT 节点读取并填入对应 TextBlock.Value。业务字段/动作、状态、位置和尺寸从对应 MasterGo 节点读取；文本位置从各自节点 bbox 读取，TextBlock 高度固定 40，TextBlock 宽度只从 DSL `constraints` 发射 `MinWidth` / `MaxWidth`。无图标槽位时 Icon、IconWidth、IconHeight 仍恒写并输出空字符串值；PageName、IOVisible、IOCommand、IOEnable 按“按钮族固定参数”一节恒写；MasterGo 未提供的其他必写字段缺失时保留对应 XML 属性并输出空字符串值。`TextBlock` 的 `Align` 不适用该空占位口径，只看下文「文本对齐」通用规则。
 
 ### 固定模板：属性 1=加减快捷键操作-2有标题
 
@@ -297,11 +299,11 @@ Style 与内部组件对照（只对下表列出的真实值成立）：
 <IOContorl ID="{button_minus_5_id}" IOName="{button_minus_5_io_name}" IOCommand="{button_minus_5_io_command}" ControlType="IconButton" Style="SmallButton" IOEnable="{button_minus_5_enable}" IOState="{button_minus_5_state}" LangName="{button_minus_5_lang}" Value="{button_minus_5_value}" Left="{button_minus_5_left}" Top="{button_minus_5_top}" Width="{button_minus_5_width}" Height="{button_minus_5_height}" />
 <IOContorl ID="{button_plus_1_id}" IOName="{button_plus_1_io_name}" IOCommand="{button_plus_1_io_command}" ControlType="IconButton" Style="SmallButton" IOEnable="{button_plus_1_enable}" IOState="{button_plus_1_state}" LangName="{button_plus_1_lang}" Value="{button_plus_1_value}" Left="{button_plus_1_left}" Top="{button_plus_1_top}" Width="{button_plus_1_width}" Height="{button_plus_1_height}" />
 <IOContorl ID="{button_minus_1_id}" IOName="{button_minus_1_io_name}" IOCommand="{button_minus_1_io_command}" ControlType="IconButton" Style="SmallButton" IOEnable="{button_minus_1_enable}" IOState="{button_minus_1_state}" LangName="{button_minus_1_lang}" Value="{button_minus_1_value}" Left="{button_minus_1_left}" Top="{button_minus_1_top}" Width="{button_minus_1_width}" Height="{button_minus_1_height}" />
-<IOContorl ID="{title_id}" ControlType="TextBlock" LangName="{title_lang}" Value="{title}" Left="{title_left}" Top="{title_top}" Height="40" />
-<IOContorl ID="{value_id}" ControlType="TextBlock" LangName="{value_lang}" Value="{display_value}" Left="{value_left}" Top="{value_top}" Height="40" />
+<IOContorl ID="{title_id}" ControlType="TextBlock" LangName="{title_lang}" Value="{title}" Left="{title_left}" Top="{title_top}" Height="40" Align="{align}" />
+<IOContorl ID="{value_id}" ControlType="TextBlock" LangName="{value_lang}" Value="{display_value}" Left="{value_left}" Top="{value_top}" Height="40" Align="{align}" />
 ```
 
-四个按钮文案（例如 +5、-5、+1、-1）分别从对应 TEXT 节点读取并填入 Value；标题和数值文本分别从真实 TEXT 节点读取并填入对应 TextBlock.Value。按钮业务字段/动作、状态、位置和尺寸从对应 MasterGo 节点读取；文本位置从各自节点 bbox 读取，TextBlock 高度固定 40，TextBlock 宽度只从 DSL `constraints` 发射 `MinWidth` / `MaxWidth`。无图标槽位时 Icon、IconWidth、IconHeight 仍恒写并输出空字符串值；PageName、IOVisible、IOCommand、IOEnable 按“按钮族固定参数”一节恒写；MasterGo 未提供的必写字段缺失时保留对应 XML 属性并输出空字符串值。
+四个按钮文案（例如 +5、-5、+1、-1）分别从对应 TEXT 节点读取并填入 Value；标题和数值文本分别从真实 TEXT 节点读取并填入对应 TextBlock.Value。按钮业务字段/动作、状态、位置和尺寸从对应 MasterGo 节点读取；文本位置从各自节点 bbox 读取，TextBlock 高度固定 40，TextBlock 宽度只从 DSL `constraints` 发射 `MinWidth` / `MaxWidth`。无图标槽位时 Icon、IconWidth、IconHeight 仍恒写并输出空字符串值；PageName、IOVisible、IOCommand、IOEnable 按“按钮族固定参数”一节恒写；MasterGo 未提供的必写字段缺失时保留对应 XML 属性并输出空字符串值。`TextBlock` 的 `Align` 不适用该空占位口径，只看下文「文本对齐」通用规则。
 
 ### 固定模板：属性 1=加减快捷操作-有标题
 
@@ -312,12 +314,12 @@ Style 与内部组件对照（只对下表列出的真实值成立）：
 <IOContorl ID="{button_minus_5_id}" IOName="{button_minus_5_io_name}" IOCommand="{button_minus_5_io_command}" ControlType="IconButton" Style="SmallButton" IOEnable="{button_minus_5_enable}" IOState="{button_minus_5_state}" LangName="{button_minus_5_lang}" Value="{button_minus_5_value}" Left="{button_minus_5_left}" Top="{button_minus_5_top}" Width="{button_minus_5_width}" Height="{button_minus_5_height}" />
 <IOContorl ID="{button_plus_1_id}" IOName="{button_plus_1_io_name}" IOCommand="{button_plus_1_io_command}" ControlType="IconButton" Style="SmallButton" IOEnable="{button_plus_1_enable}" IOState="{button_plus_1_state}" LangName="{button_plus_1_lang}" Value="{button_plus_1_value}" Left="{button_plus_1_left}" Top="{button_plus_1_top}" Width="{button_plus_1_width}" Height="{button_plus_1_height}" />
 <IOContorl ID="{button_minus_1_id}" IOName="{button_minus_1_io_name}" IOCommand="{button_minus_1_io_command}" ControlType="IconButton" Style="SmallButton" IOEnable="{button_minus_1_enable}" IOState="{button_minus_1_state}" LangName="{button_minus_1_lang}" Value="{button_minus_1_value}" Left="{button_minus_1_left}" Top="{button_minus_1_top}" Width="{button_minus_1_width}" Height="{button_minus_1_height}" />
-<IOContorl ID="{title_id}" ControlType="TextBlock" LangName="{title_lang}" Value="{title}" Left="{title_left}" Top="{title_top}" Height="40" />
-<IOContorl ID="{value_id}" ControlType="TextBlock" LangName="{value_lang}" Value="{display_value}" Left="{value_left}" Top="{value_top}" Height="40" />
-<IOContorl ID="{direction_id}" ControlType="TextBlock" LangName="{direction_lang}" Value="{direction}" Left="{direction_left}" Top="{direction_top}" Height="40" />
+<IOContorl ID="{title_id}" ControlType="TextBlock" LangName="{title_lang}" Value="{title}" Left="{title_left}" Top="{title_top}" Height="40" Align="{align}" />
+<IOContorl ID="{value_id}" ControlType="TextBlock" LangName="{value_lang}" Value="{display_value}" Left="{value_left}" Top="{value_top}" Height="40" Align="{align}" />
+<IOContorl ID="{direction_id}" ControlType="TextBlock" LangName="{direction_lang}" Value="{direction}" Left="{direction_left}" Top="{direction_top}" Height="40" Align="{align}" />
 ```
 
-四个按钮文案（例如 +5、-5、+1、-1）分别从对应 TEXT 节点读取并填入 Value；标题、数值和方向文本分别从真实 TEXT 节点读取并填入对应 TextBlock 的 Value。按钮业务字段/动作、状态、位置和尺寸从对应 MasterGo 节点读取；文本位置从各自节点 bbox 读取，TextBlock 高度固定 40，TextBlock 宽度只从 DSL `constraints` 发射 `MinWidth` / `MaxWidth`。无图标槽位时 Icon、IconWidth、IconHeight 仍恒写并输出空字符串值；PageName、IOVisible、IOCommand、IOEnable 按“按钮族固定参数”一节恒写；MasterGo 未提供的其他必写字段缺失时保留对应 XML 属性并输出空字符串值。
+四个按钮文案（例如 +5、-5、+1、-1）分别从对应 TEXT 节点读取并填入 Value；标题、数值和方向文本分别从真实 TEXT 节点读取并填入对应 TextBlock 的 Value。按钮业务字段/动作、状态、位置和尺寸从对应 MasterGo 节点读取；文本位置从各自节点 bbox 读取，TextBlock 高度固定 40，TextBlock 宽度只从 DSL `constraints` 发射 `MinWidth` / `MaxWidth`。无图标槽位时 Icon、IconWidth、IconHeight 仍恒写并输出空字符串值；PageName、IOVisible、IOCommand、IOEnable 按“按钮族固定参数”一节恒写；MasterGo 未提供的其他必写字段缺失时保留对应 XML 属性并输出空字符串值。`TextBlock` 的 `Align` 不适用该空占位口径，只看下文「文本对齐」通用规则。
 
 该规则的真实子节点关系为：四个按钮子节点名称均为 `按钮`，按父节点链和组件内顺序区分；按钮内部 TEXT 节点写入对应 IconButton.Value。与按钮平级的主标题 TEXT 节点生成独立 TextBlock；组 2525 内的 TEXT 节点也分别生成独立 TextBlock。主标题可见性由实例属性控制，不影响按钮 Value 文本或组内独立文本。
 
@@ -325,14 +327,14 @@ Style 与内部组件对照（只对下表列出的真实值成立）：
 
 ### 固定模板：属性 1=轴操作
 
-固定节点：四个 IconButton IOContorl 和一个可选 TextBlock IOContorl；按钮 ControlType 固定为 IconButton，Style 属性省略；文本 ControlType 固定为 TextBlock；四个方向按钮（up、left、right、down）与 SCAN 文本的槽位顺序和父子关系固定。
+固定节点：四个 IconButton IOContorl 和一个可选 TextBlock IOContorl；按钮 ControlType 固定为 IconButton，Style 固定发射空字符串占位；文本 ControlType 固定为 TextBlock；四个方向按钮（up、left、right、down）与 SCAN 文本的槽位顺序和父子关系固定。
 
 ```xml
-<IOContorl ID="{up_id}" IOName="{up_io_name}" IOCommand="{up_io_command}" ControlType="IconButton" Icon="{up_icon}" IconHeight="{up_icon_height}" IconWidth="{up_icon_width}" IOEnable="{up_enable}" IOState="{up_state}" Value="{up_value}" Left="{up_left}" Top="{up_top}" Width="{up_width}" Height="{up_height}" />
-<IOContorl ID="{left_id}" IOName="{left_io_name}" IOCommand="{left_io_command}" ControlType="IconButton" Icon="{left_icon}" IconHeight="{left_icon_height}" IconWidth="{left_icon_width}" IOEnable="{left_enable}" IOState="{left_state}" Value="{left_value}" Left="{left_left}" Top="{left_top}" Width="{left_width}" Height="{left_height}" />
-<IOContorl ID="{right_id}" IOName="{right_io_name}" IOCommand="{right_io_command}" ControlType="IconButton" Icon="{right_icon}" IconHeight="{right_icon_height}" IconWidth="{right_icon_width}" IOEnable="{right_enable}" IOState="{right_state}" Value="{right_value}" Left="{right_left}" Top="{right_top}" Width="{right_width}" Height="{right_height}" />
-<IOContorl ID="{down_id}" IOName="{down_io_name}" IOCommand="{down_io_command}" ControlType="IconButton" Icon="{down_icon}" IconHeight="{down_icon_height}" IconWidth="{down_icon_width}" IOEnable="{down_enable}" IOState="{down_state}" Value="{down_value}" Left="{down_left}" Top="{down_top}" Width="{down_width}" Height="{down_height}" />
-<IOContorl ID="{scan_id}" ControlType="TextBlock" Value="{scan_text}" Left="{scan_left}" Top="{scan_top}" Height="40" />
+<IOContorl ID="{up_id}" IOName="{up_io_name}" IOCommand="{up_io_command}" ControlType="IconButton" Style="" Icon="{up_icon}" IconHeight="{up_icon_height}" IconWidth="{up_icon_width}" IOEnable="{up_enable}" IOState="{up_state}" Value="{up_value}" Left="{up_left}" Top="{up_top}" Width="{up_width}" Height="{up_height}" />
+<IOContorl ID="{left_id}" IOName="{left_io_name}" IOCommand="{left_io_command}" ControlType="IconButton" Style="" Icon="{left_icon}" IconHeight="{left_icon_height}" IconWidth="{left_icon_width}" IOEnable="{left_enable}" IOState="{left_state}" Value="{left_value}" Left="{left_left}" Top="{left_top}" Width="{left_width}" Height="{left_height}" />
+<IOContorl ID="{right_id}" IOName="{right_io_name}" IOCommand="{right_io_command}" ControlType="IconButton" Style="" Icon="{right_icon}" IconHeight="{right_icon_height}" IconWidth="{right_icon_width}" IOEnable="{right_enable}" IOState="{right_state}" Value="{right_value}" Left="{right_left}" Top="{right_top}" Width="{right_width}" Height="{right_height}" />
+<IOContorl ID="{down_id}" IOName="{down_io_name}" IOCommand="{down_io_command}" ControlType="IconButton" Style="" Icon="{down_icon}" IconHeight="{down_icon_height}" IconWidth="{down_icon_width}" IOEnable="{down_enable}" IOState="{down_state}" Value="{down_value}" Left="{down_left}" Top="{down_top}" Width="{down_width}" Height="{down_height}" />
+<IOContorl ID="{scan_id}" ControlType="TextBlock" Value="{scan_text}" Left="{scan_left}" Top="{scan_top}" Height="40" Align="{align}" />
 ```
 
 四个按钮的图标、文案、业务字段/动作、状态、位置和尺寸从对应 MasterGo 节点读取；SCAN 文本节点填入 TextBlock.Value。SCAN 是可选取槽位：当前实例不存在该 TEXT 节点时不生成该 TextBlock，也不得用坐标或相邻实例补齐。存在图标槽位时生成 Icon、IconHeight、IconWidth；未提供的可选字段缺失时保留对应 XML 属性并输出空字符串值。
@@ -349,18 +351,18 @@ Style 与内部组件对照（只对下表列出的真实值成立）：
 
 ### 固定模板：属性 1=轴操作-快慢
 
-固定节点：八个 IconButton IOContorl 和一个可选 TextBlock IOContorl；按钮 ControlType 固定为 IconButton，Style 属性省略；文本 ControlType 固定为 TextBlock；八个按钮按“方向 × 内外圈”固定槽位顺序 up_inner、up_outer、down_inner、down_outer、left_inner、left_outer、right_inner、right_outer，SCAN 文本排在最后且仅在设计稿存在该 TEXT 节点时生成。
+固定节点：八个 IconButton IOContorl 和一个可选 TextBlock IOContorl；按钮 ControlType 固定为 IconButton，Style 固定发射空字符串占位；文本 ControlType 固定为 TextBlock；八个按钮按“方向 × 内外圈”固定槽位顺序 up_inner、up_outer、down_inner、down_outer、left_inner、left_outer、right_inner、right_outer，SCAN 文本排在最后且仅在设计稿存在该 TEXT 节点时生成。
 
 ```xml
-<IOContorl ID="{up_inner_id}" IOName="{up_inner_io_name}" IOCommand="{up_inner_io_command}" ControlType="IconButton" Icon="{up_inner_icon}" IconHeight="{up_inner_icon_height}" IconWidth="{up_inner_icon_width}" IOEnable="{up_inner_enable}" IOState="{up_inner_state}" Value="{up_inner_value}" Left="{up_inner_left}" Top="{up_inner_top}" Width="{up_inner_width}" Height="{up_inner_height}" />
-<IOContorl ID="{up_outer_id}" IOName="{up_outer_io_name}" IOCommand="{up_outer_io_command}" ControlType="IconButton" Icon="{up_outer_icon}" IconHeight="{up_outer_icon_height}" IconWidth="{up_outer_icon_width}" IOEnable="{up_outer_enable}" IOState="{up_outer_state}" Value="{up_outer_value}" Left="{up_outer_left}" Top="{up_outer_top}" Width="{up_outer_width}" Height="{up_outer_height}" />
-<IOContorl ID="{down_inner_id}" IOName="{down_inner_io_name}" IOCommand="{down_inner_io_command}" ControlType="IconButton" Icon="{down_inner_icon}" IconHeight="{down_inner_icon_height}" IconWidth="{down_inner_icon_width}" IOEnable="{down_inner_enable}" IOState="{down_inner_state}" Value="{down_inner_value}" Left="{down_inner_left}" Top="{down_inner_top}" Width="{down_inner_width}" Height="{down_inner_height}" />
-<IOContorl ID="{down_outer_id}" IOName="{down_outer_io_name}" IOCommand="{down_outer_io_command}" ControlType="IconButton" Icon="{down_outer_icon}" IconHeight="{down_outer_icon_height}" IconWidth="{down_outer_icon_width}" IOEnable="{down_outer_enable}" IOState="{down_outer_state}" Value="{down_outer_value}" Left="{down_outer_left}" Top="{down_outer_top}" Width="{down_outer_width}" Height="{down_outer_height}" />
-<IOContorl ID="{left_inner_id}" IOName="{left_inner_io_name}" IOCommand="{left_inner_io_command}" ControlType="IconButton" Icon="{left_inner_icon}" IconHeight="{left_inner_icon_height}" IconWidth="{left_inner_icon_width}" IOEnable="{left_inner_enable}" IOState="{left_inner_state}" Value="{left_inner_value}" Left="{left_inner_left}" Top="{left_inner_top}" Width="{left_inner_width}" Height="{left_inner_height}" />
-<IOContorl ID="{left_outer_id}" IOName="{left_outer_io_name}" IOCommand="{left_outer_io_command}" ControlType="IconButton" Icon="{left_outer_icon}" IconHeight="{left_outer_icon_height}" IconWidth="{left_outer_icon_width}" IOEnable="{left_outer_enable}" IOState="{left_outer_state}" Value="{left_outer_value}" Left="{left_outer_left}" Top="{left_outer_top}" Width="{left_outer_width}" Height="{left_outer_height}" />
-<IOContorl ID="{right_inner_id}" IOName="{right_inner_io_name}" IOCommand="{right_inner_io_command}" ControlType="IconButton" Icon="{right_inner_icon}" IconHeight="{right_inner_icon_height}" IconWidth="{right_inner_icon_width}" IOEnable="{right_inner_enable}" IOState="{right_inner_state}" Value="{right_inner_value}" Left="{right_inner_left}" Top="{right_inner_top}" Width="{right_inner_width}" Height="{right_inner_height}" />
-<IOContorl ID="{right_outer_id}" IOName="{right_outer_io_name}" IOCommand="{right_outer_io_command}" ControlType="IconButton" Icon="{right_outer_icon}" IconHeight="{right_outer_icon_height}" IconWidth="{right_outer_icon_width}" IOEnable="{right_outer_enable}" IOState="{right_outer_state}" Value="{right_outer_value}" Left="{right_outer_left}" Top="{right_outer_top}" Width="{right_outer_width}" Height="{right_outer_height}" />
-<IOContorl ID="{scan_id}" ControlType="TextBlock" Value="{scan_text}" Left="{scan_left}" Top="{scan_top}" Height="40" />
+<IOContorl ID="{up_inner_id}" IOName="{up_inner_io_name}" IOCommand="{up_inner_io_command}" ControlType="IconButton" Style="" Icon="{up_inner_icon}" IconHeight="{up_inner_icon_height}" IconWidth="{up_inner_icon_width}" IOEnable="{up_inner_enable}" IOState="{up_inner_state}" Value="{up_inner_value}" Left="{up_inner_left}" Top="{up_inner_top}" Width="{up_inner_width}" Height="{up_inner_height}" />
+<IOContorl ID="{up_outer_id}" IOName="{up_outer_io_name}" IOCommand="{up_outer_io_command}" ControlType="IconButton" Style="" Icon="{up_outer_icon}" IconHeight="{up_outer_icon_height}" IconWidth="{up_outer_icon_width}" IOEnable="{up_outer_enable}" IOState="{up_outer_state}" Value="{up_outer_value}" Left="{up_outer_left}" Top="{up_outer_top}" Width="{up_outer_width}" Height="{up_outer_height}" />
+<IOContorl ID="{down_inner_id}" IOName="{down_inner_io_name}" IOCommand="{down_inner_io_command}" ControlType="IconButton" Style="" Icon="{down_inner_icon}" IconHeight="{down_inner_icon_height}" IconWidth="{down_inner_icon_width}" IOEnable="{down_inner_enable}" IOState="{down_inner_state}" Value="{down_inner_value}" Left="{down_inner_left}" Top="{down_inner_top}" Width="{down_inner_width}" Height="{down_inner_height}" />
+<IOContorl ID="{down_outer_id}" IOName="{down_outer_io_name}" IOCommand="{down_outer_io_command}" ControlType="IconButton" Style="" Icon="{down_outer_icon}" IconHeight="{down_outer_icon_height}" IconWidth="{down_outer_icon_width}" IOEnable="{down_outer_enable}" IOState="{down_outer_state}" Value="{down_outer_value}" Left="{down_outer_left}" Top="{down_outer_top}" Width="{down_outer_width}" Height="{down_outer_height}" />
+<IOContorl ID="{left_inner_id}" IOName="{left_inner_io_name}" IOCommand="{left_inner_io_command}" ControlType="IconButton" Style="" Icon="{left_inner_icon}" IconHeight="{left_inner_icon_height}" IconWidth="{left_inner_icon_width}" IOEnable="{left_inner_enable}" IOState="{left_inner_state}" Value="{left_inner_value}" Left="{left_inner_left}" Top="{left_inner_top}" Width="{left_inner_width}" Height="{left_inner_height}" />
+<IOContorl ID="{left_outer_id}" IOName="{left_outer_io_name}" IOCommand="{left_outer_io_command}" ControlType="IconButton" Style="" Icon="{left_outer_icon}" IconHeight="{left_outer_icon_height}" IconWidth="{left_outer_icon_width}" IOEnable="{left_outer_enable}" IOState="{left_outer_state}" Value="{left_outer_value}" Left="{left_outer_left}" Top="{left_outer_top}" Width="{left_outer_width}" Height="{left_outer_height}" />
+<IOContorl ID="{right_inner_id}" IOName="{right_inner_io_name}" IOCommand="{right_inner_io_command}" ControlType="IconButton" Style="" Icon="{right_inner_icon}" IconHeight="{right_inner_icon_height}" IconWidth="{right_inner_icon_width}" IOEnable="{right_inner_enable}" IOState="{right_inner_state}" Value="{right_inner_value}" Left="{right_inner_left}" Top="{right_inner_top}" Width="{right_inner_width}" Height="{right_inner_height}" />
+<IOContorl ID="{right_outer_id}" IOName="{right_outer_io_name}" IOCommand="{right_outer_io_command}" ControlType="IconButton" Style="" Icon="{right_outer_icon}" IconHeight="{right_outer_icon_height}" IconWidth="{right_outer_icon_width}" IOEnable="{right_outer_enable}" IOState="{right_outer_state}" Value="{right_outer_value}" Left="{right_outer_left}" Top="{right_outer_top}" Width="{right_outer_width}" Height="{right_outer_height}" />
+<IOContorl ID="{scan_id}" ControlType="TextBlock" Value="{scan_text}" Left="{scan_left}" Top="{scan_top}" Height="40" Align="{align}" />
 ```
 
 槽位绑定规则：以八个候选按钮组整体包围盒的中心为基准，按钮中心落在主轴方向决定 up/down/left/right，到中心的距离决定 inner（近）/outer（远）；同一方向距离更近的一组记为 inner。八个按钮的图标、文案、业务字段/动作、状态、位置和尺寸从各自 MasterGo 节点读取。
@@ -369,26 +371,26 @@ Style 与内部组件对照（只对下表列出的真实值成立）：
 
 ### 固定模板：属性 1=方向
 
-固定节点：四个 IconButton IOContorl；ControlType 固定为 IconButton，Style 属性省略；每个按钮包含两个图标槽位，按钮顺序和父子关系固定。
+固定节点：四个 IconButton IOContorl；ControlType 固定为 IconButton，Style 固定发射空字符串占位；每个按钮包含两个图标槽位，按钮顺序和父子关系固定。
 
 ```xml
-<IOContorl ID="{up_pair_id}" IOName="{up_pair_io_name}" IOCommand="{up_pair_io_command}" ControlType="IconButton" Icon="{up_pair_icon}" IconHeight="{up_pair_icon_height}" IconWidth="{up_pair_icon_width}" IOEnable="{up_pair_enable}" IOState="{up_pair_state}" Value="{up_pair_value}" Left="{up_pair_left}" Top="{up_pair_top}" Width="{up_pair_width}" Height="{up_pair_height}" />
-<IOContorl ID="{down_pair_id}" IOName="{down_pair_io_name}" IOCommand="{down_pair_io_command}" ControlType="IconButton" Icon="{down_pair_icon}" IconHeight="{down_pair_icon_height}" IconWidth="{down_pair_icon_width}" IOEnable="{down_pair_enable}" IOState="{down_pair_state}" Value="{down_pair_value}" Left="{down_pair_left}" Top="{down_pair_top}" Width="{down_pair_width}" Height="{down_pair_height}" />
-<IOContorl ID="{vertical_pair_id}" IOName="{vertical_pair_io_name}" IOCommand="{vertical_pair_io_command}" ControlType="IconButton" Icon="{vertical_pair_icon}" IconHeight="{vertical_pair_icon_height}" IconWidth="{vertical_pair_icon_width}" IOEnable="{vertical_pair_enable}" IOState="{vertical_pair_state}" Value="{vertical_pair_value}" Left="{vertical_pair_left}" Top="{vertical_pair_top}" Width="{vertical_pair_width}" Height="{vertical_pair_height}" />
-<IOContorl ID="{horizontal_pair_id}" IOName="{horizontal_pair_io_name}" IOCommand="{horizontal_pair_io_command}" ControlType="IconButton" Icon="{horizontal_pair_icon}" IconHeight="{horizontal_pair_icon_height}" IconWidth="{horizontal_pair_icon_width}" IOEnable="{horizontal_pair_enable}" IOState="{horizontal_pair_state}" Value="{horizontal_pair_value}" Left="{horizontal_pair_left}" Top="{horizontal_pair_top}" Width="{horizontal_pair_width}" Height="{horizontal_pair_height}" />
+<IOContorl ID="{up_pair_id}" IOName="{up_pair_io_name}" IOCommand="{up_pair_io_command}" ControlType="IconButton" Style="" Icon="{up_pair_icon}" IconHeight="{up_pair_icon_height}" IconWidth="{up_pair_icon_width}" IOEnable="{up_pair_enable}" IOState="{up_pair_state}" Value="{up_pair_value}" Left="{up_pair_left}" Top="{up_pair_top}" Width="{up_pair_width}" Height="{up_pair_height}" />
+<IOContorl ID="{down_pair_id}" IOName="{down_pair_io_name}" IOCommand="{down_pair_io_command}" ControlType="IconButton" Style="" Icon="{down_pair_icon}" IconHeight="{down_pair_icon_height}" IconWidth="{down_pair_icon_width}" IOEnable="{down_pair_enable}" IOState="{down_pair_state}" Value="{down_pair_value}" Left="{down_pair_left}" Top="{down_pair_top}" Width="{down_pair_width}" Height="{down_pair_height}" />
+<IOContorl ID="{vertical_pair_id}" IOName="{vertical_pair_io_name}" IOCommand="{vertical_pair_io_command}" ControlType="IconButton" Style="" Icon="{vertical_pair_icon}" IconHeight="{vertical_pair_icon_height}" IconWidth="{vertical_pair_icon_width}" IOEnable="{vertical_pair_enable}" IOState="{vertical_pair_state}" Value="{vertical_pair_value}" Left="{vertical_pair_left}" Top="{vertical_pair_top}" Width="{vertical_pair_width}" Height="{vertical_pair_height}" />
+<IOContorl ID="{horizontal_pair_id}" IOName="{horizontal_pair_io_name}" IOCommand="{horizontal_pair_io_command}" ControlType="IconButton" Style="" Icon="{horizontal_pair_icon}" IconHeight="{horizontal_pair_icon_height}" IconWidth="{horizontal_pair_icon_width}" IOEnable="{horizontal_pair_enable}" IOState="{horizontal_pair_state}" Value="{horizontal_pair_value}" Left="{horizontal_pair_left}" Top="{horizontal_pair_top}" Width="{horizontal_pair_width}" Height="{horizontal_pair_height}" />
 ```
 
-四个按钮分别对应真实的方向图标槽位；图标、业务字段/动作、状态、文案、位置和尺寸逐节点读取。没有真实 Value 或可选字段时删除对应属性。
+四个按钮分别对应真实的方向图标槽位；图标、业务字段/动作、状态、文案、位置和尺寸逐节点读取。没有真实 Value 时保留 Value 并输出空字符串；可选字段只有登记在 `omitRequiredAttrs` 时不发射，其余取不到来源时写空字符串占位。
 
 ### 固定模板：属性 1=图像移动-单侧
 
-固定节点：四个 IconButton IOContorl；ControlType 固定为 IconButton，Style 属性省略；按钮顺序和父子关系固定。
+固定节点：四个 IconButton IOContorl；ControlType 固定为 IconButton，Style 固定发射空字符串占位；按钮顺序和父子关系固定。
 
 ```xml
-<IOContorl ID="{up_id}" IOName="{up_io_name}" IOCommand="{up_io_command}" ControlType="IconButton" Icon="{up_icon}" IconHeight="{up_icon_height}" IconWidth="{up_icon_width}" IOEnable="{up_enable}" IOState="{up_state}" Value="{up_value}" Left="{up_left}" Top="{up_top}" Width="{up_width}" Height="{up_height}" />
-<IOContorl ID="{left_id}" IOName="{left_io_name}" IOCommand="{left_io_command}" ControlType="IconButton" Icon="{left_icon}" IconHeight="{left_icon_height}" IconWidth="{left_icon_width}" IOEnable="{left_enable}" IOState="{left_state}" Value="{left_value}" Left="{left_left}" Top="{left_top}" Width="{left_width}" Height="{left_height}" />
-<IOContorl ID="{right_id}" IOName="{right_io_name}" IOCommand="{right_io_command}" ControlType="IconButton" Icon="{right_icon}" IconHeight="{right_icon_height}" IconWidth="{right_icon_width}" IOEnable="{right_enable}" IOState="{right_state}" Value="{right_value}" Left="{right_left}" Top="{right_top}" Width="{right_width}" Height="{right_height}" />
-<IOContorl ID="{down_id}" IOName="{down_io_name}" IOCommand="{down_io_command}" ControlType="IconButton" Icon="{down_icon}" IconHeight="{down_icon_height}" IconWidth="{down_icon_width}" IOEnable="{down_enable}" IOState="{down_state}" Value="{down_value}" Left="{down_left}" Top="{down_top}" Width="{down_width}" Height="{down_height}" />
+<IOContorl ID="{up_id}" IOName="{up_io_name}" IOCommand="{up_io_command}" ControlType="IconButton" Style="" Icon="{up_icon}" IconHeight="{up_icon_height}" IconWidth="{up_icon_width}" IOEnable="{up_enable}" IOState="{up_state}" Value="{up_value}" Left="{up_left}" Top="{up_top}" Width="{up_width}" Height="{up_height}" />
+<IOContorl ID="{left_id}" IOName="{left_io_name}" IOCommand="{left_io_command}" ControlType="IconButton" Style="" Icon="{left_icon}" IconHeight="{left_icon_height}" IconWidth="{left_icon_width}" IOEnable="{left_enable}" IOState="{left_state}" Value="{left_value}" Left="{left_left}" Top="{left_top}" Width="{left_width}" Height="{left_height}" />
+<IOContorl ID="{right_id}" IOName="{right_io_name}" IOCommand="{right_io_command}" ControlType="IconButton" Style="" Icon="{right_icon}" IconHeight="{right_icon_height}" IconWidth="{right_icon_width}" IOEnable="{right_enable}" IOState="{right_state}" Value="{right_value}" Left="{right_left}" Top="{right_top}" Width="{right_width}" Height="{right_height}" />
+<IOContorl ID="{down_id}" IOName="{down_io_name}" IOCommand="{down_io_command}" ControlType="IconButton" Style="" Icon="{down_icon}" IconHeight="{down_icon_height}" IconWidth="{down_icon_width}" IOEnable="{down_enable}" IOState="{down_state}" Value="{down_value}" Left="{down_left}" Top="{down_top}" Width="{down_width}" Height="{down_height}" />
 ```
 
 四个方向按钮的图标、业务字段/动作、状态、文案、位置和尺寸逐节点读取；MasterGo 未提供的可选属性字段缺失时保留对应 XML 属性并输出空字符串值。
@@ -397,13 +399,13 @@ Style 与内部组件对照（只对下表列出的真实值成立）：
 
 ### 固定模板：属性 1=图像移动-双侧
 
-固定节点：四个 IconButton IOContorl；ControlType 固定为 IconButton，Style 属性省略；每个按钮的双图标槽位、顺序和父子关系固定。
+固定节点：四个 IconButton IOContorl；ControlType 固定为 IconButton，Style 固定发射空字符串占位；每个按钮的双图标槽位、顺序和父子关系固定。
 
 ```xml
-<IOContorl ID="{first_id}" IOName="{first_io_name}" IOCommand="{first_io_command}" ControlType="IconButton" Icon="{first_icon}" IconHeight="{first_icon_height}" IconWidth="{first_icon_width}" IOEnable="{first_enable}" IOState="{first_state}" Value="{first_value}" Left="{first_left}" Top="{first_top}" Width="{first_width}" Height="{first_height}" />
-<IOContorl ID="{second_id}" IOName="{second_io_name}" IOCommand="{second_io_command}" ControlType="IconButton" Icon="{second_icon}" IconHeight="{second_icon_height}" IconWidth="{second_icon_width}" IOEnable="{second_enable}" IOState="{second_state}" Value="{second_value}" Left="{second_left}" Top="{second_top}" Width="{second_width}" Height="{second_height}" />
-<IOContorl ID="{third_id}" IOName="{third_io_name}" IOCommand="{third_io_command}" ControlType="IconButton" Icon="{third_icon}" IconHeight="{third_icon_height}" IconWidth="{third_icon_width}" IOEnable="{third_enable}" IOState="{third_state}" Value="{third_value}" Left="{third_left}" Top="{third_top}" Width="{third_width}" Height="{third_height}" />
-<IOContorl ID="{fourth_id}" IOName="{fourth_io_name}" IOCommand="{fourth_io_command}" ControlType="IconButton" Icon="{fourth_icon}" IconHeight="{fourth_icon_height}" IconWidth="{fourth_icon_width}" IOEnable="{fourth_enable}" IOState="{fourth_state}" Value="{fourth_value}" Left="{fourth_left}" Top="{fourth_top}" Width="{fourth_width}" Height="{fourth_height}" />
+<IOContorl ID="{first_id}" IOName="{first_io_name}" IOCommand="{first_io_command}" ControlType="IconButton" Style="" Icon="{first_icon}" IconHeight="{first_icon_height}" IconWidth="{first_icon_width}" IOEnable="{first_enable}" IOState="{first_state}" Value="{first_value}" Left="{first_left}" Top="{first_top}" Width="{first_width}" Height="{first_height}" />
+<IOContorl ID="{second_id}" IOName="{second_io_name}" IOCommand="{second_io_command}" ControlType="IconButton" Style="" Icon="{second_icon}" IconHeight="{second_icon_height}" IconWidth="{second_icon_width}" IOEnable="{second_enable}" IOState="{second_state}" Value="{second_value}" Left="{second_left}" Top="{second_top}" Width="{second_width}" Height="{second_height}" />
+<IOContorl ID="{third_id}" IOName="{third_io_name}" IOCommand="{third_io_command}" ControlType="IconButton" Style="" Icon="{third_icon}" IconHeight="{third_icon_height}" IconWidth="{third_icon_width}" IOEnable="{third_enable}" IOState="{third_state}" Value="{third_value}" Left="{third_left}" Top="{third_top}" Width="{third_width}" Height="{third_height}" />
+<IOContorl ID="{fourth_id}" IOName="{fourth_io_name}" IOCommand="{fourth_io_command}" ControlType="IconButton" Style="" Icon="{fourth_icon}" IconHeight="{fourth_icon_height}" IconWidth="{fourth_icon_width}" IOEnable="{fourth_enable}" IOState="{fourth_state}" Value="{fourth_value}" Left="{fourth_left}" Top="{fourth_top}" Width="{fourth_width}" Height="{fourth_height}" />
 ```
 
 四个按钮的双图标槽位、业务字段/动作、状态、文案、位置和尺寸逐节点读取；未提供的可选属性字段缺失时保留对应 XML 属性并输出空字符串值。
@@ -412,11 +414,11 @@ Style 与内部组件对照（只对下表列出的真实值成立）：
 
 ### 固定模板：属性 1=缺口位置
 
-固定节点：两个 IconButton IOContorl；ControlType 固定为 IconButton，Style 属性省略；左右按钮槽位顺序和父子关系固定。
+固定节点：两个 IconButton IOContorl；ControlType 固定为 IconButton，Style 固定发射空字符串占位；左右按钮槽位顺序和父子关系固定。
 
 ```xml
-<IOContorl ID="{left_id}" IOName="{left_io_name}" IOCommand="{left_io_command}" ControlType="IconButton" Icon="{left_icon}" IconHeight="{left_icon_height}" IconWidth="{left_icon_width}" IOEnable="{left_enable}" IOState="{left_state}" Value="{left_value}" Left="{left_left}" Top="{left_top}" Width="{left_width}" Height="{left_height}" />
-<IOContorl ID="{right_id}" IOName="{right_io_name}" IOCommand="{right_io_command}" ControlType="IconButton" Icon="{right_icon}" IconHeight="{right_icon_height}" IconWidth="{right_icon_width}" IOEnable="{right_enable}" IOState="{right_state}" Value="{right_value}" Left="{right_left}" Top="{right_top}" Width="{right_width}" Height="{right_height}" />
+<IOContorl ID="{left_id}" IOName="{left_io_name}" IOCommand="{left_io_command}" ControlType="IconButton" Style="" Icon="{left_icon}" IconHeight="{left_icon_height}" IconWidth="{left_icon_width}" IOEnable="{left_enable}" IOState="{left_state}" Value="{left_value}" Left="{left_left}" Top="{left_top}" Width="{left_width}" Height="{left_height}" />
+<IOContorl ID="{right_id}" IOName="{right_io_name}" IOCommand="{right_io_command}" ControlType="IconButton" Style="" Icon="{right_icon}" IconHeight="{right_icon_height}" IconWidth="{right_icon_width}" IOEnable="{right_enable}" IOState="{right_state}" Value="{right_value}" Left="{right_left}" Top="{right_top}" Width="{right_width}" Height="{right_height}" />
 ```
 
 左右按钮图标、业务字段/动作、状态、文案、位置和尺寸逐节点读取；未提供的可选属性字段缺失时保留对应 XML 属性并输出空字符串值。
@@ -425,11 +427,11 @@ Style 与内部组件对照（只对下表列出的真实值成立）：
 
 ### 固定模板：属性 1=拟合数据-双侧上下
 
-固定节点：两个 IconButton IOContorl；ControlType 固定为 IconButton，Style 属性省略；每个按钮为双图标槽位，按钮顺序和父子关系固定。
+固定节点：两个 IconButton IOContorl；ControlType 固定为 IconButton，Style 固定发射空字符串占位；每个按钮为双图标槽位，按钮顺序和父子关系固定。
 
 ```xml
-<IOContorl ID="{first_id}" IOName="{first_io_name}" IOCommand="{first_io_command}" ControlType="IconButton" Icon="{first_icon}" IconHeight="{first_icon_height}" IconWidth="{first_icon_width}" IOEnable="{first_enable}" IOState="{first_state}" Value="{first_value}" Left="{first_left}" Top="{first_top}" Width="{first_width}" Height="{first_height}" />
-<IOContorl ID="{second_id}" IOName="{second_io_name}" IOCommand="{second_io_command}" ControlType="IconButton" Icon="{second_icon}" IconHeight="{second_icon_height}" IconWidth="{second_icon_width}" IOEnable="{second_enable}" IOState="{second_state}" Value="{second_value}" Left="{second_left}" Top="{second_top}" Width="{second_width}" Height="{second_height}" />
+<IOContorl ID="{first_id}" IOName="{first_io_name}" IOCommand="{first_io_command}" ControlType="IconButton" Style="" Icon="{first_icon}" IconHeight="{first_icon_height}" IconWidth="{first_icon_width}" IOEnable="{first_enable}" IOState="{first_state}" Value="{first_value}" Left="{first_left}" Top="{first_top}" Width="{first_width}" Height="{first_height}" />
+<IOContorl ID="{second_id}" IOName="{second_io_name}" IOCommand="{second_io_command}" ControlType="IconButton" Style="" Icon="{second_icon}" IconHeight="{second_icon_height}" IconWidth="{second_icon_width}" IOEnable="{second_enable}" IOState="{second_state}" Value="{second_value}" Left="{second_left}" Top="{second_top}" Width="{second_width}" Height="{second_height}" />
 ```
 
 两个按钮的双图标槽位、业务字段/动作、状态、文案、位置和尺寸逐节点读取；未提供的可选属性字段缺失时保留对应 XML 属性并输出空字符串值。
@@ -438,11 +440,11 @@ Style 与内部组件对照（只对下表列出的真实值成立）：
 
 ### 固定模板：属性 1=拟合数据-前后
 
-固定节点：两个 IconButton IOContorl；ControlType 固定为 IconButton，Style 属性省略；前后按钮顺序和父子关系固定。
+固定节点：两个 IconButton IOContorl；ControlType 固定为 IconButton，Style 固定发射空字符串占位；前后按钮顺序和父子关系固定。
 
 ```xml
-<IOContorl ID="{front_id}" IOName="{front_io_name}" IOCommand="{front_io_command}" ControlType="IconButton" Icon="{front_icon}" IconHeight="{front_icon_height}" IconWidth="{front_icon_width}" IOEnable="{front_enable}" IOState="{front_state}" Value="{front_value}" Left="{front_left}" Top="{front_top}" Width="{front_width}" Height="{front_height}" />
-<IOContorl ID="{back_id}" IOName="{back_io_name}" IOCommand="{back_io_command}" ControlType="IconButton" Icon="{back_icon}" IconHeight="{back_icon_height}" IconWidth="{back_icon_width}" IOEnable="{back_enable}" IOState="{back_state}" Value="{back_value}" Left="{back_left}" Top="{back_top}" Width="{back_width}" Height="{back_height}" />
+<IOContorl ID="{front_id}" IOName="{front_io_name}" IOCommand="{front_io_command}" ControlType="IconButton" Style="" Icon="{front_icon}" IconHeight="{front_icon_height}" IconWidth="{front_icon_width}" IOEnable="{front_enable}" IOState="{front_state}" Value="{front_value}" Left="{front_left}" Top="{front_top}" Width="{front_width}" Height="{front_height}" />
+<IOContorl ID="{back_id}" IOName="{back_io_name}" IOCommand="{back_io_command}" ControlType="IconButton" Style="" Icon="{back_icon}" IconHeight="{back_icon_height}" IconWidth="{back_icon_width}" IOEnable="{back_enable}" IOState="{back_state}" Value="{back_value}" Left="{back_left}" Top="{back_top}" Width="{back_width}" Height="{back_height}" />
 ```
 
 前后按钮图标、业务字段/动作、状态、文案、位置和尺寸逐节点读取；未提供的可选属性字段缺失时保留对应 XML 属性并输出空字符串值。
@@ -451,23 +453,23 @@ Style 与内部组件对照（只对下表列出的真实值成立）：
 
 ### 固定模板：属性 1=拟合数据-单侧上下
 
-固定节点：两个 IconButton IOContorl；ControlType 固定为 IconButton，Style 属性省略；上下按钮顺序和父子关系固定。
+固定节点：两个 IconButton IOContorl；ControlType 固定为 IconButton，Style 固定发射空字符串占位；上下按钮顺序和父子关系固定。
 
 ```xml
-<IOContorl ID="{up_id}" IOName="{up_io_name}" IOCommand="{up_io_command}" ControlType="IconButton" Icon="{up_icon}" IconHeight="{up_icon_height}" IconWidth="{up_icon_width}" IOEnable="{up_enable}" IOState="{up_state}" Value="{up_value}" Left="{up_left}" Top="{up_top}" Width="{up_width}" Height="{up_height}" />
-<IOContorl ID="{down_id}" IOName="{down_io_name}" IOCommand="{down_io_command}" ControlType="IconButton" Icon="{down_icon}" IconHeight="{down_icon_height}" IconWidth="{down_icon_width}" IOEnable="{down_enable}" IOState="{down_state}" Value="{down_value}" Left="{down_left}" Top="{down_top}" Width="{down_width}" Height="{down_height}" />
+<IOContorl ID="{up_id}" IOName="{up_io_name}" IOCommand="{up_io_command}" ControlType="IconButton" Style="" Icon="{up_icon}" IconHeight="{up_icon_height}" IconWidth="{up_icon_width}" IOEnable="{up_enable}" IOState="{up_state}" Value="{up_value}" Left="{up_left}" Top="{up_top}" Width="{up_width}" Height="{up_height}" />
+<IOContorl ID="{down_id}" IOName="{down_io_name}" IOCommand="{down_io_command}" ControlType="IconButton" Style="" Icon="{down_icon}" IconHeight="{down_icon_height}" IconWidth="{down_icon_width}" IOEnable="{down_enable}" IOState="{down_state}" Value="{down_value}" Left="{down_left}" Top="{down_top}" Width="{down_width}" Height="{down_height}" />
 ```
 
 上下按钮图标、业务字段/动作、状态、文案、位置和尺寸逐节点读取；未提供的可选属性字段缺失时保留对应 XML 属性并输出空字符串值。
 
 ### 固定模板：属性 1=扫描
 
-固定节点：一个 TextBlock IOContorl 和两个 IconButton IOContorl；文本与按钮的槽位顺序和父子关系固定，按钮 ControlType 固定为 IconButton，Style 属性省略，文本 ControlType 固定为 TextBlock。
+固定节点：一个 TextBlock IOContorl 和两个 IconButton IOContorl；文本与按钮的槽位顺序和父子关系固定，按钮 ControlType 固定为 IconButton，Style 固定发射空字符串占位，文本 ControlType 固定为 TextBlock。
 
 ```xml
-<IOContorl ID="{scan_title_id}" ControlType="TextBlock" Value="{scan_title}" Left="{scan_title_left}" Top="{scan_title_top}" Height="40" />
-<IOContorl ID="{left_id}" IOName="{left_io_name}" IOCommand="{left_io_command}" ControlType="IconButton" Icon="{left_icon}" IconHeight="{left_icon_height}" IconWidth="{left_icon_width}" IOEnable="{left_enable}" IOState="{left_state}" Value="{left_value}" Left="{left_left}" Top="{left_top}" Width="{left_width}" Height="{left_height}" />
-<IOContorl ID="{right_id}" IOName="{right_io_name}" IOCommand="{right_io_command}" ControlType="IconButton" Icon="{right_icon}" IconHeight="{right_icon_height}" IconWidth="{right_icon_width}" IOEnable="{right_enable}" IOState="{right_state}" Value="{right_value}" Left="{right_left}" Top="{right_top}" Width="{right_width}" Height="{right_height}" />
+<IOContorl ID="{scan_title_id}" ControlType="TextBlock" Value="{scan_title}" Left="{scan_title_left}" Top="{scan_title_top}" Height="40" Align="{align}" />
+<IOContorl ID="{left_id}" IOName="{left_io_name}" IOCommand="{left_io_command}" ControlType="IconButton" Style="" Icon="{left_icon}" IconHeight="{left_icon_height}" IconWidth="{left_icon_width}" IOEnable="{left_enable}" IOState="{left_state}" Value="{left_value}" Left="{left_left}" Top="{left_top}" Width="{left_width}" Height="{left_height}" />
+<IOContorl ID="{right_id}" IOName="{right_io_name}" IOCommand="{right_io_command}" ControlType="IconButton" Style="" Icon="{right_icon}" IconHeight="{right_icon_height}" IconWidth="{right_icon_width}" IOEnable="{right_enable}" IOState="{right_state}" Value="{right_value}" Left="{right_left}" Top="{right_top}" Width="{right_width}" Height="{right_height}" />
 ```
 
 扫描文本节点填入 TextBlock.Value；左右按钮图标、业务字段/动作、状态、文案、位置和尺寸逐节点读取。MasterGo 未提供的可选属性字段缺失时保留对应 XML 属性并输出空字符串值。
@@ -528,15 +530,15 @@ Style 与内部组件对照（只对下表列出的真实值成立）：
 </IOContorl>
 ```
 
-字段来源：根节点 Value→**当前阶段固定空串**（数据源由工程师或运行时后续绑定，禁止编造文件名）；业务字段/表标识→IOName；加载、刷新或选中动作→IOCommand；可用条件→IOEnable；自动刷新→IsAutoRefresh；根节点位置和尺寸→表格图层 bbox；列节点位置尺寸→映射表 `columnTemplate` 固定值。Style 只填 MasterGo 节点实际提供且代码库已登记的样式。
+字段来源：根节点 Value→**当前阶段固定空串**（数据源由工程师或运行时后续绑定，禁止编造文件名）；业务字段/表标识→IOName；加载、刷新或选中动作→IOCommand；可用条件→IOEnable；自动刷新→IsAutoRefresh；根节点位置和尺寸→表格图层 bbox；列节点位置尺寸→映射表 `columnTemplate` 固定值。Style 按“固定字段与可选字段规则”的 Style 口径发射。
 
 列节点按表头展开：**列数 = 表头可见文本数**，列标题→子节点 Value（必须回溯到该表头文本的 layerId/ref），列业务字段→子节点 IOName（设计无来源写空串），列控件类型按该列单元格类型严格多数判定（`TextBlock` / `NumberBox` / `IntNumberBox` / `TextBox` 等已登记类型；没有多数退化为 `TextBlock`）。列控件类型不是加载器必填契约，但必须由单元格机械判定并把分布写进 `tableAudits[].columns`，不得凭外观猜。**本族不为列发射 `IOVisible`**（表头文本没有「是否主键」这类信息，没有可靠来源）；确实需要隐藏列时，先在映射表 `columnTemplate` 登记来源判据与发射口径，再四处人读文档同步。
 
 # 固定字段与可选字段规则
 
-- **必写字段与按钮族固定参数（IconButton / Button / StatusButton）**：每个 ControlType 的固定必写字段集登记在 `mtslg-iocontrol-map.json` 的 `controlTypeRequiredAttrs`，生成器必须发射这些属性，取不到来源时写**空字符串占位**。按钮族在此基础上恒写 `PageName`、`IOVisible`、`IOCommand`、`IOEnable`（**变体登记 `omitRequiredAttrs` 时该变体做减法：登记的属性不发射，生成器与校验器共用 `omittedAttrs()` 判据（见飞书组件库映射规范「组件级固定变体的公共口径」）**）；`IconButton` 模板含 `Icon`/`IconWidth`/`IconHeight`：有图标槽位时机械取**台账命中条目节点的 bbox**（不是控件宽高，也不是图标容器尺寸）四舍五入取整，无图标槽位时这三项写空字符串；`Button`/`StatusButton` 模板不含图标字段，不发射 `Icon`/`IconWidth`/`IconHeight`。映射带 `Icon` 却缺少 `iconSize` 时生成器直接失败，禁止猜尺寸。`LangName` 是另一个例外：只在多语言绑定层给出真实 key 时发射——全量多语言下每个设计文本 `Value` 都产键挂 `LangName`，只有**槽位登记 `langRefPolicy=none` 的值**（当前只有选择框 `Value`，运行时由数据决定）与**空文本节点**（`Value=""`，没有可翻译的文案）不产键、不写空占位。`TextBlock` 的 `Align` 是第二个例外：**不适用空字符串口径**——取值只能是 `Left` / `Right`，映射缺失/空串/第三种值由渲染层与校验层直接判失败，且该属性**只有 `TextBlock` 有**（见映射表 `textBlockAlign`）。
+- **必写字段与按钮族固定参数（IconButton / Button / StatusButton）**：每个 ControlType 的固定必写字段集登记在 `mtslg-iocontrol-map.json` 的 `controlTypeRequiredAttrs`，生成器必须发射这些属性，取不到来源时写**空字符串占位**。按钮族在此基础上恒写 `PageName`、`IOVisible`、`IOCommand`、`IOEnable`（**变体登记 `omitRequiredAttrs` 时该变体做减法：登记的属性不发射，生成器与校验器共用 `omittedAttrs()` 判据（见飞书组件库映射规范「组件级固定变体的公共口径」）**）；`IconButton` 模板含 `Icon`/`IconWidth`/`IconHeight`：有图标槽位时机械取**台账命中条目节点的 bbox**（不是控件宽高，也不是图标容器尺寸）四舍五入取整，无图标槽位时这三项写空字符串；`Button`/`StatusButton` 模板不含图标字段，不发射 `Icon`/`IconWidth`/`IconHeight`。映射带 `Icon` 却缺少 `iconSize` 时生成器直接失败，禁止猜尺寸。`LangName` 是另一个例外：只在多语言绑定层给出真实 key 时发射——全量多语言下每个设计文本 `Value` 都产键挂 `LangName`，只有**槽位登记 `langRefPolicy=none` 的值**（当前只有选择框 `Value`，运行时由数据决定）与**空文本节点**（`Value=""`，没有可翻译的文案）不产键、不写空占位。`TextBlock` 的 `Align` 是第二个例外：**不适用空字符串口径**——取值只能是 `Left` / `Right`，映射层 `Align` 字段缺失/空串/第三种值由渲染层与校验层直接判失败，且该属性**只有 `TextBlock` 有**（见映射表 `textBlockAlign`）。
 - 固定：ControlType、节点数量、父子关系、槽位顺序。
-- 几何/显示字段：Value、Left、Top、Height、MinWidth、MaxWidth、FontSize、FontWeight、Align、字体/颜色/Style；其中 DSL 提供字体样式时 FontSize 必填，Height 与 FontSize 独立取值；`FontWeight` 是**命中才写**的条件属性（设计稿字重非 normal 时发射，值取设计稿 `styles[...].value.style` 的 `fontStyle`，如 `Bold`；**判定顺序固定为两步：先看样式名，命中映射表 `textBlockFontWeight.normalStyleNames` 即判为 normal、不写；只有样式名取不到时才回退用 `normalValues` 按 `weight` 判定**），不参与 `controlTypeRequiredAttrs` 恒写集合，规则以 `mtslg-mode.md` 的 TextBlock 字体规则与映射表 `textBlockFontWeight` 为准；`Align` 相反，是**恒写**字段且**只有 `TextBlock` 有**（设计稿 TEXT 节点 `textAlign=right` → `"Right"`，其余含 `left`/`center`/缺失 → `"Left"` **默认左对齐**，规则见映射表 `textBlockAlign`）；MTSLG TextBlock 的 Height 固定为 40，不发射常规 `Width`，只在 DSL `constraints` 提供时发射 `MinWidth` / `MaxWidth`；输入框和选择框外框的 Height 按 MasterGo 的 40/36/32/28 变体处理；Height 与 FontSize 必须分别读取。一般显示型子节点缺少 Value 时控件仍会生成，但文字内容为空；**DataGrid 根节点例外：`Value` 恒写、当前阶段固定写空串 `Value=""`（数据源由工程师或运行时后续绑定，禁止编造文件名），并置 `valuePending=true` 作为待绑定提示（提示性审计字段，不是交付门禁；规则见 `mtslg-mode.md` 第 4.1 节「DataGrid 的命中口径与 Value 现阶段口径」与映射表 `valuePolicy`）**。列子节点是**列定义**不是页面控件：`Value` 一律等于该列表头文本（由表头机械展开，不是「可选字段」），列几何与字段集走 `tableTemplates.columnTemplate`，不套用本条页面控件字段集。Style 只有 MasterGo 明确提供且代码库存在对应资源键时才填写。只有当 MasterGo 层级明确存在父级容器并且该父级有样式选择器时，才由父级为子控件提供样式；不得根据外观或组件名称自行添加父级容器。
+- 几何/显示字段：Value、Left、Top、Width、Height、MinWidth、MaxWidth、FontSize、FontWeight、Align、字体/颜色/Style；其中非 TextBlock 控件的 `Width` / `Height` 取自身 bbox，TextBlock 不发射常规 `Width`、Height 固定为 40，只在 DSL `constraints` 提供时发射 `MinWidth` / `MaxWidth`；DSL 提供字体样式时 FontSize 必填，Height 与 FontSize 独立取值；`FontWeight` 是**命中才写**的条件属性（设计稿字重非 normal 时发射，值取设计稿 `styles[...].value.style` 的 `fontStyle`，如 `Bold`；**判定顺序固定为两步：先看样式名，命中映射表 `textBlockFontWeight.normalStyleNames` 即判为 normal、不写；只有样式名取不到时才回退用 `normalValues` 按 `weight` 判定**），不参与 `controlTypeRequiredAttrs` 恒写集合，规则以 `mtslg-mode.md` 的 TextBlock 字体规则与映射表 `textBlockFontWeight` 为准；`Align` 相反，是**恒写**字段且**只有 `TextBlock` 有**（设计稿 TEXT 节点 `textAlign=right` → `"Right"`，其余含 `left`/`center`/缺失 → `"Left"` **默认左对齐**，规则见映射表 `textBlockAlign`）；输入框和选择框外框的 Height 按 MasterGo 的 40/36/32/28 变体处理；Height 与 FontSize 必须分别读取。一般显示型子节点缺少 Value 时控件仍会生成，但文字内容为空；**DataGrid 根节点例外：`Value` 恒写、当前阶段固定写空串 `Value=""`（数据源由工程师或运行时后续绑定，禁止编造文件名），并置 `valuePending=true` 作为待绑定提示（提示性审计字段，不是交付门禁；规则见 `mtslg-mode.md` 第 4.1 节「DataGrid 的命中口径与 Value 现阶段口径」与映射表 `valuePolicy`）**。列子节点是**列定义**不是页面控件：`Value` 一律等于该列表头文本（由表头机械展开，不是「可选字段」），列几何与字段集走 `tableTemplates.columnTemplate`，不套用本条页面控件字段集。Style 的非空值只有 MasterGo 明确提供且代码库存在对应资源键时才填写；必写字段集合登记 Style 时，取不到非空值仍发射 `Style=""` 空字符串占位，空字符串占位不属于资源键填写。只有当 MasterGo 层级明确存在父级容器并且该父级有样式选择器时，才由父级为子控件提供样式；不得根据外观或组件名称自行添加父级容器。
 - 运行时：IOName、IOCommand、PageName、IOEnable、IOState、LangName。
 - ID 按 MX_GUID/Pin 规则生成，不复制 MasterGo layer ID。
 
@@ -545,10 +547,10 @@ Style 与内部组件对照（只对下表列出的真实值成立）：
 ## 文本属性固定映射
 
 ```
-<IOContorl ID="{id_text}" IOName="{io_name_text}" ControlType="TextBlock" IOState="{state_text}" IOEnable="{enable_text}" LangName="{lang_name_text}" Value="{text_value}" Left="{left}" Top="{top}" Height="40" FontSize="{font_size}" Align="{align}" />
+<IOContorl ID="{id_text}" ControlType="TextBlock" Style="" IOName="{io_name_text}" IOVisible="{visible_text}" IOEnable="{enable_text}" IsAutoRead="{auto_read_text}" Foreground="{foreground_text}" LangName="{lang_name_text}" Value="{text_value}" Left="{left}" Top="{top}" Height="40" FontSize="{font_size}" Align="{align}" />
 ```
 
-- 文本对齐：`Align` 是恒写字段（登记在 `controlTypeRequiredAttrs.TextBlock`），**只有 `TextBlock` 有这个属性**，取值只有 `Left` / `Right` —— 设计稿 TEXT 节点的 `textAlign=right` → `Right`，其余（`left` / `center` / 字段缺失）→ `Left`（**默认左对齐**）。规则真值源是映射表 `textBlockAlign`。
+- 文本对齐：`Align` 是页面控件 `TextBlock` 的恒写字段（登记在 `controlTypeRequiredAttrs.TextBlock`），**只有 `TextBlock` 有这个属性**，取值只有 `Left` / `Right` —— 设计稿 TEXT 节点的 `textAlign=right` → `Right`，其余（`left` / `center` / 字段缺失）→ `Left`（**默认左对齐**）。规则真值源是映射表 `textBlockAlign`。表格列定义是列结构，不套 `controlTypeRequiredAttrs`，因此不要求 `Align`。
 - `Align` 会同时决定 **`Left` 的口径**（同一个属性名、两个含义）：`Align=Left` 时 `Left` = 控件左边缘到父容器**内容区左边缘**的距离；`Align=Right` 时 `Left` = 以控件**右上角**为原点，量到父容器**外框右边缘**的距离 = `父外框右边缘 − (控件 pageAbsX + 设计稿 bbox 宽度)`（页面根用**页面宽度**，容器用**容器 left + width**）。产物不发射 TextBlock 的常规 `Width`；设计稿 bbox 宽度只用于这里的 `Left` 计算与约束溯源。口径真值源是映射表 `textBlockAlign.distance*`，实现在 `scripts/lib/script-helpers.js`。
 - 独立文本节点统一映射为 `TextBlock`，不因所在组件或变体改变 ControlType。
 - 如果文本是输入框、选择框等控件内部内容，则保留为所属控件内容，不额外拆分为 TextBlock。

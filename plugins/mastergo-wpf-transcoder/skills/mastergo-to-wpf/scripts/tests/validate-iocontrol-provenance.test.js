@@ -94,6 +94,14 @@ fs.writeFileSync(constrainedManifestPath, JSON.stringify({ contentOriginY: 192, 
 }] }));
 const constrainedResult = validate(constrainedXmlPath, constrainedManifestPath);
 if (!constrainedResult.ok) throw new Error('TextBlock 只发射 MinWidth/MaxWidth 时应通过 provenance 校验: ' + constrainedResult.errors.join('; '));
+const badHeightXmlPath = path.join(dir, 'textblock-height-constraints.xml');
+fs.writeFileSync(badHeightXmlPath, '<IOContorl ID="" Left="NaN" Top="NaN" Width="NaN" Height="NaN"><IOContorl ID="ConstrainedText" ControlType="TextBlock" Value="标题" Left="10" Top="20" MinWidth="80" MaxWidth="194" MinHeight="12" MaxHeight="80" Height="40" /></IOContorl>');
+const badHeightResult = validate(badHeightXmlPath, constrainedManifestPath);
+if (badHeightResult.ok ||
+    !badHeightResult.errors.some(x => /TextBlock 不得发射 MinHeight/.test(x)) ||
+    !badHeightResult.errors.some(x => /TextBlock 不得发射 MaxHeight/.test(x))) {
+  throw new Error('TextBlock 高度约束必须被 provenance 校验拒绝: ' + badHeightResult.errors.join('; '));
+}
 const fixedManifestPath = path.join(dir, 'wrong-origin.json');
 const fixedManifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 fixedManifest.contentOriginY = 191;
@@ -205,6 +213,9 @@ const numericTextResult = validate(numericTextXmlPath, numericTextManifestPath);
 if (numericTextResult.ok) throw new Error('TextBlock 使用具体宽度时必须失败');
 if (!numericTextResult.errors.some(x => /TextBlock 不得发射常规 Width/.test(x))) {
   throw new Error('缺少 TextBlock Width 必须省略错误: ' + numericTextResult.errors.join('; '));
+}
+if (numericTextResult.errors.filter(x => /TextBlock 不得发射常规 Width/.test(x)).length !== 1) {
+  throw new Error('TextBlock Width 省略错误必须只报一次: ' + numericTextResult.errors.join('; '));
 }
 if (!numericTextResult.errors.some(x => /TextBlock 的 expectedWidth 必须是省略宽度的 NaN 哨兵/.test(x))) {
   throw new Error('缺少 TextBlock expectedWidth NaN 哨兵错误');

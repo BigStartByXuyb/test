@@ -127,7 +127,7 @@ Bundle **不会**把新页面的文件写进 `.csproj`（实测 `csprojChanged=F
 | 字段 | 含义 |
 |---|---|
 | `runId` | 本次运行的身份；清单 `runRegistry.runId` 与它不一致直接失败 |
-| `identity` | `{ fileId, layerId, ui, designPageName }`（来自命令行或 `docs/page-registry.json`） |
+| `identity` | `{ mode, fileId, layerId, ui, designPageName }`；`mode` 来自 `-Mode`，其余来自命令行或 `docs/page-registry.json` |
 | `inputs` | 页面级语义输入 + 指纹：`pageTitleText`、`translations{path,sha256,size}`、`glossary`、`iconNaming` |
 | `artifacts` | 本次运行产出的中间产物：`getDsl / snapshot / coverage / dslManifest / timing / visibility / extractSvg / mappingDsl / mappingDraft / iconCandidates / iconMap / layoutManifest / bundleManifest`，每条 `{path, sha256, size, mtime, step}` |
 | `steps` | 每一步 `{id, name, status, seconds, note, log, at}`（失败步骤也登记） |
@@ -135,12 +135,12 @@ Bundle **不会**把新页面的文件写进 `.csproj`（实测 `csprojChanged=F
 
 **硬规则**
 
-**本页现状摘要**（`Generated/<Target>.summary.json`）：上面这条契约的机器可读投影，由 `run-all.ps1` 每步成功后刷新（`scripts/core/build-run-summary.mjs`）。需要了解本页现状时读它，不要为了盘点现状再手写探针去数产物——它给身份、控件构成、`todos`（需人工/AI 动作）、`notices`（状态说明）、图标候选与台账、布局、产出清单，并在 `sources` 里逐项写明来源路径与产出步骤。它是**派生视图**：内容随每次刷新变化，因此不写回登记表，任何条目都与登记表同源同规则——未登记的一律不取，条目在消费时按登记 sha256 复校（不符即整次失败），而**本次尝试读取**的条目（登记产物或页面产出）取不到时一并记进 `unavailable`（带 `layer` 区分），而不是记 0。
+**本页现状摘要**（`Generated/<Target>.summary.json`）：上面这条契约的机器可读投影，由 `run-all.ps1` 每步成功后刷新（`scripts/core/build-run-summary.mjs`）。`run` 固定投影本次运行的五个身份字段 `mode`、`fileId`、`layerId`、`ui`、`designPageName`，并给控件构成、`todos`（需人工/AI 动作）、`notices`（状态说明）、图标候选与台账、布局、产出清单；`sources` 逐项写明来源路径与产出步骤。需要了解本页现状时读它，不要为了盘点现状再手写探针去数产物。它是**派生视图**：内容随每次刷新变化，因此不写回登记表，任何条目都与登记表同源同规则——未登记的一律不取，条目在消费时按登记 sha256 复校（不符即整次失败），而**本次尝试读取**的条目（登记产物或页面产出）取不到时一并记进 `unavailable`（带 `layer` 区分），而不是记 0。
 
 1. **产出即登记**：`run-all.ps1` 每一步成功后就登记该步产物（`run-registry.mjs artifact`）；中途失败也把该步状态写进 `steps`。
 2. **消费只按登记**：`build-bundle-manifest.mjs <…> <area> --run-json <run.json>` 从登记表取 `snapshot` / `visibility` / `extractSvg`，并在提供 `--mapping-dsl` 时取 `mappingDsl`；每个输入的 `sha256` 都写进清单 `runRegistry.digests`。Bundle 读清单时**复校**：路径按登记表解析、`sha256` 与 `digests` 一致、`runId` 一致。**`--run-json` 是必填**——缺了直接报错，不再回落到顶层 `Generated/*.json`（`area` 同理必填，推导只在 run-all.ps1 里做一次）。
-3. **未登记的旧同名文件一律拒绝**：Bundle 直接失败并点名它**实际消费的三个采集输入**——`Generated/dsl.snapshot.json`、`Generated/visibility.json`、`Generated/extractSvg.json`（内容与本次登记恰好一致时只提示可清理）。其余同层文件（`Generated/coverage-report.json`、`Generated/manifest.json`、`Generated/timing.json`、`Generated/getDsl.json`）不参与输入解析，由 `run-registry.mjs check` 按同一张 `LEGACY_SHADOWS` 表列出。
-4. **断点续跑（身份不可变）**：`run-all.ps1 -Progress <步骤>` 且步骤号大于 1 时才用 `run-registry.mjs init --keep`。续跑**优先回放首次运行冻结的身份**：`fileId` / `layerId` / `ui` / `designPageName` 取 `run.json` 的 `identity`，命令行显式值必须与它一致——所以项目登记表里**改了值**不影响续跑（回放赢）。身份解析顺序仍是「命令行 → 项目登记表」，因此**删掉登记表条目**时取不到值会先报「缺少…」；此时显式传回 `-FileId` / `-LayerId` / `-Ui` / `-DesignPageName` 即可续跑（**步骤循环内**失败时脚本会打印带全参数的续跑命令；这条例出的身份解析段失败发生在循环之前，不会打印，需自行带上这四个参数）。`-Progress fetch`（第 1 步）不带 `--keep`，一律新开一次运行：新 `runId`、产物登记清空，登记表不存在时直接新建；步骤号大于 1 而运行登记表缺失时直接报错，提示从 `fetch` 新开。`target` / 归一化后的 `projectRoot` / schema 由守卫直接校验，失败发生在保存之前、原登记表逐字节不变；不得通过编辑 `run.json` 绕过。
+3. **未登记的旧同名文件一律拒绝**：Bundle 直接失败并点名它**拒绝的三个旧同名采集输入**——`Generated/dsl.snapshot.json`、`Generated/visibility.json`、`Generated/extractSvg.json`（内容与本次登记恰好一致时只提示可清理）。其余同层文件（`Generated/coverage-report.json`、`Generated/manifest.json`、`Generated/timing.json`、`Generated/getDsl.json`）不参与输入解析，由 `run-registry.mjs check` 按同一张 `LEGACY_SHADOWS` 表列出。
+4. **断点续跑（身份不可变）**：`run-all.ps1 -Progress <步骤>` 且步骤号大于 1 时才用 `run-registry.mjs init --keep`。续跑**优先回放首次运行冻结的身份**：`mode` / `fileId` / `layerId` / `ui` / `designPageName` 取 `run.json` 的 `identity`，命令行显式值必须与它一致；`mode` 只来自 `-Mode`，其余身份来自命令行或项目登记表。项目登记表改值不影响续跑（回放赢）。身份解析顺序仍是「命令行 → 项目登记表」，因此**删掉登记表条目**时取不到值会先报「缺少…」；此时显式传回 `-Mode` / `-FileId` / `-LayerId` / `-Ui` / `-DesignPageName` 即可续跑（**步骤循环内**失败时脚本会打印带全参数的续跑命令；身份解析段失败发生在循环之前，不会打印，需自行带齐参数）。登记表没有 `mode` 键时视为未登记路线：不得用显式 `-Mode` 回填，只能不带显式路线续跑。`-Progress fetch`（第 1 步）不带 `--keep`，一律新开一次运行：新 `runId`、产物登记清空，登记表不存在时直接新建；步骤号大于 1 而运行登记表缺失时直接报错，提示从 `fetch` 新开。`target` / 归一化后的 `projectRoot` / schema 由守卫直接校验，失败发生在保存之前、原登记表逐字节不变；不得通过编辑 `run.json` 绕过。
    - **省略 → 用冻结值**：冻结值非空时 capture 拿到的就是首次那份身份（不会退回 DSL 根节点名）。冻结值为空时分两种：本次解析**仍为空** → 按既有口径兜底；本次解析出**非空** → 按「不得补写」失败。
    - **逐阶段输入复校**：每步消费前对它实际消费的产物复校 sha256；续跑路径上若该产物**未登记**（存在但没进本次 `run.json`），按「未登记的旧同名文件一律拒绝」直接失败。
    - **显式传入不同值 → fail-closed**：要换设计来源或运行配置就是**新开一次运行**（不带 `-Progress`），那时才按「命令行 → 项目登记表 `docs/page-registry.json` → 报错」重新解析身份；已有产物要重写时用 `-Overwrite` + 清单 `operation=replace-existing`。
