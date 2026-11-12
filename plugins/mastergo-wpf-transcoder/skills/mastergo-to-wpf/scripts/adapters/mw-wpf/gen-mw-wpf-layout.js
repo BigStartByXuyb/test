@@ -77,7 +77,16 @@ const { normalizeConstraints } = require(path.join(__dirname, "..", "..", "lib",
 const { containerSizingMode } = require(path.join(__dirname, "..", "..", "lib", "design-box.js"));
 
 const ROUTE_MAP = path.join(__dirname, "..", "..", "..", "references", "adapters", "mw-wpf", "mw-wpf-map.json");
+const FAILURE_CODES = require(path.join(__dirname, "..", "..", "lib", "failure-codes.json"));
 const EPSILON = 2;
+const LAYOUT_GROUPS_ERROR = FAILURE_CODES.layoutGroups.rejected;
+
+// 分组表输入错误的稳定标记：run-all 原样带到失败摘要首行，GUI 只按机器码决定恢复入口。
+function failGroups(message) {
+  const error = new Error("[" + LAYOUT_GROUPS_ERROR + "] " + message);
+  error.code = LAYOUT_GROUPS_ERROR;
+  throw error;
+}
 
 function parseArgs(argv) {
   const args = {};
@@ -874,7 +883,7 @@ function buildRegionGrid(entries, containers, pending, dslTree, size, origin, gr
 // 声明了组就停下报告，不静默忽略——声明的意图不会无声丢掉。判据只有这一处。
 function requireNoDeclaredGroups(groupsDoc, reason) {
   if (!groupsDoc || !groupsDoc.groups.length) return;
-  fail("分组表声明了 " + groupsDoc.groups.length + " 个组，但" + reason + "：表里不声明任何组（groups 写成空数组，表本身仍是对象）");
+  failGroups("分组表声明了 " + groupsDoc.groups.length + " 个组，但" + reason + "：表里不声明任何组（groups 写成空数组，表本身仍是对象）");
 }
 
 // 分组表只写"哪些条目同属一组"，不写坐标与尺寸——事实一律来自 DSL 快照。
@@ -897,20 +906,26 @@ const LAYOUT_GROUP_CANDIDATES_SCHEMA = "mw-wpf-layout-group-candidates/1";
 //   { "schemaVersion": "mw-wpf-layout-groups/1", "pageTarget": "<页面名>",
 //     "groups": [ { "id": "g1", "kind": "column" | "row", "members": ["<DSL ref>", ...] } ] }
 function readLayoutGroups(filePath) {
-  const doc = readJson(filePath, "分组表");
-  if (doc.schemaVersion !== LAYOUT_GROUPS_SCHEMA) {
-    fail("分组表 schemaVersion 必须是 " + LAYOUT_GROUPS_SCHEMA + "，当前: " + doc.schemaVersion);
+  let doc;
+  try {
+    doc = readJson(filePath, "分组表");
   }
-  if (doc.groups !== undefined && !Array.isArray(doc.groups)) fail("分组表的 groups 必须是数组");
+  catch (error) {
+    failGroups(error.message);
+  }
+  if (doc.schemaVersion !== LAYOUT_GROUPS_SCHEMA) {
+    failGroups("分组表 schemaVersion 必须是 " + LAYOUT_GROUPS_SCHEMA + "，当前: " + doc.schemaVersion);
+  }
+  if (doc.groups !== undefined && !Array.isArray(doc.groups)) failGroups("分组表的 groups 必须是数组");
   const list = doc.groups || [];
   list.forEach(function (group, index) {
     const label = "分组表第 " + (index + 1) + " 项";
-    if (!group || typeof group !== "object") fail(label + "不是对象");
-    if (!group.id) fail(label + "缺 id");
-    if (group.kind !== "column" && group.kind !== "row") fail(label + "（" + group.id + "）的 kind 必须是 column 或 row");
-    if (!Array.isArray(group.members) || group.members.length < 2) fail(label + "（" + group.id + "）的 members 至少 2 个 ref");
+    if (!group || typeof group !== "object") failGroups(label + "不是对象");
+    if (!group.id) failGroups(label + "缺 id");
+    if (group.kind !== "column" && group.kind !== "row") failGroups(label + "（" + group.id + "）的 kind 必须是 column 或 row");
+    if (!Array.isArray(group.members) || group.members.length < 2) failGroups(label + "（" + group.id + "）的 members 至少 2 个 ref");
     group.members.forEach(function (ref) {
-      if (typeof ref !== "string" || !ref) fail(label + "（" + group.id + "）的 members 只能是非空字符串 ref");
+      if (typeof ref !== "string" || !ref) failGroups(label + "（" + group.id + "）的 members 只能是非空字符串 ref");
     });
   });
   return { pageTarget: doc.pageTarget || null, groups: list };
@@ -953,8 +968,8 @@ function declaredGroups(items, groupsDoc) {
   const built = groupsDoc.groups.map(function (group) {
     const members = group.members.map(function (ref) {
       const item = byRef.get(ref);
-      if (!item) fail("分组 " + group.id + " 的 ref 不在本层条目里: " + ref);
-      if (used.has(ref)) fail("ref 出现在多个分组里: " + ref);
+      if (!item) failGroups("分组 " + group.id + " 的 ref 不在本层条目里: " + ref);
+      if (used.has(ref)) failGroups("ref 出现在多个分组里: " + ref);
       used.add(ref);
       return item;
     });
@@ -970,7 +985,7 @@ function declaredGroups(items, groupsDoc) {
         item.x + item.w <= box.x + box.w + EPSILON &&
         item.y + item.h <= box.y + box.h + EPSILON;
       if (inside) {
-        fail("分组 " + entry.id + " 的范围内还有未归组的条目: " + item.ref + "（标注与设计稿几何矛盾）");
+        failGroups("分组 " + entry.id + " 的范围内还有未归组的条目: " + item.ref + "（标注与设计稿几何矛盾）");
       }
     });
   });
@@ -1051,7 +1066,7 @@ function deriveLayout(options) {
 
   // 分组表标的页面必须与本次页面一致：防止把另一页的表套到这一页（表里只有 ref，套错了会静默错组）。
   if (options.groups && options.groups.pageTarget && options.groups.pageTarget !== options.pageTarget) {
-    fail("分组表的 pageTarget（" + options.groups.pageTarget + "）与本次页面（" + options.pageTarget + "）不一致");
+    failGroups("分组表的 pageTarget（" + options.groups.pageTarget + "）与本次页面（" + options.pageTarget + "）不一致");
   }
 
   const entries = [];
@@ -1174,7 +1189,7 @@ function loadInputs(args) {
       .map(function (entry) { return entry[0]; })
   );
   const groupsPath = args.groupsPath || "";
-  if (groupsPath && !fs.existsSync(groupsPath)) fail("分组表不存在: " + groupsPath);
+  if (groupsPath && !fs.existsSync(groupsPath)) failGroups("分组表不存在: " + groupsPath);
   return {
     types: { doc: typesDoc, byRef: byRef },
     dsl: readJson(args.dslPath, "DSL 快照"),
