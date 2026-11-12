@@ -3,7 +3,7 @@
 
 // 约束适配层：把外部导出的尺寸约束（min/max 宽高）合并进 DSL 快照。
 //
-// 这是**唯一**读取约束来源的地方：下游（布局推导 / XAML 发射 / 布局门禁）只认统一字段
+// 这是**唯一**读取约束来源的地方：下游（A 的布局/XAML/门禁与 B 的 mapping/XML/校验）只认统一字段
 // `node.constraints = { minWidth, maxWidth, minHeight, maxHeight }`（只保留 > 0 的项）；
 // 键集与归一化口径的唯一实现在 scripts/lib/constraints.js。
 //

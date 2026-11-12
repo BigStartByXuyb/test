@@ -33,7 +33,7 @@ if (!result.errors.some(x => /Width/.test(x))) throw new Error('缺少 Width 错
 if (!result.errors.some(x => /expectedLeft/.test(x))) throw new Error('缺少 sourceNodes 坐标重算错误');
 const flatXmlPath = path.join(dir, 'flat.xml');
 const flatManifestPath = path.join(dir, 'flat.json');
-fs.writeFileSync(flatXmlPath, '<IOContorl ID="" Left="NaN" Top="NaN" Width="NaN" Height="NaN"><IOContorl ID="FlatChild" ControlType="TextBlock" Value="SCAN" Left="150" Top="158" Width="NaN" Height="40" /></IOContorl>');
+fs.writeFileSync(flatXmlPath, '<IOContorl ID="" Left="NaN" Top="NaN" Width="NaN" Height="NaN"><IOContorl ID="FlatChild" ControlType="TextBlock" Value="SCAN" Left="150" Top="158" Height="40" /></IOContorl>');
 fs.writeFileSync(flatManifestPath, JSON.stringify({ contentOriginY: 192, rootRef: 'root', sourceNodes: [
   { ref: 'root', parentRef: null, pageAbsX: 0, pageAbsY: 0, relativeX: 0, relativeY: 0, width: 1280, height: 1024 },
   { ref: 'component', parentRef: 'root', pageAbsX: 100, pageAbsY: 300, relativeX: 100, relativeY: 300, width: 384, height: 132 },
@@ -41,7 +41,7 @@ fs.writeFileSync(flatManifestPath, JSON.stringify({ contentOriginY: 192, rootRef
 ], nodes: [{
   xmlId: 'FlatChild', sourceRef: 'component/scan', sourceParent: 'component', layoutParent: null,
   sourceText: 'SCAN', valueSource: 'dsl.text', expectedLeft: 150, expectedTop: 158,
-  expectedWidth: 'NaN', expectedHeight: 40, widthSource: 'mtslg.textblock.fixed-nan', dslWidth: 45, heightSource: 'mtslg.textblock.fixed-40'
+  expectedWidth: 'NaN', expectedHeight: 40, widthSource: 'mtslg.textblock.omit-width', dslWidth: 45, heightSource: 'mtslg.textblock.fixed-40'
 }] }));
 const flatResult = validate(flatXmlPath, flatManifestPath);
 if (!flatResult.ok) throw new Error('展平模板节点应按 layoutParent=null 使用页面绝对坐标: ' + flatResult.errors.join('; '));
@@ -51,8 +51,8 @@ if (!flatResult.ok) throw new Error('展平模板节点应按 layoutParent=null 
 const externalXmlPath = path.join(dir, 'external.xml');
 fs.writeFileSync(externalXmlPath,
   '<IOContorl ID="" Left="NaN" Top="NaN" Width="NaN" Height="NaN">' +
-  '<IOContorl ID="FlatChild" ControlType="TextBlock" Value="SCAN" Left="150" Top="158" Width="NaN" Height="40" />' +
-  '<IOContorl ID="MX_HANDMADE_1" ControlType="TextBlock" Value="人工加的说明" Left="600" Top="700" Width="NaN" Height="40" />' +
+  '<IOContorl ID="FlatChild" ControlType="TextBlock" Value="SCAN" Left="150" Top="158" Height="40" />' +
+  '<IOContorl ID="MX_HANDMADE_1" ControlType="TextBlock" Value="人工加的说明" Left="600" Top="700" Height="40" />' +
   '</IOContorl>');
 const externalStrict = validate(externalXmlPath, flatManifestPath);
 if (externalStrict.ok) throw new Error('默认口径下，无设计来源的 TextBlock 必须被拒绝');
@@ -67,17 +67,41 @@ if (!(externalAllowed.externalNodes || []).includes('MX_HANDMADE_1')) {
 console.log('PASS 人工/外部节点（allowExternalNodes）口径回归测试');
 const fixed40XmlPath = path.join(dir, 'fixed40.xml');
 const fixed40ManifestPath = path.join(dir, 'fixed40.json');
-fs.writeFileSync(fixed40XmlPath, '<IOContorl ID="" Left="NaN" Top="NaN" Width="NaN" Height="NaN"><IOContorl ID="FixedText" ControlType="TextBlock" Value="标题" FontSize="16" Left="10" Top="20" Width="NaN" Height="40" /></IOContorl>');
+fs.writeFileSync(fixed40XmlPath, '<IOContorl ID="" Left="NaN" Top="NaN" Width="NaN" Height="NaN"><IOContorl ID="FixedText" ControlType="TextBlock" Value="标题" FontSize="16" Left="10" Top="20" Height="40" /></IOContorl>');
 fs.writeFileSync(fixed40ManifestPath, JSON.stringify({ contentOriginY: 192, sourceNodes: [
   { ref: 'root', parentRef: null, pageAbsX: 0, pageAbsY: 0, relativeX: 0, relativeY: 0, width: 1280, height: 1024 },
   { ref: 'text', parentRef: 'root', pageAbsX: 10, pageAbsY: 212, relativeX: 10, relativeY: 212, width: 50, height: 16, text: '标题' }
 ], nodes: [{
   xmlId: 'FixedText', sourceRef: 'text', sourceParent: 'root', sourceText: '标题', valueSource: 'dsl.text',
   expectedLeft: 10, expectedTop: 20, expectedWidth: 'NaN', expectedHeight: 40,
+  widthSource: 'mtslg.textblock.omit-width',
   heightSource: 'mtslg.textblock.fixed-40'
 }] }));
 const fixed40Result = validate(fixed40XmlPath, fixed40ManifestPath);
 if (!fixed40Result.ok) throw new Error('TextBlock 固定 40 高度应通过 provenance 校验: ' + fixed40Result.errors.join('; '));
+
+const constrainedXmlPath = path.join(dir, 'textblock-constrained-width.xml');
+const constrainedManifestPath = path.join(dir, 'textblock-constrained-width.json');
+fs.writeFileSync(constrainedXmlPath, '<IOContorl ID="" Left="NaN" Top="NaN" Width="NaN" Height="NaN"><IOContorl ID="ConstrainedText" ControlType="TextBlock" Value="标题" Left="10" Top="20" MinWidth="80" MaxWidth="194" Height="40" /></IOContorl>');
+fs.writeFileSync(constrainedManifestPath, JSON.stringify({ contentOriginY: 192, sourceNodes: [
+  { ref: 'root', parentRef: null, pageAbsX: 0, pageAbsY: 0, relativeX: 0, relativeY: 0, width: 1280, height: 1024 },
+  { ref: 'text', parentRef: 'root', pageAbsX: 10, pageAbsY: 212, relativeX: 10, relativeY: 212, width: 80, height: 16, text: '标题', constraints: { minWidth: 80, maxWidth: 194 } }
+], nodes: [{
+  xmlId: 'ConstrainedText', sourceRef: 'text', sourceParent: 'root', sourceText: '标题', valueSource: 'dsl.text',
+  expectedLeft: 10, expectedTop: 20, expectedWidth: 'NaN', expectedHeight: 40,
+  widthSource: 'mtslg.textblock.omit-width', heightSource: 'mtslg.textblock.fixed-40',
+  dslWidth: 80, constraints: { minWidth: 80, maxWidth: 194 }
+}] }));
+const constrainedResult = validate(constrainedXmlPath, constrainedManifestPath);
+if (!constrainedResult.ok) throw new Error('TextBlock 只发射 MinWidth/MaxWidth 时应通过 provenance 校验: ' + constrainedResult.errors.join('; '));
+const badHeightXmlPath = path.join(dir, 'textblock-height-constraints.xml');
+fs.writeFileSync(badHeightXmlPath, '<IOContorl ID="" Left="NaN" Top="NaN" Width="NaN" Height="NaN"><IOContorl ID="ConstrainedText" ControlType="TextBlock" Value="标题" Left="10" Top="20" MinWidth="80" MaxWidth="194" MinHeight="12" MaxHeight="80" Height="40" /></IOContorl>');
+const badHeightResult = validate(badHeightXmlPath, constrainedManifestPath);
+if (badHeightResult.ok ||
+    !badHeightResult.errors.some(x => /TextBlock 不得发射 MinHeight/.test(x)) ||
+    !badHeightResult.errors.some(x => /TextBlock 不得发射 MaxHeight/.test(x))) {
+  throw new Error('TextBlock 高度约束必须被 provenance 校验拒绝: ' + badHeightResult.errors.join('; '));
+}
 const fixedManifestPath = path.join(dir, 'wrong-origin.json');
 const fixedManifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 fixedManifest.contentOriginY = 191;
@@ -174,7 +198,7 @@ if (plainButtonResult.ok || !plainButtonResult.errors.some(x => /无图标按钮
   throw new Error('无图标按钮带非空 IconWidth/IconHeight 时必须失败');
 }
 
-// ---- TextBlock 固定宽度 NaN ----
+// ---- TextBlock 不发射常规 Width，只接受 MinWidth/MaxWidth ----
 const numericTextXmlPath = path.join(dir, 'textblock-numeric-width.xml');
 const numericTextManifestPath = path.join(dir, 'textblock-numeric-width.json');
 fs.writeFileSync(numericTextXmlPath, '<IOContorl ID="" Left="NaN" Top="NaN" Width="NaN" Height="NaN"><IOContorl ID="TextWidth" ControlType="TextBlock" Value="标签" Left="10" Top="220" Width="76" Height="40" /></IOContorl>');
@@ -187,11 +211,14 @@ fs.writeFileSync(numericTextManifestPath, JSON.stringify({ contentOriginY: 192, 
 }] }));
 const numericTextResult = validate(numericTextXmlPath, numericTextManifestPath);
 if (numericTextResult.ok) throw new Error('TextBlock 使用具体宽度时必须失败');
-if (!numericTextResult.errors.some(x => /TextBlock 的 Width 必须固定为 NaN/.test(x))) {
-  throw new Error('缺少 TextBlock Width 固定 NaN 错误: ' + numericTextResult.errors.join('; '));
+if (!numericTextResult.errors.some(x => /TextBlock 不得发射常规 Width/.test(x))) {
+  throw new Error('缺少 TextBlock Width 必须省略错误: ' + numericTextResult.errors.join('; '));
 }
-if (!numericTextResult.errors.some(x => /TextBlock 的 expectedWidth 必须固定为 NaN/.test(x))) {
-  throw new Error('缺少 TextBlock expectedWidth 固定 NaN 错误');
+if (numericTextResult.errors.filter(x => /TextBlock 不得发射常规 Width/.test(x)).length !== 1) {
+  throw new Error('TextBlock Width 省略错误必须只报一次: ' + numericTextResult.errors.join('; '));
+}
+if (!numericTextResult.errors.some(x => /TextBlock 的 expectedWidth 必须是省略宽度的 NaN 哨兵/.test(x))) {
+  throw new Error('缺少 TextBlock expectedWidth NaN 哨兵错误');
 }
 // 按钮族规则改为读模板表（--map）：表里要求额外属性时，校验必须跟着变严
 const assert = require('assert');

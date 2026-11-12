@@ -11,7 +11,7 @@
     {
       "name": "mastergo-wpf-transcoder",
       "source": "./plugins/mastergo-wpf-transcoder",
-      "description": "MasterGo design to MW WPF and MTSLG IOContorl conversion rules, component mappings, provenance checks, and coordinate validation."
+      "description": "MasterGo design to MW WPF and MTSLG IOContorl conversion rules, component mappings, strict mapping-document format, provenance checks, and coordinate validation."
     },
     {
       "name": "agent-plugin-publisher",
@@ -26,7 +26,7 @@
     {
       "name": "sip-methodology-classifier",
       "source": "./plugins/sip-methodology-classifier",
-      "description": "把 MAXWELL《成品检验指导书》Excel 按 SIP 方法论归类：9 个主顺序 + 每个环节内部 1–12 级子顺序，支持 GBK zip、标黄列排除、多项目分表、标准答案校验。"
+      "description": "把 MAXWELL《成品检验指导书》Excel 按 SIP 方法论归类：9 个主顺序 + 每个环节内部 1–12 级子顺序；主干通用规则 + SDC/EXP/SLG 设备族分支，支持 GBK zip、标黄列排除、多项目分表、标准答案校验。"
     },
     {
       "name": "inteplm-deliverable-docs",

@@ -9,7 +9,7 @@
 //   - 原点 = 该节点「输出父容器」的内容区原点（父容器优先级 layoutParent → parent → DSL parentRef），
 //     根级用 (0, 192)（顶层公共栏 126 + 示例标题 66 只在根级扣一次），嵌套用父容器 pageAbs + contentInset；
 //   - 表格列定义（nodeKind=table-column）按 columnTemplate 固定几何发射：x/y 取父容器原点本身、w = "NaN"；
-//   - TextBlock 的 Width 固定 "NaN"；
+//   - TextBlock 不发射常规 Width，constraints 的 MinWidth/MaxWidth 单独核对；
 //   - TextBlock 且 Align=Right：Left 不是 x − 原点，另外给出 expectedLeft（官方核对器优先采用）。
 
 const path = require("path");
@@ -87,6 +87,7 @@ function buildCoordNodes(mapping, options) {
           " 缺少页面/父容器宽度或设计稿 bbox 宽度（不能猜）");
       }
     }
+    const textConstraints = node.constraints || source.constraints;
     return Object.assign({
       id: node.xmlId || node.id || node.ref,
       x: number(source.pageAbsX !== undefined ? source.pageAbsX : node.absX),
@@ -95,7 +96,8 @@ function buildCoordNodes(mapping, options) {
       h: number(node.expectedHeight !== undefined ? node.expectedHeight : source.height),
       contentOriginX: originX,
       contentOriginY: originY
-    }, expectedLeft !== null ? { expectedLeft: expectedLeft } : {});
+    }, isTextBlock && textConstraints ? { constraints: textConstraints } : {},
+      expectedLeft !== null ? { expectedLeft: expectedLeft } : {});
   });
 }
 

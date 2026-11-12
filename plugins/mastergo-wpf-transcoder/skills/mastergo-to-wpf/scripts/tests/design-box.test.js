@@ -60,6 +60,9 @@ function node(id, type, style, children, extra) {
   assert.deepStrictEqual(designBoxAttrs(box(80, 16, 80, 16, 0, 0)), {}, "格子与控件同尺寸：不写任何属性");
   assert.deepStrictEqual(designBoxAttrs(box(140, 40, 144, 40, undefined, undefined)),
     { Width: "140" }, "没有偏移来源：只写尺寸，不猜对齐");
+  assert.deepStrictEqual(designBoxAttrs(box(120, 30, 300, 100, 90, 35), { omitWidth: true }),
+    { Height: "30", HorizontalAlignment: "Center", VerticalAlignment: "Center" },
+    "TextBlock 不写常规 Width，只保留高度与对齐");
 }
 
 // ── ② 布局推导：口径 A 成带（带 = 条目 + 间距；大空档成星号带；无间隙元素）/ 交叉轴聚类 ──
@@ -186,10 +189,12 @@ function node(id, type, style, children, extra) {
     }]])
   };
   const result = renderXaml({ iconPage: null, assembly: null }, layout, types, MAP);
-  assert.match(result.xaml, /Width="120"\n\s+Height="30"\n\s+HorizontalAlignment="Center"\n\s+VerticalAlignment="Center"/,
-    "尺寸与居中对齐必须落到 XAML");
+  assert.match(result.xaml, /Height="30"\n\s+HorizontalAlignment="Center"\n\s+VerticalAlignment="Center"/,
+    "TextBlock 的高度与居中对齐必须落到 XAML");
+  assert.ok(!/Width="120"/.test(result.xaml), "TextBlock 不得发射常规 Width");
   assert.strictEqual(result.report.designBox.length, 1, "发射报告必须逐格登记尺寸/对齐");
-  assert.deepStrictEqual(result.report.designBox[0].attrs, designBoxAttrs(layout.regions[0].grid.cells[0]),
+  assert.deepStrictEqual(result.report.designBox[0].attrs,
+    designBoxAttrs(layout.regions[0].grid.cells[0], { omitWidth: true }),
     "发射报告与共享实现同结果");
   // 缺格子尺寸（旧产物）→ fail-closed，不静默发射一个尺寸丢失的页面。
   const legacy = JSON.parse(JSON.stringify(layout));
@@ -310,7 +315,8 @@ function node(id, type, style, children, extra) {
   const typesPath = writeJson("unsized-types.json", { schemaVersion: 1, nodes: Array.from(types.byRef.values()), pending: [], unmappedComponents: [] });
   const reportPath = writeJson("unsized-report.json", {
     designBox: Array.from(cells.values()).filter(function (cell) { return !cell.spacer; }).map(function (cell) {
-      return { ref: cell.ref, container: !!cell.container, attrs: designBoxAttrs(cell) };
+      return { ref: cell.ref, container: !!cell.container,
+        attrs: designBoxAttrs(cell, { omitWidth: cell.controlType === "TextBlock" }) };
     })
   });
   const outPath = path.join(tmp, "unsized-gate.json");

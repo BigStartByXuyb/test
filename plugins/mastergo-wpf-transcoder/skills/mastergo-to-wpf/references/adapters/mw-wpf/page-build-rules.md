@@ -51,7 +51,7 @@
 10. **待人工确认（提示）**：每个页面用到写法表 `status: manual-only` 的类型时，都登记提示 `R10`，不失败——每次页面生成均提示人工确认，直到证据补齐并将映射状态更新为 `ready`。
 11. **尺寸约束一致性**：格子带的尺寸约束必须与 DSL 节点上的 `constraints` 逐个一致（多一项 / 少一项 / 改数值都失败）——约束是设计意图，不允许推导侧改动。
 12. **尺寸约束未落格**：带约束的节点在布局产物里既没有对应格子、也不在产物登记的 `constraintExempt` 里即失败（`R12`）——约束是设计意图，产物漏了就是漏了。豁免只有 `constraintExempt` 里登记的三类（页面根 / 不可见 / 框架固定区）；其余未落格的带约束节点（含待确认类型、无尺寸等）一律失败。判定范围与常见成因见第 5 节第 4 条。
-13. **尺寸约束未发射**：带约束的格子必须在 `View.xaml` 里出现对应的 `MinWidth / MaxWidth / MinHeight / MaxHeight`（入参前提见 `check-wpf-layout.js` 头部 CLI 注释）。
+13. **尺寸约束未发射**：带约束的格子必须在 `View.xaml` 里**对应到该格子自己的控件或容器 Grid**，并出现对应的 `MinWidth / MaxWidth / MinHeight / MaxHeight`；不得用另一个同值控件代替核对（入参前提见 `check-wpf-layout.js` 头部 CLI 注释）。
 14. **格子尺寸与尺寸/对齐发射**：每个格子必须登记格子尺寸（Pixel 照值、Star 按权重分配剩余（未写权重视为 1）、Auto 按设计期望尺寸复核、跨格按 span 累加）与承载物设计尺寸；容器 `sizingMode` 必须与页面根槽位及直接子项类型一致；发射报告里该格子的 `Width / Height / HorizontalAlignment / VerticalAlignment / Margin` 必须与 `scripts/lib/design-box.js` 的同一实现一致（格子尺寸 − 控件尺寸 = 间距，差值落在哪一侧由设计稿偏移决定）。缺格子尺寸、格子尺寸与行列定义重算不一致、容器 sizingMode 错误、报告缺条目或取值不一致都失败（入参前提见 `check-wpf-layout.js` 头部 CLI 注释）。**例外按类说明**（只免掉真正没有真值的那部分）：`cell.shifted`（为避让撞格被挪出设计带）设计稿偏移没有真值——只写控件自身尺寸、不表达间距 / 对齐，只有这一半按提示登记，格子尺寸与承载物设计尺寸照常要求与核对；`cell.unsized = {width?,height?}`（星号带被前面的固定带吃光＝内容溢出承载物）按维免尺寸——该维什么都不写，且只在该维重算值非正数时才放行（重算 > 0 即失败，说明产物被改坏）。发射报告缺条目、取值不一致与第 11 / 13 条照常失败。
 
 门禁报告落在 `Generated/_inputs/<Target>.wpf-gate.json`；发射器自己的报告（命中的样式键、未命中变体、待办文本、值槽位豁免的值、跳过的固定区）落在 `Generated/_inputs/<Target>.wpf-xaml.report.json`。
@@ -62,10 +62,10 @@
 
 1. **取约束**：需要一份**外部导出的约束 JSON**（本仓库不产出该文件）。形状固定为 `{ pageId, nodes: [{ id, minWidth, maxWidth, minHeight, maxHeight, … }] }`；**未设置返回 `0`（不是 `null`）**，只有 `> 0` 才算设置。
 2. **合并**：`scripts/core/apply-constraints.js --dsl <dsl.snapshot.json> --constraints <约束.json>` 把 `node.constraints = { minWidth, maxWidth, minHeight, maxHeight }`（只保留 `> 0` 的项）合并进 DSL 快照，**不改动 DSL 任何原生字段**。配对先按完整 id，再按复合 id 末段兜底（实例内子层两边链长不同）；末段歧义不猜，记进报告。
-3. **入口**：`run-all.ps1 -Constraints <约束.json>`；不给就自动找 `Generated/_inputs/<Target>.constraints.json`；两者都没有 = 无约束。`-RequireConstraints` 要求约束来源必须存在且至少配上一条（缺失或全空直接失败，不静默退化成"无约束"）。解析与合并只有 `Resolve-LayoutDslSnapshot` 一处实现：`layout` 与 `gates` / `verify` 都调它重算，不读磁盘上遗留的合并快照。
+3. **入口**：`run-all.ps1 -Constraints <约束.json>`；不给就自动找 `Generated/_inputs/<Target>.constraints.json`；两者都没有 = 无约束。`-RequireConstraints` 要求约束来源必须存在且至少配上一条（缺失或全空直接失败，不静默退化成"无约束"）。解析与合并只有 `Resolve-LayoutDslSnapshot` 一处实现：`mapping`、`layout`、`inputs` 与 `gates` / `verify` 都调它重算，不读磁盘上遗留的合并快照。A 的约束会由 `layout` 写进格子，因此新增、修改或删除约束后必须从 `layout` 续跑；B 不消费布局格子，改约束后可从 `inputs` 续跑，并同步登记新的 `mappingDsl`。
 4. **透传**：布局推导只把 `constraints` 透传进对应格子（`cell.constraints`），不推算、不补默认值。**带约束的容器不展平**——不展平是落格的必要条件，不是充分条件：容器还要有可发射的内容才落到产物（展平等于放弃承载物，所以不展平是前提）。
    **豁免的只有 `constraintExempt` 三类**：页面根（画布本身不是页面里的控件）、不可见节点、落在框架固定区（顶部栏 / 底部栏）的节点——由 `layout` 登记进产物的 `constraintExempt`（含原因），门禁按它登记提示、不失败。其余带约束节点在产物里没有格子即失败（门禁报 `R12`），不许静默丢；常见成因与处置（不封闭枚举）：容器子树里没有可发射的控件（补可发射内容，或由设计侧确认这个盒子是否真的要在页面里存在）、待确认类型 / 无尺寸等不进格子的节点（先按门禁第 1 / 9 条修类型判定与映射）、产物与本次输入不同步（先重跑 `layout`）。
-5. **发射**：`View.xaml` 上落 `MinWidth / MaxWidth / MinHeight / MaxHeight`（控件与容器 Grid 都写）；`TextBlock` 在设了最大宽时补 `TextWrapping="Wrap"`。
+5. **发射**：A 的 `View.xaml` 落 `MinWidth / MaxWidth / MinHeight / MaxHeight`（控件与容器 Grid 都写），B 的 IOContorl XML 在 `TextBlock` 上落 `MinWidth / MaxWidth`。两条路线的 `TextBlock` 都不写常规 `Width`；A 在设了最大宽时补 `TextWrapping="Wrap"`。
 6. **门禁**：第 4 节第 11 / 12 / 13 条。
 
-**官方 DSL 支持这四个字段之后**：删掉 `apply-constraints.js` 这一步与 `run-all.ps1` 的 `-Constraints` / `-RequireConstraints` 入口，改由下游直接读 DSL 节点自带的同名字段。键名一致时，布局推导、XAML 发射、门禁三处一行都不用改——要动的只有"约束来源"这一处适配。
+**官方 DSL 支持这四个字段之后**：删掉 `apply-constraints.js` 这一步与 `run-all.ps1` 的 `-Constraints` / `-RequireConstraints` 入口，改由下游直接读 DSL 节点自带的同名字段。键名一致时，A 的布局/XAML/门禁与 B 的 mapping/XML/校验都不用改——要动的只有"约束来源"这一处适配。

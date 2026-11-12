@@ -164,7 +164,7 @@ function isRightAlignedTextBlock(node, spec) {
 // 调用方：映射生成器 / 容器重挂 / XML 渲染 / provenance 校验（两条分支都调）；坐标核对输入的
 // 唯一实现在 lib/coord-nodes.js，同样调用本函数算出右对齐节点的 expectedLeft。
 // 宽度来源固定为设计稿 bbox 宽度（mapping nodes[].dslWidth / sourceNodes[].width）；
-// 产物 XML 的 Width 仍是 NaN（自适应），宽度只参与这里的 Left 计算。
+// 产物 XML 不发射 TextBlock 的常规 Width，宽度只参与这里的 Left 计算。
 // 任一输入取不到 → null，由调用方 fail-closed（不猜）。
 function textBlockLeftValue(options) {
   const opts = options || {};

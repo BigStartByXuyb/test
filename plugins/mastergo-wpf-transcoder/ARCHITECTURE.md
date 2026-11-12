@@ -97,7 +97,7 @@ flowchart LR
 | `scripts/lib/page-node-id.js` | 页面节点 ID 口径的唯一真值源（`MX_` + sha256(页面键 + "\n" + 节点 ref) 前 32 位小写十六进制） | `gen-mtslg-mapping-from-dsl.js`（`allocateId` 转调） |
 | `scripts/adapters/mtslg-iocontrol/lib/icon-ownership.js` | 图标归属判据（树包含优先、前缀回退、取最深命中） | `gen-mtslg-mapping-from-dsl.js`、`discover-mtslg-page-icon-map.js` |
 | `scripts/adapters/mtslg-iocontrol/lib/icon-registration-policy.js` | 图标**登记判据**的唯一实现（「这个 PATH 要不要进本页台账」：模板族变体的 `iconPolicy`、布局族底部栏 MenuItem、常驻分组、宿主壳标记、装饰名；取值全部读映射表） | `discover-mtslg-page-icon-map.js` |
-| `scripts/lib/constraints.js` | 尺寸约束（min/max 宽高）的唯一实现：键集、`> 0 才算设置`的归一化、键名 → WPF 属性名、DSL 遍历与收集 | `core/apply-constraints.js`、`adapters/mw-wpf/gen-mw-wpf-layout.js`、`adapters/mw-wpf/gen-mw-wpf-xaml.js`、`adapters/mw-wpf/check-wpf-layout.js` |
+| `scripts/lib/constraints.js` | 尺寸约束（min/max 宽高）的唯一实现：键集、`> 0 才算设置`的归一化、键名 → WPF 属性名、DSL 遍历与收集 | A：`core/apply-constraints.js`、`adapters/mw-wpf/gen-mw-wpf-layout.js`、`adapters/mw-wpf/gen-mw-wpf-xaml.js`、`adapters/mw-wpf/check-wpf-layout.js`；B：`adapters/mtslg-iocontrol/gen-mtslg-mapping-from-dsl.js`、`gen-iocontrol-xml.js`、`validate-iocontrol-provenance.js`、`check-iocontrol-coords.js` |
 | `scripts/lib/design-box.js` | 容器 `sizingMode` 分类与格内「尺寸 + 对齐」共享实现；`shifted` / `unsized` 例外见 `skills/mastergo-to-wpf/references/adapters/mw-wpf/page-build-rules.md` 第 4 节第 14 条 | `adapters/mw-wpf/gen-mw-wpf-layout.js`、`adapters/mw-wpf/gen-mw-wpf-xaml.js`、`adapters/mw-wpf/check-wpf-layout.js` |
 
 规则：**同一个功能要复用，不许反复造轮子**。新脚本需要已存在的工具就 `require` 共享模块；确实职责不同但同名的函数，登记到 `scripts/lib/script-reuse-registry.json` 并写清 `reason`（登记是显式决定，不是隐藏白名单）。发版前 `tests/script-duplication.test.js` 必须 PASS。
@@ -144,7 +144,7 @@ flowchart LR
 | 门禁 | 执行者 | 覆盖范围（规则见 SKILL.md / 映射表） |
 |---|---|---|
 | 来源与固定字段 | `validate-iocontrol-provenance.js` | 节点 ↔ DSL ref ↔ 父链 ↔ 文本的闭环、`ControlType` 必写字段、TextBlock 尺寸约束 |
-| 坐标 | `check-iocontrol-coords.js` | Left/Top/Width/Height 独立重算，要求 0 MISMATCH / 0 EXTRA |
+| 坐标 | `check-iocontrol-coords.js` | 独立重算 `Left` / `Top` / `Height` 与非 TextBlock 的 `Width`；TextBlock 拒绝常规 `Width`，改为核对 `MinWidth` / `MaxWidth`。要求 0 MISMATCH / 0 EXTRA |
 | 图标闭合 | `gen-mastergo-page-bundle.js` 内置校验 | Icon 键唯一与引用闭合、页面 Icon 文件结构 |
 | 语言闭环 | Bundle 的语言绑定与字典校验 | `LangName` 引用必须存在于本页字典，各语言 key 一致 |
 | 页面壳层 | `gen-mtslg-layout.js` 校验 | MenuItem 常驻属性、Index（菜单项 `1..N` 连续编号，常驻分组不占号）、图标尺寸门禁 |

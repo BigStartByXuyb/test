@@ -263,6 +263,7 @@ function main() {
     run: {
       runId: registryData.runId,
       target,
+      mode: registryData.identity ? registryData.identity.mode : null,
       ui: registryData.identity ? registryData.identity.ui : null,
       fileId: registryData.identity ? registryData.identity.fileId : null,
       layerId: registryData.identity ? registryData.identity.layerId : null,

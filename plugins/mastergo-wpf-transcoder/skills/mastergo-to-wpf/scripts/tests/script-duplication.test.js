@@ -77,6 +77,16 @@ const requiredBy = [
     "adapters/mtslg-iocontrol/resolve-mtslg-template-mapping.js", "adapters/mtslg-iocontrol/gen-mtslg-mapping-from-dsl.js",
     "adapters/mtslg-iocontrol/apply-container-containment.js", "adapters/mtslg-iocontrol/check-iocontrol-coords.js",
     "adapters/mtslg-iocontrol/validate-iocontrol-provenance.js"
+  ]],
+  ["lib/constraints.js", [
+    "core/apply-constraints.js",
+    "adapters/mw-wpf/gen-mw-wpf-layout.js",
+    "adapters/mw-wpf/gen-mw-wpf-xaml.js",
+    "adapters/mw-wpf/check-wpf-layout.js",
+    "adapters/mtslg-iocontrol/gen-mtslg-mapping-from-dsl.js",
+    "adapters/mtslg-iocontrol/gen-iocontrol-xml.js",
+    "adapters/mtslg-iocontrol/validate-iocontrol-provenance.js",
+    "adapters/mtslg-iocontrol/check-iocontrol-coords.js"
   ]]
 ];
 for (const [libRelative, scripts] of requiredBy) {

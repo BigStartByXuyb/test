@@ -2,11 +2,13 @@
 """SIP 方法论归类规则——主干（通用/已验证基线）。
 
 主顺序：9 个环节；子顺序：每个环节内部 1级→12级。
-本模块只存放规则数据和标准答案读取；归类逻辑与分支合并由 `sip_rules.py` 统一调度。
+本模块存放规则数据、标准答案读取和 `exact_result` 标准值判定辅助；归类调度与分支合并由 `sip_rules.py` 统一执行。
 通用工序补这里的 STAGE_RULES / EXACT；设备族特有工序加到对应 `sip_family_*.py`，
 不要改动标准答案已有归属。
 """
 import re
+
+from sip_seq import parse_seq
 
 M = '1. 铭牌核对'
 W = '2. 外观检验'
@@ -32,10 +34,11 @@ def norm(s):
             .replace('　', '').replace('（', '(').replace('）', ')'))
 
 
+EXCLUDED_COLUMN_HEADERS = ('检验频率', '重要等级', '检验记录表', '备注')
 HEADER_BASES = (
     '序号', '检验工序', '检验项目', '检验标准', '检验方法', '检验工具',
-    '主顺序', '子顺序', '检验频率', '重要等级', '检验记录表', '备注',
-)
+    '主顺序', '子顺序',
+) + EXCLUDED_COLUMN_HEADERS
 
 
 def header_key(v):
@@ -186,6 +189,14 @@ EXACT = {
     ('杀毒软件', '查看加密有无执行'): (B, '7级'),
 }
 
+
+def exact_result(key, std):
+    """返回需要按检验标准再分的项目级例外；普通 EXACT 项返回 None。"""
+    if key == ('流量、压力及位置检查表', '接触式测高位置及刀刃外观确认'):
+        return (D, '6级') if '刀刃外观' in std else (D, '5级')
+    return None
+
+
 BOM_STAGES = {
     'UPS电源', '交换机', '继电器', '触摸屏', '触控屏', '显示器',
     '报警灯', 'LED防水灯', 'LED灯', '急停', '气缸', '主轴', '风机',
@@ -250,11 +261,8 @@ def load_reference(path):
     st = it = ''
     for r in range(header_row + 1, ws.max_row + 1):
         a = ws.cell(r, c_seq).value
-        if isinstance(a, (int, float)):
-            seq_no = int(a)
-        elif isinstance(a, str) and a.strip().isdigit():
-            seq_no = int(a.strip())
-        else:
+        seq_no = parse_seq(a)
+        if seq_no is None:
             continue
         b = ws.cell(r, c_stage).value
         if b is not None and str(b).strip():

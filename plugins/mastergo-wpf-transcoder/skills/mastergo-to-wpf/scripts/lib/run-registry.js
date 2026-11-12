@@ -35,6 +35,7 @@ const LEGACY_SHADOWS = {
 // 登记表里的产物键（消费端只用这些键，不拼路径）
 const ARTIFACT_KEYS = [
   "getDsl", "snapshot", "coverage", "dslManifest", "timing", "visibility", "extractSvg",
+  "mappingDsl",
   "mappingDraft", "iconCandidates", "iconMap", "layoutManifest", "bundleManifest",
   // 作业A（mw-wpf）产物：类型判定 / Grid 布局产物 / 分组表可引用的条目清单 / 发射出的真控件 View.xaml。
   // 条目清单也登记：它要带本次运行的身份与哈希，不能被上一次运行留下的同名旧件冒充。
@@ -275,9 +276,11 @@ function summarize(registry) {
   return {
     runId: registry.runId,
     target: registry.target,
+    mode: registry.identity && registry.identity.mode,
     fileId: registry.identity && registry.identity.fileId,
     layerId: registry.identity && registry.identity.layerId,
     ui: registry.identity && registry.identity.ui,
+    designPageName: registry.identity && registry.identity.designPageName,
     artifactCount: artifacts.length,
     artifacts,
     outputCount: outputs.length,

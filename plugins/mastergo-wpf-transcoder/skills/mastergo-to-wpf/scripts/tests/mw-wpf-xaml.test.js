@@ -156,6 +156,43 @@ function emitArgs(layoutPath, typesPath, outPath, extra = []) {
   assert.strictEqual(report.textPending.length, 0);
 }
 
+// 1b) 共享类型表已登记的选择控件与手动控制弹层：A 路线必须按已登记样式族正常发射。
+{
+  const layout = baseLayout();
+  layout.regions[1].grid.cells = [
+    cell("work/group", "GroupBox", 0, 0, designBox(600, 160, 200, 160)),
+    cell("work/radio", "RadioButton", 1, 1, designBox(680, 522, 160, 40))
+  ];
+  const layoutPath = writeJson("layout.selection-modal.json", layout);
+  const typesPath = writeJson("types.selection-modal.json", baseTypes([
+    {
+      ref: "work/group", sourceRef: "work/group", controlType: "GroupBox",
+      variant: "信息模块-手动控制弹层", sourceText: "手动控制", absX: 0, absY: 0,
+      w: 200, h: 160, langName: "SamplePageManualControl"
+    },
+    {
+      ref: "work/radio", sourceRef: "work/radio", controlType: "RadioButton",
+      variant: "单选-选中", sourceText: "选项 A", absX: 16, absY: 106,
+      w: 160, h: 40, langName: "SamplePageOptionA"
+    }
+  ]));
+  const outPath = path.join(tmpRoot, "selection-modal", "View.xaml");
+  const reportPath = path.join(tmpRoot, "selection-modal", "report.json");
+  run(emitArgs(layoutPath, typesPath, outPath, ["--report", reportPath, "--overwrite"]));
+  const xaml = fs.readFileSync(outPath, "utf8");
+  const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
+  assert.match(xaml,
+    /<Style TargetType="\{x:Type RadioButton\}" BasedOn="\{StaticResource RadioButtonBaseStyle\}" \/>/,
+    "RadioButton 必须走页级 RadioButtonBaseStyle");
+  assert.match(xaml, /<RadioButton[\s\S]*Content="\{DynamicResource SamplePageOptionA\}"/,
+    "RadioButton 文本按 Content 绑定语言键");
+  assert.match(xaml, /<s:IOGroupBox[\s\S]*Style="\{StaticResource IOGroupBoxSecondary\}"/,
+    "信息模块-手动控制弹层必须走 IOGroupBoxSecondary");
+  assert.ok(report.styleHits.some((hit) => hit.controlType === "RadioButton" && hit.from === "pageDefault"));
+  assert.ok(report.styleHits.some((hit) =>
+    hit.controlType === "GroupBox" && hit.from === "byVariant:信息模块-手动控制弹层"));
+}
+
 // 2) 未登记/待确认类型（写法表 status=pending，当前是 Border）→ 挂待确认、不发射（与作业B 的 pending 处置一致）。
 {
   const layout = baseLayout();

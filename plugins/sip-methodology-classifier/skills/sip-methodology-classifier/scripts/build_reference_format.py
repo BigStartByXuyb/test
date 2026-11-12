@@ -2,9 +2,9 @@
 """按参考样张格式生成对应表（每个机型一个 Sheet）。
 
 与参考样张一致：
-  - 删除源表顶部标题行与页脚，表头位于第 1 行
-  - 保留原 A-L 列与合并单元格（整体上移）
-  - 新增 M 主顺序 / N 子顺序（按原表行位置填值）
+  - 删除源表顶部标题行；数据区截断到最后一条可解析正整数序号所在行，后续页脚整行删除
+  - 从前 12 列排除检验频率、重要等级、检验记录表、备注，保留其余列与合并单元格（整体上移）
+  - 在剩余列之后追加主顺序 / 子顺序（按原表行位置填值）
   - 统一列宽、表头字体/填充、数据字体、边框、冻结窗格
   - 标点规范化：半角括号/冒号转全角，连续空格折叠，l/min -> L/min
 
@@ -26,6 +26,7 @@ from copy import copy
 
 from openpyxl import load_workbook, Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 if HERE not in sys.path:
@@ -33,8 +34,11 @@ if HERE not in sys.path:
 
 from sip_rules import classify, load_reference, header_key, family_label  # noqa: E402
 from sip_source import parse_sheet, discover_projects, find_header_row  # noqa: E402
+from sip_seq import last_parseable_seq_row  # noqa: E402
 from sip_family_detect import detect_family_from_rows  # noqa: E402
 from sip_verify import verify_file, format_results  # noqa: E402
+from sip_sheet_name import safe_name  # noqa: E402
+from sip_rules_trunk import EXCLUDED_COLUMN_HEADERS  # noqa: E402
 from extract_gbk_zip import extract as extract_zip  # noqa: E402
 
 try:
@@ -61,9 +65,23 @@ def normalize_text(s):
     return s.replace('l/min', 'L/min')
 
 
+def excluded_source_columns(ws, header_row, source_columns):
+    return [
+        col for col in source_columns
+        if header_key(ws.cell(header_row, col).value) in EXCLUDED_COLUMN_HEADERS
+    ]
 
 
-def transform_source(src_path, row_map):
+def remap_merge_columns(start, end, column_map):
+    mapped = [column_map[col] for col in range(start, end + 1) if col in column_map]
+    if not mapped:
+        return None
+    return min(mapped), max(mapped)
+
+
+
+
+def transform_source(src_path, row_map, title):
     """把一个源表转成参考样张格式，返回 Workbook（单 Sheet）。"""
     wb = load_workbook(src_path)
     ws = wb.worksheets[0]
@@ -87,31 +105,40 @@ def transform_source(src_path, row_map):
     if col_seq is None:
         raise ValueError('找不到序号列')
 
-    last_seq_row = 1
-    for r in range(2, ws.max_row + 1):
-        v = ws.cell(r, col_seq).value
-        if isinstance(v, (int, float)) or (isinstance(v, str) and v.strip().isdigit()):
-            last_seq_row = r
-    if last_seq_row < ws.max_row:
-        ws.delete_rows(last_seq_row + 1, ws.max_row - last_seq_row)
+    source_columns = list(range(1, min(max_col0, 12) + 1))
+    dropped_columns = excluded_source_columns(ws, 1, source_columns)
+    kept_columns = [col for col in source_columns if col not in dropped_columns]
+    column_map = {source: target for target, source in enumerate(kept_columns, start=1)}
+    last_data_col = len(kept_columns)
+    main_col = last_data_col + 1
+    sub_col = last_data_col + 2
+
+    last_data_row = last_parseable_seq_row(
+        ws.cell(r, col_seq).value for r in range(2, ws.max_row + 1))
+    if last_data_row < ws.max_row:
+        ws.delete_rows(last_data_row + 1, ws.max_row - last_data_row)
     if max_col0 > 12:
-        ws.delete_cols(13, ws.max_column - 12)
+        ws.delete_cols(13, max_col0 - 12)
+    for col in sorted(dropped_columns, reverse=True):
+        ws.delete_cols(col, 1)
 
     # 标点规范化（在重建合并区域之前）
-    for row in ws.iter_rows(min_row=2, max_row=last_seq_row, min_col=1, max_col=12):
+    for row in ws.iter_rows(min_row=2, max_row=last_data_row, min_col=1, max_col=last_data_col):
         for cell in row:
             cell.value = normalize_text(cell.value)
 
     # 重建合并区域
     for c1, r1, c2, r2 in orig_merges:
-        if c2 > 12:
+        mapped = remap_merge_columns(c1, c2, column_map)
+        if mapped is None:
             continue
+        nc1, nc2 = mapped
         nr1, nr2 = r1 - n_title, r2 - n_title
-        if nr2 < 1 or nr1 > last_seq_row:
+        if nr2 < 1 or nr1 > last_data_row:
             continue
-        nr1, nr2 = max(1, nr1), min(last_seq_row, nr2)
+        nr1, nr2 = max(1, nr1), min(last_data_row, nr2)
         if nr2 >= nr1:
-            ws.merge_cells(start_row=nr1, start_column=c1, end_row=nr2, end_column=c2)
+            ws.merge_cells(start_row=nr1, start_column=nc1, end_row=nr2, end_column=nc2)
 
     # 边框：普通单元格细框；合并区域只画外框；A 列左边 medium；末行下边 medium
     merge_map = {}
@@ -119,8 +146,8 @@ def transform_source(src_path, row_map):
         for rr in range(m.min_row, m.max_row + 1):
             for cc in range(m.min_col, m.max_col + 1):
                 merge_map[(rr, cc)] = m
-    for r in range(2, last_seq_row + 1):
-        for c in range(1, 13):
+    for r in range(2, last_data_row + 1):
+        for c in range(1, last_data_col + 1):
             m = merge_map.get((r, c))
             if m is None:
                 left, right, top, bottom = ('medium' if c == 1 else 'thin'), 'thin', 'thin', 'thin'
@@ -131,45 +158,47 @@ def transform_source(src_path, row_map):
                 bottom = 'thin' if r == m.max_row else None
                 if c == 1 and left:
                     left = 'medium'
-            if r == last_seq_row and bottom:
+            if r == last_data_row and bottom:
                 bottom = 'medium'
             ws.cell(r, c).border = Border(
                 left=Side(style=left), right=Side(style=right),
                 top=Side(style=top), bottom=Side(style=bottom))
 
-    # M/N（未解析/跳过行留空，不填分类值）
+    # 主顺序/子顺序（未解析/跳过行留空，不填分类值）
     unclassified = []
-    ws.cell(1, 13, '主顺序')
-    ws.cell(1, 14, '子顺序（1级优先进行，12级最后进行）')
-    for r in range(2, last_seq_row + 1):
+    ws.cell(1, main_col, '主顺序')
+    ws.cell(1, sub_col, '子顺序（1级优先进行，12级最后进行）')
+    for r in range(2, last_data_row + 1):
         if r in row_map:
             main, sub = row_map[r]
-            ws.cell(r, 13, main)
-            ws.cell(r, 14, sub)
+            ws.cell(r, main_col, main)
+            ws.cell(r, sub_col, sub)
         else:
             unclassified.append(r)
 
     # 样式
-    for c in range(1, 15):
+    for c in range(1, sub_col + 1):
         cell = ws.cell(1, c)
         cell.font = copy(HEADER_FONT)
         cell.fill = copy(HEADER_FILL)
         cell.alignment = copy(CENTER)
-        if c in (13, 14):
+        if c in (main_col, sub_col):
             cell.border = Border(left=THIN, right=THIN, top=THIN, bottom=THIN)
     ws.row_dimensions[1].height = HEADER_ROW_HEIGHT
-    for r in range(2, last_seq_row + 1):
-        for c in range(1, 15):
+    for r in range(2, last_data_row + 1):
+        for c in range(1, sub_col + 1):
             cell = ws.cell(r, c)
             cell.font = copy(DATA_FONT)
-            if c in (13, 14):
+            if c in (main_col, sub_col):
                 cell.alignment = copy(CENTER)
                 cell.border = Border(left=THIN, right=THIN, top=THIN, bottom=THIN)
         ws.row_dimensions[r].height = None
-    for col, w in WIDTHS.items():
-        ws.column_dimensions[col].width = w
+    for source_col, target_col in column_map.items():
+        ws.column_dimensions[get_column_letter(target_col)].width = WIDTHS[get_column_letter(source_col)]
+    ws.column_dimensions[get_column_letter(main_col)].width = WIDTHS['M']
+    ws.column_dimensions[get_column_letter(sub_col)].width = WIDTHS['N']
     ws.freeze_panes = 'A3'
-    ws.title = os.path.splitext(os.path.basename(src_path))[0][:31]
+    ws.title = title
     return wb, unclassified
 
 
@@ -198,19 +227,6 @@ def copy_sheet(dst_wb, src_ws, title):
     return dst
 
 
-def safe_name(name, used):
-    for ch in '\\/*?:[]':
-        name = name.replace(ch, '_')
-    name = (name or 'Sheet')[:31]
-    base, i = name, 2
-    while name in used:
-        suffix = f'_{i}'
-        name = base[:31 - len(suffix)] + suffix
-        i += 1
-    used.add(name)
-    return name
-
-
 def main():
     ap = argparse.ArgumentParser(description='按参考样张格式生成 SIP 对应表')
     ap.add_argument('--input', required=True, help='zip 或包含 xlsx 的文件夹')
@@ -237,12 +253,18 @@ def main():
     used = set()
     total = 0
     total_unclassified = 0
+    total_skipped_yellow = 0
+    total_skipped_invalid = 0
+    total_branch_hits = 0
+    total_trunk_hits = 0
     total_rule_inferred = 0
 
     for pname, pdir, files in projects:
         for f in files:
             path = os.path.join(pdir, f)
-            rows, _ = parse_sheet(path, pname)
+            rows, skipped = parse_sheet(path, pname)
+            total_skipped_yellow += skipped['yellow']
+            total_skipped_invalid += skipped['invalid']
             probe = load_workbook(path, data_only=True)
             n_title = find_header_row(probe.worksheets[0]) - 1
             family = detect_family_from_rows(rows, file_name=f)
@@ -264,22 +286,19 @@ def main():
                     trunk_hits += 1
                 # 源表行号 -> 转换后行号（减标题行数）
                 row_map[row['src'] - n_title] = (main, sub)
-            wb, unclassified = transform_source(path, row_map)
+            title = safe_name(os.path.splitext(os.path.basename(path))[0], used)
+            wb, unclassified = transform_source(path, row_map, title)
             ws = wb.worksheets[0]
-            title = safe_name(ws.title, used)
             dst = copy_sheet(out_wb, ws, title)
             total += max(0, dst.max_row - 1)
             total_unclassified += len(unclassified)
+            total_branch_hits += branch_hits
+            total_trunk_hits += trunk_hits
             total_rule_inferred += rule_inferred
             extra = f' [分支 {family_label(family)}]'
-            if unclassified:
-                extra += f'（未解析/跳过行 {len(unclassified)}，M/N 留空）'
-            if branch_hits:
-                extra += f'（分支规则 {branch_hits}）'
-            if trunk_hits:
-                extra += f'（主干规则 {trunk_hits}）'
-            if rule_inferred:
-                extra += f'（规则推断 {rule_inferred}，建议复核）'
+            extra += f'（跳过黄行 {skipped["yellow"]}；序号未解析 {skipped["invalid"]}；主顺序/子顺序空行 {len(unclassified)}）'
+            extra += f'（分支规则 {branch_hits}；主干规则 {trunk_hits}；'
+            extra += f'规则推断 {rule_inferred}{"，建议复核" if rule_inferred else ""}）'
             print(f'  {title}: {max(0, dst.max_row - 1)} 行{extra}')
 
     if not out_wb.sheetnames:
@@ -288,12 +307,12 @@ def main():
     out_wb.save(args.output)
     print(f'\n已生成: {os.path.abspath(args.output)}')
     print(f'总数据行: {total}')
-    if total_unclassified:
-        print(f'未解析/跳过行: {total_unclassified}（M/N 留空，请复核）')
-    if total_rule_inferred:
-        print(f'规则推断行: {total_rule_inferred}'
-              '（关键字推断，只会落在主顺序 2–9、子顺序 1–5 级；'
-              '完全无法推断时用 (3. 通电检验, 5级)，建议复核）')
+    print(f'未解析/跳过行: 跳过黄行 {total_skipped_yellow}；序号未解析 {total_skipped_invalid}；主顺序/子顺序空行 {total_unclassified}（请复核）')
+    print(f'分支规则行: {total_branch_hits}')
+    print(f'主干规则行: {total_trunk_hits}')
+    print(f'规则推断行: {total_rule_inferred}'
+          '（关键字推断，只会落在主顺序 2–9、子顺序 1–5 级；'
+          '完全无法推断时用 (3. 通电检验, 5级)，建议复核）')
     if ref:
         for line in format_results(verify_file(args.output, ref)):
             print(line)

@@ -28,7 +28,7 @@
 - 内容区坐标：`contentOriginX`、固定 `contentOriginY=192`、设计稿标题处理与目标画布尺寸。
 - Target 映射：新建页面首次必须以运行时加载验证页面 Target 与文件的实际关联（属「项目运行时交付」门禁；只做静态结构映射时不执行，改为在待确认清单里登记该验证项）。
 
-（续跑身份提示：本表用于**新开运行**解析身份；续跑回放运行登记表 `Generated/runs/<Target>/run.json` 里冻结的 `identity`，因此**改本表的 `pages[].ui` / `pages[].designSource.*` 值不影响续跑**——但**删掉本表的页面条目**后身份会取不到值，需要显式传回 `-FileId` / `-LayerId` / `-Ui` / `-DesignPageName`（或新开一次运行）。口径见 `bundle-manifest.md` 第 7 节。）
+（续跑身份提示：本表用于**新开运行**解析身份；续跑回放运行登记表 `Generated/runs/<Target>/run.json` 里冻结的 `identity.mode` / `fileId` / `layerId` / `ui` / `designPageName`。项目登记表改值不影响续跑；显式传入与冻结值不同的 `-Mode` / `-FileId` / `-LayerId` / `-Ui` / `-DesignPageName` 必须 fail-closed。删掉项目登记表的页面条目后，需要显式传回五项身份（或新开一次运行）。口径见 `bundle-manifest.md` 第 7 节。）
 
 ## 1.1 MasterGo 组件库映射入口
 
@@ -88,7 +88,7 @@
 - **页面坐标不是完整窗口坐标**：根级保留业务节点统一计算 `PageX = MasterGoX − contentOriginX`、`PageY = MasterGoY − 192`。业务页面固定使用 `contentOriginY=192`，公共栏和 `design-artifact-title` 的偏移只能在根级归一化时扣除一次，嵌套控件不重复扣除。不得按单个控件手调偏移。
 - **公共栏节点不重复生成**：顶部/底部公共背景、标题栏、状态栏、底部快捷键区和宿主已有控件必须在映射表标记“框架负责、页面不生成”；页面标题只有在 MasterGo 业务区确有独立标题节点且宿主不提供时才生成。
   标题识别按「文本或图层名 == 设计页名」+「落在顶部标题区（`pageAbsY < contentOriginY`）」判定，**不要求它是页面根的直接子节点**：设计稿把整页（含标题）包进容器时同样识别为 `page-title` 并 omit。
-- **组件文本尺寸与字号分开处理**：所有 MTSLG `TextBlock`（标签、数值、单位和独立文本）的 `Height` 固定为 `40`、`Width` 固定为 `NaN`；不得使用外层组件高度、内部文字 bbox、独立文本 bbox、文本 bbox 宽度或 `FontSize` 改写这两个值（文本 bbox 宽度只作为 `dslWidth` 记入 mapping 溯源）。`FontSize` 仍从对应 MasterGo DSL 的字体属性读取并写入。
+- **组件文本尺寸与字号分开处理**：所有 MTSLG `TextBlock`（标签、数值、单位和独立文本）的 `Height` 固定为 `40`，不发射常规 `Width`，只发射 DSL `constraints` 中的 `MinWidth` / `MaxWidth`；不得使用外层组件高度、内部文字 bbox、独立文本 bbox、文本 bbox 宽度或 `FontSize` 改写这些值（文本 bbox 宽度只作为 `dslWidth` 记入 mapping 溯源）。`FontSize` 仍从对应 MasterGo DSL 的字体属性读取并写入。
 - **`FontWeight` 命中才写（判定顺序：样式名优先）**：`TextBlock` 的 `FontWeight` 只在设计稿字重**不是 normal** 时发射，**值取设计稿自己的字体样式名**（`dsl.styles[<text[0].font>].value.style` 里的 `fontStyle`，例如 `Bold`、`SemiBold`）——不是把数值翻译成名字。带字体族档位数字的前缀要去掉（`75 SemiBold` → `SemiBold`、`55 Regular` → `Regular`）。判定顺序固定为两步：① 先看样式名——命中 `normalStyleNames` 即 normal、**不写该属性**；② 只有**样式名取不到**（`style` 缺失/非法 JSON/没有 `fontStyle` 字段）时才回退看 `weight` 数值，命中 `normalValues` 即 normal、不写，否则写该数值。normal 一律**不写该属性**（不写空串，也不参与 `controlTypeRequiredAttrs` 恒写集合）。规则真值源是映射表 `textBlockFontWeight`（`normalStyleNames` + `normalValues` + `fallbackValueSource`，**完整清单以映射表为准**；正文不另立枚举，避免与真值源漂移），`FontSize` 的恒写规则不受影响。输入框、选择框等非 TextBlock 控件按正式变体模板取自身宽高；非 TextBlock 控件的文本不发射 `FontWeight`。
 - **文本来源与 `Value` 硬门禁**：每个 `TextBlock` 的 `Value` 必须回溯到唯一 MasterGo `layerId`/DSL `ref` 及其真实文本节点；不得依据 XML `ID`、控件名称、坐标方向、页面语义或相邻实例推断文本。生成前必须逐项核对“XML 节点 → layerId/ref → 父节点链 → 原始文本 → Value”；不一致即停止生成并标记待确认。
 - **必写字段（所有 ControlType）**：每个 ControlType 的固定必写字段集登记在 `mtslg-iocontrol-map.json` 的 `controlTypeRequiredAttrs`；生成器必须发射这些属性，取不到来源时写**空字符串占位**（个别字段在 `controlTypeAttrDefaults` 里登记了默认值，如 `Border.Value` 线宽默认 `1`）。**变体登记 `omitRequiredAttrs` 时该变体做减法：登记的属性不发射，生成器与校验器共用 `omittedAttrs()` 判据（见飞书组件库映射规范「组件级固定变体的公共口径」）**。`LangName` 是另一个例外：只在多语言绑定层给出真实 key 时发射——全量多语言下每个设计文本 `Value` 都产键挂 `LangName`，只有**槽位登记 `langRefPolicy=none` 的值**（当前只有选择框 `Value`，运行时由数据决定）与**空文本节点**（`Value=""`，没有可翻译的文案）不产键、不写空占位。`TextBlock` 的 `Align` 是第二个例外：**不适用空字符串口径**——取值只能是 `Left` / `Right`，映射缺失/空串/第三种值由渲染层与校验层直接判失败（见映射表 `textBlockAlign.note`）。
@@ -99,7 +99,7 @@
 - **图标尺寸来源（`IconWidth`/`IconHeight`）**：取**台账命中条目节点**的 bbox——即该条目 `sourceRef` 指向的节点（缺失时回退 `sourceId`），四舍五入取整；`validate-iocontrol-provenance.js` 用同一个 `sourceRef` 独立重算比对，生成器与校验器不可能自相矛盾。**因此台账条目必须登记在「只包住该图标图形」的节点上**（图标组 / 图标实例 / 图标 PATH），不要登记在按钮级容器上——登记在按钮级容器上会取到按钮尺寸（实测 `exit` 的图标实例覆盖整个按钮：取到 170×80，而图标区 PATH 是 35×32）。右栏这类带图标槽位的按钮，图标来自 `实例` 属性指向的图标节点；空占位虚线框视为没有图标。**例外：变体登记 `iconPolicy=runtime`（图标由目标项目提供，如右栏 `enter`/`exit`）时本页台账没有也不该有该条目，尺寸改取该实例子树里唯一 PATH 的 bbox；多个 PATH 直接失败，要求设计侧消歧（登记台账对该变体无效）。**该例外只在映射表登记的 runtime 变体上生效，其余按钮族一律按台账口径。
 - **图标几何补充来源（extractSvg 去重 + 祖先朝向自动烘焙）**：`extractSvg` 只输出 PATH 自身的 `d` + `transform`，几何完全相同的复用实例会被去重（同一方向图标经组级 `rotate`/`flipV` 复用时只返回一条），因此会出现「按钮有图标槽位却没有 `Icon`」。补齐办法：`gen-mtslg-page-icons.js` 追加第 4 个参数（`dsl.snapshot.json`），图标映射条目加 `"fromDsl": true`（按 PATH 原始 `d` + 自身 matrix 合成，与 extractSvg 等价并平移到原点）。**祖先朝向由脚本自动判定并烘焙**：只要图标节点的 PATH 祖先链上出现 `rotate`/`flipH`/`flipV`，脚本就自动走「DSL + 烘焙」（即使 `extractSvg` 恰好也有该条目——它只给 PATH 自身变换，表达不了祖先朝向），不需要台账手写 `bakeAncestorTransform`；自动烘焙的图标在 stdout 逐条报告。台账显式写 `"bakeAncestorTransform": true` 时结果与自动一致。该烘焙是机械计算：按树序把祖先变换烘进坐标，计算结果即产物，不做视觉复核、不读图、不识别图形外观。同一组图标在 DSL 里几何完全一致（如「向左」与「向右」，把祖先变换一并算进去后逐字段相同）时属于设计侧缺图：照常按槽位语义命名并出图，同时标记待确认并要求设计补图，不得自行镜像猜测。
 - **设计稿最上方示例标题默认剥离**：位于根节点或展示外壳、仅用于说明组件或工件示教的标题标记为 `design-artifact-title`，不写入页面 XML。业务内容容器内部且运行时需要的标题才保留。
-- **设计稿像素直传（归一后）**：`Left = pageAbsX − parentPageAbsX`，`Top = pageAbsY − parentPageAbsY`，Width/Height 原样；`TextBlock` 例外：`Height` 固定 `40`、`Width` 固定 `NaN`。**`Left` 还有一个例外**：`TextBlock` 且 `Align=Right` 时 `Left` 不是"到左边缘"，而是"到右边缘"（见本节的「`Left` 的口径随 `Align` 切换」）。目标画布尺寸必须与第 1 节适配记录一致；不允许从固定分辨率、截图缩放或其他页面推断。
+- **设计稿像素直传（归一后）**：`Left = pageAbsX − parentPageAbsX`，`Top = pageAbsY − parentPageAbsY`，Width/Height 原样；`TextBlock` 例外：`Height` 固定 `40`，不发射常规 `Width`，只发射 DSL `constraints` 中的 `MinWidth` / `MaxWidth`。**`Left` 还有一个例外**：`TextBlock` 且 `Align=Right` 时 `Left` 不是"到左边缘"，而是"到右边缘"（见本节的「`Left` 的口径随 `Align` 切换」）。目标画布尺寸必须与第 1 节适配记录一致；不允许从固定分辨率、截图缩放或其他页面推断。
 - 允许小数与负数；`NaN` 表示自适应（根节点四属性均为 `NaN`；叶子无宽高时省略属性）。具体数值必须来自当前实例的 MasterGo bbox。
 - 子控件坐标相对**父容器的内容区原点**；父容器与子控件的坐标关系必须由唯一 MasterGo 父子链和 bbox 计算。普通容器（无内容区内边距）的内容区原点 = 父容器左上角；**容器类控件（`ControlType="GroupBox"`）不是**——框架模板是"标题条 + 内容区"两段式，内容区原点 = 容器左上角 + 内容区边框 + 标题条高度，登记在 `mtslg-iocontrol-map.json` 的 `infoGroupTemplates.styleInsets`（按容器变体的**内容区原点键** `contentInsetStyle` 取值：`IOGroupBoxBaseStyle` = `{left:2, top:40}`、`IOGroupBoxSecondary` = `{left:1, top:35}`、`IOGroupBoxThirdly` = `{left:1, top:25}`、`IOGroupBoxFour` = `{left:1, top:35}`）。换算：`Left = 子控件绝对X − 容器绝对X − inset.left`、`Top = 子控件绝对Y − 容器绝对Y − inset.top`；漏扣会让容器内所有子控件整体下移一个标题条高度。容器变体必须登记两个**互相独立**的字段：`style` 是发射到 XML 的 `Style` 值（当前项目框架口径下 GroupBox 恒为空串，即 `Style=""`，由框架落默认样式）；`contentInsetStyle` 是**仅用于查本表**的内部键（本族 `IOGroupBoxSecondary`），**不发射**到 XML。`contentInsetStyle` 缺失或在本表查不到原点时，生成脚本 fail-closed 直接失败（不猜原点）。**该口径是项目框架侧的确定口径，按既定事实执行**：GroupBox 的 `Style` 写死为空串（`Style=""`）；空 `Style` 时内容区原点**就是** `IOGroupBoxSecondary` 的 `{left:1, top:35}`——不是待确认事项，也不设待确认编号，生成时直接按此机械换算。`gen-mtslg-mapping-from-dsl.js`、`apply-container-containment.js`、`gen-iocontrol-xml.js`、`check-iocontrol-coords.js` 与 `validate-iocontrol-provenance.js` 必须使用同一公式；**唯一例外**是 `TextBlock` 且 `Align=Right` 的 `Left`——它走本节「`Left` 的口径随 `Align` 切换」那条（到父容器**外框右边缘**的距离），`Top` 与其它 ControlType 的 `Left` 都仍按上面这个公式。
 - 当完整 DSL 的根节点或对应容器节点的 `overflow` 属性为 `hidden` 时，必须保留外层布局容器及其 `Width/Height` 裁剪边界，内部子控件继续使用相对父容器坐标。该规则优先于模板中“平级节点”的展开形式。只有 DSL 明确没有裁剪需求时才允许展开为同级节点，且必须保留等价裁剪边界。
@@ -107,7 +107,7 @@
 - 取数后先核对完整 DSL 根节点 `dsl.nodes[0].layoutStyle.width/height` 与已确认目标画布尺寸一致。不一致或根节点尺寸缺失时先与用户确认页面区域，不能继续生成。
 
 - **`Align` 恒写、只有 `TextBlock` 有（真值源 = 设计稿 TEXT 节点 `textAlign`）**：`TextBlock` 的 `Align` 属于 `controlTypeRequiredAttrs` 恒写字段，取值只有 `Left` / `Right`：设计稿 `textAlign` 归一（去空白 + 转小写）后命中 `right` 就发射 `Right`，其余（`left` / `center` / 字段缺失 / 其它取值）一律发射 `Left`——**默认左对齐**。其它 ControlType 没有这个参数，不得发射。规则真值源是映射表 `textBlockAlign`（`rightMatch` / `rightValue` / `defaultValue` / `policy`），正文不另立枚举。
-- **`Left` 的口径随 `Align` 切换（同一个属性名，两个含义）**：`Align=Left`（含设计稿 `center`）时 `Left` = 控件**左边缘**到输出父容器**内容区左边缘**的距离（与既有口径一致）；`Align=Right` 时 `Left` = 以控件**右上角**为原点，量到输出父容器**外框右边缘**的距离 = `父外框右边缘 − (控件 pageAbsX + 设计稿 bbox 宽度)`。外框右边缘：页面根 = **页面宽度**（根节点宽度）；容器 = **容器 pageAbsX + 容器宽度**（外框，不是内容区右边缘）。宽度来源固定为**设计稿 bbox 宽度**（mapping `nodes[].dslWidth`）——产物 XML 的 `Width` 仍是 `NaN`（自适应），它只参与这里的 `Left` 计算。分支判据与计算都只有一处实现：`scripts/lib/script-helpers.js` 的 `isRightAlignedTextBlock`（判据 = 节点 `Align` 属性）/ `textBlockLeftValue` / `parentOuterRightEdge`，映射生成器 / 容器重挂 / XML 渲染 / provenance 校验直接调用；坐标核对输入的唯一实现是 `scripts/lib/coord-nodes.js`（Bundle 与 `check-coords.mjs` 共用，右对齐节点在那里算出 `expectedLeft`）。口径登记在映射表 `textBlockAlign.distance*`（登记 + 回归断言，不是运行期输入）。
+- **`Left` 的口径随 `Align` 切换（同一个属性名，两个含义）**：`Align=Left`（含设计稿 `center`）时 `Left` = 控件**左边缘**到输出父容器**内容区左边缘**的距离（与既有口径一致）；`Align=Right` 时 `Left` = 以控件**右上角**为原点，量到输出父容器**外框右边缘**的距离 = `父外框右边缘 − (控件 pageAbsX + 设计稿 bbox 宽度)`。外框右边缘：页面根 = **页面宽度**（根节点宽度）；容器 = **容器 pageAbsX + 容器宽度**（外框，不是内容区右边缘）。宽度来源固定为**设计稿 bbox 宽度**（mapping `nodes[].dslWidth`）——产物 XML 不发射常规 `Width`，设计稿 bbox 宽度只参与这里的 `Left` 计算与 `MinWidth/MaxWidth` 约束溯源。分支判据与计算都只有一处实现：`scripts/lib/script-helpers.js` 的 `isRightAlignedTextBlock`（判据 = 节点 `Align` 属性）/ `textBlockLeftValue` / `parentOuterRightEdge`，映射生成器 / 容器重挂 / XML 渲染 / provenance 校验直接调用；坐标核对输入的唯一实现是 `scripts/lib/coord-nodes.js`（Bundle 与 `check-coords.mjs` 共用，右对齐节点在那里算出 `expectedLeft`）。口径登记在映射表 `textBlockAlign.distance*`（登记 + 回归断言，不是运行期输入）。
 
 ## 4. ControlType 摘要（完整表见 mtslg-iocontrol-map.json）
 
@@ -115,7 +115,7 @@
 |---|---|
 | 容器 | View（页签，Value=标题/Index/Icon）、GroupBox（Header）、Border（Value=线宽）、ButtonGroup（内放 RadioButton 共用 IOName）、TabControl+TabItem |
 | 文本/输入 | TextBlock、TextBox（Keypad）、NumberBox（DecimalPlaces 默认 3）、IntNumberBox、CheckBox |
-| 按钮 | Button（PageName="Jump:X"/IOName/IOStyle）、IconButton（Icon=Geometry 键/TopLeftContent=F1..F12）、StatusButton（IOState 状态色）、Togglebutton、RadioButton |
+| 按钮 | Button（PageName="Jump:X"/IOName/IOStyle）、IconButton（Icon=Geometry 键/TopLeftContent=F1..F12）、StatusButton（IOState 状态色）、ToggleButton、RadioButton |
 
 按钮族（IconButton / Button / StatusButton）另有固定参数：`PageName`/`IOVisible`/`IOCommand`/`IOEnable` 恒写（取不到写空字符串值；**变体登记 `omitRequiredAttrs` 时该变体做减法：登记的属性不发射，生成器与校验器共用 `omittedAttrs()` 判据（见飞书组件库映射规范「组件级固定变体的公共口径」）**）；`IconButton` 的 `Icon`/`IconWidth`/`IconHeight` 同样恒写——有图标槽位时按台账命中条目节点 bbox 四舍五入发射（**例外：变体登记 `iconPolicy=runtime` 时本页台账没有也不该有该条目，尺寸取该实例子树里唯一 PATH 的 bbox，多个 PATH 直接失败并要求设计侧消歧（登记台账对该变体无效，Bundle 会剔除命中该 owner 的条目）**），无图标槽位时写空字符串，`Button`/`StatusButton` 不含图标字段、不发射这三项；详见飞书组件库映射规范的“固定字段与可选字段规则”。
 | 选择 | ComboBox（选项=子 TextBlock；ItemsSourceFile/DisplayMemberPath/SelectedValuePath） |
@@ -161,7 +161,7 @@
 `gen-iocontrol-xml.js --merge <现有XML> <mapping.json>` 的行为：
 
 1. **匹配**：映射节点 ↔ 现有节点，ID 优先；无 ID 时按 ControlType + Left/Top（容差 0.5）位置匹配。
-2. **几何更新**：Left/Top/Width/Height 按映射更新（这就是设计稿改动的落点）。
+2. **几何更新**：`Left` / `Top` / `Height` 以及非 TextBlock 控件的 `Width` 按映射更新（这就是设计稿改动的落点）。TextBlock 不发射常规 `Width`，merge 会删除旧 `Width`、`MinHeight`、`MaxHeight`；其宽度只按 DSL `constraints` 更新 `MinWidth` / `MaxWidth`。
 3. **ControlType**：按映射更新，变化写冲突报告。
 4. **业务属性保护**：现有 XML 同名的属性一律保留现有值（值不同 → 冲突报告，不覆盖）；映射多出来的属性 → 追加（新增报告）。工程师手写的 IOName/IOCommand/IOState 等永远不会被设计稿冲掉。**例外**：映射节点的 `valueSource=dsl.text` 时，**文案承载属性**是设计文本，merge 强制按映射覆盖并写“设计文本覆盖（dsl.text）”报告——否则 provenance 校验会失败。文案承载属性与 `validate-iocontrol-provenance.js` 同口径：有 `Value` 比 `Value`；容器类控件（如 `GroupBox`）没有 `Value`，标题文案由 `Header` 承载，此时比 `Header`。
 5. **节点增删**：映射里的新节点渲染插入父容器闭合标签前；现有但映射未涉及的节点原样保留（报告列出）。

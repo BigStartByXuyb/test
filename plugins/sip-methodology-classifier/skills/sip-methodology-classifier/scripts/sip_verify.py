@@ -2,13 +2,13 @@
 """标准答案校验（同格式输出与分析视图共用同一口径）。
 
 支持两种输出：
-  - 同格式：表头第 1 行，A 列序号 + M/N；用 Sheet 名作为机型文件。
-  - 分析视图：表头含 机型文件/原序号 + M/N；读取机型代码。
+  - 同格式：表头第 1 行，A 列序号 + 主顺序/子顺序；用 Sheet 名作为机型文件。
+  - 分析视图：表头含 机型文件/原序号 + 主顺序/子顺序；读取机型代码。
 
 判定：
-  ok    = 有对应标准答案，且 M/N 与标准答案一致
-  bad   = 有对应标准答案，M/N 非空但不一致
-  blank = 有对应标准答案，但 M/N 为空（未分类/未完成）
+  ok    = 有对应标准答案，且主顺序/子顺序与标准答案一致
+  bad   = 有对应标准答案，主顺序/子顺序非空但不一致
+  blank = 有对应标准答案，但主顺序/子顺序为空（未分类/未完成）
   missing = 标准答案中没有该序号（不计入一致/不符）
 """
 import os
@@ -21,14 +21,7 @@ if HERE not in sys.path:
 from openpyxl import load_workbook
 
 from sip_rules import header_key
-
-
-def parse_seq(v):
-    if isinstance(v, (int, float)):
-        return int(v)
-    if isinstance(v, str) and v.strip().isdigit():
-        return int(v.strip())
-    return None
+from sip_seq import parse_seq
 
 
 def read_output_records(path):
@@ -36,8 +29,6 @@ def read_output_records(path):
     wb = load_workbook(path, data_only=True)
     records = []
     for ws in wb.worksheets:
-        if ws.title == '说明' or ws.title.startswith('待确认'):
-            continue
         hr = None
         for r in range(1, min(ws.max_row, 15) + 1):
             vals = [header_key(ws.cell(r, c).value) for c in range(1, ws.max_column + 1)]
@@ -136,14 +127,14 @@ def format_results(results, include_diffs=True):
         if r['ok'] + r['bad'] == 0:
             if r['blank']:
                 lines.append(f"标准答案比对 {r['file']}: 无可比对行；"
-                             f"{r['blank']} 行 M/N 为空（未完成校验）")
+                             f"{r['blank']} 行主顺序/子顺序为空（未完成校验）")
             else:
                 lines.append(f"标准答案比对 {r['file']}: 没有可比序号（未完成校验）")
             continue
         line = (f"标准答案比对 {r['file']}: {r['ok']}/{r['ok'] + r['bad']} 一致, "
                 f"{r['bad']} 不符")
         if r['blank']:
-            line += f", {r['blank']} 行 M/N 为空（未完成）"
+            line += f", {r['blank']} 行主顺序/子顺序为空（未完成）"
         lines.append(line)
         if include_diffs:
             for seq, got, exp in r['diffs']:

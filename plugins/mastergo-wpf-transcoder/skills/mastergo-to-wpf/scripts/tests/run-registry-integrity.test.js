@@ -15,7 +15,7 @@ function registeredRun(overrides = {}) {
   const projectRoot = tmpDir("mastergo-integrity-");
   const options = {
     projectRoot, target: "Demo", fileId: "file-A", layerId: "layer-A",
-    ui: "F2", designPageName: "设计页 A", ...overrides
+    ui: "F2", designPageName: "设计页 A", mode: "mtslg-iocontrol", ...overrides
   };
   const created = registry.createRegistry(options);
   const capture = path.join(projectRoot, "capture.json");
@@ -33,7 +33,7 @@ function registryCommand(args) {
 }
 
 for (const [field, changed] of [
-  ["fileId", "file-B"], ["layerId", "layer-B"], ["ui", "F3"],
+  ["fileId", "file-B"], ["layerId", "layer-B"], ["ui", "F3"], ["mode", "mw-wpf"],
   ["designPageName", "设计页 B"], ["target", "AnotherPage"]
 ]) {
   test("resume rejects changed " + field + " without rewriting the registry", () => {

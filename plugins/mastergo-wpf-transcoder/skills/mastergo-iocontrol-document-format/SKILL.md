@@ -74,7 +74,7 @@ description: 强制规范 MasterGo → MTSLG IOContorl 映射文档的写法，�
 
 <IOContorl ... />
 
-文案→Value；业务字段/动作→IOName/IOCommand；位置尺寸→Left/Top/Width/Height。
+文案→Value；业务字段/动作→IOName/IOCommand；位置与高度→Left/Top/Height，`Width→Width` 只适用于非 TextBlock 控件。
 固定模板中已声明但 MasterGo 或目标项目没有可靠来源的可选属性，保留属性并输出空字符串值；不在固定模板中的属性不新增。节点本身只有在可见性规则、页面根级大标题规则或宿主结构边界明确剥离时才省略；组件库 placeholder 标记不构成省略理由。
 例外：按钮族（IconButton / Button / StatusButton）的 `PageName`、`IOVisible`、`IOCommand`、`IOEnable`，以及模板含图标字段的 `IconButton` 的 `Icon`、`IconWidth`、`IconHeight`，都属于固定字段：无论固定模板是否逐条声明、无论能否取到来源都必须发射，取不到时写空字符串值（**变体登记 `omitRequiredAttrs` 时该变体做减法：登记的属性不发射，生成器与校验器共用 `omittedAttrs()` 判据（见飞书组件库映射规范「组件级固定变体的公共口径」）**；`IconWidth`/`IconHeight` 有图标槽位时改取**台账命中条目节点**的 bbox —— 该条目 `sourceRef` 指向的节点，四舍五入取整；因此台账条目必须登记在只包住该图标图形的节点上）。模板不含图标字段的 `Button`、`StatusButton` 不发射 `Icon`/`IconWidth`/`IconHeight`。该口径以映射表 `buttonFamily` 与 `controlTypeRequiredAttrs` 为准（映射表位置：以插件根为基准的 `skills/mastergo-to-wpf/references/adapters/mtslg-iocontrol/mtslg-iocontrol-map.json`），冲突时以映射表为准。
 ```
@@ -93,7 +93,7 @@ description: 强制规范 MasterGo → MTSLG IOContorl 映射文档的写法，�
 ## XML 书写规则
 
 - `ControlType`、节点数量、父子关系和槽位顺序由固定模板决定。
-- `Value`、`IOName`、`IOCommand`、`IOEnable`、`IOState`、`LangName`、`Left`、`Top`、`Width`、`Height`、`FontSize`、`Align`（文本对齐，恒写）等由对应 MasterGo 节点或已确认配置填充；其中 **`Align=Right` 时 `Left` 的口径不同**（以控件右上角为原点量到父容器外框右边缘的距离，口径见组件库映射文档与映射表 `textBlockAlign.distance*`）。
+- `Value`、`IOName`、`IOCommand`、`IOEnable`、`IOState`、`LangName`、`Left`、`Top`、`Height`、`FontSize`、`Align`（文本对齐，恒写）等由对应 MasterGo 节点或已确认配置填充；`Width` 只适用于非 TextBlock 控件，TextBlock 不发射常规 `Width`，只发射 DSL `constraints` 中的 `MinWidth` / `MaxWidth`。其中 **`Align=Right` 时 `Left` 的口径不同**（以控件右上角为原点量到父容器外框右边缘的距离，口径见组件库映射文档与映射表 `textBlockAlign.distance*`）。
 - XML 字段顺序沿用文档中相邻模板，不要无理由重新排序。
 - 固定模板中已声明的可选字段，MasterGo 未提供时保留对应 XML 属性并输出空字符串值；不在固定模板中的字段不得新增。不得猜值或把缺失字段扩展成新的节点。
 - 没有可靠映射时标记“待确认/未映射”，不得静默降级为普通 Button、Border、Canvas 或近似控件。
@@ -109,7 +109,7 @@ description: 强制规范 MasterGo → MTSLG IOContorl 映射文档的写法，�
 ## 特殊规则
 
 - 图标字段随 `ControlType` 的固定模板决定：模板含图标字段的 `IconButton` 恒写 `Icon`、`IconWidth`、`IconHeight`，无图标槽位时写空字符串值；有图标槽位时 `IconWidth`/`IconHeight` 取值是**台账命中条目节点**的 bbox（`sourceRef`，缺失回退 `sourceId`；**不是控件宽高**），`Icon` 取已登记的资源键。台账条目因此必须登记在**只包住该图标图形**的节点上（图标组 / 图标实例 / 图标 PATH）；登记在按钮级容器上会取到按钮尺寸。模板不含图标字段的 `Button`、`StatusButton` 以及其余无图标控件不得出现 `Icon`、`IconWidth`、`IconHeight`。
-- `FontSize`、`Height`、`Width` 始终分开表达；`TextBlock` 的 `Height` 固定 `40`、`Width` 固定 `NaN`，不得用字号、行高、文本 bbox 高度或文本 bbox 宽度替代；非 TextBlock 控件的宽高必须来自对应 MasterGo bbox。
+- `FontSize`、`Height`、宽度约束始终分开表达；通用模板里的 `Width` 只适用于非 TextBlock 控件，非 TextBlock 的 `Height` 取自身 bbox。`TextBlock` 的 `Height` 固定 `40`，不发射常规 `Width`，只发射设计稿 `constraints` 中的 `MinWidth` / `MaxWidth`；不得用字号、行高、文本 bbox 高度或文本 bbox 宽度替代。
 - 表格（`tableTemplates`）：命中后发射一个 `DataGrid` 根节点 + 由表头可见文本从左到右派生的列定义子节点；根节点几何取表格图层 bbox（原样直传，图层声明尺寸覆盖不了内容范围时记入审计交设计侧修正），列节点几何取 `columnTemplate` 固定值。行数据只登记不发射控件；表头文本承载列 `Value`（`valueSource=dsl.text`），其余行内文本走 `omit` 角色 `table-data-cell`。
 - 坐标必须来自对应 MasterGo bbox，并按项目统一内容区坐标规则计算；模板不能决定实例坐标。
 - 根级示例标题/工件示教标题按 `design-artifact-title` 规则处理，不得混入业务 XML；保留或剥离都要记录原因。

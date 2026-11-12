@@ -79,6 +79,8 @@ const dsl = {
   }],
   components: []
 };
+dsl.nodes[0].children[0].children[4].children[0].constraints = { minWidth: 40, maxWidth: 120 };
+dsl.nodes[0].children[0].children[0].constraints = { minWidth: 10, maxWidth: 20 };
 
 fs.writeFileSync(dslPath, JSON.stringify({
   schemaVersion: 'mastergo-dsl-capture/1',
@@ -119,10 +121,19 @@ assert.deepStrictEqual(
 assert.deepStrictEqual(mapping.pending, []);
 for (const textNode of mapping.nodes.filter(node => node.controlType === 'TextBlock')) {
   assert.strictEqual(textNode.expectedWidth, 'NaN', 'TextBlock 的 expectedWidth 必须固定为 NaN');
-  assert.strictEqual(textNode.widthSource, 'mtslg.textblock.fixed-nan', 'TextBlock 必须记录 widthSource');
+  assert.strictEqual(textNode.widthSource, 'mtslg.textblock.omit-width', 'TextBlock 必须记录省略常规 Width');
   const source = mapping.sourceNodes.find(item => item.ref === textNode.sourceRef);
   assert.ok(source && textNode.dslWidth === source.width, 'TextBlock 必须保留 dslWidth 作为 bbox 来源');
 }
+const constrainedText = mapping.nodes.find(node => node.sourceRef === innerRef + '/value-group/value');
+assert.deepStrictEqual(constrainedText.constraints, { minWidth: 40, maxWidth: 120 },
+  'TextBlock 必须把 DSL 尺寸约束带进映射');
+assert.deepStrictEqual(mapping.sourceNodes.find(node => node.ref === constrainedText.sourceRef).constraints,
+  { minWidth: 40, maxWidth: 120 }, 'sourceNodes 必须保留同一份尺寸约束');
+const nonTextConstrained = mapping.nodes.find(node => node.sourceRef === innerRef + '/plus5');
+assert.strictEqual(nonTextConstrained.controlType, 'IconButton');
+assert.strictEqual(nonTextConstrained.constraints, undefined,
+  '非 TextBlock 节点上的 constraints 不得进入映射输出节点');
 
 // ---- 右栏族：componentSet 命中、iconSize 机械取值 ----
 function rightSidebarDsl(rootName, properties, innerName, buttonType) {
@@ -462,7 +473,7 @@ assert.deepStrictEqual(
 );
 assert.strictEqual(axis.nodes.length, 8, '8 个方向键都必须发射为 IconButton');
 assert.ok(axis.nodes.every(node => node.controlType === 'IconButton' && node.attrs && node.attrs.Style === undefined),
-  '轴操作按钮使用默认 IconButton 且省略 Style');
+  '轴操作按钮在 mapping 中不登记专用 Style，最终 XML 必写字段补 Style=""');
 
 console.log('PASS MTSLG DSL-to-mapping text-slot regression test');
 console.log('PASS MTSLG DSL-to-mapping button-family regression test');
