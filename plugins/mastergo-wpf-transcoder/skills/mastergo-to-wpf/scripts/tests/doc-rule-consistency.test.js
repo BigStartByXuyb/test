@@ -1191,6 +1191,8 @@ console.log("PASS TextBlock Align 口径（映射表 textBlockAlign ↔ 生成�
     "文档格式示例不得把属性映射分隔冒号包进 Width→Width 代码片段");
   assert.match(modeDoc, /TextBlock 不发射常规 `Width`，merge 会删除旧 `Width`/,
     "merge 语义必须写明 TextBlock 的旧 Width 会被删除");
+  assert.match(modeDoc, /merge 会删除旧 `Width`、`MinHeight`、`MaxHeight`/,
+    "merge 语义必须写明 TextBlock 的旧 MinHeight/MaxHeight 也会被删除");
   assert.ok(!/Left\/Top\/Width\/Height 按映射更新/.test(modeDoc),
     "merge 语义不得再把 Width 无条件列为几何更新项");
   assert.ok(!/文本位置和尺寸也从各自节点 bbox 读取/.test(feishuMapping),

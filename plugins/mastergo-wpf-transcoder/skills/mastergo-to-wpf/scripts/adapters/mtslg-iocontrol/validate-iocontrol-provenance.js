@@ -338,9 +338,6 @@ function validate(xmlPath, manifestPath, options) {
       }
       // TextBlock：常规 Width 不发射；bbox 宽度只作为 dslWidth 来源保留。
       if (x.ControlType === 'TextBlock') {
-        if (x.Width !== undefined) {
-          errors.push('[' + n.xmlId + '] TextBlock 不得发射常规 Width');
-        }
         for (const attr of ['MinHeight', 'MaxHeight']) {
           if (x[attr] !== undefined) errors.push('[' + n.xmlId + '] TextBlock 不得发射 ' + attr);
         }
@@ -394,6 +391,7 @@ function validate(xmlPath, manifestPath, options) {
       if (n[field] === undefined) { errors.push('[' + n.xmlId + '] 缺少 ' + field); continue; }
       // 表格列定义已在上面按 columnTemplate 校验过几何（含「不写 Width」），这里不重复判。
       if (isTableColumn) continue;
+      // TextBlock 的常规 Width 只在这里校验：避免同一条规则出现第二个报错来源。
       if (attr === 'Width' && x.ControlType === 'TextBlock') {
         if (x.Width !== undefined) errors.push('[' + n.xmlId + '] TextBlock 不得发射常规 Width');
         continue;
