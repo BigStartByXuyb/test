@@ -92,7 +92,9 @@
       "NumberBox": "NumberBoxBaseStyle",
       "IntNumberBox": "IntNumberBoxBaseStyle",
       "DataGrid": "DataGridBaseStyle",
-      "Camera": "implicit"
+      "Camera": "implicit",
+      "RadioButton": "RadioButtonBaseStyle",
+      "ToggleButton": "implicit"
     },
     "byVariant": {
       "IconButton": {
@@ -103,7 +105,8 @@
         "加减快捷键-无标题": "ButtonIconStyle"
       },
       "GroupBox": {
-        "信息分组-模块化": "IOGroupBoxSecondary"
+        "信息分组-模块化": "IOGroupBoxSecondary",
+        "信息模块-手动控制弹层": "IOGroupBoxSecondary"
       }
     }
   },
@@ -276,7 +279,7 @@
       "evidence": [],
       "status": "manual-only"
     },
-    "Togglebutton": {
+    "ToggleButton": {
       "element": "ToggleButton",
       "ioVariant": "s:IOToggleButton",
       "styleKeys": [
