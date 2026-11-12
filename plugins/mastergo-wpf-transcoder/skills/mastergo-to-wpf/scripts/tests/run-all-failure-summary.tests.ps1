@@ -8,6 +8,9 @@ function Assert-True {
     if (-not $Condition) { throw "断言失败: $Message" }
 }
 
+# 本用例从 layout 进入，不联网；给 run-all 一个格式合法的桩 token，避免它去读本机配置。
+$env:MASTERGO_MCP_TOKEN = 'mg_' + ('0' * 32)
+
 try {
     $generated = Join-Path $root 'Generated'
     $runDir = Join-Path (Join-Path $generated 'runs') 'Demo'

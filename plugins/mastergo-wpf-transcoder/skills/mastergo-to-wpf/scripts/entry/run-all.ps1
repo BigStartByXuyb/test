@@ -281,15 +281,18 @@ function Get-ProjectTarget {
 
 function Get-MastergoToken {
     if ($env:MASTERGO_MCP_TOKEN) { return $env:MASTERGO_MCP_TOKEN }
-    # 配置路径不写死某台机器：优先 -ConfigPath，其次 CODEX_CONFIG，最后 ~/.codex/config.toml
+    # 配置路径不写死某台机器：优先 -ConfigPath，其次 CODEX_CONFIG，最后用户目录下的 config.toml。
+    $homeDir = if ($env:USERPROFILE) { $env:USERPROFILE } elseif ($env:HOME) { $env:HOME } else { '' }
     $configPath = if ($ConfigPath) { $ConfigPath }
         elseif ($env:CODEX_CONFIG) { $env:CODEX_CONFIG }
-        else { Join-Path $env:USERPROFILE '.codex\config.toml' }
-    if (Test-Path -LiteralPath $configPath) {
+        elseif ($homeDir) { Join-Path $homeDir '.codex/config.toml' }
+        else { '' }
+    if ($configPath -and (Test-Path -LiteralPath $configPath)) {
         $cfg = Get-Content -LiteralPath $configPath -Raw -Encoding UTF8
         if ($cfg -match '--token=(mg_[0-9a-fA-F]+)') { return $Matches[1] }
     }
-    throw "缺少 MasterGo token：设置环境变量 MASTERGO_MCP_TOKEN，或用 -ConfigPath / CODEX_CONFIG 指向含 mastergo 配置的 config.toml（当前尝试: $configPath；token 不会写入任何产物）"
+    $attempted = if ($configPath) { $configPath } else { '（未找到可用的 HOME 目录）' }
+    throw "缺少 MasterGo token：设置环境变量 MASTERGO_MCP_TOKEN，或用 -ConfigPath / CODEX_CONFIG 指向含 mastergo 配置的 config.toml（当前尝试: $attempted；token 不会写入任何产物）"
 }
 
 function Invoke-StepCommand {
