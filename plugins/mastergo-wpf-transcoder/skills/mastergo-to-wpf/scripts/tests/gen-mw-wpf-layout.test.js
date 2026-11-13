@@ -23,6 +23,7 @@ const os = require("os");
 const path = require("path");
 
 const { deriveLayout, readLayoutGroups } = require(path.join(__dirname, "..", "adapters", "mw-wpf", "gen-mw-wpf-layout.js"));
+const FAILURE_CODES = require(path.join(__dirname, "..", "lib", "failure-codes.json"));
 
 const TOKENS = { headerHeight: 85, bottomHeight: 180 };
 const ROUTE_MAP = path.join(__dirname, "..", "..", "references", "adapters", "mw-wpf", "mw-wpf-map.json");
@@ -455,11 +456,17 @@ function sizes(bands) {
   try {
     const write = function (doc) { fs.writeFileSync(tmp, JSON.stringify(doc), "utf8"); };
     write({ schemaVersion: "nope", groups: [] });
-    assert.throws(function () { readLayoutGroups(tmp); }, /schemaVersion/, "分组表 schema 版本不对 → 失败");
+    assert.throws(function () { readLayoutGroups(tmp); },
+      new RegExp("\\[" + FAILURE_CODES.layoutGroups.rejected + "\\].*schemaVersion"),
+      "分组表 schema 版本不对 → 失败并带稳定机器码");
     write({ schemaVersion: "mw-wpf-layout-groups/1", groups: [{ id: "g", kind: "diagonal", members: ["a", "b"] }] });
-    assert.throws(function () { readLayoutGroups(tmp); }, /kind/, "分组表的 kind 只能是 column / row");
+    assert.throws(function () { readLayoutGroups(tmp); },
+      new RegExp("\\[" + FAILURE_CODES.layoutGroups.rejected + "\\].*kind"),
+      "分组表的 kind 只能是 column / row，并带稳定机器码");
     write({ schemaVersion: "mw-wpf-layout-groups/1", groups: [{ id: "g", kind: "column", members: ["a"] }] });
-    assert.throws(function () { readLayoutGroups(tmp); }, /至少 2 个 ref/, "分组至少要有 2 个成员");
+    assert.throws(function () { readLayoutGroups(tmp); },
+      new RegExp("\\[" + FAILURE_CODES.layoutGroups.rejected + "\\].*至少 2 个 ref"),
+      "分组至少要有 2 个成员，并带稳定机器码");
   } finally {
     fs.unlinkSync(tmp);
   }

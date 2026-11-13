@@ -33,7 +33,7 @@ description: 将明确要求的 MasterGo 设计稿转换为 MTSLG IOContorl XML�
 
 1. **只认一次 `getDsl`**：用 `scripts/core/call-mastergo-mcp.js` 调 `getDsl(fileId, layerId, format=json)` 读当前图层完整 DSL，**响应只落盘**（`<runDir>/getDsl.json`）不进上下文；不得分段读取，不得用浏览器、截图或视觉猜测替代。MCP 不可调用或 `getDsl` 报错时**停止本次转换并报告原因**，不得换成其他设计数据来源继续。`extractSvg` 是 `getDsl` 成功后的独立图标步骤（`<runDir>/extractSvg.json`），不参与页面结构。
 2. **读图按路线分**：作业 B 不读图；作业 A 读图，但只用来判断 DSL 里没有真值的**空间关系与分组意图**，
-   结论必须落成**分组表**（`Generated/_inputs/<Target>.layout-groups.json`）再进 `layout`；**约定路径上有设计稿位图（`Generated/_inputs/<Target>.design.png`，`.jpg` / `.jpeg` 同口径，按设计稿原始尺寸导出）就必须先产出分组表**，
+   结论必须落成**分组表**（`Generated/_inputs/<Target>.layout-groups.json`）再进 `layout`；**约定路径上有页面位图（`Generated/_inputs/<Target>.design.png` / `.design.jpg` / `.design.jpeg`，按设计稿原始尺寸导出）就必须先产出分组表**，
    否则 `layout` 停下。读图只补关系、不增删控件；读图结论**不得覆盖或否决** DSL 机械真值
    （外观、图标含义与朝向、坐标、尺寸一律以 DSL 为准）。
    完整口径与分组表 schema 只在 `references/adapters/mw-wpf/mw-wpf-mode.md` 第 2 节。
@@ -98,7 +98,7 @@ pwsh -NoProfile -File <skill>\scripts\entry\run-all.ps1 -List -Format json -OutF
 | 图标命名表 | `Generated/_inputs/<Target>.icon-naming.json` | 候选下标 → 英文资源名（`…Geometry`）+ 中文注释（可选 `fromDsl`）；下标**只能**取候选清单的 `mustName`（= `discover` 判定的要登记项，多一个少一个都失败） |
 | 译文清单 | `Generated/_inputs/<Target>.lang-translations.json` | 中文 → 英文译文；脚本不做翻译、不调机翻服务 |
 | 术语表 | `Generated/_inputs/<Target>.lang-glossary.json` | 无英文语义或单字符文案的稳定标识符 |
-| 分组表 | `Generated/_inputs/<Target>.layout-groups.json` | **仅作业A**：看图后产出的分组意图（`kind` 只取 `column` / `row`，成员是 `members` 里的 DSL ref；`pageTarget` 写本次页面，写了就必须与本次页面一致）；有设计稿位图而缺它，`layout` 停下报告 |
+| 分组表 | `Generated/_inputs/<Target>.layout-groups.json` | **仅作业A**：看图后产出的分组意图（`kind` 只取 `column` / `row`，成员是 `members` 里的 DSL ref；`pageTarget` 写本次页面，写了就必须与本次页面一致）；有页面位图而缺它，`layout` 停下报告 |
 
 ## 硬门禁索引
 
